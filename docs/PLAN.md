@@ -23,7 +23,7 @@ Each item below is one GitHub issue and one PR, in order. Each milestone ends wi
 11. `feat(core)`: pure scoring engine (ruleset, points, replay, validate, time) with property tests
 12. `feat(core)`: verification state machine and season standings
 13. `feat(db)`: game schema and the transactional log-and-rescore write path
-14. `feat(web)`: chores admin, seed chores, and logging a completion on phone and kiosk
+14. `feat(web)`: chores admin, seed chores (SPEC §4.7), and logging a completion on phone and kiosk
 15. `feat(web)`: confirm, dispute and undo flows, and photo proof on Vercel Blob
 16. `feat(web)`: scoreboard, streak board, season standings, pot tracker and prize mode
 17. `feat(web)`: frequency tracking and weight suggestions with schedule and veto
@@ -37,7 +37,7 @@ Each item below is one GitHub issue and one PR, in order. Each milestone ends wi
 ## M4: AI command and MCP
 
 21. `feat(ai)`: Baumy command (typed): Claude tools generated from the registry, and the proposal review sheet
-22. `feat(ai)`: voice input through Groq Whisper, and Baumy's sprite states
+22. `feat(ai)`: voice input through Groq Whisper, and Baumy's sprite states (from `design/baumy-reference.png`)
 23. `feat(mcp)`: MCP OAuth authorization server and the connections page
 24. `feat(mcp)`: MCP server with read and write tools from the registry
 

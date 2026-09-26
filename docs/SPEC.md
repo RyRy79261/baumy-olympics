@@ -1,6 +1,6 @@
 # Baumy Olympics: product and technical spec
 
-Status: draft v1, 2026-09-27. Owner: Ryan. Decisions are recorded in `docs/decisions/`. Questions that are still open are listed at the end.
+Status: draft v1, 2026-09-27. Owner: Ryan. Decisions are recorded in `docs/decisions/`. Owner decisions and the questions still open are listed at the end (section 12).
 
 Reference repos (read-only, copy from these):
 
@@ -53,7 +53,7 @@ Section 4 has the full rules.
 
 ### 3.3 Shared calendar
 
-This is the house's existing Google Calendar, shared with a service account that has "Make changes to events" access. You can list events for a day, week or month, create events (all-day or timed), edit them and delete them. The house's calendar data lives only in Google, and we store no local copy.
+This is a house Google Calendar (which one is still open, section 12), shared with a **new service account created just for this house** (not camp-404's) that has "Make changes to events" access. You can list events for a day, week or month, create events (all-day or timed), edit them and delete them. The house's calendar data lives only in Google, and we store no local copy.
 
 ### 3.4 Shopping list
 
@@ -65,7 +65,7 @@ Short household notes, such as "plumber comes Tue" or the wifi guest code (not s
 
 ### 3.6 Baumy the cat and the AI command
 
-- **Sprite.** Baumy is a 16-bit sprite with these states: `idle`, `listening`, `thinking`, `talking`, `happy` (points awarded), `sad` (error), and `sleeping` (night mode).
+- **Sprite.** Baumy is a 16-bit sprite (drawn from `design/baumy-reference.png`, section 7) with these states: `idle`, `listening`, `thinking`, `talking`, `happy` (points awarded), `sad` (error), and `sleeping` (night mode).
 - **Command sheet.** You type or hold to speak. Speech is transcribed by Groq `whisper-large-v3-turbo`, as in intake-tracker. The text goes to `POST /api/ai/command`, and Claude receives the registry tools (section 6.3).
 - **Read tools** run inside the loop and are answered in Baumy's speech bubble, for example "who's winning?" or "what's on Saturday?".
 - **Write tools** are never run inside the loop. They come back as **proposals** in a review list, copied from intake-tracker's voice-panel pattern. Each row can be edited and approved or rejected. There is "Approve all", which skips rows marked `risk: "destructive"`. When saving, each approved row is sent to `runAction` with its proposal id as the idempotency key.
@@ -84,13 +84,12 @@ Everything in this section is pure code in `packages/core/src/scoring/`:
 
 | Term | Rule |
 |---|---|
-| **Streak** | Kept **per chore**. A chore has one *holder* and a *length*: the number of consecutive counted completions by the same member, in `occurred_at` order. |
+| **Streak** | Kept **per chore**. A chore has one *holder* and a *length*: the number of consecutive counted completions by the same member, in `occurred_at` order. A streak ends only when another member completes the chore, or at the end of the season. Time alone never ends it (there is no lapse). |
 | **Break** | Someone other than the holder completes the chore. The breaker gets a break bonus that scales with the broken length, and starts at length 1. The previous holder loses nothing: scores only ever go up. |
-| **Lapse** | If the gap since the previous completion is greater than `lapse_minutes`, the streak ends quietly, with no break bonus. The default is `max(3 × natural interval, 3 days)`. |
 | **Cooldown** | A completion of the same chore within `cooldown_minutes` of the last *live* one, by anyone, is **rejected** and not stored. The default is `clamp(0.5 × interval, 1h, 7d)`. |
 | **Counted** (for scoring) | Status is `confirmed`, `finalized`, or `pending` with `confirm_mode=optimistic`. Partner-mode `pending`, `disputed` and `voided` are skipped. Optimistic pending ones show as provisional (dimmed). The counted set therefore only changes on a write, never because time passed. |
 | **Live** (for the validator) | Any completion that is not `voided` at `now` (using `effectiveStatus(now)`), including `disputed` and unexpired partner-mode `pending`. |
-| **Season** | A calendar year in Europe/Berlin time, stored as UTC timestamptz. Streaks reset at the start of each season. |
+| **Season** | A calendar year in Europe/Berlin time, stored as UTC timestamptz. Streaks reset at the start of each season (1 Jan), and at no other time. |
 | **Verified** | Someone other than `done_by` logged the completion or confirmed it. |
 
 ### 4.2 Formula
@@ -98,14 +97,13 @@ Everything in this section is pure code in `packages/core/src/scoring/`:
 ```ts
 export const RULESET_V1 = {
   version: 1,
-  streakStepPct: 25, streakCapPct: 200,        // +25% per consecutive completion, cap at n=5 (open question 12)
+  streakStepPct: 25,                           // +25% per consecutive completion, no cap
   breakPctPerLen: 20, breakLenCap: 10,         // 20% of base per broken length, cap 200%
   minBrokenStreak: 1,
   undoWindowMin: 10, challengeWindowH: 24, partnerConfirmExpiryH: 72, maxBackdateH: 24,
-  defaultLapseFactor: 3, minLapseMin: 3 * 1440,
 } as const;
 
-multiplierPct(n) = min(100 + 25·(n−1), 200)
+multiplierPct(n) = 100 + 25·(n−1)                           // uncapped
 pctOf(base, pct)  = floor((base·pct + 50) / 100)            // integer, round half up
 streakTotal       = pctOf(base, multiplierPct(n))
 breakPts          = brokenLen ≥ minBrokenStreak ? pctOf(base, 20·min(brokenLen, 10)) : 0
@@ -118,7 +116,6 @@ total             = streakTotal + breakPts
 2. Start with `holder = null` and `len = 0`.
 3. For each completion:
    - Look up the rule version in effect at `occurred_at`.
-   - If the completion is lapsed, reset the streak.
    - If the holder did it again: `len++`, and there is no break.
    - Otherwise: `broken = len` if there was a holder, `holder = doneBy`, `len = 1`.
    - Emit the score.
@@ -172,43 +169,59 @@ The natural interval is measured over finalized or confirmed, never-disputed com
 raw = 10 × (effort_factor_pct / 100) × sqrt(I_days)      // daily=10, 4-day=20, weekly≈26, monthly≈55
 suggest only if |raw − current| ≥ max(2, 10% current)      // dead-band
 suggested = clamp(round(clamp(raw, 0.75·cur, 1.25·cur)), 5, 60)
-cooldown = clamp(0.5·I, 60min, 7d); lapse = max(3·I, 3d)
+cooldown = clamp(0.5·I, 60min, 7d)
 ```
 
 - Suggestions are recomputed weekly (on the first run whose Berlin weekday is Monday, computed from `now` by `time.ts`).
 - An admin can **Schedule**, **Edit & schedule** or **Dismiss** a suggestion. A scheduled one applies at the next Monday 00:00 Berlin, at least 48h ahead, unless another member vetoes it in the meantime.
 - Applying a suggestion inserts a new `chore_rule_versions` row, so changes are never retroactive.
 - Each chore can have at most one applied change per 28 days.
-- Weights, adjustments and prize mode can only be changed in the **UI** (open question 11). The AI command, MCP and Telegram cannot change them.
+- Weights, adjustments and prize mode can only be changed in the **UI**. The AI command, MCP and Telegram cannot change them.
 
 ### 4.5 Year-end prize
 
-- The mode is stored in `seasons.prize_mode`. An admin sets it with `set_prize_mode` (UI only) for the current season before its first completion, or for next year's season (created on demand). After that it is locked:
-  - `points` (default): the season total of `total_pts`, plus approved adjustments;
-  - `heaviest_streak`: the best single run, measured as the sum of `base_pts` across the run;
-  - `longest_streak`: the longest run length.
+- **v1 uses `points` only, winner takes all:** the season total of `total_pts`, plus approved adjustments. The winner takes the whole pot.
+- The mode is stored in `seasons.prize_mode`. The enum keeps `heaviest_streak` (best single run, as the sum of `base_pts`) and `longest_streak` (longest run length) for later, but they are not implemented in v1, and `set_prize_mode` (UI only) accepts only `points`. The mode locks at the season's first completion.
 - Ties are broken by season points, then by the number of verified completions, then by who reached the value first.
 - At Dec 31 24:00 Berlin the season becomes `closing`. It becomes `closed` once every challenge window has passed (up to 72h). The winner is written at that point.
 - Monthly pot contributions are logged in `pot_contributions`.
 
 ### 4.6 Worked examples (these become test fixtures)
 
-Chores: Trash (base 20, cooldown 48h, lapse 12d), Dishes (10, 12h, 3d), Bathroom (26, 3.5d, 21d).
+Chores: Trash (base 20, cooldown 48h), Dishes (10, 12h), Bathroom (26, 3.5d), as seeded (section 4.7).
 
 | # | Scenario | Result |
 |---|---|---|
-| E1 | Ryan takes the trash out 6 times in a row | 20, 25, 30, 35, 40, 40. The first four total 110; all six total 190. |
+| E1 | Ryan takes the trash out 6 times in a row | 20, 25, 30, 35, 40, 45 (no cap). The first four total 110; all six total 195. |
 | E2 | The partner breaks Ryan's trash streak of k | Totals: k=1 → 24; k=4 → 36; k=5 → 40; k≥10 → 60. The partner's streak is now 1. |
-| E3 | Trash in strict alternation R,P,R,P… (8 completions) | 20 + 7×24 = 188, split 92/96. Doing all 8 alone would give 270. |
+| E3 | Trash in strict alternation R,P,R,P… (8 completions) | 20 + 7×24 = 188, split 92/96. Doing all 8 alone would give 20 + 25 + … + 55 = 300. |
 | E4 | Dishes: n=2, then breaking a 3-streak | 12.5 rounds to **13**; the break gives 10 + 6 = **16**. |
 | E5 | Trash Mon 08:00, then another attempt Mon 20:00, or the partner on Tue 09:00 | Both attempts get `COOLDOWN`, with retryAt Wed 08:00. |
-| E6 | Dishes 4-streak, last done Mon 20:00, next done Fri 21:00 | The streak lapsed. The next completion scores 10, with no break bonus. |
-| E7 | Bathroom at current 35, intervals [6,7,7,8,5,9,7,14,6,7,7,8] | I=7, raw 26.46, suggestion **26**, cooldown 3.5d, lapse 21d. |
+| E6 | Dishes 4-streak, last done Mon 20:00, next done by the same person Fri 21:00 (4 days later) | No lapse: the streak continues to n=5 and scores `pctOf(10, 200)` = **20**. |
+| E7 | Bathroom at current 35, intervals [6,7,7,8,5,9,7,14,6,7,7,8] | I=7, raw 26.46, suggestion **26**, cooldown 3.5d. |
 | E8 | Trash at current 15, I=4 | raw 20, clamped to 18.75, suggestion **19**. The next cycle's difference of 1 is inside the dead-band, so there is no change. |
 | E9 | A disputed Bathroom claim, then a photo, then the dispute is withdrawn | Excluded while disputed. It returns to `pending`, finalizes at `max(logged_at + 24h, withdraw + 1h)`, and the chore is re-scored. |
 | E11 | Ryan logs Trash Mon 08:00; the partner disputes it and tries Trash at 10:00 | `COOLDOWN` (a disputed row is live). |
 | E12 | Dishes at 23:50 Dec 31, again at 00:05 Jan 1 | `COOLDOWN` across the season boundary; the Jan streak still starts at 1. |
-| E10 | Ryan has 3020 points and a best run of 9×20=180; the partner has 2850 and 21×10=210 | `points`: Ryan wins. `heaviest_streak` and `longest_streak`: the partner wins. |
+| E10 | Ryan has 3020 points and a best run of 9×20=180; the partner has 2850 and 21×10=210 | `points` (v1): Ryan wins the whole pot. Run length and weight do not matter. |
+
+### 4.7 Seed chores
+
+Starting values follow the weight formula with the expected interval `I` and effort 100%: `base ≈ 10·sqrt(I_days)`, `cooldown = clamp(0.5·I, 1h, 7d)`. They are seeded as `chore_rule_versions` with `source = seed`, and frequency suggestions take over once there is data.
+
+| Chore | Expected interval | Base | Cooldown |
+|---|---|---|---|
+| Trash | 4d | 20 | 48h |
+| Recycling | 7d | 26 | 3.5d |
+| Dishes | 1d | 10 | 12h |
+| Dishwasher (unload) | 2d | 14 | 24h |
+| Bathroom | 7d | 26 | 3.5d |
+| Vacuum | 7d | 26 | 3.5d |
+| Mop | 14d | 37 | 7d |
+| Laundry | 3d | 17 | 36h |
+| Plants | 4d | 20 | 48h |
+| Fridge clean-out | 30d | 55 | 7d |
+| Keller | 30d | 55 | 7d |
 
 ---
 
@@ -234,13 +247,13 @@ The schema is one hand-written file and is the only source of truth. Migrations 
 | Table | Columns |
 |---|---|
 | `chores` | `name`, `sprite`, `proof_mode` (`none`, `optional`, `required`), `confirm_mode` (`optimistic`, `partner`), `effort_factor_pct` (50–300), `archived_at` |
-| `chore_rule_versions` | `chore_id`, `effective_from`, `base_points` (1–200), `cooldown_minutes`, `lapse_minutes`, `source` (`seed`, `manual`, `suggestion`), `suggestion_id`, `created_by`. Unique on `(chore_id, effective_from)`. |
+| `chore_rule_versions` | `chore_id`, `effective_from`, `base_points` (1–200), `cooldown_minutes`, `source` (`seed`, `manual`, `suggestion`), `suggestion_id`, `created_by`. Unique on `(chore_id, effective_from)`. |
 | `seasons` | `year`, `starts_at`, `ends_at`, `prize_mode`, `status` (`active`, `closing`, `closed`), `winner_member_id`, `finalized_at`. Unique on `(household_id, year)`. |
 | `completions` | `chore_id`, `season_id`, `done_by`, `logged_by`, `occurred_at`, `logged_at`, `source` (the `Surface` enum: `ui`, `kiosk`, `ai`, `mcp`, `brain`), `status`, `verified_by`, `verified_at`, `finalizes_at`, `photo_pathname`, `note`, `void_reason`, `client_request_id`. Unique on `(household_id, client_request_id)`. Index on `(chore_id, season_id, occurred_at)`. |
 | `completion_scores` | `completion_id` PK, `rule_version_id`, `ruleset_version`, `streak_len`, `multiplier_pct`, `base_pts`, `streak_pts`, `broken_member_id`, `broken_len`, `break_pts`, `total_pts`, `computed_at`. This is output of the replay and is always rebuildable. |
 | `disputes` | `completion_id`, `raised_by`, `reason`, `resolution`, `resolved_at` |
 | `point_adjustments` | `season_id`, `member_id`, `points`, `reason`, `created_by`, `approved_by`. Check `approved_by <> created_by`. |
-| `weight_suggestions` | As in the game design: the window, `sample_intervals`, `median_interval_minutes`, `raw_points`, `current_points`, `suggested_points`, the suggested cooldown and lapse, `status`, `applies_at`, `vetoed_by` |
+| `weight_suggestions` | As in the game design: the window, `sample_intervals`, `median_interval_minutes`, `raw_points`, `current_points`, `suggested_points`, the suggested cooldown, `status`, `applies_at`, `vetoed_by` |
 | `pot_contributions` | `season_id`, `month` (date), `amount_cents` (> 0), `contributed_by`, `note` |
 
 **Hub**
@@ -400,7 +413,7 @@ export interface ActionDef<I extends z.ZodType, O> {
 | `list_notes`, `create_note`, `update_note`, `pin_note` | read and write | all | |
 | `delete_note` | write, destructive | ui, kiosk, ai | |
 | `link_telegram` | write | brain | `requires: "service"`; redeems a one-time link code a member created in the UI, and sets `members.telegram_user_id` |
-| `manage_chore`, `schedule_weight`, `dismiss_weight`, `veto_weight`, `adjust_points`, `add_pot_contribution`, `set_prize_mode`, `mint_invite`, `manage_members`, `pair_kiosk`, `revoke_kiosk`, `resolve_dispute` | write | **ui only** | admin actions (open question 11) |
+| `manage_chore`, `schedule_weight`, `dismiss_weight`, `veto_weight`, `adjust_points`, `add_pot_contribution`, `set_prize_mode`, `mint_invite`, `manage_members`, `pair_kiosk`, `revoke_kiosk`, `resolve_dispute` | write | **ui only** | admin actions: UI only, never the AI command, MCP or brain |
 
 ### 6.4 Google Calendar
 
@@ -415,6 +428,7 @@ export interface ActionDef<I extends z.ZodType, O> {
   - Writes use `PATCH` for updates.
   - Private and confidential events are hidden on the kiosk.
 - **Consistency:** calendar writes are `transactional: false` actions. As in camp-404 `packages/db/src/calendar-events.ts`, call Google with no transaction open, then write the audit row. If the audit write fails, the `undo` callback deletes the event again.
+- **Service account:** a new one for this house only, not camp-404's. Share the chosen calendar with it.
 - **Env:** `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_CLIENT_EMAIL`, `GOOGLE_CALENDAR_PRIVATE_KEY`.
 
 ### 6.5 Vercel Blob
@@ -484,6 +498,7 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
   - PNG sprite sheets drawn at 16×16 or 32×32 and scaled by an integer amount, with `image-rendering: pixelated`.
   - Animated with CSS `steps()` in a `<Sprite sheet frames fps />` component.
   - Baumy has 7 states (section 3.6). Each chore has an icon, and each member has an avatar.
+  - **Source art:** AI-generated pixel art based on the reference picture `design/baumy-reference.png` (a black fluffy cat with heterochromia, one green eye and one blue-violet eye, a pastel party hat with stars, purple and teal fairy lights and trinkets around the neck, in a cosy cluttered maker den), cleaned up by hand and approved by the owner before it ships.
   - Honour `prefers-reduced-motion`, using camp-404's global kill switch.
 - **Juice:** a "+25" floating score and a streak flame counter. Breaking a streak shows a "STREAK BROKEN" banner with the broken length.
 - **Base:** components start from shadcn/ui (Radix) in `packages/ui` with a restyled cva, as in camp-404 `packages/ui/components.json`.
@@ -546,20 +561,27 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
 - Offline-first sync (unlike intake-tracker). The server is authoritative.
 - Websockets or realtime push. Recipes, meal planning and timers are also out.
 - Passkeys and 2FA, which are deferred. Better Auth plugins can add them later.
-- Letting the AI change weights, adjustments or the prize mode (pending open question 11).
+- Admin actions (chores, weights, adjustments, pot, prize mode, members, kiosk pairing) through the AI command, MCP or brain. They are UI only.
+- Prize modes other than `points`.
 - The `baumy-bot` ROS2 robot. A future robot could call the same MCP or action API.
 
-## 12. Open questions for the owner (the defaults are in use until answered)
+## 12. Owner decisions and open questions
 
-1. **Prize mode.** Default: `points`, winner takes all. The alternatives are `heaviest_streak`, literal `longest_streak`, or splitting the pot by each person's share of points.
-2. **Breaking a 1-streak.** Default: it pays 20% of base, because you said "breaking a 5-streak > breaking a 1-streak". The alternative is `minBrokenStreak = 2`.
-3. **Confirmation.** Default: optimistic, with a 24h dispute window. The alternative is that the partner must confirm every chore.
-4. **Resets.** Default: a streak lapses after 3× the chore's natural interval, and everything resets on Jan 1.
-5. **Weight changes.** Default: one person schedules the change and the other has 48h to veto it, plus a manual effort factor. The alternative is that both must approve.
-6. **Starting chores and base points.** Which chores, and what should they be worth before there is enough data to measure frequency?
-7. **Speech input.** Default: Groq Whisper (needs `GROQ_API_KEY`). The alternative is the browser's Web Speech API, which costs nothing but is less accurate on iPad.
-8. **Sprites.** Who makes Baumy and the chore icons: commissioned, drawn in Aseprite, or AI-generated and cleaned up?
-9. **Domain.** The domain for the app and for MCP (`MCP_PUBLIC_URL`, and later the passkey rpID).
-10. **Calendar.** Which Google Calendar, and should the service account be the camp-404 one or a new one?
-11. **Admin actions through Baumy.** Your brief says everything in the UI can be done through the AI button. Default: admin actions (chores, weights, adjustments, pot, members, kiosk pairing, prize mode) stay UI-only. The alternative is exposing them to the `ai` surface as proposals that need admin approval, never to MCP or brain.
-12. **Streak cap.** Default: the multiplier stops growing at 200% (5 in a row). The alternative is a higher cap or none.
+Decided 2026-09-27:
+
+1. **Prize:** `points`, winner takes all. It is the only v1 mode.
+2. **Breaking a 1-streak** pays a bonus (`minBrokenStreak = 1`).
+3. **Confirmation:** optimistic, with a 24h dispute window.
+4. **Resets:** streaks reset on 1 Jan only. There is no lapse; a streak ends only when another member does the chore.
+5. **Weight changes:** one member schedules, the other has 48h to veto. The manual effort factor stays.
+6. **Starting chores:** the seed list and values in section 4.7.
+7. **Speech input:** Groq Whisper (`GROQ_API_KEY`).
+8. **Sprites:** AI-generated pixel art from `design/baumy-reference.png`, cleaned up and approved by the owner (section 7).
+9. **Calendar service account:** a new one just for this house, not camp-404's.
+10. **Admin actions** (chores, weights, adjustments, pot, prize mode, members, kiosk pairing) are UI only, never exposed to the AI command, MCP or brain.
+11. **No streak cap:** `multiplierPct = 100 + 25·(n−1)` forever. The break bonus cap (`breakLenCap = 10`) stays.
+
+Still open:
+
+- **Domain** for the app and for MCP (`MCP_PUBLIC_URL`, and later the passkey rpID).
+- **Which Google Calendar** to share with the service account.
