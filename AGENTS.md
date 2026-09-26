@@ -101,7 +101,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 
 - Measure before you claim, and attribute a failure before you blame something for it.
 - If you change behaviour, fix the doc in the same PR, or mark the doc `[CORRECTION yyyy-mm-dd]` or `[UNRESOLVED yyyy-mm-dd]`.
-- Owner rulings go into `docs/decisions/` or SPEC's open questions, dated.
+- Owner rulings go into `docs/decisions/` or SPEC §12 (decisions and open questions), dated.
 
 ## Reference repos (copy patterns, cite the path in the PR)
 
