@@ -16,14 +16,14 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `pnpm i` | Install dependencies. Uses pnpm 10 (`packageManager`) and Node 22 or later. |
-| `pnpm dev` | Start the web app on :3000. |
-| `pnpm db:local:up`, then `pnpm db:local:migrate` | Start Docker Postgres and the Neon proxies, then migrate. |
-| `pnpm --filter @baumy/db db:generate` | Generate a migration after editing `schema.ts`. |
-| `pnpm turbo run format:check lint typecheck test build` | **The gate.** Run it before every push. |
-| `E2E_SERVE=build ./scripts/e2e-local.sh [specs/<area>]` | Run Playwright against Docker Postgres. |
+| Command                                                 | What it does                                                                |
+| ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `pnpm i`                                                | Install dependencies. Uses pnpm 10 (`packageManager`) and Node 22 or later. |
+| `pnpm dev`                                              | Start the web app on :3000.                                                 |
+| `pnpm db:local:up`, then `pnpm db:local:migrate`        | Start Docker Postgres and the Neon proxies, then migrate.                   |
+| `pnpm --filter @baumy/db db:generate`                   | Generate a migration after editing `schema.ts`.                             |
+| `pnpm turbo run format:check lint typecheck test build` | **The gate.** Run it before every push.                                     |
+| `E2E_SERVE=build ./scripts/e2e-local.sh [specs/<area>]` | Run Playwright against Docker Postgres.                                     |
 
 ## Git and PRs
 
@@ -55,7 +55,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 ## Database rules
 
 - `packages/db/src/schema.ts` is the only source of truth.
-- Migrations are **generated only, append-only, and never edited or renamed**. If your migration collides with another after a rebase, delete *your* migration and regenerate it.
+- Migrations are **generated only, append-only, and never edited or renamed**. If your migration collides with another after a rebase, delete _your_ migration and regenerate it.
 - Data fixes are custom migrations (`db:generate --custom --name x`). They must be idempotent and tested on PGlite.
 - CI fails if `drizzle-kit generate` produces a diff.
 - **Pick the right driver:** `createHttpDb()` has no transactions, so use it for reads only. Use `withTransaction()` (the pooled driver) for any multi-statement write.

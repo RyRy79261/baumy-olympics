@@ -6,7 +6,7 @@
 
 The owner's requirement is that everything a user can do in the UI can also be done by the Baumy command button (Claude), by chatbots over MCP and by the Telegram bot. intake-tracker only gets partway there:
 
-- Its voice path shares the *client-side* hooks with the UI.
+- Its voice path shares the _client-side_ hooks with the UI.
 - Its MCP server is read-only.
 
 The reason is that its data is offline-first in Dexie. Olympics is server-authoritative, so it can go all the way.

@@ -18,13 +18,13 @@ The kitchen iPad is the house's shared screen. It shows what's on today, what ne
 
 ## 2. Users and devices
 
-| Actor | Device | Identity |
-|---|---|---|
-| Housemate (2 now, allow up to 6) | Their own phone (PWA) or laptop | Better Auth session (cookie), or a bearer token later on native |
-| Kitchen kiosk | iPad in landscape, always on, home-screen PWA | A paired **kiosk device** token, not a person. The actor is chosen by tapping an avatar. Attesting (confirming, disputing or vouching for a completion) needs that member's PIN. Admin actions and personal settings need a real session, never the kiosk. |
-| Admin | Any member with `role=admin` | Same as a housemate |
-| Baumy (Telegram) | baumy-brain server | A service token, with the actor given as a Telegram user id and mapped to a member |
-| Chatbots (claude.ai etc.) | MCP client | OAuth 2.1 access token tied to a member |
+| Actor                            | Device                                        | Identity                                                                                                                                                                                                                                                   |
+| -------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Housemate (2 now, allow up to 6) | Their own phone (PWA) or laptop               | Better Auth session (cookie), or a bearer token later on native                                                                                                                                                                                            |
+| Kitchen kiosk                    | iPad in landscape, always on, home-screen PWA | A paired **kiosk device** token, not a person. The actor is chosen by tapping an avatar. Attesting (confirming, disputing or vouching for a completion) needs that member's PIN. Admin actions and personal settings need a real session, never the kiosk. |
+| Admin                            | Any member with `role=admin`                  | Same as a housemate                                                                                                                                                                                                                                        |
+| Baumy (Telegram)                 | baumy-brain server                            | A service token, with the actor given as a Telegram user id and mapped to a member                                                                                                                                                                         |
+| Chatbots (claude.ai etc.)        | MCP client                                    | OAuth 2.1 access token tied to a member                                                                                                                                                                                                                    |
 
 ## 3. Features
 
@@ -82,15 +82,15 @@ Everything in this section is pure code in `packages/core/src/scoring/`:
 
 ### 4.1 Definitions
 
-| Term | Rule |
-|---|---|
-| **Streak** | Kept **per chore**. A chore has one *holder* and a *length*: the number of consecutive counted completions by the same member, in `occurred_at` order. A streak ends only when another member completes the chore, or at the end of the season. Time alone never ends it (there is no lapse). |
-| **Break** | Someone other than the holder completes the chore. The breaker gets a break bonus that scales with the broken length, and starts at length 1. The previous holder loses nothing: scores only ever go up. |
-| **Cooldown** | A completion of the same chore within `cooldown_minutes` of the last *live* one, by anyone, is **rejected** and not stored. The default is `clamp(0.5 × interval, 1h, 7d)`. |
-| **Counted** (for scoring) | Status is `confirmed`, `finalized`, or `pending` with `confirm_mode=optimistic`. Partner-mode `pending`, `disputed` and `voided` are skipped. Optimistic pending ones show as provisional (dimmed). The counted set therefore only changes on a write, never because time passed. |
-| **Live** (for the validator) | Any completion that is not `voided` at `now` (using `effectiveStatus(now)`), including `disputed` and unexpired partner-mode `pending`. |
-| **Season** | A calendar year in Europe/Berlin time, stored as UTC timestamptz. Streaks reset at the start of each season (1 Jan), and at no other time. |
-| **Verified** | Someone other than `done_by` logged the completion or confirmed it. |
+| Term                         | Rule                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Streak**                   | Kept **per chore**. A chore has one _holder_ and a _length_: the number of consecutive counted completions by the same member, in `occurred_at` order. A streak ends only when another member completes the chore, or at the end of the season. Time alone never ends it (there is no lapse). |
+| **Break**                    | Someone other than the holder completes the chore. The breaker gets a break bonus that scales with the broken length, and starts at length 1. The previous holder loses nothing: scores only ever go up.                                                                                      |
+| **Cooldown**                 | A completion of the same chore within `cooldown_minutes` of the last _live_ one, by anyone, is **rejected** and not stored. The default is `clamp(0.5 × interval, 1h, 7d)`.                                                                                                                   |
+| **Counted** (for scoring)    | Status is `confirmed`, `finalized`, or `pending` with `confirm_mode=optimistic`. Partner-mode `pending`, `disputed` and `voided` are skipped. Optimistic pending ones show as provisional (dimmed). The counted set therefore only changes on a write, never because time passed.             |
+| **Live** (for the validator) | Any completion that is not `voided` at `now` (using `effectiveStatus(now)`), including `disputed` and unexpired partner-mode `pending`.                                                                                                                                                       |
+| **Season**                   | A calendar year in Europe/Berlin time, stored as UTC timestamptz. Streaks reset at the start of each season (1 Jan), and at no other time.                                                                                                                                                    |
+| **Verified**                 | Someone other than `done_by` logged the completion or confirmed it.                                                                                                                                                                                                                           |
 
 ### 4.2 Formula
 
@@ -122,7 +122,7 @@ total             = streakTotal + breakPts
 
 The results are written to `completion_scores`, and the whole (chore, season) is rebuilt on every write to that chore.
 
-**Write validator** (`validateNewCompletion`) checks against *live* completions (so a dispute cannot open a cooldown gap that reinstatement later closes). For `COOLDOWN` only, it also loads the previous live completion across the season boundary. It returns one of these errors:
+**Write validator** (`validateNewCompletion`) checks against _live_ completions (so a dispute cannot open a cooldown gap that reinstatement later closes). For `COOLDOWN` only, it also loads the previous live completion across the season boundary. It returns one of these errors:
 
 - `COOLDOWN` (with `retryAt`; landing exactly on the cooldown boundary is allowed)
 - `FUTURE` (more than 2 minutes after now)
@@ -142,17 +142,17 @@ The results are written to `completion_scores`, and the whole (chore, season) is
 
 **Transitions** (pure, in `verification.ts`; every one is a compare-and-set write except the time-derived ones marked ⏱):
 
-| From | Event | To |
-|---|---|---|
-| `pending` | another member confirms | `confirmed` |
-| `pending` (optimistic) | ⏱ `finalizes_at <= now` | `finalized` |
-| `pending` (partner) | ⏱ 72h without confirmation | `voided` (`unconfirmed`) |
-| `pending` | another member disputes inside the window | `disputed` |
-| `disputed` | disputer withdraws | `pending`; `finalizes_at = max(original, now + 1h)` |
-| `disputed` | doer concedes | `voided` (`conceded`) |
-| `disputed`, no photo | ⏱ challenge window ends | `voided` (`disputed`) |
-| `disputed`, photo attached before the window ends | ⏱ window ends | stays `disputed` until withdraw, concede or an admin ruling (`resolve_dispute`) |
-| `pending`/`disputed` | logger undoes within 10 min | `voided` (`undone`) |
+| From                                              | Event                                     | To                                                                              |
+| ------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------- |
+| `pending`                                         | another member confirms                   | `confirmed`                                                                     |
+| `pending` (optimistic)                            | ⏱ `finalizes_at <= now`                   | `finalized`                                                                     |
+| `pending` (partner)                               | ⏱ 72h without confirmation                | `voided` (`unconfirmed`)                                                        |
+| `pending`                                         | another member disputes inside the window | `disputed`                                                                      |
+| `disputed`                                        | disputer withdraws                        | `pending`; `finalizes_at = max(original, now + 1h)`                             |
+| `disputed`                                        | doer concedes                             | `voided` (`conceded`)                                                           |
+| `disputed`, no photo                              | ⏱ challenge window ends                   | `voided` (`disputed`)                                                           |
+| `disputed`, photo attached before the window ends | ⏱ window ends                             | stays `disputed` until withdraw, concede or an admin ruling (`resolve_dispute`) |
+| `pending`/`disputed`                              | logger undoes within 10 min               | `voided` (`undone`)                                                             |
 
 A photo attached after the challenge window has no effect on the timeout. Time-derived transitions are **computed when data is read** with `effectiveStatus(now)`. None of them changes the counted set (they move rows between non-counted states, or from optimistic pending to finalized), so stored scores never go stale. The daily cron only persists them.
 
@@ -190,38 +190,38 @@ cooldown = clamp(0.5·I, 60min, 7d)
 
 Chores: Trash (base 20, cooldown 48h), Dishes (10, 12h), Bathroom (26, 3.5d), as seeded (section 4.7).
 
-| # | Scenario | Result |
-|---|---|---|
-| E1 | Ryan takes the trash out 6 times in a row | 20, 25, 30, 35, 40, 45 (no cap). The first four total 110; all six total 195. |
-| E2 | The partner breaks Ryan's trash streak of k | Totals: k=1 → 24; k=4 → 36; k=5 → 40; k≥10 → 60. The partner's streak is now 1. |
-| E3 | Trash in strict alternation R,P,R,P… (8 completions) | 20 + 7×24 = 188, split 92/96. Doing all 8 alone would give 20 + 25 + … + 55 = 300. |
-| E4 | Dishes: n=2, then breaking a 3-streak | 12.5 rounds to **13**; the break gives 10 + 6 = **16**. |
-| E5 | Trash Mon 08:00, then another attempt Mon 20:00, or the partner on Tue 09:00 | Both attempts get `COOLDOWN`, with retryAt Wed 08:00. |
-| E6 | Dishes 4-streak, last done Mon 20:00, next done by the same person Fri 21:00 (4 days later) | No lapse: the streak continues to n=5 and scores `pctOf(10, 200)` = **20**. |
-| E7 | Bathroom at current 35, intervals [6,7,7,8,5,9,7,14,6,7,7,8] | I=7, raw 26.46, suggestion **26**, cooldown 3.5d. |
-| E8 | Trash at current 15, I=4 | raw 20, clamped to 18.75, suggestion **19**. The next cycle's difference of 1 is inside the dead-band, so there is no change. |
-| E9 | A disputed Bathroom claim, then a photo, then the dispute is withdrawn | Excluded while disputed. It returns to `pending`, finalizes at `max(logged_at + 24h, withdraw + 1h)`, and the chore is re-scored. |
-| E11 | Ryan logs Trash Mon 08:00; the partner disputes it and tries Trash at 10:00 | `COOLDOWN` (a disputed row is live). |
-| E12 | Dishes at 23:50 Dec 31, again at 00:05 Jan 1 | `COOLDOWN` across the season boundary; the Jan streak still starts at 1. |
-| E10 | Ryan has 3020 points and a best run of 9×20=180; the partner has 2850 and 21×10=210 | `points` (v1): Ryan wins the whole pot. Run length and weight do not matter. |
+| #   | Scenario                                                                                    | Result                                                                                                                            |
+| --- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| E1  | Ryan takes the trash out 6 times in a row                                                   | 20, 25, 30, 35, 40, 45 (no cap). The first four total 110; all six total 195.                                                     |
+| E2  | The partner breaks Ryan's trash streak of k                                                 | Totals: k=1 → 24; k=4 → 36; k=5 → 40; k≥10 → 60. The partner's streak is now 1.                                                   |
+| E3  | Trash in strict alternation R,P,R,P… (8 completions)                                        | 20 + 7×24 = 188, split 92/96. Doing all 8 alone would give 20 + 25 + … + 55 = 300.                                                |
+| E4  | Dishes: n=2, then breaking a 3-streak                                                       | 12.5 rounds to **13**; the break gives 10 + 6 = **16**.                                                                           |
+| E5  | Trash Mon 08:00, then another attempt Mon 20:00, or the partner on Tue 09:00                | Both attempts get `COOLDOWN`, with retryAt Wed 08:00.                                                                             |
+| E6  | Dishes 4-streak, last done Mon 20:00, next done by the same person Fri 21:00 (4 days later) | No lapse: the streak continues to n=5 and scores `pctOf(10, 200)` = **20**.                                                       |
+| E7  | Bathroom at current 35, intervals [6,7,7,8,5,9,7,14,6,7,7,8]                                | I=7, raw 26.46, suggestion **26**, cooldown 3.5d.                                                                                 |
+| E8  | Trash at current 15, I=4                                                                    | raw 20, clamped to 18.75, suggestion **19**. The next cycle's difference of 1 is inside the dead-band, so there is no change.     |
+| E9  | A disputed Bathroom claim, then a photo, then the dispute is withdrawn                      | Excluded while disputed. It returns to `pending`, finalizes at `max(logged_at + 24h, withdraw + 1h)`, and the chore is re-scored. |
+| E11 | Ryan logs Trash Mon 08:00; the partner disputes it and tries Trash at 10:00                 | `COOLDOWN` (a disputed row is live).                                                                                              |
+| E12 | Dishes at 23:50 Dec 31, again at 00:05 Jan 1                                                | `COOLDOWN` across the season boundary; the Jan streak still starts at 1.                                                          |
+| E10 | Ryan has 3020 points and a best run of 9×20=180; the partner has 2850 and 21×10=210         | `points` (v1): Ryan wins the whole pot. Run length and weight do not matter.                                                      |
 
 ### 4.7 Seed chores
 
 Starting values follow the weight formula with the expected interval `I` and effort 100%: `base ≈ 10·sqrt(I_days)`, `cooldown = clamp(0.5·I, 1h, 7d)`. They are seeded as `chore_rule_versions` with `source = seed`, and frequency suggestions take over once there is data.
 
-| Chore | Expected interval | Base | Cooldown |
-|---|---|---|---|
-| Trash | 4d | 20 | 48h |
-| Recycling | 7d | 26 | 3.5d |
-| Dishes | 1d | 10 | 12h |
-| Dishwasher (unload) | 2d | 14 | 24h |
-| Bathroom | 7d | 26 | 3.5d |
-| Vacuum | 7d | 26 | 3.5d |
-| Mop | 14d | 37 | 7d |
-| Laundry | 3d | 17 | 36h |
-| Plants | 4d | 20 | 48h |
-| Fridge clean-out | 30d | 55 | 7d |
-| Keller | 30d | 55 | 7d |
+| Chore               | Expected interval | Base | Cooldown |
+| ------------------- | ----------------- | ---- | -------- |
+| Trash               | 4d                | 20   | 48h      |
+| Recycling           | 7d                | 26   | 3.5d     |
+| Dishes              | 1d                | 10   | 12h      |
+| Dishwasher (unload) | 2d                | 14   | 24h      |
+| Bathroom            | 7d                | 26   | 3.5d     |
+| Vacuum              | 7d                | 26   | 3.5d     |
+| Mop                 | 14d               | 37   | 7d       |
+| Laundry             | 3d                | 17   | 36h      |
+| Plants              | 4d                | 20   | 48h      |
+| Fridge clean-out    | 30d               | 55   | 7d       |
+| Keller              | 30d               | 55   | 7d       |
 
 ---
 
@@ -233,45 +233,45 @@ The schema is one hand-written file and is the only source of truth. Migrations 
 
 **Identity**
 
-| Table | Columns |
-|---|---|
-| `households` | `name`, `tz` (default `Europe/Berlin`) |
-| `members` | `household_id`, `auth_user_id text unique null` (no FK, as camp-404 does), `display_name`, `avatar_sprite`, `color`, `role` (`admin`, `member`), `kiosk_pin_hash null` (scrypt), `kiosk_pin_locked_at null`, `telegram_user_id bigint unique null`, `deactivated_at` |
-| `telegram_link_codes` | `code_hash` PK, `member_id`, `expires_at` (10 min), `used_at`, `used_by_tg`. At least 8 random characters, single use, claimed with `UPDATE … RETURNING`. |
-| `invite_codes` | `code` PK (lowercased), `role`, `max_uses`, `use_count`, `expires_at`, `revoked_at`, `created_by`. Claimed atomically with `UPDATE … RETURNING`, as in camp-404 `packages/db/src/invite-codes.ts` |
-| `kiosk_devices` | `name`, `token_hash` unique (sha256), `paired_by`, `last_seen_at`, `revoked_at` |
-| `pin_attempts` | Reuses `action_rate_limit` with keys `pin:<device>:<member>` (5 per 15 min) and `pin24:<member>` (10 per 24h, then `kiosk_pin_locked_at` is set). It is not a separate table. |
+| Table                 | Columns                                                                                                                                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `households`          | `name`, `tz` (default `Europe/Berlin`)                                                                                                                                                                                                                               |
+| `members`             | `household_id`, `auth_user_id text unique null` (no FK, as camp-404 does), `display_name`, `avatar_sprite`, `color`, `role` (`admin`, `member`), `kiosk_pin_hash null` (scrypt), `kiosk_pin_locked_at null`, `telegram_user_id bigint unique null`, `deactivated_at` |
+| `telegram_link_codes` | `code_hash` PK, `member_id`, `expires_at` (10 min), `used_at`, `used_by_tg`. At least 8 random characters, single use, claimed with `UPDATE … RETURNING`.                                                                                                            |
+| `invite_codes`        | `code` PK (lowercased), `role`, `max_uses`, `use_count`, `expires_at`, `revoked_at`, `created_by`. Claimed atomically with `UPDATE … RETURNING`, as in camp-404 `packages/db/src/invite-codes.ts`                                                                    |
+| `kiosk_devices`       | `name`, `token_hash` unique (sha256), `paired_by`, `last_seen_at`, `revoked_at`                                                                                                                                                                                      |
+| `pin_attempts`        | Reuses `action_rate_limit` with keys `pin:<device>:<member>` (5 per 15 min) and `pin24:<member>` (10 per 24h, then `kiosk_pin_locked_at` is set). It is not a separate table.                                                                                        |
 
 **Game**
 
-| Table | Columns |
-|---|---|
-| `chores` | `name`, `sprite`, `proof_mode` (`none`, `optional`, `required`), `confirm_mode` (`optimistic`, `partner`), `effort_factor_pct` (50–300), `archived_at` |
-| `chore_rule_versions` | `chore_id`, `effective_from`, `base_points` (1–200), `cooldown_minutes`, `source` (`seed`, `manual`, `suggestion`), `suggestion_id`, `created_by`. Unique on `(chore_id, effective_from)`. |
-| `seasons` | `year`, `starts_at`, `ends_at`, `prize_mode`, `status` (`active`, `closing`, `closed`), `winner_member_id`, `finalized_at`. Unique on `(household_id, year)`. |
-| `completions` | `chore_id`, `season_id`, `done_by`, `logged_by`, `occurred_at`, `logged_at`, `source` (the `Surface` enum: `ui`, `kiosk`, `ai`, `mcp`, `brain`), `status`, `verified_by`, `verified_at`, `finalizes_at`, `photo_pathname`, `note`, `void_reason`, `client_request_id`. Unique on `(household_id, client_request_id)`. Index on `(chore_id, season_id, occurred_at)`. |
-| `completion_scores` | `completion_id` PK, `rule_version_id`, `ruleset_version`, `streak_len`, `multiplier_pct`, `base_pts`, `streak_pts`, `broken_member_id`, `broken_len`, `break_pts`, `total_pts`, `computed_at`. This is output of the replay and is always rebuildable. |
-| `disputes` | `completion_id`, `raised_by`, `reason`, `resolution`, `resolved_at` |
-| `point_adjustments` | `season_id`, `member_id`, `points`, `reason`, `created_by`, `approved_by`. Check `approved_by <> created_by`. |
-| `weight_suggestions` | As in the game design: the window, `sample_intervals`, `median_interval_minutes`, `raw_points`, `current_points`, `suggested_points`, the suggested cooldown, `status`, `applies_at`, `vetoed_by` |
-| `pot_contributions` | `season_id`, `month` (date), `amount_cents` (> 0), `contributed_by`, `note` |
+| Table                 | Columns                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chores`              | `name`, `sprite`, `proof_mode` (`none`, `optional`, `required`), `confirm_mode` (`optimistic`, `partner`), `effort_factor_pct` (50–300), `archived_at`                                                                                                                                                                                                               |
+| `chore_rule_versions` | `chore_id`, `effective_from`, `base_points` (1–200), `cooldown_minutes`, `source` (`seed`, `manual`, `suggestion`), `suggestion_id`, `created_by`. Unique on `(chore_id, effective_from)`.                                                                                                                                                                           |
+| `seasons`             | `year`, `starts_at`, `ends_at`, `prize_mode`, `status` (`active`, `closing`, `closed`), `winner_member_id`, `finalized_at`. Unique on `(household_id, year)`.                                                                                                                                                                                                        |
+| `completions`         | `chore_id`, `season_id`, `done_by`, `logged_by`, `occurred_at`, `logged_at`, `source` (the `Surface` enum: `ui`, `kiosk`, `ai`, `mcp`, `brain`), `status`, `verified_by`, `verified_at`, `finalizes_at`, `photo_pathname`, `note`, `void_reason`, `client_request_id`. Unique on `(household_id, client_request_id)`. Index on `(chore_id, season_id, occurred_at)`. |
+| `completion_scores`   | `completion_id` PK, `rule_version_id`, `ruleset_version`, `streak_len`, `multiplier_pct`, `base_pts`, `streak_pts`, `broken_member_id`, `broken_len`, `break_pts`, `total_pts`, `computed_at`. This is output of the replay and is always rebuildable.                                                                                                               |
+| `disputes`            | `completion_id`, `raised_by`, `reason`, `resolution`, `resolved_at`                                                                                                                                                                                                                                                                                                  |
+| `point_adjustments`   | `season_id`, `member_id`, `points`, `reason`, `created_by`, `approved_by`. Check `approved_by <> created_by`.                                                                                                                                                                                                                                                        |
+| `weight_suggestions`  | As in the game design: the window, `sample_intervals`, `median_interval_minutes`, `raw_points`, `current_points`, `suggested_points`, the suggested cooldown, `status`, `applies_at`, `vetoed_by`                                                                                                                                                                    |
+| `pot_contributions`   | `season_id`, `month` (date), `amount_cents` (> 0), `contributed_by`, `note`                                                                                                                                                                                                                                                                                          |
 
 **Hub**
 
-| Table | Columns |
-|---|---|
+| Table   | Columns                                                                        |
+| ------- | ------------------------------------------------------------------------------ |
 | `notes` | `title`, `body_md`, `color`, `pinned`, `author_id`, `updated_at`, `deleted_at` |
 
 **Platform**
 
-| Table | Columns |
-|---|---|
-| `action_requests` | PK `(actor_member_id, source, request_id)`, `action`, `input_hash`, `status` (`pending`, `done`, `failed`), `result jsonb`, `created_at`. Every write action's idempotency ledger, owned by `runAction`. |
-| `audit_events` | `bigserial` id, `actor_member_id`, `source`, `action`, `entity`, `entity_id`, `payload jsonb`, `at`. Owned by `runAction`, written in the **same transaction** as the change. |
-| `action_rate_limit` | Copied from camp-404 `packages/db/src/rate-limit.ts` |
-| `service_tokens` | `name` (for example `baumy-brain`), `token_hash`, `scopes text[]`, `revoked_at` |
-| `mcp_oauth_clients`, `mcp_auth_codes`, `mcp_access_tokens` | Copied from intake-tracker `packages/db/src/schema.ts`, plus `member_id` on codes and tokens. Tokens are stored hashed. |
-| `ai_usage` | `member_id`, `provider`, `input_tokens`, `output_tokens`, `audio_seconds`, `at` |
+| Table                                                      | Columns                                                                                                                                                                                                  |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action_requests`                                          | PK `(actor_member_id, source, request_id)`, `action`, `input_hash`, `status` (`pending`, `done`, `failed`), `result jsonb`, `created_at`. Every write action's idempotency ledger, owned by `runAction`. |
+| `audit_events`                                             | `bigserial` id, `actor_member_id`, `source`, `action`, `entity`, `entity_id`, `payload jsonb`, `at`. Owned by `runAction`, written in the **same transaction** as the change.                            |
+| `action_rate_limit`                                        | Copied from camp-404 `packages/db/src/rate-limit.ts`                                                                                                                                                     |
+| `service_tokens`                                           | `name` (for example `baumy-brain`), `token_hash`, `scopes text[]`, `revoked_at`                                                                                                                          |
+| `mcp_oauth_clients`, `mcp_auth_codes`, `mcp_access_tokens` | Copied from intake-tracker `packages/db/src/schema.ts`, plus `member_id` on codes and tokens. Tokens are stored hashed.                                                                                  |
+| `ai_usage`                                                 | `member_id`, `provider`, `input_tokens`, `output_tokens`, `audio_seconds`, `at`                                                                                                                          |
 
 **Writes and transactions**
 
@@ -314,11 +314,11 @@ packages/{eslint-config,typescript-config}
 
 **Where to copy from**
 
-| What | Source |
-|---|---|
-| Monorepo scaffolding, turbo `globalEnv`, tsconfigs, `transpilePackages`, `typedRoutes` | camp-404 `turbo.json`, `packages/typescript-config/*`, `apps/web/next.config.ts` |
-| Build outputs excluding `.next/dev/**` | afrikaburn `turbo.json` (origin/main) |
-| Drivers | camp-404 `packages/db/src/index.ts` (`createHttpDb`, `createPooledDb`, `withTransaction`, `__setDbOverride`, `NEON_LOCAL_PROXY`), plus afrikaburn's WebSocket-for-reads proxy switch |
+| What                                                                                   | Source                                                                                                                                                                               |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Monorepo scaffolding, turbo `globalEnv`, tsconfigs, `transpilePackages`, `typedRoutes` | camp-404 `turbo.json`, `packages/typescript-config/*`, `apps/web/next.config.ts`                                                                                                     |
+| Build outputs excluding `.next/dev/**`                                                 | afrikaburn `turbo.json` (origin/main)                                                                                                                                                |
+| Drivers                                                                                | camp-404 `packages/db/src/index.ts` (`createHttpDb`, `createPooledDb`, `withTransaction`, `__setDbOverride`, `NEON_LOCAL_PROXY`), plus afrikaburn's WebSocket-for-reads proxy switch |
 
 ### 6.2 Auth (ADR 0001)
 
@@ -347,16 +347,17 @@ Every read and write that the product offers is **one registry entry**. The UI, 
 export const Surface = z.enum(["ui", "kiosk", "ai", "mcp", "brain"]);
 // apps/web/lib/actions/define.ts
 export interface ActionDef<I extends z.ZodType, O> {
-  name: ActionName;                 // snake_case, ^[a-z0-9_]{1,64}$ (valid Claude + MCP tool name)
-  title: string; description: string;  // description is the LLM tool description
-  consent: string;                  // plain-language line for MCP consent screen (typed map, intake pattern)
+  name: ActionName; // snake_case, ^[a-z0-9_]{1,64}$ (valid Claude + MCP tool name)
+  title: string;
+  description: string; // description is the LLM tool description
+  consent: string; // plain-language line for MCP consent screen (typed map, intake pattern)
   kind: "read" | "write";
   risk: "safe" | "confirm" | "destructive";
-  surfaces: Surface[];              // admin-only actions: ["ui"] only
-  requires: Gate | ((ctx, input) => Gate);    // input-aware, e.g. log_completion: done_by ≠ actor → "attested"
-  transactional?: boolean;          // default true; false for external calls (Google, brain)
-  input: I;                         // Zod v4 → z.toJSONSchema for Claude/MCP
-  preview?(ctx, input): Promise<string>;   // "Log Trash for Ryan: +25 (streak 2)"
+  surfaces: Surface[]; // admin-only actions: ["ui"] only
+  requires: Gate | ((ctx, input) => Gate); // input-aware, e.g. log_completion: done_by ≠ actor → "attested"
+  transactional?: boolean; // default true; false for external calls (Google, brain)
+  input: I; // Zod v4 → z.toJSONSchema for Claude/MCP
+  preview?(ctx, input): Promise<string>; // "Log Trash for Ryan: +25 (streak 2)"
   execute(ctx: ActionCtx, input: z.infer<I>): Promise<ActionResult<O>>;
 }
 // Gate = "member" | "admin" | "attested" | "session" | "service"
@@ -395,25 +396,25 @@ export interface ActionDef<I extends z.ZodType, O> {
 
 **v1 action catalogue**
 
-| Action | Kind | Surfaces | Notes |
-|---|---|---|---|
-| `list_chores`, `get_streaks`, `get_standings`, `get_pending_confirmations`, `get_pot` | read | all | |
-| `log_completion` | write, confirm | all | `done_by` defaults to the actor; logging for someone else needs attestation |
-| `confirm_completion`, `dispute_completion`, `undo_completion`, `withdraw_dispute`, `concede_completion` | write, confirm | all | undo only within 10 minutes and only by the logger; withdraw only by the disputer; concede only by the doer |
-| `attach_completion_photo` | write | ui, kiosk | upload handled by a route |
-| `whoami` | read | all | |
-| `update_my_profile` | write, safe | ui | `requireSession` |
-| `redeem_invite` | write | ui | signed-in user with no member row |
-| `set_kiosk_pin`, `create_telegram_link_code` | write | ui | `requireSession` |
-| `list_events` | read | all | |
-| `create_event`, `update_event` | write, confirm | all | |
-| `delete_event` | write, destructive | ui, kiosk, ai | always confirmed explicitly |
-| `list_shopping` | read | all | reads from brain (see below) |
-| `add_shopping_items`, `check_off_shopping_items` | write, safe | ui, kiosk, ai, mcp | brain already owns these for Telegram, so `brain` is not a surface |
-| `list_notes`, `create_note`, `update_note`, `pin_note` | read and write | all | |
-| `delete_note` | write, destructive | ui, kiosk, ai | |
-| `link_telegram` | write | brain | `requires: "service"`; redeems a one-time link code a member created in the UI, and sets `members.telegram_user_id` |
-| `manage_chore`, `schedule_weight`, `dismiss_weight`, `veto_weight`, `adjust_points`, `add_pot_contribution`, `set_prize_mode`, `mint_invite`, `manage_members`, `pair_kiosk`, `revoke_kiosk`, `resolve_dispute` | write | **ui only** | admin actions: UI only, never the AI command, MCP or brain |
+| Action                                                                                                                                                                                                          | Kind               | Surfaces           | Notes                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `list_chores`, `get_streaks`, `get_standings`, `get_pending_confirmations`, `get_pot`                                                                                                                           | read               | all                |                                                                                                                     |
+| `log_completion`                                                                                                                                                                                                | write, confirm     | all                | `done_by` defaults to the actor; logging for someone else needs attestation                                         |
+| `confirm_completion`, `dispute_completion`, `undo_completion`, `withdraw_dispute`, `concede_completion`                                                                                                         | write, confirm     | all                | undo only within 10 minutes and only by the logger; withdraw only by the disputer; concede only by the doer         |
+| `attach_completion_photo`                                                                                                                                                                                       | write              | ui, kiosk          | upload handled by a route                                                                                           |
+| `whoami`                                                                                                                                                                                                        | read               | all                |                                                                                                                     |
+| `update_my_profile`                                                                                                                                                                                             | write, safe        | ui                 | `requireSession`                                                                                                    |
+| `redeem_invite`                                                                                                                                                                                                 | write              | ui                 | signed-in user with no member row                                                                                   |
+| `set_kiosk_pin`, `create_telegram_link_code`                                                                                                                                                                    | write              | ui                 | `requireSession`                                                                                                    |
+| `list_events`                                                                                                                                                                                                   | read               | all                |                                                                                                                     |
+| `create_event`, `update_event`                                                                                                                                                                                  | write, confirm     | all                |                                                                                                                     |
+| `delete_event`                                                                                                                                                                                                  | write, destructive | ui, kiosk, ai      | always confirmed explicitly                                                                                         |
+| `list_shopping`                                                                                                                                                                                                 | read               | all                | reads from brain (see below)                                                                                        |
+| `add_shopping_items`, `check_off_shopping_items`                                                                                                                                                                | write, safe        | ui, kiosk, ai, mcp | brain already owns these for Telegram, so `brain` is not a surface                                                  |
+| `list_notes`, `create_note`, `update_note`, `pin_note`                                                                                                                                                          | read and write     | all                |                                                                                                                     |
+| `delete_note`                                                                                                                                                                                                   | write, destructive | ui, kiosk, ai      |                                                                                                                     |
+| `link_telegram`                                                                                                                                                                                                 | write              | brain              | `requires: "service"`; redeems a one-time link code a member created in the UI, and sets `members.telegram_user_id` |
+| `manage_chore`, `schedule_weight`, `dismiss_weight`, `veto_weight`, `adjust_points`, `add_pot_contribution`, `set_prize_mode`, `mint_invite`, `manage_members`, `pair_kiosk`, `revoke_kiosk`, `resolve_dispute` | write              | **ui only**        | admin actions: UI only, never the AI command, MCP or brain                                                          |
 
 ### 6.4 Google Calendar
 
@@ -464,17 +465,17 @@ export interface ActionDef<I extends z.ZodType, O> {
 
 Every variable goes into both `.env.example` and turbo `globalEnv`.
 
-| Group | Variables |
-|---|---|
-| Database | `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_LOCAL_PROXY`, `PROD_DB_HOST` (the migrate guard refuses it on previews, ADR 0004) |
-| Auth | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `FOUNDER_EMAILS`, `INVITE_CODES` |
-| Calendar | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_CLIENT_EMAIL`, `GOOGLE_CALENDAR_PRIVATE_KEY` |
-| Blob | `BLOB_READ_WRITE_TOKEN` |
-| AI | `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `AI_DAILY_COMMANDS_PER_MEMBER` |
-| MCP | `MCP_PUBLIC_URL` |
-| Brain | `BRAIN_BASE_URL`, `KITCHEN_API_TOKEN` (Olympics → brain). `BRAIN_SERVICE_TOKEN` lives only in brain's env; Olympics keeps its hash in `service_tokens`. |
-| Cron | `CRON_SECRET` |
-| E2E | `E2E_TEST_MODE`, `E2E_*` |
+| Group    | Variables                                                                                                                                                    |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Database | `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_LOCAL_PROXY`, `PROD_DB_HOST` (the migrate guard refuses it on previews, ADR 0004)                             |
+| Auth     | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `FOUNDER_EMAILS`, `INVITE_CODES` |
+| Calendar | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_CLIENT_EMAIL`, `GOOGLE_CALENDAR_PRIVATE_KEY`                                                                          |
+| Blob     | `BLOB_READ_WRITE_TOKEN`                                                                                                                                      |
+| AI       | `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `AI_DAILY_COMMANDS_PER_MEMBER`                                                                                          |
+| MCP      | `MCP_PUBLIC_URL`                                                                                                                                             |
+| Brain    | `BRAIN_BASE_URL`, `KITCHEN_API_TOKEN` (Olympics → brain). `BRAIN_SERVICE_TOKEN` lives only in brain's env; Olympics keeps its hash in `service_tokens`.      |
+| Cron     | `CRON_SECRET`                                                                                                                                                |
+| E2E      | `E2E_TEST_MODE`, `E2E_*`                                                                                                                                     |
 
 ---
 
@@ -532,12 +533,12 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
 
 ## 10. Testing strategy
 
-| Layer | Tool | Floor |
-|---|---|---|
-| `packages/core` (scoring) | Vitest + **fast-check** property tests + the E1–E10 fixtures | 95% lines and branches, 100% on `scoring/*` |
-| `packages/db` | Vitest + in-process **PGlite** that replays the real migrations (port camp-404 `packages/db/src/__tests__/_harness.ts`) | 75% |
-| `apps/web/lib/**` | Vitest in jsdom, with an alias from `server-only` to an empty module (camp-404 `apps/web/vitest.config.ts`). Covers every action's `execute`, surface and permission rules, and each adapter. | 90% |
-| E2E | Playwright against `next start` on a **real Docker Postgres** (afrikaburn `scripts/e2e-local.sh`, `docker-compose.local.yml`). Projects: `desktop-chromium`, `ipad-landscape` (1180×820, touch) and `mobile-360`. | Critical flows |
+| Layer                     | Tool                                                                                                                                                                                                              | Floor                                       |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `packages/core` (scoring) | Vitest + **fast-check** property tests + the E1–E10 fixtures                                                                                                                                                      | 95% lines and branches, 100% on `scoring/*` |
+| `packages/db`             | Vitest + in-process **PGlite** that replays the real migrations (port camp-404 `packages/db/src/__tests__/_harness.ts`)                                                                                           | 75%                                         |
+| `apps/web/lib/**`         | Vitest in jsdom, with an alias from `server-only` to an empty module (camp-404 `apps/web/vitest.config.ts`). Covers every action's `execute`, surface and permission rules, and each adapter.                     | 90%                                         |
+| E2E                       | Playwright against `next start` on a **real Docker Postgres** (afrikaburn `scripts/e2e-local.sh`, `docker-compose.local.yml`). Projects: `desktop-chromium`, `ipad-landscape` (1180×820, touch) and `mobile-360`. | Critical flows                              |
 
 - In E2E, external services (Google Calendar, Claude, Groq, brain, Blob) sit behind adapter interfaces with in-memory fakes, which are chosen when `E2E_TEST_MODE=1`. Users are created through the real UI, and there is no DB back door except the seed script.
 - Server time comes from `apps/web/lib/clock.ts`. With `E2E_TEST_MODE=1` it adds an offset set through a test-only route, so specs can advance past the 24h window; Playwright's clock alone only moves the browser.
