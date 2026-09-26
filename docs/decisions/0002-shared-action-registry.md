@@ -26,7 +26,7 @@ The reason is that its data is offline-first in Dexie. Olympics is server-author
   - **AI command:** `z.toJSONSchema` becomes the Claude `tools`. Read tools run in the loop. Write tools come back as proposals, which a human approves in a review list (intake-tracker `components/voice/voice-panel.tsx`).
   - **MCP:** `server.registerTool` for each entry, gated by `baumy:read` / `baumy:write` scopes. The consent line is typed, so a tool cannot ship without one (intake-tracker `lib/mcp/tool-catalog.ts`).
   - **Brain:** `POST /api/v1/actions/{name}` with a service token and the actor's Telegram id.
-- Admin actions (weights, point adjustments, prize mode, members, kiosk pairing) have `surfaces: ["ui"]`. This departs from the owner's "everything through the AI button" brief and is pending SPEC §12 open question 11. Destructive actions are never exposed over MCP or to brain.
+- Admin actions (chore management, weights, point adjustments, pot, prize mode, members, kiosk pairing) have `surfaces: ["ui"]`. They are never exposed to the AI command, MCP or brain; the owner confirmed this on 2026-09-27 (SPEC §12), narrowing the original "everything through the AI button" brief. Destructive actions are never exposed over MCP or to brain.
 
 ## Consequences
 
