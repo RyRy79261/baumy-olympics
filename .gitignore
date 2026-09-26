@@ -13,10 +13,12 @@ out/
 dist/
 build/
 
-# env
-.env
-.env.local
-.env.*.local
+# env (every .env variant except the committed example)
+.env*
+!.env.example
+
+# vercel
+.vercel/
 
 # logs
 *.log
