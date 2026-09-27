@@ -379,9 +379,7 @@ export interface ChoreWeight {
 
 /**
  * Put a weight in effect from `now` (a `manual` rule version by `createdBy`).
- * Two changes in the same instant keep the later one. The chore's current
- * season is then re-scored, since a completion up to 2 minutes "in the
- * future" (SPEC §4.2) may fall after `now`.
+ * Two changes in the same instant keep the later one.
  */
 async function putWeight(
   db: Queryable,
@@ -415,16 +413,27 @@ async function putWeight(
       },
     })
     .returning({ id: choreRuleVersions.id });
-  const season = await findSeason(db, input.householdId, seasonYear(input.now));
-  if (season) {
-    await rescoreChore(db, {
-      householdId: input.householdId,
-      choreId: input.choreId,
-      seasonId: season.id,
-      now: input.now,
-    });
-  }
   return version!.id;
+}
+
+/** Re-score the given seasons of a chore, or every season it has rows in. */
+async function rescoreSeasons(
+  db: Queryable,
+  input: { householdId: string; choreId: string; now: Date },
+  seasonIds?: string[],
+): Promise<void> {
+  const ids =
+    seasonIds ??
+    (
+      await db
+        .selectDistinct({ seasonId: completions.seasonId })
+        .from(completions)
+        .where(eq(completions.choreId, input.choreId))
+        .orderBy(asc(completions.seasonId))
+    ).map((r) => r.seasonId);
+  for (const seasonId of ids) {
+    await rescoreChore(db, { ...input, seasonId });
+  }
 }
 
 export interface ChoreSettings {
@@ -474,6 +483,14 @@ export async function createChore(
  * Change a locked chore's settings, and its weight when `weight` differs from
  * the version in effect now. Returns the new row and whether a rule version
  * was added.
+ *
+ * Scores stay what a rebuild would make them:
+ * - a new weight re-scores the current season, since a completion up to 2
+ *   minutes "in the future" (SPEC §4.2) may fall after `now`;
+ * - a new confirm mode re-scores every season of the chore, because whether
+ *   a stored `pending` self-claim counts depends on it (SPEC §4.1). Switching
+ *   to `partner` stops unconfirmed self-claims counting until someone
+ *   confirms them; switching back counts them again.
  */
 export async function updateChore(
   db: Queryable,
@@ -525,6 +542,22 @@ export async function updateChore(
       });
       weightChanged = true;
     }
+  }
+
+  const scope = {
+    householdId: input.householdId,
+    choreId: input.chore.id,
+    now: input.now,
+  };
+  if (row!.confirmMode !== input.chore.confirmMode) {
+    await rescoreSeasons(db, scope);
+  } else if (weightChanged) {
+    const season = await findSeason(
+      db,
+      input.householdId,
+      seasonYear(input.now),
+    );
+    await rescoreSeasons(db, scope, season ? [season.id] : []);
   }
   return { chore: row!, weightChanged };
 }
