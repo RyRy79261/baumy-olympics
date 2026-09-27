@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Surface } from "@baumy/types";
-import type { ActionRisk, AnyActionDef } from "./define";
+import type { ActionKind, ActionRisk, AnyActionDef } from "./define";
 import { REGISTRY } from "./registry";
 
 // Tool definitions generated from the registry (ADR 0002): the Claude `tools`
@@ -8,9 +8,13 @@ import { REGISTRY } from "./registry";
 
 export interface ToolSpec {
   name: string;
+  /** The human title (MCP clients show it in their tool approval prompt). */
+  title: string;
   description: string;
   /** JSON Schema of the input the caller sends (Zod's input side). */
   input_schema: Record<string, unknown>;
+  /** Which MCP scope the tool needs (baumy:read or baumy:write). */
+  kind: ActionKind;
   risk: ActionRisk;
 }
 
@@ -28,11 +32,13 @@ export function toolSpecs(
     )
     .map((def) => ({
       name: def.name,
+      title: def.title,
       description: def.description,
       input_schema: z.toJSONSchema(def.input, { io: "input" }) as Record<
         string,
         unknown
       >,
+      kind: def.kind,
       risk: def.risk,
     }));
 }

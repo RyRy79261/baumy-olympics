@@ -517,11 +517,33 @@ e2e need nothing: off Vercel the issuer is the request's own address.
 - [ ] **After the deploy, check it:**
       `curl https://<your-domain>/.well-known/oauth-authorization-server`
       shows `"issuer": "https://<your-domain>"` and
-      `"code_challenge_methods_supported": ["S256"]`. Connecting Claude
-      end to end waits for issue #24 (the `/api/mcp/mcp` endpoint).
+      `"code_challenge_methods_supported": ["S256"]`.
 - If a firewall or Cloudflare sits in front of Vercel, let
   `/.well-known/oauth-*` and `/api/mcp/*` through: claude.ai's probes look
   like bots (intake-tracker's gotcha #10).
+
 - [ ] **Look and feel is deferred to issue #7.** The consent page
       (`app/oauth/consent/page.tsx`) and `/settings/connections` use the
       neutral `packages/ui` placeholders, including the new `Checkbox`.
+
+### The MCP endpoint (issue #24)
+
+The connector URL is `<MCP_PUBLIC_URL>/api/mcp/mcp` (the doubled `mcp` is
+right: mcp-handler's base path plus its transport). It needs nothing beyond
+`MCP_PUBLIC_URL` above: no Redis (SSE is off), no new variable. CI and e2e
+drive it with a scripted client (`apps/web/e2e/specs/mcp-server.spec.ts`).
+
+- [ ] **Check it answers:** `curl -i -X POST https://<your-domain>/api/mcp/mcp`
+      is a 401 whose `WWW-Authenticate` names
+      `resource_metadata="https://<your-domain>/.well-known/oauth-protected-resource"`.
+- [ ] **Connect claude.ai** (Pro, Max, Team or Enterprise): Settings →
+      Connectors → Add custom connector → paste
+      `https://<your-domain>/api/mcp/mcp` → Connect. Sign in to Baumy if
+      asked, tick "Make changes as you (baumy:write)" only if Claude should
+      log chores, and Approve. In a new chat ask "What are the Baumy
+      standings?": Claude should call `get_standings`.
+- [ ] **Check the write path** (only with baumy:write): ask Claude to log a
+      chore; approve the tool call in claude.ai; the chore shows on
+      `/chores`, and its audit row has `source = mcp`.
+- [ ] **Check revoking:** disconnect it on `/settings/connections`; Claude's
+      next tool call fails and it asks to reconnect.

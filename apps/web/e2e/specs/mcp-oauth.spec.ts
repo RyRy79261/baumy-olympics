@@ -1,12 +1,17 @@
-import { createHash, randomBytes } from "node:crypto";
-import {
-  expect,
-  test,
-  type APIRequestContext,
-  type Page,
-} from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { PASSWORD, founderEmail } from "../lib/accounts";
 import { founderAdmin, newAccount } from "../lib/household";
+import {
+  REDIRECT,
+  authorizeUrl,
+  catchCallback,
+  discover,
+  exchange,
+  pkce,
+  register,
+  verify,
+  type Tokens,
+} from "../lib/mcp";
 
 // Issue #23 end to end, against Docker Postgres: a scripted MCP client
 // (standing in for claude.ai) discovers the authorization server, registers
@@ -14,111 +19,11 @@ import { founderAdmin, newAccount } from "../lib/household";
 // page, exchanges the code with PKCE S256, refreshes and is disconnected on
 // /settings/connections. The token is checked through the test-only
 // /api/test/mcp-token, which calls the same verifyToken the MCP endpoint
-// will (issue #24).
+// does; mcp-server.spec.ts drives the endpoint itself (issue #24).
 
 // One worker runs this file's tests in order: they share this project's
 // founder, and the connections page lists all of that founder's clients.
 test.describe.configure({ mode: "default" });
-
-// A loopback redirect, as Claude Desktop and Claude Code use. Nothing listens
-// there: the browser's navigation to it is caught by page.route.
-const REDIRECT = "http://127.0.0.1:47823/callback";
-
-interface Meta {
-  issuer: string;
-  authorization_endpoint: string;
-  token_endpoint: string;
-  registration_endpoint: string;
-  revocation_endpoint: string;
-  scopes_supported: string[];
-  code_challenge_methods_supported: string[];
-}
-
-interface Tokens {
-  access_token: string;
-  refresh_token: string;
-  scope: string;
-  token_type: string;
-}
-
-async function discover(request: APIRequestContext): Promise<Meta> {
-  const res = await request.get("/.well-known/oauth-authorization-server");
-  expect(res.status()).toBe(200);
-  const meta = (await res.json()) as Meta;
-  expect(meta.code_challenge_methods_supported).toEqual(["S256"]);
-  expect(meta.scopes_supported).toEqual(["baumy:read", "baumy:write"]);
-  const resource = await request.get("/.well-known/oauth-protected-resource");
-  expect((await resource.json()).authorization_servers).toEqual([meta.issuer]);
-  return meta;
-}
-
-async function register(
-  request: APIRequestContext,
-  meta: Meta,
-  name: string,
-): Promise<string> {
-  const res = await request.post(meta.registration_endpoint, {
-    data: { client_name: name, redirect_uris: [REDIRECT] },
-  });
-  expect(res.status()).toBe(201);
-  return ((await res.json()) as { client_id: string }).client_id;
-}
-
-function pkce() {
-  const verifier = randomBytes(32).toString("base64url");
-  const challenge = createHash("sha256").update(verifier).digest("base64url");
-  return { verifier, challenge };
-}
-
-function authorizeUrl(meta: Meta, clientId: string, challenge: string) {
-  const q = new URLSearchParams({
-    response_type: "code",
-    client_id: clientId,
-    redirect_uri: REDIRECT,
-    code_challenge: challenge,
-    code_challenge_method: "S256",
-    state: "e2e-state",
-    scope: "baumy:read baumy:write",
-  });
-  return `${meta.authorization_endpoint}?${q}`;
-}
-
-/** Catch the navigation back to the client and hand over its query. */
-function catchCallback(page: Page): Promise<URL> {
-  return new Promise((resolve) => {
-    void page.route(`${REDIRECT}**`, async (route) => {
-      resolve(new URL(route.request().url()));
-      await route.fulfill({ status: 200, body: "connected" });
-    });
-  });
-}
-
-async function exchange(
-  request: APIRequestContext,
-  meta: Meta,
-  clientId: string,
-  code: string,
-  verifier: string,
-): Promise<Tokens> {
-  const res = await request.post(meta.token_endpoint, {
-    form: {
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: REDIRECT,
-      client_id: clientId,
-      code_verifier: verifier,
-    },
-  });
-  expect(res.status()).toBe(200);
-  expect(res.headers()["cache-control"]).toBe("no-store");
-  return (await res.json()) as Tokens;
-}
-
-async function verify(request: APIRequestContext, token: string) {
-  return request.get("/api/test/mcp-token", {
-    headers: { authorization: `Bearer ${token}` },
-  });
-}
 
 const unique = (label: string) =>
   `${label} ${Math.random().toString(36).slice(2, 8)}`;
