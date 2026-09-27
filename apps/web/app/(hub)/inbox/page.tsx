@@ -5,6 +5,7 @@ import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { needsOkLabel, settledLabel } from "@/lib/claims/view";
+import { ScheduledChanges } from "../admin/weights/scheduled-changes";
 import {
   concedeClaimAction,
   confirmClaimAction,
@@ -27,6 +28,9 @@ export default async function InboxPage() {
   const me = await requireMemberPage();
   const ctx = (await uiRequestCtx(undefined))!;
   const listed = await runAction("get_pending_confirmations", {}, ctx);
+  // Weight changes waiting to apply, which any other member may veto.
+  const weights = await runAction("get_weights", { scheduledOnly: true }, ctx);
+  const scheduled = weights.ok ? weights.data.scheduled : [];
   const actions = {
     confirm: confirmClaimAction,
     dispute: disputeClaimAction,
@@ -85,6 +89,15 @@ export default async function InboxPage() {
             empty="You have no claims waiting to settle."
           />
         </section>
+        {scheduled.length > 0 ? (
+          <Card
+            title="Point changes coming"
+            description="Each applies unless someone other than the member who scheduled it vetoes it first."
+            data-testid="weight-changes"
+          >
+            <ScheduledChanges changes={scheduled} />
+          </Card>
+        ) : null}
         {others.length > 0 ? (
           <section aria-labelledby="others" data-testid="other-claims">
             <h2 id="others" className="mb-3 text-lg font-semibold">

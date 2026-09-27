@@ -133,6 +133,32 @@ export function nextBerlinMonday(after: Date): Date {
   );
 }
 
+/**
+ * `days` Berlin calendar days after `instant`, at the same Berlin wall time
+ * (to the minute; seconds are dropped).
+ * Unlike `+ days × 24h`, a daylight-saving change in between does not move
+ * the clock reading (Mon 00:00 + 28 days is Mon 00:00, not Sun 23:00).
+ */
+export function addBerlinDays(instant: Date, days: number): Date {
+  const p = berlinParts(instant);
+  const target = new Date(
+    Date.UTC(p.year, p.month - 1, p.day) + days * MS_PER_DAY,
+  );
+  return berlinWallTimeToUtc(
+    target.getUTCFullYear(),
+    target.getUTCMonth() + 1,
+    target.getUTCDate(),
+    p.hour,
+    p.minute,
+  );
+}
+
+/** Monday 00:00 Berlin of the Berlin week that `instant` falls in. */
+export function startOfBerlinWeek(instant: Date): Date {
+  const day = startOfBerlinDay(instant);
+  return addBerlinDays(day, 1 - berlinWeekday(instant));
+}
+
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const MONTHS = [
   "Jan",

@@ -285,3 +285,22 @@ is being logged) and end to end on a phone and a desktop.
       in `packages/ui/src/scores.tsx`.
 - Closing the season and writing the winner arrive with the daily job
   (issue #18); the kiosk's leaderboard widget with the hub (issue #20).
+
+## Weights (issue #17)
+
+Nothing here needs an account, a secret or a new env var: the formula is
+unit and property tested, the weekly compute and the apply on PGlite and
+Docker Postgres (two computes at once, a veto racing the apply, two applies
+at once), and the schedule-then-veto flow end to end.
+
+- [ ] **Nothing is suggested until the daily job exists (issue #18).**
+      `computeSuggestions` and `applyDueSuggestions` (`packages/db/src/weights.ts`)
+      are written but nothing calls them on a deployment yet; `/admin/weights`
+      already shows each chore's live measurement. In e2e, the test-only
+      `POST /api/test/weights` runs them (404 outside `E2E_TEST_MODE=1`).
+- [ ] **Decide the weight changes together.** A change one admin schedules
+      shows on `/inbox` ("Point changes coming") for everyone else to veto
+      until it applies, at the first Monday 00:00 Berlin at least 48h away
+      and at least 28 days after the chore's last change.
+- [ ] **Look and feel is deferred to issue #7.** The sparkline is a neutral
+      placeholder in `packages/ui/src/sparkline.tsx`.

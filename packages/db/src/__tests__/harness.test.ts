@@ -63,6 +63,7 @@ describe("useTestDb", () => {
       "telegram_link_codes",
       "user",
       "verification",
+      "weight_suggestions",
     ]);
   });
 
