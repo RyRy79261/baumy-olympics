@@ -163,21 +163,25 @@ describe("manage_members under concurrent requests", () => {
   it("two admins demoting each other at once do not deadlock", async () => {
     // Both lock every active admin in id order before touching either row,
     // so one waits for the other instead of each holding what the other
-    // needs. (Other tests' admins share this household, so both may win.)
-    const [x, y] = [await member("admin"), await member("admin")];
-    const results = await Promise.all([
-      run(
-        "manage_members",
-        { op: "set_role", memberId: y, role: "member" },
-        ctxFor(sessionActor(x, "admin")),
-      ),
-      run(
-        "manage_members",
-        { op: "set_role", memberId: x, role: "member" },
-        ctxFor(sessionActor(y, "admin")),
-      ),
-    ]);
-    expect(results.every((r) => r.ok || r.code === "LAST_ADMIN")).toBe(true);
-    expect(results.some((r) => !r.ok && r.code === "INTERNAL")).toBe(false);
+    // needs. The acting member's row is already key-share locked by the
+    // ledger's foreign key, which is why those locks are FOR NO KEY UPDATE.
+    // A third admin stays, so both demotions may succeed.
+    await member("admin");
+    for (let round = 0; round < 10; round++) {
+      const [x, y] = [await member("admin"), await member("admin")];
+      const results = await Promise.all([
+        run(
+          "manage_members",
+          { op: "set_role", memberId: y, role: "member" },
+          ctxFor(sessionActor(x, "admin")),
+        ),
+        run(
+          "manage_members",
+          { op: "set_role", memberId: x, role: "member" },
+          ctxFor(sessionActor(y, "admin")),
+        ),
+      ]);
+      expect(results.filter((r) => !r.ok)).toEqual([]);
+    }
   });
 });

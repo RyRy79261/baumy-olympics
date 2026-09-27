@@ -127,11 +127,18 @@ export async function listMembers(
 }
 
 /**
- * Every active admin's id, row-locked (`FOR UPDATE`) in id order until the
- * transaction ends. Demoting or deactivating a member takes these locks
- * first, so two admins demoting each other at once cannot leave the
- * household with none: the second waits for the first, then counts one admin
- * fewer. Locking in one fixed order means the two cannot deadlock either.
+ * Every active admin's id, row-locked in id order until the transaction ends.
+ * Demoting or deactivating a member takes these locks first, so two admins
+ * demoting each other at once cannot leave the household with none: the
+ * second waits for the first, then counts one admin fewer. Locking in one
+ * fixed order means the two cannot deadlock over these rows.
+ *
+ * `FOR NO KEY UPDATE`, not `FOR UPDATE`: runAction's ledger insert has
+ * already taken a `KEY SHARE` lock on the ACTING member's row (the foreign
+ * key check), and `FOR UPDATE` conflicts with that. Two admins demoting each
+ * other would each hold a key-share on themselves and wait for the other's:
+ * a deadlock (seen on Docker Postgres). Only non-key columns change here, so
+ * the weaker lock is enough and still serialises these writers.
  */
 export async function lockActiveAdmins(
   db: Queryable,
@@ -148,11 +155,14 @@ export async function lockActiveAdmins(
       ),
     )
     .orderBy(asc(members.id))
-    .for("update");
+    .for("no key update");
   return rows.map((r) => r.id);
 }
 
-/** A member row in the household, row-locked for the change about to follow. */
+/**
+ * A member row in the household, row-locked (`FOR NO KEY UPDATE`, see
+ * lockActiveAdmins) for the change about to follow.
+ */
 export async function lockMember(
   db: Queryable,
   householdId: string,
@@ -162,7 +172,7 @@ export async function lockMember(
     .select()
     .from(members)
     .where(and(eq(members.id, memberId), eq(members.householdId, householdId)))
-    .for("update");
+    .for("no key update");
   return row ?? null;
 }
 
