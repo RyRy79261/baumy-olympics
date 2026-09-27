@@ -188,6 +188,29 @@ describe("BaumySheet voice", () => {
     expect(baumy()).toBe("talking");
   });
 
+  it("turns the microphone off when the sheet closes during the permission prompt", async () => {
+    const stop = vi.fn();
+    let grant!: (stream: unknown) => void;
+    getUserMedia.mockReturnValue(
+      new Promise((r) => {
+        grant = r;
+      }),
+    );
+    const started = vi.spyOn(FakeRecorder.prototype, "start");
+    mount(true);
+    await act(async () => mic()!.click());
+    const close = [...document.querySelectorAll("button")].find(
+      (b) => b.textContent === "Close",
+    )!;
+    await act(async () => close.click());
+    await act(async () => grant({ getTracks: () => [{ stop }] }));
+    await settle(300);
+    expect(stop).toHaveBeenCalled();
+    expect(started).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    started.mockRestore();
+  });
+
   it("drops a clip too short to hold words", async () => {
     mount(true);
     await act(async () => mic()!.click());
