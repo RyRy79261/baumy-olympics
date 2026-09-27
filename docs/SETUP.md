@@ -114,3 +114,36 @@ done, both Neon workflows exit 0 with a notice, previews are skipped
       branch that already has `NEON_PREVIEW_READY`, redeploy, and check the
       build fails with `points at the production host`. Delete the row
       afterwards.
+
+## Auth (issue #6)
+
+Nothing here blocks development: locally, in CI and in e2e, Better Auth signs
+with a public placeholder secret (fine off Vercel), and reset emails go to the
+console or to the e2e capture file. On any Vercel environment without
+`BETTER_AUTH_SECRET`, auth **fails closed**: `/api/auth/*` answers 503 and
+nobody is signed in (CI checks this against the real build).
+
+- [ ] **Generate the secret** and set `BETTER_AUTH_SECRET` in Vercel for
+      Production **and** Preview (a different value per scope is fine; a
+      preview's sessions then do not work on production). Use
+      `openssl rand -base64 32`. Never commit it.
+- [ ] **Set `BETTER_AUTH_URL`** (Production scope) to the address people
+      visit, for example `https://baumy.example`. Leave it unset on Preview:
+      a preview uses its own `VERCEL_URL`.
+- [ ] **Resend, for password reset.** Create a Resend account, verify the
+      sending domain, then set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (for
+      example `Baumy Olympics <hello@your-domain>`) in Vercel. Without both,
+      `/auth/forgot-password` says reset is off, and nobody can recover a
+      forgotten password.
+- [ ] **Google sign-in (optional).** In Google Cloud Console create an OAuth
+      client (type Web application) with the authorised redirect URI
+      `<BETTER_AUTH_URL>/api/auth/callback/google`, then set `GOOGLE_CLIENT_ID`
+      and `GOOGLE_CLIENT_SECRET` (Production scope). The button only appears
+      when both are set. Previews cannot finish a Google sign-in (Google only
+      calls back registered URIs); use email and password there.
+- [ ] **Never set** `AUTH_EMAIL_CAPTURE_FILE`, `AUTH_RATE_LIMIT_WINDOW_SECONDS`
+      or `AUTH_RATE_LIMIT_MAX` on Vercel. The capture file is refused there
+      anyway; the rate-limit knobs exist only for the e2e harness.
+- [ ] **After the first production deploy**, sign up at `/auth/sign-up`,
+      sign out, sign in, and request a password reset to check the email
+      arrives. The deploy log should show no `[auth]` warning.

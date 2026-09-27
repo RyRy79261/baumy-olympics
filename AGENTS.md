@@ -50,6 +50,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 - Seed fixtures from the constants the code uses (for example `RULESET_V1`), not from copied numbers.
 - Coverage floors live in each workspace's `vitest.config.ts` and **only go up**:
   - core: 95%, and 100% for `scoring/*`;
+  - auth: 95%;
   - db: 75%;
   - web `lib/**`: 90%.
 - E2E runs against Docker Postgres, never against production. External services are faked when `E2E_TEST_MODE=1`, and the app refuses to boot with that flag set on Vercel.
