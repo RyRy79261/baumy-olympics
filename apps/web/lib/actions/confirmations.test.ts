@@ -631,6 +631,19 @@ describe("attach_completion_photo", () => {
         }),
       ),
     ).resolves.toMatchObject({ ok: false, code: "PHOTO_MISSING" });
+    // The route stored it for another claim, even under this claim's folder.
+    await expect(
+      runAction(
+        "attach_completion_photo",
+        { completionId: id },
+        me(ryan, {
+          photo: {
+            completionId: other,
+            pathname: `completions/${id}/abcdefgh.webp`,
+          },
+        }),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "PHOTO_MISSING" });
     await expect(
       runAction(
         "attach_completion_photo",
