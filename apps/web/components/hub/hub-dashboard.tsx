@@ -11,7 +11,7 @@ import {
   cx,
 } from "@baumy/ui";
 import type { HubData } from "@/lib/hub/load";
-import { BaumyLauncher } from "./baumy-launcher";
+import { BaumySheet } from "@/components/baumy/baumy-sheet";
 import { LiveClock } from "./live-clock";
 
 // The hub (SPEC §3.1, issue #20): one screen with the clock, today's events,
@@ -54,10 +54,13 @@ export function HubDashboard({
   hub,
   links,
   kiosk = false,
+  actingName,
 }: {
   hub: HubData;
   links: HubLinks;
   kiosk?: boolean;
+  /** The kiosk's acting member, for the PIN pad of Baumy's proposals. */
+  actingName?: string;
 }) {
   const { events, chores, standings, pot, notes } = hub;
   return (
@@ -196,7 +199,7 @@ export function HubDashboard({
           message="The shopping list moves in here soon."
         />
       </HubGrid>
-      <BaumyLauncher kiosk={kiosk} />
+      <BaumySheet kiosk={kiosk} actingName={actingName} />
     </>
   );
 }

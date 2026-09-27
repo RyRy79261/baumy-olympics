@@ -36,6 +36,7 @@ export default async function KioskHomePage() {
       <HubDashboard
         hub={hub}
         kiosk
+        actingName={kiosk.displayName}
         links={{
           calendar: "/kiosk/calendar",
           chores: "/kiosk/chores",
