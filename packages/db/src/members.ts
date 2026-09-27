@@ -91,6 +91,8 @@ export type MemberListing = Pick<
   hasAccount: boolean;
   hasKioskPin: boolean;
   telegramLinked: boolean;
+  /** For the admin members page, which may set or clear it (issue #27). */
+  telegramUserId: number | null;
 };
 
 /** Everyone in the household, active first, then by when they joined. */
@@ -123,6 +125,7 @@ export async function listMembers(
     hasAccount: authUserId !== null,
     hasKioskPin: kioskPinHash !== null,
     telegramLinked: telegramUserId !== null,
+    telegramUserId,
   }));
 }
 
@@ -179,7 +182,12 @@ export async function lockMember(
 export type MemberPatch = Partial<
   Pick<
     typeof members.$inferInsert,
-    "displayName" | "avatarSprite" | "color" | "role" | "deactivatedAt"
+    | "displayName"
+    | "avatarSprite"
+    | "color"
+    | "role"
+    | "deactivatedAt"
+    | "telegramUserId"
   >
 >;
 
@@ -290,4 +298,44 @@ export async function findKioskPinLockedAt(
     .where(eq(members.id, memberId))
     .limit(1);
   return row?.lockedAt ?? null;
+}
+
+/**
+ * The active member linked to this Telegram user id, or null (issue #27).
+ * The brain endpoint maps `X-Baumy-Actor: tg:<id>` through it on every
+ * request, so unlinking or deactivating takes effect at once.
+ */
+export async function findActiveMemberByTelegramUserId(
+  db: Queryable,
+  householdId: string,
+  telegramUserId: number,
+): Promise<{ id: string; displayName: string } | null> {
+  const [row] = await db
+    .select({ id: members.id, displayName: members.displayName })
+    .from(members)
+    .where(
+      and(
+        eq(members.telegramUserId, telegramUserId),
+        eq(members.householdId, householdId),
+        isNull(members.deactivatedAt),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Who holds this Telegram user id, active or not, or null. The column is
+ * unique, so a deactivated member's link still blocks anyone else's.
+ */
+export async function findMemberIdByTelegramUserId(
+  db: Queryable,
+  telegramUserId: number,
+): Promise<string | null> {
+  const [row] = await db
+    .select({ id: members.id })
+    .from(members)
+    .where(eq(members.telegramUserId, telegramUserId))
+    .limit(1);
+  return row?.id ?? null;
 }
