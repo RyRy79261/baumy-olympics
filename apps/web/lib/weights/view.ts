@@ -48,11 +48,10 @@ export function verdictLabel(live: WeightRowView["live"]): string {
   }
 }
 
-/** The sparkline's words: "Gaps between completions: 6, 7, 7 days". */
+/** The sparkline's words: "Gaps between completions: 6 days, 12 h." */
 export function intervalsLabel(intervals: readonly number[]): string {
   if (intervals.length === 0) return "No gaps measured yet.";
-  const days = intervals.map((m) => short(m / DAY_MIN)).join(", ");
-  return `Gaps between completions, in days: ${days}.`;
+  return `Gaps between completions: ${intervals.map(formatMinutes).join(", ")}.`;
 }
 
 /** "Applies Mon 5 Oct, 00:00 (Berlin time) unless someone vetoes it." */
