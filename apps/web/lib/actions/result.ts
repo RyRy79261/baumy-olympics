@@ -49,7 +49,22 @@ export type DomainErrorCode =
   /** The change would leave the household without an active admin. */
   | "LAST_ADMIN"
   /** Needs the current password or a session under 10 minutes old. */
-  | "REAUTH_REQUIRED";
+  | "REAUTH_REQUIRED"
+  /** The chore was done too recently; `retryAt` says when it may be logged. */
+  | "COOLDOWN"
+  /** A completion more than 2 minutes in the future. */
+  | "FUTURE"
+  /** A completion more than 24h ago. */
+  | "BACKDATE_TOO_FAR"
+  /** A completion before the chore's last one; history is append-only. */
+  | "OUT_OF_ORDER"
+  | "SEASON_CLOSED"
+  | "PHOTO_REQUIRED"
+  | "ARCHIVED_CHORE"
+  /** The chore has no points set for that time. */
+  | "NO_RULE_VERSION"
+  /** Another chore that is not archived already has that name. */
+  | "CHORE_NAME_TAKEN";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 
@@ -68,6 +83,8 @@ export interface ActionFailure {
   issues?: InputIssue[];
   /** With RATE_LIMITED. */
   retryAfterSeconds?: number;
+  /** With COOLDOWN: when it may be tried again, ISO 8601. */
+  retryAt?: string;
 }
 
 export interface ActionSuccess<O> {
@@ -80,7 +97,7 @@ export type ActionResult<O> = ActionSuccess<O> | ActionFailure;
 export function fail(
   code: ActionErrorCode,
   message: string,
-  extra: Pick<ActionFailure, "issues" | "retryAfterSeconds"> = {},
+  extra: Pick<ActionFailure, "issues" | "retryAfterSeconds" | "retryAt"> = {},
 ): ActionFailure {
   return { ok: false, code, message, ...extra };
 }
