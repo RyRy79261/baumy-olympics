@@ -222,7 +222,8 @@ beforeEach(() => {
   deps = {
     ...defaultDeps,
     rateLimiter: allowAll,
-    verifyPin: async ({ pin }) => pin === "1234",
+    verifyPin: async ({ pin }) =>
+      pin === "1234" ? { ok: true } : { ok: false, reason: "wrong" },
     logError,
     // Counts open transactions, so a test can see none is open in execute.
     withTransaction: async <T>(fn: (tx: Tx) => Promise<T>) => {

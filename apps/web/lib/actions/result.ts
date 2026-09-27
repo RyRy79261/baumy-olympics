@@ -20,6 +20,8 @@ export type PlatformErrorCode =
   | "ATTESTATION_REQUIRED"
   /** The PIN sent with a kiosk action was not accepted. */
   | "ATTESTATION_FAILED"
+  /** The member's kiosk PIN is locked after 10 failures in 24h. */
+  | "PIN_LOCKED"
   | "RATE_LIMITED"
   /** The request id was already used for a different input. */
   | "IDEMPOTENCY_CONFLICT"
