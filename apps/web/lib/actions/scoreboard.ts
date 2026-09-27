@@ -23,7 +23,11 @@ import {
   type AdjustmentListing,
   type ScoredCompletion,
 } from "@baumy/db/scores";
-import { findSeason, type SeasonRow } from "@baumy/db/seasons";
+import {
+  findSeason,
+  seasonStatusNow,
+  type SeasonRow,
+} from "@baumy/db/seasons";
 import { defineAction, type ActionCtx } from "./define";
 import { fail } from "./result";
 
@@ -60,7 +64,8 @@ interface SeasonScope {
 /**
  * The season for `year` (default: the one `now` is in). A season nobody has
  * logged anything in yet has no row; it reads as active, `points`, and empty.
- * Reads never create one.
+ * Reads never create one. The status is the one at `now`
+ * (`seasonStatusNow`), whether or not the daily job has written it.
  */
 async function seasonScope(
   ctx: ActionCtx,
@@ -73,7 +78,7 @@ async function seasonScope(
     view: {
       year: y,
       prizeMode: row?.prizeMode ?? "points",
-      status: row?.status ?? "active",
+      status: row ? await seasonStatusNow(ctx.db, row, ctx.now) : "active",
     },
   };
 }
