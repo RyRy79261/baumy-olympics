@@ -106,6 +106,9 @@ export const disputeResolution = pgEnum("dispute_resolution", [
   "expired",
 ]);
 
+/** Who an `ai_usage` row paid (SPEC §5): Claude for commands, Groq for speech. */
+export const aiProvider = pgEnum("ai_provider", ["anthropic", "groq"]);
+
 // ---------------------------------------------------------------------------
 // Better Auth (ADR 0001, SPEC §5)
 // ---------------------------------------------------------------------------
@@ -921,4 +924,37 @@ export const actionRateLimit = pgTable(
     windowStart: bigint("window_start", { mode: "number" }).notNull(),
   },
   (t) => [index("action_rate_limit_window_start_idx").on(t.windowStart)],
+);
+
+/**
+ * What the AI features cost, per member (SPEC §5, §6.3). One `anthropic` row
+ * per Baumy command, with the tokens of every Claude call in its tool loop
+ * summed: the row is claimed before the first call (`claimAiCommand` in
+ * ai-usage.ts, which also enforces the daily limit) and its tokens are added
+ * when the loop ends. Groq rows (speech, issue #22) carry `audio_seconds`.
+ */
+export const aiUsage = pgTable(
+  "ai_usage",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id),
+    provider: aiProvider("provider").notNull(),
+    model: text("model"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    audioSeconds: doublePrecision("audio_seconds"),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("ai_usage_member_at_idx").on(t.memberId, t.provider, t.at),
+    check(
+      "ai_usage_tokens_non_negative",
+      sql`${t.inputTokens} >= 0 AND ${t.outputTokens} >= 0`,
+    ),
+  ],
 );
