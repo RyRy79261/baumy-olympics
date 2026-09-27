@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { findKioskPinLockedAt } from "@baumy/db/members";
 import { AppShell, FormMessage, buttonClass } from "@baumy/ui";
+import { runAction } from "@/lib/actions/registry";
+import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { NavLinks, type NavItem } from "./nav-links";
 
@@ -20,9 +22,20 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     createHttpDb() as unknown as Queryable,
     me.memberId,
   );
+  // "Needs your OK" shows how many claims wait on this member (SPEC §4.3).
+  const pending = await runAction(
+    "get_pending_confirmations",
+    {},
+    (await uiRequestCtx(undefined))!,
+  );
+  const waiting = pending.ok ? pending.data.needsYouCount : 0;
   const items: NavItem[] = [
     { href: "/", label: "Hub" },
     { href: "/chores", label: "Chores" },
+    {
+      href: "/inbox",
+      label: waiting > 0 ? `Needs your OK (${waiting})` : "Needs your OK",
+    },
     { href: "/settings", label: "Settings" },
     ...(me.role === "admin"
       ? ([
