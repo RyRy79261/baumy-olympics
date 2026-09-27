@@ -125,6 +125,19 @@ jobs:
       - name: CI gate
         run: pnpm turbo run format:check lint typecheck test build
 
+      # The deploy scripts (ADR 0004): the Vercel ignored-build step and the
+      # Neon preview provisioning, the latter against a fake curl. shellcheck
+      # ships on the ubuntu runner.
+      - name: Test the deploy shell scripts
+        run: |
+          shellcheck scripts/vercel-ignore-build.sh scripts/neon-preview-env.sh \
+            scripts/tests/*.sh scripts/tests/fake-bin/curl
+          for t in scripts/tests/*.test.sh; do
+            echo "::group::$t"
+            bash "$t"
+            echo "::endgroup::"
+          done
+
   # COVERAGE AS A RATCHET. The floors live in each workspace's
   # `vitest.config.ts`, so `pnpm test:coverage` enforces them identically on a
   # laptop and here. `turbo run test:coverage` covers every workspace that has
@@ -221,6 +234,32 @@ jobs:
 
       - name: Run the Docker Postgres tests
         run: pnpm db:local:test
+
+      # The preview migrate guard (ADR 0004) through the real `vercel-build`
+      # entry point. wsproxy ignores the host in the URL, so the "production"
+      # host here is just a name the guard compares against.
+      - name: Preview migrate guard refuses the production host
+        env:
+          NEON_LOCAL_PROXY: "1"
+          DATABASE_URL_UNPOOLED: postgres://postgres:postgres@localhost:54329/baumy
+        run: |
+          set +e
+          VERCEL_ENV=preview PROD_DB_HOST=localhost \
+            pnpm --filter @baumy/web run vercel-build > "$RUNNER_TEMP/guard.log" 2>&1
+          code=$?
+          cat "$RUNNER_TEMP/guard.log"
+          if [ "$code" -eq 0 ]; then
+            echo "::error::vercel-build ran on a preview pointed at PROD_DB_HOST"
+            exit 1
+          fi
+          grep -q "points at the production host" "$RUNNER_TEMP/guard.log"
+          if grep -q "Creating an optimized production build" "$RUNNER_TEMP/guard.log"; then
+            echo "::error::next build started after the guard refused"
+            exit 1
+          fi
+          VERCEL_ENV=preview PROD_DB_HOST=ep-prod.eu-central-1.aws.neon.tech \
+            pnpm --filter @baumy/db db:migrate
+          VERCEL_ENV=production pnpm --filter @baumy/db db:migrate
 
       - name: Show container logs
         if: failure()
