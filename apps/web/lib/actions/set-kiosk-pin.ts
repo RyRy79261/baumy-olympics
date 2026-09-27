@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { hashKioskPin } from "@baumy/auth/kiosk-pin";
+import { clearKioskPinAttempts } from "@baumy/db/kiosk-pin";
 import { hasKioskPin, setKioskPinHash } from "@baumy/db/members";
 import { KioskPin } from "@baumy/types";
 import { verifyCurrentPassword } from "@/lib/auth/password-check";
@@ -11,7 +12,8 @@ import { fail } from "./result";
 // needs the account password or a session signed in under 10 minutes ago,
 // so a phone left unlocked on the table cannot be used to take over
 // someone's kiosk attestation. Setting it also lifts a lock from failed PIN
-// attempts (`kiosk_pin_locked_at`).
+// attempts (`kiosk_pin_locked_at`) and forgets the attempts counted so far,
+// on every kiosk, in the same transaction.
 //
 // Neither the PIN nor the password reaches the ledger or the audit row: the
 // fingerprint leaves both out, and the result holds neither.
@@ -69,6 +71,7 @@ export const setKioskPin = defineAction({
       }
     }
     await setKioskPinHash(ctx.db, actor.memberId, await hashKioskPin(pin));
+    await clearKioskPinAttempts(ctx.db, actor.memberId);
     const data: SetKioskPinData = { changed };
     return {
       ok: true,
