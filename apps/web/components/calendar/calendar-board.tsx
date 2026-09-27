@@ -261,7 +261,9 @@ function EventDetails({
       {event.addedBy ? (
         <>
           <dt className="text-neutral-600">Added by</dt>
-          <dd>{memberNames[event.addedBy] ?? "a former member"}</dd>
+          <dd data-testid="event-added-by">
+            {memberNames[event.addedBy] ?? "a former member"}
+          </dd>
         </>
       ) : null}
     </dl>
@@ -342,7 +344,7 @@ function EventForm({
         )}
       </Field>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field id={`${id}-date`} label="Day" errors={errors.date}>
+        <Field id={`${id}-date`} label="Date" errors={errors.date}>
           {(c) => (
             <Input
               {...c}
