@@ -29,7 +29,7 @@ export {
 } from "./chores";
 export { cx } from "./cx";
 export { Dialog } from "./dialog";
-export { Field, FormMessage, Input, Select, Textarea } from "./field";
+export { Checkbox, Field, FormMessage, Input, Select, Textarea } from "./field";
 export {
   BaumyButton,
   ClockFace,
