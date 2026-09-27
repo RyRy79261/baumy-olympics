@@ -15,7 +15,10 @@
     "./telegram-link-codes": "./src/telegram-link-codes.ts",
     "./kiosk-devices": "./src/kiosk-devices.ts",
     "./kiosk-pin": "./src/kiosk-pin.ts",
-    "./test-harness": "./src/__tests__/_harness.ts"
+    "./seasons": "./src/seasons.ts",
+    "./completions": "./src/completions.ts",
+    "./test-harness": "./src/__tests__/_harness.ts",
+    "./game-fixtures": "./src/__tests__/_game-fixtures.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
@@ -29,6 +32,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@baumy/core": "workspace:*",
+    "@baumy/types": "workspace:*",
     "@neondatabase/serverless": "^1.1.0",
     "drizzle-orm": "^0.45.3"
   },
