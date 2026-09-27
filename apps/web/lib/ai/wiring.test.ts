@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
 import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
+import { aiUsage } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
 import { ctxFor, seedMember, sessionActor } from "@/test-utils/actions";
 
@@ -13,8 +14,12 @@ const uiRequestCtx = vi.fn(async () => null);
 vi.mock("@/lib/actions/kiosk", () => ({ kioskRequestCtx }));
 vi.mock("@/lib/actions/ui", () => ({ uiRequestCtx }));
 
-const { commandRouteDeps, proposalRouteDeps, runRouteDeps } =
-  await import("./wiring");
+const {
+  commandRouteDeps,
+  proposalRouteDeps,
+  runRouteDeps,
+  transcribeRouteDeps,
+} = await import("./wiring");
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -63,5 +68,25 @@ describe("AI route wiring", () => {
     deps.logError("x", "y");
     expect(err).toHaveBeenCalledWith("x", "y");
     err.mockRestore();
+  });
+
+  it("gives the transcriber its adapter, and records a clip's seconds", async () => {
+    const ryan = await seedMember(db(), { displayName: "Ryan" });
+    const deps = transcribeRouteDeps();
+    expect(typeof deps.transcriber().ok).toBe("boolean");
+    expect(typeof deps.rateLimiter.limit).toBe("function");
+    await deps.recordAudio(
+      ctxFor(sessionActor(ryan)),
+      "whisper-large-v3-turbo",
+      2.5,
+    );
+    const rows = await t.db().select().from(aiUsage);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        memberId: ryan,
+        provider: "groq",
+        audioSeconds: 2.5,
+      }),
+    ]);
   });
 });
