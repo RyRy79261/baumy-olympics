@@ -5,12 +5,7 @@ import type { ActionDef, ActionName, AnyActionDef, RequestCtx } from "./define";
 import { addPotContribution } from "./add-pot-contribution";
 import { adjustPoints } from "./adjust-points";
 import { attachCompletionPhoto } from "./attach-completion-photo";
-import {
-  createEvent,
-  deleteEvent,
-  listEvents,
-  updateEvent,
-} from "./calendar";
+import { createEvent, deleteEvent, listEvents, updateEvent } from "./calendar";
 import { checkKioskPin } from "./check-kiosk-pin";
 import {
   concedeCompletion,
