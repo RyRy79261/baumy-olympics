@@ -45,11 +45,24 @@ export default defineConfig({
   // All run on Chromium, the only browser CI installs. Specs that move the
   // shared server clock run in their own project, `server-clock`, one test
   // at a time (`workers: 1`), so two of them never move the clock under each
-  // other; the other projects run beside it and do not move the clock.
+  // other. The other projects depend on it, so they start only once it has
+  // finished and the clock is back on real time: every page they load reads
+  // that one clock, and a chore logged while it stood 25h ahead (claims) or
+  // at 23:10 (kiosk-night) would land on the wrong day. A dependency ignores
+  // file filters, so a slice run runs the clock specs first too (skip them
+  // with --no-deps when the slice moves no clock and the founders exist).
   projects: [
+    {
+      // Every project's founder, bootstrapped once before anything else
+      // (e2e/founders.setup.ts), so no two specs race to create one.
+      name: "founders",
+      testMatch: "**/founders.setup.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "desktop-chromium",
       testIgnore: SHARED_CLOCK_SPECS,
+      dependencies: ["server-clock"],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 800 },
@@ -61,6 +74,7 @@ export default defineConfig({
       name: "server-clock",
       testMatch: SHARED_CLOCK_SPECS,
       workers: 1,
+      dependencies: ["founders"],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 800 },
@@ -70,6 +84,7 @@ export default defineConfig({
       // The kitchen kiosk.
       name: "ipad-landscape",
       testIgnore: SHARED_CLOCK_SPECS,
+      dependencies: ["server-clock"],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1180, height: 820 },
@@ -81,6 +96,7 @@ export default defineConfig({
     {
       name: "mobile-360",
       testIgnore: SHARED_CLOCK_SPECS,
+      dependencies: ["server-clock"],
       use: {
         ...devices["Pixel 7"],
         viewport: { width: 360, height: 780 },
