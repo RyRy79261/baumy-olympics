@@ -4,6 +4,7 @@ import {
   berlinParts,
   berlinWallTimeToUtc,
   berlinWeekday,
+  formatBerlinDateTime,
   isBerlinMonday,
   nextBerlinMonday,
   seasonBounds,
@@ -161,6 +162,25 @@ describe("weekdays and Mondays", () => {
           );
         },
       ),
+    );
+  });
+});
+
+describe("formatBerlinDateTime", () => {
+  it("reads Berlin wall time in summer and in winter", () => {
+    // 06:00Z is 08:00 in Berlin summer time (+2h).
+    expect(formatBerlinDateTime(iso("2026-09-30T06:00:00Z"))).toBe(
+      "Wed 30 Sep, 08:00",
+    );
+    // 06:05Z is 07:05 in Berlin winter time (+1h).
+    expect(formatBerlinDateTime(iso("2026-01-05T06:05:00Z"))).toBe(
+      "Mon 5 Jan, 07:05",
+    );
+  });
+
+  it("puts a UTC evening on the next Berlin day", () => {
+    expect(formatBerlinDateTime(iso("2026-12-31T23:30:00Z"))).toBe(
+      "Fri 1 Jan, 00:30",
     );
   });
 });
