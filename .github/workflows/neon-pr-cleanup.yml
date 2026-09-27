@@ -1,0 +1,225 @@
+name: Delete Neon branch for closed PR
+
+# WHY THIS EXISTS, and what it cost to find out.
+#
+# The Vercel–Neon integration provisions a database branch for every preview
+# deployment and NEVER removes it. Nothing else does either, so every pull
+# request leaves one behind permanently. Once the project hits its branch quota,
+# Neon stops handing out new ones — and Vercel then rejects the preview
+# deployment IN ABOUT ONE SECOND, before any build starts.
+#
+# That failure mode is deeply unhelpful to diagnose from the outside. It looks
+# exactly like a broken build: three red "Vercel – …" checks on the pull request.
+# It is not. Production deployments keep working perfectly (they need no new
+# branch), the code is fine, and every local reproduction passes. The only
+# distinguishing signal is the CLOCK — a real build takes minutes, and these die
+# in a second, because they were refused rather than run.
+#
+# So: when a PR closes (merged or not), delete the Neon branch created for it.
+#
+# Ported from RyRy79261/intake-tracker, where this was already solved. Kept close
+# to that version on purpose — it is proven, and the reasoning in its comments is
+# the reason it works.
+#
+# Copied into baumy-olympics from afrikaburn-contributors-app
+# (origin/main:.github/workflows/neon-pr-cleanup.yml) per ADR 0004. Only change:
+# the Vercel step also deletes the branch-scoped NEON_PREVIEW_READY row that
+# scripts/neon-preview-env.sh writes. It still runs for Dependabot PRs, as a
+# safety net, even though none should have a branch.
+#
+# ## Naming
+#
+# scripts/neon-preview-env.sh (like the integration before it) names preview
+# branches after the git head branch:
+#
+#     preview/<head-branch-name>
+#
+# We look these up by PREFIX rather than reconstructing the full name from event
+# data — head-ref slugging can differ between Vercel, the Neon integration and
+# the action that reports branch names, so a prefix match is more robust while
+# staying narrowly scoped to this PR. (It does mean a branch named `feat-a` would
+# also match `preview/feat-a-b`; keep branch names distinct, which they are.)
+
+# `pull_request_target` (not `pull_request`) so the base repository's Actions
+# secret store is available even when the PR was opened or closed by Dependabot
+# or from a fork. Under `pull_request`, a Dependabot-actor close gets the empty
+# Dependabot secret store, NEON_API_KEY resolves to nothing, and the job fails
+# before deleting anything — leaking the branch it exists to remove.
+#
+# This is safe here, and the reason is worth stating because `pull_request_target`
+# is normally a red flag: this job checks out NO PR CODE. It reads event metadata
+# and calls the Neon REST API. There is no untrusted-code surface for a fork to
+# reach the secrets through.
+on:
+  pull_request_target:
+    types: [closed]
+
+# Least privilege — this job never writes to the repository.
+permissions:
+  contents: read
+
+jobs:
+  delete-neon-branch:
+    # Only same-repo PRs get a `preview/<head-branch>` Neon branch from the
+    # integration, so scope cleanup to those. Fork PRs have nothing to delete,
+    # and skipping them keeps the pull_request_target blast radius minimal.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Neon branch for this PR
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          # Unconfigured is not an error, matching scripts/neon-preview-env.sh:
+          # with no Neon secrets the preview workflow never created a branch,
+          # so there is nothing here to leak. Failing would turn every closed
+          # PR red until someone configures an opt-in feature.
+          if [ -z "${NEON_API_KEY:-}" ] || [ -z "${NEON_PROJECT_ID:-}" ]; then
+            echo "::notice::Neon preview wiring is not configured (NEON_API_KEY / NEON_PROJECT_ID unset) — nothing to clean up."
+            exit 0
+          fi
+
+          prefix="preview/${HEAD_REF}"
+          echo "Looking up Neon branches with prefix: $prefix"
+
+          api="https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}"
+          auth="Authorization: Bearer ${NEON_API_KEY}"
+
+          # Bounded timeouts + bounded retries: transient hangs and 5xx get
+          # retried, client errors do not (which is why --retry-all-errors is
+          # deliberately absent).
+          curl_opts=(--connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5)
+
+          # Page through ALL branches (cursor-based; follow pagination.next).
+          # Without this, an over-quota project with enough branches to span
+          # multiple pages could hide the target beyond the first page — a false
+          # "nothing to delete" and a silent leak, on exactly the project where
+          # the leak matters most.
+          all_branches='[]'
+          cursor=""
+          while :; do
+            url="$api/branches?limit=10000"
+            if [ -n "$cursor" ]; then
+              url="${url}&cursor=${cursor}"
+            fi
+            resp=$(curl -sS "${curl_opts[@]}" -w "\n%{http_code}" -H "$auth" -H "Accept: application/json" "$url")
+            body=$(printf '%s' "$resp" | sed '$d')
+            status=$(printf '%s' "$resp" | tail -n1)
+            if [ "$status" != "200" ]; then
+              echo "::error::Neon API returned HTTP $status when listing branches"
+              echo "$body"
+              exit 1
+            fi
+            all_branches=$(jq -n --argjson acc "$all_branches" --argjson page "$body" '$acc + ($page.branches // [])')
+            cursor=$(printf '%s' "$body" | jq -r '.pagination.next // empty')
+            if [ -z "$cursor" ]; then
+              break
+            fi
+          done
+
+          # Non-primary branches matching this PR's prefix. `primary != true` is
+          # the guard that matters most in this repository: the primary branch is
+          # PRODUCTION, holding real burners' registrations, and it must never be
+          # a candidate for deletion under any circumstance.
+          targets=$(printf '%s' "$all_branches" | jq -r --arg prefix "$prefix" '
+            .[]
+            | select(.primary != true)
+            | select(.name | startswith($prefix))
+            | [.id, .name] | @tsv
+          ')
+
+          if [ -z "$targets" ]; then
+            echo "No Neon branch found for PR #${PR_NUMBER} (prefix: $prefix). Nothing to delete."
+            exit 0
+          fi
+
+          # In practice there is exactly one match per PR; the loop is defensive
+          # in case an earlier failed run left duplicates behind.
+          while IFS=$'\t' read -r id name; do
+            [ -z "$id" ] && continue
+            echo "Deleting branch: $name (id=$id)"
+            del_status=$(curl -sS "${curl_opts[@]}" -o /dev/null -w "%{http_code}" -X DELETE -H "$auth" "$api/branches/$id")
+            if [ "$del_status" = "200" ] || [ "$del_status" = "202" ]; then
+              echo "  ok"
+            else
+              echo "::error::Failed to delete $name (HTTP $del_status)"
+              exit 1
+            fi
+          done <<< "$targets"
+
+      # Pairs with neon-pr-preview.yml, which writes git-branch-scoped Preview
+      # DATABASE_URL / DATABASE_URL_UNPOOLED / NEON_PREVIEW_READY rows onto each
+      # Vercel project.
+      # Deleting the Neon branch without deleting those rows leaves every closed
+      # PR's env behind pointing at a database that no longer exists — the same
+      # slow accumulation the Neon branch leak above was, one API up.
+      #
+      # `always()` so the rows go even if the Neon delete failed; they are dead
+      # either way. Skips quietly when the Vercel secrets are not configured,
+      # which is the state this repo is in until someone opts in.
+      - name: Delete git-branch-scoped Vercel Preview env
+        if: always()
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_IDS: ${{ secrets.VERCEL_PROJECT_IDS }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${VERCEL_TOKEN:-}" ] || [ -z "${VERCEL_ORG_ID:-}" ] || [ -z "${VERCEL_PROJECT_IDS:-}" ]; then
+            echo "Vercel secrets not configured — skipping Preview env cleanup."
+            exit 0
+          fi
+          if [ -z "${HEAD_REF:-}" ]; then
+            echo "::warning::no head ref on this event; skipping Preview env cleanup"
+            exit 0
+          fi
+
+          auth=( -H "Authorization: Bearer ${VERCEL_TOKEN}" -H "Accept: application/json" )
+          api="https://api.vercel.com"
+          curl_opts=(--connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5)
+
+          IFS=',' read -r -a project_ids <<< "$VERCEL_PROJECT_IDS"
+          for project_id in "${project_ids[@]}"; do
+            project_id="$(echo "$project_id" | tr -d '[:space:]')"
+            [ -z "$project_id" ] && continue
+            echo "Scanning env on ${project_id} for gitBranch=${HEAD_REF}"
+
+            list=$(curl -sS "${curl_opts[@]}" "${auth[@]}" \
+              "${api}/v9/projects/${project_id}/env?teamId=${VERCEL_ORG_ID}")
+            if ! printf '%s' "$list" | jq -e '.envs' >/dev/null 2>&1; then
+              echo "::warning::could not list env for ${project_id}; skipping"
+              continue
+            fi
+
+            # Narrowly scoped: only the keys neon-preview-env.sh writes, only target
+            # "preview", only rows pinned to THIS git branch. Production and
+            # unscoped preview env are never candidates.
+            ids=$(printf '%s' "$list" | jq -r --arg branch "$HEAD_REF" '
+              .envs[]?
+              | select(.key == "DATABASE_URL" or .key == "DATABASE_URL_UNPOOLED" or .key == "NEON_PREVIEW_READY")
+              | select((.target // []) | index("preview"))
+              | select((.gitBranch // "") == $branch)
+              | .id
+            ')
+
+            if [ -z "$ids" ]; then
+              echo "  nothing to delete"
+              continue
+            fi
+            while IFS= read -r eid; do
+              [ -z "$eid" ] && continue
+              echo "  deleting env id=${eid}"
+              code=$(curl -sS "${curl_opts[@]}" -o /dev/null -w "%{http_code}" -X DELETE "${auth[@]}" \
+                "${api}/v9/projects/${project_id}/env/${eid}?teamId=${VERCEL_ORG_ID}")
+              if [ "$code" != "200" ] && [ "$code" != "202" ]; then
+                echo "::warning::delete env ${eid} returned HTTP ${code}"
+              fi
+            done <<< "$ids"
+          done
