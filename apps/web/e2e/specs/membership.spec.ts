@@ -1,6 +1,5 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
-import { founderEmail, freshEmail, signUp, signUpOrIn } from "../lib/accounts";
-import { waitForAuthMail } from "../lib/mail";
+import { expect, test } from "@playwright/test";
+import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 
 // Issue #9 end to end, against Docker Postgres: only household members see
 // the hub. A founder (FOUNDER_EMAILS, set per project by e2e-local.sh)
@@ -10,64 +9,6 @@ import { waitForAuthMail } from "../lib/mail";
 // One worker runs this file's tests in order: they share this project's
 // founder account, and two tests bootstrapping it at once would race.
 test.describe.configure({ mode: "default" });
-
-/** The founder for this project, signed in as the household admin. */
-async function founderAdmin(page: Page, project: string) {
-  const email = founderEmail(project);
-  await signUpOrIn(page, email);
-  await page.goto("/");
-  if (new URL(page.url()).pathname === "/join") {
-    await expect(
-      page.getByRole("heading", { name: "You're on the founders list" }),
-    ).toBeVisible();
-    if (await page.getByText("Confirm your email").isVisible()) {
-      // The link sent on sign-up, read from the e2e capture file.
-      await page.goto(await waitForAuthMail(email, "verify"));
-      await page.goto("/join");
-    }
-    const founder = page.locator("form").filter({
-      has: page.getByRole("button", { name: "Join as admin" }),
-    });
-    await founder.getByLabel("Your name").fill(`Founder ${project}`);
-    await founder.getByRole("button", { name: "Join as admin" }).click();
-  }
-  await expect(page).toHaveURL(/\/$/);
-  await expect(
-    page.getByRole("heading", { name: "Hub", level: 1 }),
-  ).toBeVisible();
-}
-
-async function mintCode(page: Page, uses = 1): Promise<string> {
-  await page.goto("/admin/members");
-  await expect(
-    page.getByRole("heading", { name: "Members", level: 1 }),
-  ).toBeVisible();
-  const form = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Create invite code" }),
-  });
-  await form.getByLabel("Uses").fill(String(uses));
-  await form.getByRole("button", { name: "Create invite code" }).click();
-  const code = (await page.getByTestId("minted-code").textContent())!.trim();
-  expect(code).toMatch(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
-  await expect(page.getByTestId(`invite-${code}`)).toContainText("0 of");
-  return code;
-}
-
-async function newAccount(browser: Browser, label: string) {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await signUp(page, freshEmail(label));
-  return { context, page };
-}
-
-async function redeem(page: Page, code: string, name: string) {
-  await page.getByLabel("Invite code").fill(code);
-  const form = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Join the household" }),
-  });
-  await form.getByLabel("Your name").fill(name);
-  await form.getByRole("button", { name: "Join the household" }).click();
-}
 
 test("a founder mints a code and a new account redeems it to reach the hub", async ({
   page,
