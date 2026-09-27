@@ -9,7 +9,9 @@
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
     "./household": "./src/household.ts",
-    "./rate-limit": "./src/rate-limit.ts"
+    "./rate-limit": "./src/rate-limit.ts",
+    "./members": "./src/members.ts",
+    "./test-harness": "./src/__tests__/_harness.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
