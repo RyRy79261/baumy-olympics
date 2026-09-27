@@ -3,6 +3,7 @@
 // variants, never their own colours or borders.
 
 export { AppShell, navItemClass } from "./app-shell";
+export { ProposalItem, SpeechBubble, type ProposalState } from "./baumy";
 export {
   Button,
   buttonClass,
