@@ -4,7 +4,9 @@ import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import {
   findActiveMemberByAuthUserId,
+  findActiveMemberByTelegramUserId,
   findMemberByAuthUserId,
+  findMemberIdByTelegramUserId,
   hasKioskPin,
   insertMember,
   listMembers,
@@ -98,6 +100,7 @@ describe("member writes and listings", () => {
       hasAccount: true,
       hasKioskPin: true,
       telegramLinked: false,
+      telegramUserId: null,
     });
     expect(list[1]).toMatchObject({ hasKioskPin: false });
     expect(list[0]).not.toHaveProperty("kioskPinHash");
@@ -157,5 +160,34 @@ describe("member writes and listings", () => {
     await expect(
       setKioskPinHash(db(), "00000000-0000-4000-8000-00000000dead", "x"),
     ).resolves.toBe(false);
+  });
+});
+
+describe("Telegram lookups", () => {
+  const db = () => t.db() as unknown as Queryable;
+  const TG = 5_000_000_001;
+
+  it("finds the active member linked to a Telegram id", async () => {
+    const m = await seed("u_tg");
+    await expect(
+      findActiveMemberByTelegramUserId(db(), HOUSEHOLD_ID, TG),
+    ).resolves.toBeNull();
+    await updateMember(db(), m.id, { telegramUserId: TG });
+    await expect(
+      findActiveMemberByTelegramUserId(db(), HOUSEHOLD_ID, TG),
+    ).resolves.toEqual({ id: m.id, displayName: "Ryan" });
+    await expect(findMemberIdByTelegramUserId(db(), TG)).resolves.toBe(m.id);
+    await expect(findMemberIdByTelegramUserId(db(), TG + 1)).resolves.toBe(
+      null,
+    );
+  });
+
+  it("does not map a deactivated member, but still reports who holds the id", async () => {
+    const m = await seed("u_tg_gone", new Date("2026-01-01T00:00:00Z"));
+    await updateMember(db(), m.id, { telegramUserId: TG });
+    await expect(findMemberIdByTelegramUserId(db(), TG)).resolves.toBe(m.id);
+    await expect(
+      findActiveMemberByTelegramUserId(db(), HOUSEHOLD_ID, TG),
+    ).resolves.toBeNull();
   });
 });
