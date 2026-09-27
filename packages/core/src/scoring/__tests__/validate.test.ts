@@ -233,6 +233,20 @@ describe("validateNewCompletion", () => {
     );
   });
 
+  it("OUT_OF_ORDER: a backdate into a closing season cannot precede January", () => {
+    const now = berlin(2027, 1, 1, 10);
+    expect(
+      validateNewCompletion(
+        attempt({
+          now,
+          occurredAt: berlin(2026, 12, 31, 23),
+          seasonStatus: "closing",
+          completions: [row(berlin(2027, 1, 1, 8))],
+        }),
+      ),
+    ).toEqual({ ok: false, code: "OUT_OF_ORDER" });
+  });
+
   it("PHOTO_REQUIRED: a required-proof chore needs a photo", () => {
     const chore = { archivedAt: null, proofMode: "required" as const };
     expect(validateNewCompletion(attempt({ chore }))).toEqual({

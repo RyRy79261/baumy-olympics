@@ -45,9 +45,11 @@ export interface NewCompletion {
   seasonStatus: SeasonStatus;
   ruleVersions: readonly RuleVersion[];
   /**
-   * The chore's completions in that season, plus the previous live one from
-   * before it, so `COOLDOWN` reaches across the season boundary (E12).
-   * Non-live rows may be included; they are ignored.
+   * The chore's completions from the start of the season `occurredAt` falls
+   * in onward (including any already in the next season, which a backdated
+   * completion into a `closing` season must not slip in before), plus the
+   * previous live one from before it, so `COOLDOWN` reaches across the season
+   * boundary (E12). Non-live rows may be included; they are ignored.
    */
   completions: readonly ValidatorCompletion[];
 }
