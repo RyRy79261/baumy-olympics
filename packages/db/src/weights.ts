@@ -305,8 +305,11 @@ export async function applyDueSuggestions(
   now: Date,
   scope: { householdId?: string } = {},
 ): Promise<AppliedSuggestion[]> {
-  const due = await db
-    .select()
+  // Chore first, then the suggestion, as `schedule_weight` and
+  // `computeSuggestions` lock them, so no two of them can deadlock. The first
+  // read takes no lock; each row is claimed again under the chore's lock.
+  const candidates = await db
+    .select({ id: weightSuggestions.id, choreId: weightSuggestions.choreId })
     .from(weightSuggestions)
     .where(
       and(
@@ -317,15 +320,26 @@ export async function applyDueSuggestions(
           : undefined,
       ),
     )
-    .orderBy(asc(weightSuggestions.appliesAt), asc(weightSuggestions.id))
-    .for("update", { skipLocked: true });
+    .orderBy(asc(weightSuggestions.appliesAt), asc(weightSuggestions.id));
   const applied: AppliedSuggestion[] = [];
-  for (const s of due) {
+  for (const candidate of candidates) {
     const [chore] = await db
       .select()
       .from(chores)
-      .where(eq(chores.id, s.choreId))
+      .where(eq(chores.id, candidate.choreId))
       .for("update");
+    const [s] = await db
+      .select()
+      .from(weightSuggestions)
+      .where(
+        and(
+          eq(weightSuggestions.id, candidate.id),
+          eq(weightSuggestions.status, "scheduled"),
+          lte(weightSuggestions.appliesAt, now),
+        ),
+      )
+      .for("update", { skipLocked: true });
+    if (!s) continue;
     if (
       !changeSpacingOk({
         appliesAt: s.appliesAt!,
@@ -403,8 +417,8 @@ export async function findSuggestion(
 
 /**
  * A suggestion of the household by id, row-locked for a decision. A caller
- * that also locks the chore locks it FIRST, as `computeSuggestions` does, so
- * the two can never wait on each other.
+ * that also locks the chore locks it FIRST, as `computeSuggestions` and
+ * `applyDueSuggestions` do, so the two can never wait on each other.
  */
 export async function lockSuggestion(
   db: Queryable,

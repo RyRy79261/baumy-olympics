@@ -1,6 +1,7 @@
 import { berlinWallTimeToUtc } from "@baumy/core";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
+import { lockChoreRow } from "../chores";
 import { logCompletion } from "../completions";
 import {
   createHttpDb,
@@ -12,6 +13,7 @@ import * as schema from "../schema";
 import {
   applyDueSuggestions,
   computeSuggestions,
+  lockSuggestion,
   scheduleSuggestion,
   vetoSuggestion,
 } from "../weights";
@@ -178,6 +180,44 @@ describe("weights under concurrency", () => {
       expect(row!.status).toBe("applied");
       expect(fromSuggestion).toHaveLength(1);
     }
+  });
+
+  it("an apply racing a decision that locks the chore first does not deadlock", async () => {
+    const { householdId, choreId, ryan } = await arrange();
+    const { suggested } = await withTransaction((tx) =>
+      computeSuggestions(tx as unknown as Queryable, NOW, { householdId }),
+    );
+    const id = suggested[0]!.id;
+    const appliesAt = new Date(NOW.getTime() + 7 * DAY);
+    await withTransaction((tx) =>
+      scheduleSuggestion(tx as unknown as Queryable, {
+        suggestionId: id,
+        basePoints: 19,
+        cooldownMinutes: 48 * 60,
+        appliesAt,
+        scheduledBy: ryan,
+        now: NOW,
+      }),
+    );
+    const at = new Date(appliesAt.getTime() + HOUR);
+    // `schedule_weight` from a stale page: the chore, a pause, then the
+    // suggestion. An apply that locked the suggestion first would deadlock.
+    const [decided, applied] = await Promise.all([
+      withTransaction(async (tx) => {
+        const q = tx as unknown as Queryable;
+        await lockChoreRow(q, householdId, choreId);
+        await q.execute(sql`select pg_sleep(0.5)`);
+        return lockSuggestion(q, householdId, id);
+      }),
+      (async () => {
+        await new Promise((r) => setTimeout(r, 150));
+        return withTransaction((tx) =>
+          applyDueSuggestions(tx as unknown as Queryable, at, { householdId }),
+        );
+      })(),
+    ]);
+    expect(decided?.status).toBe("scheduled");
+    expect(applied).toHaveLength(1);
   });
 
   it("two applies at once add one rule version", async () => {
