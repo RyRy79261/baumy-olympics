@@ -70,7 +70,7 @@ export function BaumySheet({
     const said = text.trim();
     if (!said || asking) return;
     setAsking(true);
-    setMood("think");
+    setMood("thinking");
     const result = await askBaumy(said, history, surface);
     setAsking(false);
     if (!result.ok) {
@@ -80,7 +80,7 @@ export function BaumySheet({
     }
     setText("");
     setReply({ text: result.data.reply, error: false });
-    setMood(result.data.proposals.length > 0 ? "listen" : "idle");
+    setMood(result.data.proposals.length > 0 ? "listening" : "idle");
     setRows(rowsFor(result.data.proposals));
     setHistory((h) => nextHistory(h, said, result.data.reply));
   }
@@ -139,13 +139,13 @@ export function BaumySheet({
   return (
     <>
       <BaumyButton
-        state={open ? (asking ? "think" : "listen") : "idle"}
+        state={open ? (asking ? "thinking" : "listening") : "idle"}
         onClick={() => setOpen(true)}
       />
       <Dialog open={open} onClose={() => setOpen(false)} title="Ask Baumy">
         <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">
           <SpeechBubble
-            state={asking ? "think" : mood}
+            state={asking ? "thinking" : mood}
             tone={reply?.error ? "error" : "normal"}
           >
             {asking
