@@ -148,6 +148,28 @@ describe("fakeClaude", () => {
       name: "confirm_completion",
       input: { completionId: "x1" },
     });
+    const named = await fakeClaude(
+      afterRead("confirm the mop", "get_pending_confirmations", {
+        ok: true,
+        data: {
+          claims: [
+            {
+              completionId: "y1",
+              choreName: "Trash",
+              doneByName: "Sam",
+              can: { confirm: true },
+            },
+            {
+              completionId: "y2",
+              choreName: "Mop",
+              doneByName: "Sam",
+              can: { confirm: true },
+            },
+          ],
+        },
+      }),
+    );
+    expect(uses(named)[0]!.input).toEqual({ completionId: "y2" });
     const none = await fakeClaude(
       afterRead("confirm it", "get_pending_confirmations", {
         ok: true,
