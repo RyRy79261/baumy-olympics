@@ -228,6 +228,40 @@ the kiosk.
 - [ ] **Look and feel is deferred to issue #7.** The chore tiles, the "+N"
       pop, the "STREAK BROKEN" banner and the sheet are neutral placeholders
       in `packages/ui/src/chores.tsx`; the pixel kit restyles them there.
-- Photo proof arrives with issue #15: until then a chore set to "Photo
-  proof: Required" cannot be logged (it answers `PHOTO_REQUIRED`), so keep
-  proof at None or Optional.
+- Photo proof arrived with issue #15 (see "Confirmations and photo proof"
+  below): a chore set to "Photo proof: Required" can be logged only with a
+  photo, and only once Blob is configured.
+
+## Confirmations and photo proof (issue #15)
+
+Confirm, dispute, undo, withdraw, concede and the admin ruling need nothing:
+they are tested on PGlite, on Docker Postgres (a confirm and a dispute
+racing) and end to end (E9 on the phone with the server clock moved, and
+the kiosk banner with a PIN). Photos need a Vercel Blob store. Until it
+exists, uploads answer "Photo uploads aren't set up on this deployment yet."
+and store nothing, so a chore with "Photo proof: Required" cannot be logged.
+E2E and CI use an in-memory fake (`E2E_TEST_MODE=1`), so CI stays green
+without it.
+
+- [ ] **Create a PRIVATE Blob store** in Vercel (Storage → Blob → Create,
+      access "Private") and connect it to the project for Production (and
+      Preview if you test photos there). Vercel then sets
+      `BLOB_READ_WRITE_TOKEN` on the project.
+- [ ] **Add `BLOB_READ_WRITE_TOKEN` to `.env.example`** (agents cannot edit
+      `.env*` files). It is already in turbo `globalEnv`:
+
+  ```sh
+  # Vercel Blob read-write token of a PRIVATE store. Completion photos are
+  # served only through /api/blob; without it, photo uploads answer 501.
+  BLOB_READ_WRITE_TOKEN=
+  ```
+
+- [ ] **For local photo uploads outside e2e**, put the token in
+      `apps/web/.env.local` (never commit it).
+- [ ] **After the deploy, try it:** set a chore's photo proof to Optional on
+      `/admin/chores`, log it with a photo on `/chores`, and open
+      `/inbox`: the claim shows the photo. Opening that photo's
+      `/api/blob?pathname=…` link in a private window must answer 401.
+- Photos are not pruned yet: the daily job deletes them 90 days after a
+  claim finalizes once issue #18 lands. A file whose action was refused is
+  deleted at once by the upload route.

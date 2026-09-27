@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { kioskActionForm } from "@/lib/actions/kiosk";
 import type { ActionResult } from "@/lib/actions/result";
 import type { CheckKioskPinData } from "@/lib/actions/check-kiosk-pin";
+import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
 import { getKioskActor } from "@/lib/auth";
 import { now } from "@/lib/clock";
@@ -83,4 +84,56 @@ export async function kioskLogCompletionAction(
   const result = await kioskActionForm("log_completion", form);
   if (result.ok) revalidatePath("/kiosk");
   return result;
+}
+
+type ClaimResult = ActionResult<ClaimEventData>;
+
+async function claimEvent(
+  name:
+    | "confirm_completion"
+    | "dispute_completion"
+    | "undo_completion"
+    | "withdraw_dispute"
+    | "concede_completion",
+  form: FormData,
+): Promise<ClaimResult> {
+  const result = await kioskActionForm(name, form);
+  if (result.ok) revalidatePath("/kiosk");
+  return result;
+}
+
+/** "Needs your OK" on the kiosk: each needs the acting member's PIN. */
+export async function kioskConfirmClaimAction(
+  _prev: ClaimResult | null,
+  form: FormData,
+): Promise<ClaimResult> {
+  return claimEvent("confirm_completion", form);
+}
+
+export async function kioskDisputeClaimAction(
+  _prev: ClaimResult | null,
+  form: FormData,
+): Promise<ClaimResult> {
+  return claimEvent("dispute_completion", form);
+}
+
+export async function kioskUndoClaimAction(
+  _prev: ClaimResult | null,
+  form: FormData,
+): Promise<ClaimResult> {
+  return claimEvent("undo_completion", form);
+}
+
+export async function kioskWithdrawDisputeAction(
+  _prev: ClaimResult | null,
+  form: FormData,
+): Promise<ClaimResult> {
+  return claimEvent("withdraw_dispute", form);
+}
+
+export async function kioskConcedeClaimAction(
+  _prev: ClaimResult | null,
+  form: FormData,
+): Promise<ClaimResult> {
+  return claimEvent("concede_completion", form);
 }

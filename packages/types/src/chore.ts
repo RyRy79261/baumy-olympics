@@ -69,3 +69,12 @@ export const CompletionNote = z
   .string()
   .trim()
   .max(COMPLETION_NOTE_MAX, `Keep it to ${COMPLETION_NOTE_MAX} characters.`);
+
+export const DISPUTE_REASON_MAX = 280;
+
+/** Why a housemate disputes a claim: required, trimmed (the db check). */
+export const DisputeReason = z
+  .string({ error: "Say why you are disputing it." })
+  .trim()
+  .min(1, "Say why you are disputing it.")
+  .max(DISPUTE_REASON_MAX, `Keep it to ${DISPUTE_REASON_MAX} characters.`);

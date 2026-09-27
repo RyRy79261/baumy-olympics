@@ -76,6 +76,11 @@ export interface LogCompletionInput {
   note?: string | null;
   /** A Blob pathname already uploaded for this claim. */
   photoPathname?: string | null;
+  /**
+   * The id to give the new completion. The photo upload route picks it
+   * before logging, because the photo is stored under `completions/{id}/`.
+   */
+  completionId?: string;
 }
 
 export type LogCompletionFailure =
@@ -299,6 +304,7 @@ export async function logCompletion(
   const [inserted] = await db
     .insert(completions)
     .values({
+      ...(input.completionId ? { id: input.completionId } : {}),
       householdId: input.householdId,
       choreId: chore.id,
       seasonId: season.id,
@@ -458,8 +464,12 @@ function toRow(score: CompletionScore, now: Date): CompletionScoreRow {
   return { ...score, computedAt: now };
 }
 
-/** The (chore, season) replay and upsert, with the chore already locked. */
-async function rescoreLocked(
+/**
+ * The (chore, season) replay and upsert, with the chore already locked by the
+ * caller (`lockChoreRow`). For the other completion write paths in this
+ * package (confirmations.ts); everything else calls `rescoreChore`.
+ */
+export async function rescoreLocked(
   db: Queryable,
   chore: ChoreRow,
   seasonId: string,

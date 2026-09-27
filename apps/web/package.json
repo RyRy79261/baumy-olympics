@@ -23,6 +23,7 @@
     "@baumy/db": "workspace:*",
     "@baumy/types": "workspace:*",
     "@baumy/ui": "workspace:*",
+    "@vercel/blob": "^2.8.0",
     "better-auth": "1.6.25",
     "drizzle-orm": "^0.45.3",
     "next": "^16.3.6",

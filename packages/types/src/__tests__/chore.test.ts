@@ -7,6 +7,8 @@ import {
   CompletionNote,
   ConfirmMode,
   CooldownHours,
+  DISPUTE_REASON_MAX,
+  DisputeReason,
   EffortFactorPct,
   ProofMode,
   cooldownMinutesFromHours,
@@ -62,6 +64,17 @@ describe("CompletionNote", () => {
     expect(CompletionNote.parse(" took ages ")).toBe("took ages");
     expect(
       CompletionNote.safeParse("x".repeat(COMPLETION_NOTE_MAX + 1)).success,
+    ).toBe(false);
+  });
+});
+
+describe("DisputeReason", () => {
+  it("needs a reason that is not blank, and keeps it short", () => {
+    expect(DisputeReason.parse("  still dirty ")).toBe("still dirty");
+    expect(DisputeReason.safeParse("   ").success).toBe(false);
+    expect(DisputeReason.safeParse(undefined).success).toBe(false);
+    expect(
+      DisputeReason.safeParse("x".repeat(DISPUTE_REASON_MAX + 1)).success,
     ).toBe(false);
   });
 });
