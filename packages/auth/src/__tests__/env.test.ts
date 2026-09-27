@@ -6,9 +6,11 @@ import {
   canDeliverAuthEmail,
   isAuthConfigured,
   isEmailProviderConfigured,
+  isFounderEmail,
   isGoogleConfigured,
   resolveAuthEmailCaptureFile,
   resolveBaseURL,
+  resolveFounderEmails,
   resolveRateLimit,
   resolveTrustedOrigins,
   resolveUseSecureCookies,
@@ -307,5 +309,24 @@ describe("authConfigWarnings", () => {
         VERCEL_ENV: "production",
       }),
     ).toEqual([]);
+  });
+});
+
+describe("founder emails", () => {
+  it("parses a comma-separated list, trimmed and lowercased", () => {
+    const env = {
+      FOUNDER_EMAILS: " Ryan@Example.com, ,partner@example.com,nope",
+    };
+    expect([...resolveFounderEmails(env)]).toEqual([
+      "ryan@example.com",
+      "partner@example.com",
+    ]);
+    expect(isFounderEmail(env, "RYAN@example.com ")).toBe(true);
+    expect(isFounderEmail(env, "someone@example.com")).toBe(false);
+  });
+
+  it("is empty when unset, so nobody is a founder", () => {
+    expect(resolveFounderEmails({}).size).toBe(0);
+    expect(isFounderEmail({}, "ryan@example.com")).toBe(false);
   });
 });

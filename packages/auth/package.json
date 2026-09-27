@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./env": "./src/env.ts",
-    "./password": "./src/password.ts"
+    "./password": "./src/password.ts",
+    "./kiosk-pin": "./src/kiosk-pin.ts"
   },
   "scripts": {
     "lint": "eslint .",
