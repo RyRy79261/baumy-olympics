@@ -1,0 +1,138 @@
+# Brain → Olympics: the `/api/v1/actions` endpoint
+
+baumy-brain (the Telegram bot `@baumy_bot`) manages the calendar, chores and
+notes through Olympics' action registry (ADR 0003, SPEC §6.3 and §6.6,
+issue #27). This page is the contract brain codes against. The code is
+`apps/web/lib/brain/endpoint.ts`; every call ends in `runAction` with
+`source: "brain"`, so brain gets exactly the checks, idempotency and audit
+trail the UI gets.
+
+## Endpoints
+
+| Method | Path                     | What it does                                                                               |
+| ------ | ------------------------ | ------------------------------------------------------------------------------------------ |
+| `GET`  | `/api/v1/actions`        | `{ok: true, actions: [{name, title, description, input_schema, kind, risk}]}`: brain tools |
+| `POST` | `/api/v1/actions/{name}` | Runs one action. The JSON body is its input (an empty body is `{}`).                       |
+
+`GET` needs only the token. The list is `toolSpecs("brain")`: every action
+whose `surfaces` include `brain`, never a `destructive` one, never an admin
+one. `input_schema` is JSON Schema (the Zod input side), ready to become an
+LLM tool. It is snapshotted in
+`apps/web/lib/actions/__snapshots__/tool-specs.brain.json`, so a change to it
+shows up in review.
+
+## Headers
+
+| Header                            | When              | Meaning                                                                                                                   |
+| --------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `Authorization: Bearer <token>`   | always            | The service token (`BRAIN_SERVICE_TOKEN` in brain's env). Looked up by its sha256 and compared in constant time.          |
+| `X-Baumy-Actor: tg:<telegram id>` | every `POST`      | The Telegram user brain acts for. Mapped to an active member through `members.telegram_user_id` on every call.            |
+| `X-Baumy-Confirmed: 1`            | `confirm` actions | Send it only after the person tapped brain's inline confirm button. Anything else than `1` counts as not confirmed.       |
+| `Idempotency-Key: <key>`          | every write       | 8 to 128 of `A-Z a-z 0-9 . _ : -`, one per intended action (a UUID). Used as the `requestId`; a retry sends the same key. |
+
+Reads need no `Idempotency-Key`; a read sent with one ignores it.
+
+## The `risk` / confirm rule
+
+Each tool carries `risk`:
+
+- `safe` (for example `create_note`, `link_telegram`, every read): brain may
+  run it straight from the conversation.
+- `confirm` (for example `create_event`, `update_event`, `log_completion`,
+  `confirm_completion`, `dispute_completion`): brain shows an inline confirm
+  button with what it is about to do, and sends the call with
+  `X-Baumy-Confirmed: 1` only after the tap. Without the header the answer is
+  428 `CONFIRMATION_REQUIRED` and nothing runs.
+- `destructive` (`delete_event`, `delete_note`): never offered to brain. So
+  are admin actions (`manage_members`, `manage_chore`, `adjust_points`, …).
+  Calling one answers 403 `SURFACE_FORBIDDEN`.
+
+Brain's own rule stays: the LLM proposes, deterministic code calls this
+endpoint.
+
+## Answers and error codes
+
+A success is `200 {ok: true, data}`. A failure is
+`{ok: false, code, message}`, plus `issues` (with `INVALID_INPUT`), `retryAt`
+(with `COOLDOWN`) or `retryAfterSeconds` (with `RATE_LIMITED`, also sent as
+`Retry-After`). `message` is a sentence brain can show the person as it is.
+
+| Status | `code`                                                                         | Meaning                                                                                        |
+| ------ | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| 400    | `INVALID_INPUT`                                                                | The body, `X-Baumy-Actor` or `Idempotency-Key` is missing or wrong; `issues` says which field. |
+| 401    | `UNAUTHENTICATED`                                                              | The token is missing, unknown or revoked.                                                      |
+| 403    | `FORBIDDEN`                                                                    | The token lacks the `brain` scope, or the actor may not do this.                               |
+| 403    | `SURFACE_FORBIDDEN`                                                            | The action exists but is not brain's (destructive, admin or UI only).                          |
+| 403    | `TELEGRAM_NOT_LINKED`                                                          | The Telegram user is not linked to a member. Tell them to send `/link <code>` (below).         |
+| 404    | `UNKNOWN_ACTION`, `NOT_FOUND`                                                  | No such action; or the thing it names (an event, a chore) does not exist.                      |
+| 409    | `IDEMPOTENCY_CONFLICT`                                                         | This `Idempotency-Key` was already used with a different input or action.                      |
+| 409    | `IN_PROGRESS`                                                                  | The same key is still running; ask again in a moment.                                          |
+| 422    | `LINK_CODE_INVALID`, `TELEGRAM_ALREADY_LINKED`, `COOLDOWN`, `INVALID_STATE`, … | The action understood the request and said no. Show `message`.                                 |
+| 428    | `CONFIRMATION_REQUIRED`                                                        | A `confirm` action without `X-Baumy-Confirmed: 1`.                                             |
+| 429    | `RATE_LIMITED`                                                                 | Too many calls; wait `retryAfterSeconds`.                                                      |
+| 500    | `INTERNAL`                                                                     | Something broke. The message is generic; Olympics logs the detail.                             |
+| 503    | `NOT_CONFIGURED`, `UNAVAILABLE`                                                | An integration (Google Calendar) is not set up or failed just now.                             |
+
+**Idempotency.** Repeating a write with the same `Idempotency-Key` and the
+same input returns the stored answer without running it again (the ledger is
+keyed per member, source and key). A write that failed may be retried with
+the same key.
+
+**Rate limits.** 300 calls a minute per token; each action's own limits per
+Telegram user (30 writes or 120 reads a minute by default); and
+`link_telegram` 5 tries per Telegram user and 30 per token in 10 minutes.
+
+## Linking a Telegram account (`/link`)
+
+1. The member opens **Settings** in Olympics and taps **Create a link code**.
+   The code (10 characters, valid 10 minutes, single use) is shown once;
+   only its hash is stored.
+2. They send `/link <code>` to the Baumy bot.
+3. Brain calls `POST /api/v1/actions/link_telegram` with `{"code": "<code>"}`,
+   the sender in `X-Baumy-Actor` and a fresh `Idempotency-Key`. This is the
+   ONE action an unlinked Telegram user may call; the member comes from the
+   code, not from the header.
+4. Olympics claims the code with one `UPDATE … RETURNING` (unused and
+   unexpired), sets `members.telegram_user_id` and audits it with
+   `source=brain`. The answer is `{memberId, displayName}`, so brain can say
+   "Linked you as Ryan".
+
+It refuses, with 422:
+
+- `LINK_CODE_INVALID`: wrong, already used, expired, or made by a member who
+  has since been deactivated;
+- `TELEGRAM_ALREADY_LINKED`: that Telegram account is linked to another
+  member (an admin can clear it on `/admin/members`). The code stays unused.
+
+Linking a member who was linked to another Telegram account moves the link.
+An admin can also set or clear anyone's Telegram user id directly on
+`/admin/members` (`manage_members`, op `set_telegram`).
+
+## Service tokens
+
+Only the sha256 of a token is stored (`service_tokens`); the plaintext lives
+in brain's env and never in Olympics'. The script prints it once, alone on
+stdout, and needs `DATABASE_URL_UNPOOLED` (the direct Neon string for
+production):
+
+```sh
+pnpm --filter @baumy/db --silent service-token mint baumy-brain    # print a new token
+pnpm --filter @baumy/db --silent service-token rotate baumy-brain  # revoke and mint in one go
+pnpm --filter @baumy/db --silent service-token revoke baumy-brain  # 401 from the next request
+pnpm --filter @baumy/db --silent service-token list                # names and dates, never tokens
+```
+
+A token gets the `brain` scope unless `--scopes` says otherwise. There is one
+live token per name.
+
+## Example
+
+```sh
+curl -sS https://<olympics>/api/v1/actions/create_event \
+  -H "Authorization: Bearer $BRAIN_SERVICE_TOKEN" \
+  -H "X-Baumy-Actor: tg:123456789" \
+  -H "X-Baumy-Confirmed: 1" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Dinner","kind":"timed","date":"2026-10-02","startTime":"19:00","endTime":"20:30"}'
+```
