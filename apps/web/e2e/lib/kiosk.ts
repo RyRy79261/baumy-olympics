@@ -42,6 +42,12 @@ export async function pairCode(
   return code;
 }
 
+/** A made-up private address, one per kiosk context. */
+function uniqueAddress(): string {
+  const byte = () => Math.floor(Math.random() * 254) + 1;
+  return `10.${byte()}.${byte()}.${byte()}`;
+}
+
 /** A new iPad-sized context, paired with a fresh code from `admin`. */
 export async function pairedKiosk(
   browser: Browser,
@@ -52,6 +58,10 @@ export async function pairedKiosk(
   const context = await browser.newContext({
     viewport: { width: 1180, height: 820 },
     hasTouch: true,
+    // Its own address, so pairing's limit of 10 tries per address per 15
+    // minutes (lib/kiosk/pairing.ts) counts this kiosk alone, not every
+    // kiosk the suite pairs from localhost.
+    extraHTTPHeaders: { "x-forwarded-for": uniqueAddress() },
   });
   const page = await context.newPage();
   await page.goto("/kiosk/pair");

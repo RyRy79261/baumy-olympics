@@ -40,6 +40,7 @@ export {
   WidgetList,
   type WidgetStatus,
 } from "./hub";
+export { KioskIndicator, KioskNotice, NightScreen } from "./kiosk-night";
 export {
   AvatarButton,
   KioskShell,

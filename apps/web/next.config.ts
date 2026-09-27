@@ -31,10 +31,27 @@ const config: NextConfig = {
       { key: "X-Frame-Options", value: "DENY" },
       { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
     ];
-    return ["/oauth/consent", "/api/mcp/oauth/authorize"].map((source) => ({
-      source,
-      headers: noFraming,
-    }));
+    return [
+      ...["/oauth/consent", "/api/mcp/oauth/authorize"].map((source) => ({
+        source,
+        headers: noFraming,
+      })),
+      // The offline page's service worker (issue #29): always checked
+      // afresh, so a new version reaches the kiosk on its next load.
+      {
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          {
+            key: "Content-Type",
+            value: "application/javascript; charset=utf-8",
+          },
+        ],
+      },
+    ];
   },
 };
 

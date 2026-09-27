@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import { advanceClock, resetClock, serverClock } from "../lib/clock";
 
 // The server test clock, end to end through `next start`. The offset is one
-// value per server process, so these tests run serially, and only in
-// desktop-chromium (playwright.config.ts ignores this file in the other
-// projects): parallel projects would move the same clock under each other.
+// value per server process, so these tests run serially, and only in the
+// server-clock project, one test at a time (playwright.config.ts): parallel
+// tests would move the same clock under each other.
 test.describe.configure({ mode: "serial" });
 
 const DAY = 24 * 60 * 60 * 1000;

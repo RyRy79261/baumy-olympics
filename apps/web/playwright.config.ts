@@ -9,7 +9,11 @@ import { IS_CI, TIMEOUTS, assertLocalBaseUrl, baseUrl } from "./e2e/lib/env";
 // Fail before any spec runs if the target is not this machine.
 assertLocalBaseUrl();
 
-const SHARED_CLOCK_SPECS = ["**/clock.spec.ts", "**/claims.spec.ts"];
+const SHARED_CLOCK_SPECS = [
+  "**/clock.spec.ts",
+  "**/claims.spec.ts",
+  "**/kiosk-night.spec.ts",
+];
 
 export default defineConfig({
   testDir: "./e2e",
@@ -38,11 +42,25 @@ export default defineConfig({
     video: "retain-on-failure",
   },
 
-  // All three run on Chromium, the only browser CI installs. Specs that move
-  // the shared server clock run in desktop-chromium only.
+  // All run on Chromium, the only browser CI installs. Specs that move the
+  // shared server clock run in their own project, `server-clock`, one test
+  // at a time (`workers: 1`), so two of them never move the clock under each
+  // other; the other projects run beside it and do not move the clock.
   projects: [
     {
       name: "desktop-chromium",
+      testIgnore: SHARED_CLOCK_SPECS,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      // A desktop browser, like desktop-chromium; kiosk specs here open an
+      // iPad-sized context of their own.
+      name: "server-clock",
+      testMatch: SHARED_CLOCK_SPECS,
+      workers: 1,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 800 },
