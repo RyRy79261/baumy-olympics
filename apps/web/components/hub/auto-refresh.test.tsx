@@ -18,6 +18,7 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 const { AutoRefresh, HUB_REFRESH_MS, isBusy } = await import("./auto-refresh");
+const { REFRESH_COOKIE } = await import("@/lib/hub/refresh");
 
 beforeAll(() => {
   (
@@ -53,6 +54,15 @@ describe("AutoRefresh", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     act(() => vi.advanceTimersByTime(HUB_REFRESH_MS));
     expect(refresh).toHaveBeenCalledTimes(2);
+  });
+
+  it("marks each refresh so the server skips the shopping cache", () => {
+    document.cookie = `${REFRESH_COOKIE}=; max-age=0; path=/`;
+    mount();
+    expect(document.cookie).not.toContain(`${REFRESH_COOKIE}=1`);
+    act(() => vi.advanceTimersByTime(HUB_REFRESH_MS));
+    expect(document.cookie).toContain(`${REFRESH_COOKIE}=1`);
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it("refreshes on focus and when the page is visible again", () => {

@@ -43,7 +43,7 @@ This is a single screen with no scrolling at 1180×820 (iPad Air, landscape):
 Details settled while building it (added 2026-09-27, issue #20):
 
 - `/` and `/kiosk` show the same widgets (`components/hub/hub-dashboard.tsx`), read through `loadHub` (`lib/hub/load.ts`): `list_events` (today; events that have not ended, at most 5), `list_chores` (the chores in state `due`, never-done first then the longest due, "overdue" after a day; then those falling due before Berlin midnight; each with its streak holder), `get_standings` (the top 5 with the gap to the leader), `get_pot` (the total) and `list_notes` (`pinnedOnly`, at most 4). Each read that fails or throws becomes that widget's own "unavailable" line, and each widget has its own empty sentence, so the calendar being down never breaks the page.
-- The shopping list is an empty slot until issue #26. [CORRECTION 2026-09-27] issue #21: the Baumy button opens the Baumy sheet (§3.6); speech is issue #22.
+- The shopping list is an empty slot until issue #26. [CORRECTION 2026-09-27] issue #26: the widget is brain's list (§3.4), read with `list_shopping` (a `display` read). [CORRECTION 2026-09-27] issue #21: the Baumy button opens the Baumy sheet (§3.6); speech is issue #22.
 - The kiosk home reads as the paired device whether or not anyone has tapped their avatar: a new gate, `display` (`requireDisplay`), lets a kiosk actor with no member picked run **reads offered on the kiosk**; everyone else is held to `requireMember`, and writes always need a member. `list_events`, `list_chores` (its `next` preview is null then), `get_standings`, `get_pot` and `list_notes` use it.
 - The chore grid, "Needs your OK" and "Check my PIN" moved from `/kiosk` to `/kiosk/chores`; notes are at `/notes` and `/kiosk/notes`.
 
@@ -65,6 +65,15 @@ This is a house Google Calendar (which one is still open, section 12), shared wi
 ### 3.4 Shopping list
 
 baumy-brain owns the list (`baumy_list_items`). Olympics reads it and writes to it through a small API on the brain side (ADR 0003), so "buy milk" in Telegram and on the kiosk is the same row. Actions are: list, add (one or several items) and check off.
+
+Details settled while building it (added 2026-09-27, issue #26):
+
+- `lib/integrations/brain.ts` is the client: `BRAIN_BASE_URL` and `KITCHEN_API_TOKEN` (both unset: every call is `not_configured`), a 5s timeout per request, the result union `ok`/`not_configured`/`unavailable` (brain's 503 `not_configured` means the bot is not in the house group yet; any other failure, a timeout or an answer of the wrong shape is `unavailable`, logged with the HTTP status only). The list is cached 30s per server; our own writes clear it, and so does the kiosk home's periodic re-read (§8), which marks its request with the short-lived `baumy_refresh` cookie (`lib/hub/refresh.ts`).
+- Items are sent by name, as brain matches them. `add_shopping_items` and `check_off_shopping_items` take `items` (1 to 30 names of at most 80 characters, never split); the quick-add field splits what is typed at commas and new lines before it sends (`splitItemsForm`), so "milk, eggs" is two items and an item named "Bread, wholemeal" can still be ticked off. A check-off where nothing matched is `NOT_FOUND`.
+- Both writes are `transactional: false`, `requires: "member"` (no PIN on the kiosk) and audited as entity `shopping_list`; if the audit row cannot be written, the undo checks the new items off again, or adds the ticked-off ones back.
+- `/shopping`, `/kiosk/shopping` and the hub widget show the same list: a quick-add field and one big tap-to-check row per item (`CheckItemButton`, packages/ui). On the kiosk nobody can change it until someone taps their avatar. With brain down or not set up, the widget says so and the rest of the hub is unaffected.
+- The Baumy command puts every item of one request into ONE `add_shopping_items` proposal ("add milk and eggs" is `items: ["milk", "eggs"]`).
+- Attribution: Olympics does not send `telegramUserId` yet, so brain records kitchen writes with no author. [UNRESOLVED 2026-09-27] send the acting member's `telegram_user_id` once members link Telegram (issue #27).
 
 ### 3.5 Notes
 
@@ -605,7 +614,7 @@ export interface ActionDef<I extends z.ZodType, O> {
 - **Olympics → brain:**
   - `GET /api/kitchen/shopping` and `POST /api/kitchen/shopping/{add,checkoff}` are added to baumy-brain. Brain scopes the house itself with `getHouseChatId(db)` from `lib/identity/house.ts` (the scope id, which honours the `BAUMY_HOUSE_CHAT_ID` override) and reuses `lib/lists/store.ts`. If it returns `''` (bot not in a group yet), the API answers 503 `not_configured`.
   - Auth is `KITCHEN_API_TOKEN`, compared in constant time as in brain's `lib/telegram/verify.ts`.
-  - Olympics caches the list for 30s and invalidates the cache on its own writes. The kiosk's periodic refresh bypasses the cache.
+  - Olympics caches the list for 30s and invalidates the cache on its own writes. The kiosk's periodic refresh bypasses the cache. Built in issue #26 (§3.4).
 - **Brain → Olympics:** `/api/v1/actions/*` (section 6.3), using `BRAIN_SERVICE_TOKEN` (brain holds the plaintext; Olympics stores only its hash). Brain gains an Olympics client, a `/link <code>` command and calendar, chore and standings intents in its own repo.
 - **Optional later (read-only):** show brain reminders and dated facts (`upcomingDatedFacts`) on the hub.
 

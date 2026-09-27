@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { MessageParams } from "./claude";
-import { choresNamed, fakeClaude } from "./claude-fake";
+import { choresNamed, fakeClaude, shoppingItemsNamed } from "./claude-fake";
 
 // The e2e fake Claude answers in real Messages API shapes, and only from
 // the tool results it is sent.
@@ -179,6 +179,24 @@ describe("fakeClaude", () => {
     expect(text(none)).toContain("nothing waiting");
   });
 
+  it("proposes ONE add_shopping_items with every item named", async () => {
+    const shop = [
+      { name: "add_shopping_items", input_schema: { type: "object" as const } },
+    ];
+    const m = await fakeClaude(
+      params([{ role: "user", content: "Baumy, add milk and eggs" }], shop),
+    );
+    expect(m.stop_reason).toBe("tool_use");
+    expect(uses(m).map((u) => [u.name, u.input])).toEqual([
+      ["add_shopping_items", { items: ["milk", "eggs"] }],
+    ]);
+    // Not offered: no shopping proposal.
+    const off = await fakeClaude(
+      params([{ role: "user", content: "add milk" }], []),
+    );
+    expect(uses(off)).toEqual([]);
+  });
+
   it("gives a help line for anything else, or when logging is not offered", async () => {
     const hi = await fakeClaude(params([{ role: "user", content: "hello" }]));
     expect(hi.stop_reason).toBe("end_turn");
@@ -202,5 +220,19 @@ describe("choresNamed", () => {
       chores[1],
     ]);
     expect(choresNamed("nothing", chores)).toEqual([]);
+  });
+});
+
+describe("shoppingItemsNamed", () => {
+  it("reads the items after 'add', without the list's name", () => {
+    expect(shoppingItemsNamed("baumy, add milk and eggs")).toEqual([
+      "milk",
+      "eggs",
+    ]);
+    expect(
+      shoppingItemsNamed("add bread, oat milk and tea to the shopping list!"),
+    ).toEqual(["bread", "oat milk", "tea"]);
+    expect(shoppingItemsNamed("add coffee onto our list")).toEqual(["coffee"]);
+    expect(shoppingItemsNamed("who is winning")).toEqual([]);
   });
 });

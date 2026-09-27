@@ -17,6 +17,10 @@ import {
   runAction,
 } from "@/lib/actions/registry";
 import { toolSpecs } from "@/lib/actions/tool-specs";
+import {
+  setBrainClientForTests,
+  type BrainClient,
+} from "@/lib/integrations/brain";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { MessageParams } from "@/lib/integrations/claude";
 import {
@@ -205,6 +209,36 @@ describe("runCommand", () => {
     );
     expect(result.data.leaderId).toBe(sam);
     expect(await tally()).toEqual(before);
+  });
+
+  it("'Baumy, add milk and eggs' is ONE proposal with both items, and brain is not called", async () => {
+    const brain = {
+      listShopping: vi.fn(),
+      addShopping: vi.fn(),
+      checkOffShopping: vi.fn(),
+    };
+    setBrainClientForTests(brain as unknown as BrainClient);
+    try {
+      const { create } = script(recorded("shopping-add"));
+      const outcome = await runCommand(
+        request("Baumy, add milk and eggs"),
+        aiCtx(ryan),
+        deps(create),
+      );
+      expect(outcome.proposals).toHaveLength(1);
+      expect(outcome.proposals[0]).toMatchObject({
+        name: "add_shopping_items",
+        input: { items: ["milk", "eggs"] },
+        preview: "Add milk and eggs to the shopping list",
+        risk: "safe",
+        valid: true,
+        needsPin: false,
+      });
+      expect(brain.addShopping).not.toHaveBeenCalled();
+      expect(await tally()).toEqual({ completions: 0, audits: 0, requests: 0 });
+    } finally {
+      setBrainClientForTests(null);
+    }
   });
 
   it("sends the tools, the cached persona and the context", async () => {

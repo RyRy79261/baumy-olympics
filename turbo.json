@@ -31,6 +31,8 @@
     "AI_DAILY_COMMANDS_PER_MEMBER",
     "GROQ_API_KEY",
     "MCP_PUBLIC_URL",
+    "BRAIN_BASE_URL",
+    "KITCHEN_API_TOKEN",
     "E2E_*"
   ],
   "tasks": {
