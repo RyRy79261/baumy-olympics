@@ -221,6 +221,14 @@ describe("get_weights", () => {
     ]);
     const theirs = ok(await runAction("get_weights", {}, as(partner)));
     expect(theirs.scheduled).toMatchObject([{ id, canVeto: true }]);
+    // The veto list alone, without measuring every chore.
+    const only = ok(
+      await runAction("get_weights", { scheduledOnly: true }, as(partner)),
+    );
+    expect(only).toMatchObject({
+      chores: [],
+      scheduled: [{ id, choreName: BATHROOM.name, canVeto: true }],
+    });
   });
 
   it("is only in the UI", async () => {
