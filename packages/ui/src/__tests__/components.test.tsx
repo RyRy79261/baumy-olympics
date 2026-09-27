@@ -4,7 +4,14 @@ import { AppShell, navItemClass } from "../app-shell";
 import { Button, buttonClass } from "../button";
 import { Card } from "../card";
 import { cx } from "../cx";
-import { Field, FormMessage, Input, Select, Textarea } from "../field";
+import {
+  Checkbox,
+  Field,
+  FormMessage,
+  Input,
+  Select,
+  Textarea,
+} from "../field";
 import { PageHeading } from "../page-heading";
 import { ProofPhoto } from "../proof-photo";
 import { BAUMY_STATES, SPRITE_MOTION, Sprite } from "../sprite";
@@ -105,6 +112,37 @@ describe("Field", () => {
     );
     expect(html(<FormMessage tone="success">Yes</FormMessage>)).toContain(
       'role="status"',
+    );
+  });
+});
+
+describe("Checkbox", () => {
+  it("labels its box, ties the hint to it and keeps a 44px row", () => {
+    const out = html(
+      <Checkbox
+        id="scope-read"
+        name="scope"
+        value="baumy:read"
+        label="Read"
+        hint="See things"
+        defaultChecked
+      >
+        <ul>
+          <li>Your chores</li>
+        </ul>
+      </Checkbox>,
+    );
+    expect(out).toContain('type="checkbox"');
+    expect(out).toContain('for="scope-read"');
+    expect(out).toContain('aria-describedby="scope-read-hint"');
+    expect(out).toContain('checked=""');
+    expect(out).toContain("min-h-11");
+    expect(out).toContain("<li>Your chores</li>");
+  });
+
+  it("has no hint id when there is no hint", () => {
+    expect(html(<Checkbox id="x" label="X" />)).not.toContain(
+      "aria-describedby",
     );
   });
 });
