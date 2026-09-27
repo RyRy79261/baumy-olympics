@@ -192,6 +192,7 @@ cooldown = clamp(0.5·I, 60min, 7d)
 - Applying a suggestion inserts a new `chore_rule_versions` row, so changes are never retroactive.
 - Each chore can have at most one applied change per 28 days.
 - Weights, adjustments and prize mode can only be changed in the **UI**. The AI command, MCP and Telegram cannot change them.
+- **Until frequency tracking (issue #17) measures `I`** (added 2026-09-27, issue #14), the chore grid's "due" uses the interval the weight implies, the formula above read backwards: `I_days = (base / (10 × effort_factor_pct / 100))²` (`expectedIntervalMinutes` in `packages/core/src/chores.ts`; Trash 20 → 4 days). A chore is `cooldown` until `last live + cooldown`, then `done` until `last live + max(I, cooldown)`, then `due`; never done is `due`.
 
 ### 4.5 Year-end prize
 
@@ -241,6 +242,8 @@ Starting values follow the weight formula with the expected interval `I` and eff
 | Plants              | 4d                | 20   | 48h      |
 | Fridge clean-out    | 30d               | 55   | 7d       |
 | Keller              | 30d               | 55   | 7d       |
+
+Seeding (added 2026-09-27, issue #14): `STARTER_CHORES` in `packages/db/src/chores.ts` holds this table, and the game test fixtures read from it. `pnpm --filter @baumy/db db:seed` (run by `vercel-build` after `db:migrate`, behind the same preview guard, and by `scripts/e2e-local.sh`) adds them, with `seed` rule versions in effect from 1 Jan of the current season, **only while the household has no chores at all**, so an admin's renames and archives are never undone. It locks the household row, so two deploys at once add one set.
 
 ---
 
@@ -463,6 +466,12 @@ export interface ActionDef<I extends z.ZodType, O> {
 | `delete_note`                                                                                                                                                                                                                    | write, destructive | ui, kiosk, ai      |                                                                                                                     |
 | `link_telegram`                                                                                                                                                                                                                  | write              | brain              | `requires: "service"`; redeems a one-time link code a member created in the UI, and sets `members.telegram_user_id` |
 | `manage_chore`, `schedule_weight`, `dismiss_weight`, `veto_weight`, `adjust_points`, `add_pot_contribution`, `set_prize_mode`, `mint_invite`, `revoke_invite`, `manage_members`, `pair_kiosk`, `revoke_kiosk`, `resolve_dispute` | write              | **ui only**        | admin actions: UI only, never the AI command, MCP or brain                                                          |
+
+**Chore actions** (added 2026-09-27, issue #14):
+
+- `list_chores` `{includeArchived?}` returns each chore's id, points, cooldown, implied interval, this season's streak holder and length (the last scored completion in replay order), last live completion, due state (§4.4) and `next`: what logging it now would score for the member asking (`nextScore` in `packages/core`, one more replay step). The grid computes its sheet's preview for any doer with the same function.
+- `log_completion` `{choreId, doneBy?, occurredAt?, note?}`: `requires` is `attested` when `doneBy` names someone other than the actor, else `member`. On the kiosk that means the LOGGER's PIN (the picked member) in the same request; a phone session vouches by itself. A deactivated or unknown `doneBy` is `NOT_FOUND`. The validator's codes pass through as action codes (`COOLDOWN`, `FUTURE`, `BACKDATE_TOO_FAR`, `OUT_OF_ORDER`, `SEASON_CLOSED`, `PHOTO_REQUIRED`, `ARCHIVED_CHORE`, plus `NO_RULE_VERSION`); `COOLDOWN` also carries `retryAt` (ISO) and its message gives the time in Berlin ("… from Tue 29 Sep, 12:00 (Berlin time)"). A refusal rolls back, so nothing is stored. `REQUEST_ID_REUSED` becomes `IDEMPOTENCY_CONFLICT`. `preview` runs `previewCompletion` (packages/db): the same validation and the same replay with the completion appended, so the previewed number is the stored `total_pts` unless someone logs that chore in between.
+- `manage_chore` (admin, UI only) has four ops: `create`, `update` (all fields), `archive`, `restore`. Cooldowns are entered in hours (fractions allowed) and stored in minutes. A name must be unique among chores that are not archived, ignoring case (`CHORE_NAME_TAKEN`). A changed weight inserts a `manual` rule version effective `now` (the same instant twice keeps the later) and re-scores the current season; a changed confirm mode re-scores every season of the chore, since whether a stored `pending` self-claim counts depends on it. A new chore's sprite id is its name as a slug.
 
 ### 6.4 Google Calendar
 
