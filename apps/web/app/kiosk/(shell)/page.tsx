@@ -4,17 +4,30 @@ import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { listActiveMembers } from "@baumy/db/members";
 import { Card, FormMessage, PageHeading } from "@baumy/ui";
+import { ClaimList } from "@/components/claims/claim-list";
 import { ChoreGrid } from "@/components/chores/chore-grid";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { runAction } from "@/lib/actions/registry";
 import { getKioskActor } from "@/lib/auth";
-import { kioskLogCompletionAction } from "../actions";
+import { needsOkLabel } from "@/lib/claims/view";
+import {
+  kioskConcedeClaimAction,
+  kioskConfirmClaimAction,
+  kioskDisputeClaimAction,
+  kioskLogCompletionAction,
+  kioskUndoClaimAction,
+  kioskWithdrawDisputeAction,
+} from "../actions";
 import { CheckPinForm } from "./check-pin-form";
 
 // The kiosk home (SPEC §8): once someone taps their avatar, the chore grid,
 // acting as them. The other widgets (scoreboard, calendar, shopping, notes)
 // arrive with their own issues. "Check my PIN" stays, the smallest attested
 // request.
+//
+// Above the grid, the "Needs your OK" banner (SPEC §4.3): the claims waiting
+// on the acting member, and their own open ones (undo, add a photo). Every
+// button there asks for their PIN.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Kiosk - Baumy" };
@@ -23,14 +36,21 @@ export default async function KioskHomePage() {
   const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
   const acting = kiosk.memberId;
-  const [listed, people] = acting
+  const ctx = acting ? await kioskRequestCtx(undefined, undefined) : null;
+  const [listed, people, pending] = ctx
     ? await Promise.all([
-        kioskRequestCtx(undefined, undefined).then((ctx) =>
-          runAction("list_chores", {}, ctx!),
-        ),
+        runAction("list_chores", {}, ctx),
         listActiveMembers(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID),
+        runAction("get_pending_confirmations", {}, ctx),
       ])
-    : [null, []];
+    : [null, [], null];
+  const claims =
+    pending?.ok && acting
+      ? pending.data.claims.filter(
+          (c) => c.needsYou || c.doneBy === acting || c.loggedBy === acting,
+        )
+      : [];
+  const waiting = pending?.ok ? pending.data.needsYouCount : 0;
   return (
     <>
       <PageHeading
@@ -44,6 +64,30 @@ export default async function KioskHomePage() {
       />
       {acting && listed ? (
         <div className="flex flex-col gap-6">
+          {claims.length > 0 ? (
+            <section
+              aria-labelledby="needs-ok"
+              data-testid="needs-ok-banner"
+              className="rounded border border-neutral-400 bg-neutral-50 p-4"
+            >
+              <h2 id="needs-ok" className="mb-3 text-xl font-semibold">
+                {waiting > 0 ? needsOkLabel(waiting) : "Your open claims"}
+              </h2>
+              <ClaimList
+                claims={claims}
+                kiosk
+                pinLabel={`${kiosk.displayName}'s PIN`}
+                actions={{
+                  confirm: kioskConfirmClaimAction,
+                  dispute: kioskDisputeClaimAction,
+                  undo: kioskUndoClaimAction,
+                  withdraw: kioskWithdrawDisputeAction,
+                  concede: kioskConcedeClaimAction,
+                }}
+                empty=""
+              />
+            </section>
+          ) : null}
           {listed.ok ? (
             <ChoreGrid
               chores={listed.data.chores}
