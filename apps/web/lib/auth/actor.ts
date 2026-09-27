@@ -189,9 +189,10 @@ export async function getActorOrRedirect(): Promise<Actor> {
 }
 
 /**
- * For the sign-in and sign-up pages: a person already signed in goes home. A
- * paired kiosk is not a person, so someone may still sign in on its browser.
+ * For the sign-in and sign-up pages: a person already signed in goes home, or
+ * to `to` (a path already checked by `safeCallbackUrl`). A paired kiosk is
+ * not a person, so someone may still sign in on its browser.
  */
-export async function redirectIfSignedIn(): Promise<void> {
-  if ((await getActor())?.kind === "member") redirect("/");
+export async function redirectIfSignedIn(to = "/"): Promise<void> {
+  if ((await getActor())?.kind === "member") redirect(to as "/");
 }
