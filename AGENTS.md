@@ -21,7 +21,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 | `pnpm i`                                                | Install dependencies. Uses pnpm 10 (`packageManager`) and Node 22 or later. |
 | `pnpm dev`                                              | Start the web app on :3000.                                                 |
 | `pnpm db:local:up`, then `pnpm db:local:migrate`        | Start Docker Postgres and the Neon proxies, then migrate.                   |
-| `pnpm db:local:test`                                    | Run the `packages/db` tests that need Docker Postgres (concurrency).        |
+| `pnpm db:local:test`                                    | Run the `*.local.test.ts` files (db, web) that need Docker Postgres.        |
 | `pnpm --filter @baumy/db db:generate`                   | Generate a migration after editing `schema.ts`.                             |
 | `pnpm turbo run format:check lint typecheck test build` | **The gate.** Run it before every push.                                     |
 | `E2E_SERVE=build ./scripts/e2e-local.sh [specs/<area>]` | Run Playwright against Docker Postgres.                                     |
@@ -76,6 +76,8 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 - **Every capability is an action** in `apps/web/lib/actions/` (ADR 0002).
   - UI server actions, the AI command, MCP and the brain endpoint all call `runAction`. Never call domain writes directly from a route or component.
   - `runAction` alone writes `audit_events` and `action_requests`. Domain functions take the caller's `tx` and write neither.
+  - Declare an action with `defineAction` (`lib/actions/define.ts`), add its name to `ACTION_NAMES` and its entry to `lib/actions/registry.ts`. A write's `execute` returns `audit: {entity, entityId}`; returning `{ok: false}` rolls the whole transaction back.
+  - Server actions call `actionForm(name, formData)` (`lib/actions/ui.ts`); the form carries a hidden `requestId`.
   - Actions that call Google or brain set `transactional: false`; never hold a transaction across a network call.
   - Admin-only actions have `surfaces: ["ui"]`.
 - **Authorization:** one gate function per concern (`requireMember`, `requireAdmin`, `requireAttested`, `requireSession`). Never hand-roll a check at a call site. Kiosk actors never pass `requireSession` or `requireAdmin`.
