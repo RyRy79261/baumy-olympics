@@ -13,10 +13,13 @@ import {
 export function SignInForm({
   googleEnabled,
   oauthFailed = false,
+  callbackURL = "/",
 }: {
   googleEnabled: boolean;
   /** Landed here from a failed Google round trip (`?error=`). */
   oauthFailed?: boolean;
+  /** Where to go once signed in: a path on this site (safeCallbackUrl). */
+  callbackURL?: string;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +43,7 @@ export function SignInForm({
         return;
       }
       // A full navigation, so the server renders home with the new cookie.
-      window.location.assign("/");
+      window.location.assign(callbackURL);
     } catch {
       setError(SOMETHING_WENT_WRONG);
       setPending(false);
@@ -51,7 +54,7 @@ export function SignInForm({
     setError(null);
     setPending(true);
     try {
-      await authClient.signIn.social({ provider: "google", callbackURL: "/" });
+      await authClient.signIn.social({ provider: "google", callbackURL });
     } catch {
       setError(SOMETHING_WENT_WRONG);
       setPending(false);
