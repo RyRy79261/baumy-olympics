@@ -49,6 +49,11 @@ export const ACTION_NAMES = [
   "create_event",
   "update_event",
   "delete_event",
+  "list_notes",
+  "create_note",
+  "update_note",
+  "pin_note",
+  "delete_note",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 
