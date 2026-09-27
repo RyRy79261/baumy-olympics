@@ -11,13 +11,20 @@ import {
   runGate,
   type GatedAction,
 } from "./gates";
-import { verifyKioskPin } from "./pin";
+import type { PinCheck, PinVerdict } from "./pin";
 
 // Each gate against each actor kind. The kiosk rules are the ones that matter
 // most: it passes `requireMember` only for kiosk actions, never passes
 // `requireSession` or `requireAdmin`, and needs a PIN for `requireAttested`.
 
 const NOW = new Date("2026-09-27T10:00:00Z");
+
+const PASS: PinVerdict = { ok: true };
+const WRONG: PinVerdict = { ok: false, reason: "wrong" };
+const pinIs =
+  (right: string) =>
+  async ({ pin }: PinCheck): Promise<PinVerdict> =>
+    pin === right ? PASS : WRONG;
 
 const admin: Actor = {
   kind: "member",
@@ -164,7 +171,7 @@ describe("requireAdmin", () => {
 
 describe("requireAttested", () => {
   it("takes a session, MCP or brain actor as its own attestation", async () => {
-    const verify = vi.fn(async () => false);
+    const verify = vi.fn(async (): Promise<PinVerdict> => WRONG);
     for (const a of [member, brain, mcpWrite]) {
       await expect(
         requireAttested(ctx(a), everywhere, verify),
@@ -176,7 +183,7 @@ describe("requireAttested", () => {
   });
 
   it("needs the kiosk member's PIN, checked in this request", async () => {
-    const verify = vi.fn(async ({ pin }: { pin: string }) => pin === "4321");
+    const verify = vi.fn(pinIs("4321"));
     await expect(
       requireAttested(ctx(kiosk), everywhere, verify),
     ).resolves.toMatchObject({
@@ -191,6 +198,7 @@ describe("requireAttested", () => {
       requireAttested(ctx(kiosk, "4321"), everywhere, verify),
     ).resolves.toEqual({ ok: true });
     expect(verify).toHaveBeenLastCalledWith({
+      householdId: "h",
       deviceId: "d1",
       memberId: "m1",
       pin: "4321",
@@ -198,8 +206,52 @@ describe("requireAttested", () => {
     });
   });
 
+  it("says why a PIN failed, in a sentence to act on", async () => {
+    const cases: [PinVerdict, string, RegExp][] = [
+      [WRONG, "ATTESTATION_FAILED", /not right/],
+      [{ ok: false, reason: "no_pin" }, "ATTESTATION_FAILED", /no kiosk PIN/],
+      [
+        { ok: false, reason: "locked" },
+        "PIN_LOCKED",
+        /^Your kiosk PIN is locked/,
+      ],
+      [
+        { ok: false, reason: "locked", justLocked: true },
+        "PIN_LOCKED",
+        /not right, and after 10 wrong tries/,
+      ],
+      [
+        { ok: false, reason: "rate_limited", retryAfterSeconds: 61 },
+        "RATE_LIMITED",
+        /Wait 2 min/,
+      ],
+      [{ ok: false, reason: "rate_limited" }, "RATE_LIMITED", /Wait 1 min/],
+      [
+        { ok: false, reason: "unavailable" },
+        "ATTESTATION_FAILED",
+        /could not be checked/,
+      ],
+    ];
+    for (const [verdict, code, message] of cases) {
+      const out = await requireAttested(
+        ctx(kiosk, "1234"),
+        everywhere,
+        async () => verdict,
+      );
+      expect(out).toMatchObject({ ok: false, code });
+      expect(out.ok ? "" : out.message).toMatch(message);
+    }
+    await expect(
+      requireAttested(ctx(kiosk, "1234"), everywhere, async () => ({
+        ok: false,
+        reason: "rate_limited",
+        retryAfterSeconds: 30,
+      })),
+    ).resolves.toMatchObject({ retryAfterSeconds: 30 });
+  });
+
   it("checks membership first", async () => {
-    const verify = vi.fn(async () => true);
+    const verify = vi.fn(async (): Promise<PinVerdict> => PASS);
     await expect(
       requireAttested(ctx(kioskNobody, "4321"), everywhere, verify),
     ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
@@ -224,7 +276,7 @@ describe("requireService", () => {
 
 describe("runGate", () => {
   it("dispatches each gate name to its function", async () => {
-    const verify = vi.fn(async () => true);
+    const verify = vi.fn(async (): Promise<PinVerdict> => PASS);
     const gates = [
       "member",
       "session",
@@ -248,13 +300,5 @@ describe("runGate", () => {
       runGate("attested", ctx(kiosk, "1"), everywhere, verify),
     ).resolves.toEqual({ ok: true });
     expect(verify).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("verifyKioskPin", () => {
-  it("fails closed until kiosk attestation lands (issue #10)", async () => {
-    await expect(
-      verifyKioskPin({ deviceId: "d1", memberId: "m1", pin: "1234", now: NOW }),
-    ).resolves.toBe(false);
   });
 });

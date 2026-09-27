@@ -1,7 +1,7 @@
 import type { Surface } from "@baumy/types";
 import type { ActionKind, Gate, RequestCtx } from "@/lib/actions/define";
 import { fail, type ActionFailure } from "@/lib/actions/result";
-import type { PinVerifier } from "./pin";
+import type { PinVerdict, PinVerifier } from "./pin";
 
 // Authorization for actions: ONE function per concern (AGENTS.md
 // "Authorization", SPEC §6.2). Only `runAction` calls these, through
@@ -92,7 +92,8 @@ export function requireAdmin(ctx: RequestCtx): GateResult {
 /**
  * The member vouches for this request themself. A session, MCP token or brain
  * actor IS that member, so it passes as a member. The kiosk is shared, so it
- * must send the acting member's PIN, which is verified now and never stored.
+ * must send the acting member's PIN, which is verified now and never stored
+ * (lib/auth/pin.ts counts the attempt and may lock the PIN).
  */
 export async function requireAttested(
   ctx: RequestCtx,
@@ -106,14 +107,53 @@ export async function requireAttested(
   if (!ctx.pin) {
     return fail("ATTESTATION_REQUIRED", "Enter your PIN to do this.");
   }
-  const ok = await verifyPin({
+  const verdict = await verifyPin({
+    householdId: ctx.householdId,
     deviceId: actor.deviceId,
     // requireMember has checked it is set.
     memberId: actor.memberId!,
     pin: ctx.pin,
     now: ctx.now,
   });
-  return ok ? OK : fail("ATTESTATION_FAILED", "That PIN is not right.");
+  return verdict.ok ? OK : pinFailure(verdict);
+}
+
+const SET_A_NEW_PIN = "Set a new one in Settings on your phone.";
+
+/** The sentence for each way a PIN attempt fails. */
+function pinFailure(verdict: Exclude<PinVerdict, { ok: true }>): GateResult {
+  switch (verdict.reason) {
+    case "wrong":
+      return fail("ATTESTATION_FAILED", "That PIN is not right.");
+    case "no_pin":
+      return fail(
+        "ATTESTATION_FAILED",
+        "You have no kiosk PIN yet. Set one in Settings on your phone.",
+      );
+    case "locked":
+      return fail(
+        "PIN_LOCKED",
+        verdict.justLocked
+          ? `That PIN is not right, and after 10 wrong tries your kiosk PIN is now locked. ${SET_A_NEW_PIN}`
+          : `Your kiosk PIN is locked after too many wrong tries. ${SET_A_NEW_PIN}`,
+      );
+    case "rate_limited": {
+      const minutes = Math.max(
+        1,
+        Math.ceil((verdict.retryAfterSeconds ?? 60) / 60),
+      );
+      return fail(
+        "RATE_LIMITED",
+        `Too many wrong PINs. Wait ${minutes} min and try again.`,
+        { retryAfterSeconds: verdict.retryAfterSeconds ?? 60 },
+      );
+    }
+    case "unavailable":
+      return fail(
+        "ATTESTATION_FAILED",
+        "The PIN could not be checked just now. Try again in a moment.",
+      );
+  }
 }
 
 /** A service token (baumy-brain), whoever it acts for. */
