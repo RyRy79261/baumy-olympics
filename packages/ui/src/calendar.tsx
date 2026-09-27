@@ -77,7 +77,7 @@ export function CalendarDayCell({
         "flex min-w-0 flex-col gap-1 rounded border bg-white p-2",
         tall ? "min-h-40" : "min-h-24",
         today ? "border-neutral-900" : "border-neutral-300",
-        muted && "bg-neutral-50 text-neutral-500",
+        muted && "bg-neutral-50 text-neutral-600",
       )}
       {...props}
     >

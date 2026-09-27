@@ -41,7 +41,7 @@ describe("CalendarDayCell", () => {
     expect(today).toContain('data-testid="d"');
     const other = html(<CalendarDayCell label="31" muted />);
     expect(other).not.toContain("aria-current");
-    expect(other).toContain("text-neutral-500");
+    expect(other).toContain("text-neutral-600");
   });
 });
 
