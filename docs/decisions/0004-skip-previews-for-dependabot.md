@@ -8,7 +8,7 @@ The owner remembered AfrikaBurn having "a trick to stop Dependabot creating Neon
 
 - `.github/workflows/neon-pr-preview.yml`, whose job is guarded by `github.event.pull_request.user.login != 'dependabot[bot]'`, keyed on the PR author rather than `github.actor`.
 - `neon-pr-cleanup.yml`, which uses `pull_request_target` so that it can still _delete_ a branch when a Dependabot PR closes.
-- `.github/dependabot.yml` with a 2-day `cooldown`, a lockstep `vitest` group and `better-auth` / `@better-auth/*` ignores, and a commitlint ignore for `chore(deps): bump …`.
+- `.github/dependabot.yml` with a 2-day `cooldown`, a lockstep `vitest` group and `better-auth` / `@better-auth/*` ignores, and a commitlint ignore for `chore(deps): Bump …` (Dependabot capitalises `Bump`; the lower-case form is accepted too).
 
 afrikaburn does not skip the Vercel build for Dependabot, so such a PR builds against the Preview env's default `DATABASE_URL*` ("in practice production, or nothing", its `docs/deploy.md`). The same happens on the _first_ build of every PR, because `neon-preview-env.sh` sets branch-scoped env vars and redeploys only after the git-triggered build has started. With migrate-on-build, that build would migrate the wrong database.
 
