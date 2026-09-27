@@ -42,11 +42,16 @@ describe("useTestDb", () => {
         "select tablename from pg_tables where schemaname = 'public' order by 1",
       );
     expect(tables.rows.map((r) => r.tablename)).toEqual([
+      "account",
       "action_rate_limit",
       "action_requests",
       "audit_events",
       "households",
       "members",
+      "rate_limit",
+      "session",
+      "user",
+      "verification",
     ]);
   });
 

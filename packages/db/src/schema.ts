@@ -9,6 +9,7 @@
 import {
   bigint,
   bigserial,
+  boolean,
   index,
   integer,
   jsonb,
@@ -40,6 +41,131 @@ export const actionRequestStatus = pgEnum("action_request_status", [
 ]);
 
 // ---------------------------------------------------------------------------
+// Better Auth (ADR 0001, SPEC §5)
+// ---------------------------------------------------------------------------
+//
+// Copied from camp-404 `packages/db/src/schema.ts` (the Better Auth block),
+// without `two_factor` and `passkey`, which v1 leaves out (SPEC §11). Better
+// Auth 1.6.25 owns these tables through its drizzle adapter
+// (packages/auth/src/config.ts). The JS keys are Better Auth's field names,
+// which the adapter reads; the columns are snake_case like the rest of this
+// file.
+//
+// Two identities, by design: `user` is the sign-in identity (email, password
+// hash through `account`, sessions), `members` is the person in the household.
+// `members.auth_user_id` holds `user.id` with no foreign key (camp-404 does the
+// same), so an account can be erased without touching household history.
+
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/**
+ * One row per signed-in device. `token` is stored IN PLAINTEXT by Better Auth
+ * 1.6.25 (SPEC §7): whoever can read this table can take over a session, so
+ * treat database credentials accordingly. Cookies and bearer tokens carry the
+ * token plus an HMAC signature, and the bearer plugin is configured to require
+ * that signature (packages/auth/src/config.ts).
+ */
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (t) => [index("session_user_id_idx").on(t.userId)],
+);
+
+/** A way to sign in: `credential` (the password hash) or `google`. */
+export const account = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true,
+    }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      withTimezone: true,
+    }),
+    scope: text("scope"),
+    /** The password hash, on the `credential` account. Never read by the app. */
+    password: text("password"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("account_user_id_idx").on(t.userId)],
+);
+
+/** Password-reset and email-verification tokens. */
+export const verification = pgTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("verification_identifier_idx").on(t.identifier)],
+);
+
+/**
+ * Better Auth's rate-limit counters, in the database so every serverless
+ * instance shares them. BETTER AUTH OWNS THIS TABLE OUTRIGHT, including
+ * sweeping rows from it: nothing of ours may live here. Our own counters are
+ * `action_rate_limit` below.
+ */
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+});
+
+// ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
 
@@ -58,8 +184,8 @@ export const households = pgTable("households", {
 
 /**
  * A person in the household. `auth_user_id` is the Better Auth `user.id`, with
- * no foreign key, as camp-404 does: the auth tables are owned by Better Auth
- * and arrive in a later issue. Kiosk-only members have no auth user.
+ * no foreign key, as camp-404 does: the auth tables above are owned by Better
+ * Auth. Kiosk-only members have no auth user.
  */
 export const members = pgTable(
   "members",
