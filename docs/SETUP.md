@@ -6,7 +6,8 @@ stays green in the meantime. Tick an item off here in the PR that finishes it.
 
 ## GitHub repository (issue #2)
 
-- [ ] **Apply the `main` ruleset.** Needs `gh` signed in as a repo admin and
+- [x] **Apply the `main` ruleset.** Applied 2026-09-27 (ruleset #24056225)
+      while building issue #2. Re-run after editing the JSON. Needs `gh` signed in as a repo admin and
       `jq`:
 
   ```sh
