@@ -343,7 +343,12 @@ describe("runGate", () => {
     ).resolves.toEqual({ ok: true });
     expect(verify).toHaveBeenCalledTimes(1);
     await expect(
-      runGate("display", ctx(kioskNobody), { kind: "read", surfaces: ["kiosk"] }, verify),
+      runGate(
+        "display",
+        ctx(kioskNobody),
+        { kind: "read", surfaces: ["kiosk"] },
+        verify,
+      ),
     ).resolves.toEqual({ ok: true });
   });
 });
