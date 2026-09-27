@@ -2,5 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "pnpm run vercel-build",
-  "ignoreCommand": "bash ../../scripts/vercel-ignore-build.sh"
+  "ignoreCommand": "bash ../../scripts/vercel-ignore-build.sh",
+  "crons": [
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }

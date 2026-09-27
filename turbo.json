@@ -23,6 +23,7 @@
     "AUTH_EMAIL_CAPTURE_FILE",
     "FOUNDER_EMAILS",
     "BLOB_READ_WRITE_TOKEN",
+    "CRON_SECRET",
     "E2E_*"
   ],
   "tasks": {
