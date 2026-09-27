@@ -67,3 +67,14 @@ export async function typePin(dialog: Locator, pin: string) {
   }
   await dialog.getByRole("button", { name: "OK" }).click();
 }
+
+/** From the kiosk home, open the chores (the grid and "Needs your OK"). */
+export async function openKioskChores(kiosk: Page) {
+  await kiosk
+    .getByTestId("widget-chores")
+    .getByRole("link", { name: "Chores" })
+    .click();
+  await expect(
+    kiosk.getByRole("heading", { name: "Chores", level: 1 }),
+  ).toBeVisible();
+}
