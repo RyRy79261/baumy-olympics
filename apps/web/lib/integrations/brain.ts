@@ -90,7 +90,12 @@ export interface BrainConfig {
   token: string;
 }
 
-/** Brain's address and the kitchen token, or null when either is unset. */
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Brain's address and the kitchen token, or null when either is unset or the
+ * address is not https (http is allowed for localhost only).
+ */
 export function brainConfig(env: EnvBag): BrainConfig | null {
   const raw = env.BRAIN_BASE_URL?.trim();
   const token = env.KITCHEN_API_TOKEN?.trim();
@@ -101,7 +106,12 @@ export function brainConfig(env: EnvBag): BrainConfig | null {
   } catch {
     return null;
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  // The token rides in every request, so plain http only to this machine.
+  const local = LOCAL_HOSTS.has(url.hostname);
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) {
+    return null;
+  }
+  if (url.search || url.hash || url.username || url.password) return null;
   return { baseUrl: url.href.replace(/\/+$/, ""), token };
 }
 
