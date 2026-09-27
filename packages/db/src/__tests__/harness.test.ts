@@ -47,9 +47,11 @@ describe("useTestDb", () => {
       "action_requests",
       "audit_events",
       "households",
+      "invite_codes",
       "members",
       "rate_limit",
       "session",
+      "telegram_link_codes",
       "user",
       "verification",
     ]);
