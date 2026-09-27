@@ -43,6 +43,11 @@ import { revokeKiosk } from "./revoke-kiosk";
 import { createRunner } from "./run";
 import { getPot, getStandings, getStreaks } from "./scoreboard";
 import { setKioskPin } from "./set-kiosk-pin";
+import {
+  addShoppingItems,
+  checkOffShoppingItems,
+  listShopping,
+} from "./shopping";
 import { setPrizeMode } from "./set-prize-mode";
 import { updateMyProfile } from "./update-my-profile";
 import {
@@ -102,6 +107,9 @@ export const REGISTRY = {
   update_note: updateNote,
   pin_note: pinNote,
   delete_note: deleteNote,
+  list_shopping: listShopping,
+  add_shopping_items: addShoppingItems,
+  check_off_shopping_items: checkOffShoppingItems,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =
