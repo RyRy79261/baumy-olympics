@@ -30,10 +30,25 @@ export { cx } from "./cx";
 export { Dialog } from "./dialog";
 export { Field, FormMessage, Input, Select, Textarea } from "./field";
 export {
+  BaumyButton,
+  ClockFace,
+  HubGrid,
+  Widget,
+  WidgetItem,
+  WidgetList,
+  type WidgetStatus,
+} from "./hub";
+export {
   AvatarButton,
   KioskShell,
   type AvatarButtonProps,
 } from "./kiosk-shell";
+export {
+  MarkdownBody,
+  NOTE_SANITIZE_SCHEMA,
+  isAllowedNoteUrl,
+} from "./markdown";
+export { NoteGrid, StickyNote } from "./note";
 export { PageHeading } from "./page-heading";
 export { ProofPhoto } from "./proof-photo";
 export { Points, Stat, StreakFlame, Table, Td, Th } from "./scores";

@@ -255,7 +255,7 @@ export const getStandings = defineAction({
   kind: "read",
   risk: "safe",
   surfaces: ALL_SURFACES,
-  requires: "member",
+  requires: "display",
   input: z.strictObject({
     year,
     recent: z
@@ -447,7 +447,7 @@ export const getPot = defineAction({
   kind: "read",
   risk: "safe",
   surfaces: ALL_SURFACES,
-  requires: "member",
+  requires: "display",
   input: z.strictObject({ year }),
   async execute(ctx, input) {
     const scope = await seasonScope(ctx, input.year);

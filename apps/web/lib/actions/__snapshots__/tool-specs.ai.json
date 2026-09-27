@@ -414,5 +414,213 @@
       "additionalProperties": false
     },
     "risk": "destructive"
+  },
+  {
+    "name": "list_notes",
+    "description": "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created and last changed (ISO 8601, UTC). Notes are shared household text, never secrets.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pinnedOnly": {
+          "description": "Only the pinned notes (the hub shows these). Default false.",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
+            }
+          ]
+        },
+        "limit": {
+          "description": "How many notes at most. Default 100.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  },
+  {
+    "name": "create_note",
+    "description": "Adds a note for the household: a short title, an optional markdown body (bold, italic, lists, links), an optional colour and whether to pin it to the hub and the kitchen screen. Never put secrets (passwords, codes that unlock anything) in a note.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "A short title."
+        },
+        "bodyMd": {
+          "description": "The note itself, in markdown (bold, italic, lists, links). Optional.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "color": {
+          "description": "The note's colour, or \"none\". Default none.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "yellow",
+                "pink",
+                "blue",
+                "green",
+                "orange",
+                "purple"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        },
+        "pinned": {
+          "description": "Pin it to the hub and the kitchen screen. Default false.",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  },
+  {
+    "name": "update_note",
+    "description": "Rewrites a note: its title, markdown body and colour are all replaced, so send the whole note (a body or colour left out is emptied). Pinning is pin_note. Anyone in the household may change any note.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The note's id, from list_notes."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "The new title."
+        },
+        "bodyMd": {
+          "description": "The new text, in markdown. Leaving it out empties the note.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "color": {
+          "description": "The colour, or \"none\". Leaving it out makes the note plain.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "yellow",
+                "pink",
+                "blue",
+                "green",
+                "orange",
+                "purple"
+              ]
+            },
+            {
+              "type": "string",
+              "const": "none"
+            }
+          ]
+        }
+      },
+      "required": [
+        "noteId",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
+  },
+  {
+    "name": "pin_note",
+    "description": "Pins a note to the hub and the kitchen screen (pinned: true), or takes it off (pinned: false).",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The note's id, from list_notes."
+        },
+        "pinned": {
+          "description": "True to pin it to the hub, false to unpin it.",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "noteId",
+        "pinned"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  },
+  {
+    "name": "delete_note",
+    "description": "Deletes a note for everyone in the household. Always ask before doing this.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The note's id, from list_notes."
+        }
+      },
+      "required": [
+        "noteId"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "destructive"
   }
 ]

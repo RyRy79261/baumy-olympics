@@ -23,6 +23,13 @@ import { logCompletionAction } from "./log-completion";
 import { manageChore } from "./manage-chore";
 import { manageMembers } from "./manage-members";
 import { mintInvite } from "./mint-invite";
+import {
+  createNote,
+  deleteNote,
+  listNotes,
+  pinNote,
+  updateNote,
+} from "./notes";
 import { pairKiosk } from "./pair-kiosk";
 import { redeemInvite } from "./redeem-invite";
 import { revokeInvite } from "./revoke-invite";
@@ -81,6 +88,11 @@ export const REGISTRY = {
   create_event: createEvent,
   update_event: updateEvent,
   delete_event: deleteEvent,
+  list_notes: listNotes,
+  create_note: createNote,
+  update_note: updateNote,
+  pin_note: pinNote,
+  delete_note: deleteNote,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =

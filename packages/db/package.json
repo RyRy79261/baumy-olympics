@@ -23,7 +23,8 @@
     "./weights": "./src/weights.ts",
     "./sweep": "./src/sweep.ts",
     "./test-harness": "./src/__tests__/_harness.ts",
-    "./game-fixtures": "./src/__tests__/_game-fixtures.ts"
+    "./game-fixtures": "./src/__tests__/_game-fixtures.ts",
+    "./notes": "./src/notes.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

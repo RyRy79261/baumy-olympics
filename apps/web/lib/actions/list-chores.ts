@@ -43,7 +43,10 @@ export interface ChoreView {
   state: ChoreDueState | "unavailable";
   availableAt: string | null;
   dueAt: string | null;
-  /** For the member asking; null when the chore cannot be scored now. */
+  /**
+   * For the member asking; null when the chore cannot be scored now, or when
+   * nobody is asking (the kitchen screen before anyone taps in).
+   */
   next: NextScoreView | null;
 }
 
@@ -62,7 +65,8 @@ export const listChores = defineAction({
   kind: "read",
   risk: "safe",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: "member",
+  // The kitchen screen shows the due chores before anyone taps in.
+  requires: "display",
   input: z.strictObject({
     includeArchived: z
       .boolean()
@@ -70,7 +74,8 @@ export const listChores = defineAction({
       .describe("Also list archived chores. Default false."),
   }),
   async execute(ctx, input) {
-    const me = ctx.actor.memberId!;
+    // Nobody, on the kiosk before anyone taps their avatar: no `next` then.
+    const me = ctx.actor.memberId;
     const board = await listChoreBoard(ctx.db, {
       householdId: ctx.householdId,
       now: ctx.now,
@@ -90,9 +95,8 @@ export const listChores = defineAction({
             })
           : null;
         const scorable = c.rule !== null && c.archivedAt === null;
-        const next = scorable
-          ? nextScore(c.rule!.basePoints, c.streak, me)
-          : null;
+        const next =
+          scorable && me ? nextScore(c.rule!.basePoints, c.streak, me) : null;
         return {
           id: c.id,
           name: c.name,

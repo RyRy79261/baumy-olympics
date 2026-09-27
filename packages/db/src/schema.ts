@@ -808,6 +808,46 @@ export const potContributions = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Hub
+// ---------------------------------------------------------------------------
+
+/**
+ * Short household notes (SPEC §3.5): "plumber comes Tue", the guest wifi.
+ * Never secrets. `body_md` is markdown and is only ever shown through the
+ * sanitising renderer (packages/ui `MarkdownBody`). `color` is a name from
+ * `NOTE_COLORS` (packages/types), or null for a plain note. `delete_note` is
+ * a soft delete: it sets `deleted_at`, and every read leaves those rows out.
+ */
+export const notes = pgTable(
+  "notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    title: text("title").notNull(),
+    bodyMd: text("body_md").notNull().default(""),
+    color: text("color"),
+    pinned: boolean("pinned").notNull().default(false),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => members.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("notes_household_live_idx")
+      .on(t.householdId, t.pinned, t.updatedAt)
+      .where(sql`${t.deletedAt} IS NULL`),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Platform
 // ---------------------------------------------------------------------------
 
