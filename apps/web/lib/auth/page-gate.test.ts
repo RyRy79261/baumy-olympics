@@ -71,8 +71,20 @@ describe("pageGate", () => {
     expect(pageGate(admin, "member")).toEqual({ kind: "ok" });
   });
 
-  it("never shows these pages to the kiosk, MCP or brain", () => {
-    for (const a of [kiosk, mcp, brain]) {
+  it("sends a paired kiosk to its own shell, and never to admin pages", () => {
+    const nobody: Actor = { kind: "kiosk", deviceId: "d1" };
+    for (const a of [kiosk, nobody]) {
+      expect(pageGate(a, "member")).toEqual({ kind: "redirect", to: "/kiosk" });
+      expect(pageGate(a, "joining")).toEqual({
+        kind: "redirect",
+        to: "/kiosk",
+      });
+      expect(pageGate(a, "admin")).toEqual({ kind: "not_found" });
+    }
+  });
+
+  it("never shows these pages to MCP or brain", () => {
+    for (const a of [mcp, brain]) {
       for (const need of ["member", "admin", "joining"] as const) {
         expect(pageGate(a, need)).toEqual({ kind: "not_found" });
       }

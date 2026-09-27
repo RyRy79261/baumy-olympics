@@ -3,6 +3,7 @@
 export {
   getActor,
   getActorOrRedirect,
+  getKioskActor,
   redirectIfSignedIn,
   type Actor,
   type ActorKind,

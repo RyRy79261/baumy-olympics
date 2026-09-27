@@ -1,20 +1,40 @@
 import "server-only";
 
 import { cache } from "react";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { authMayServe, getAuth } from "@baumy/auth";
-import { findActiveMemberByAuthUserId } from "@baumy/db/members";
+import { createHttpDb, type Queryable } from "@baumy/db";
+import {
+  findPairedKioskDevice,
+  hashKioskToken,
+  touchKioskDevice,
+} from "@baumy/db/kiosk-devices";
+import {
+  findActiveMember,
+  findActiveMemberByAuthUserId,
+} from "@baumy/db/members";
+import { now } from "@/lib/clock";
+import {
+  KIOSK_COOKIE,
+  KIOSK_MEMBER_COOKIE,
+  KIOSK_TOKEN_MAX_LENGTH,
+  isMemberId,
+} from "@/lib/kiosk/cookies";
 
 // Who is making this request (ADR 0001, SPEC §6.2). Ported from camp-404
 // `apps/web/lib/auth.ts`, reshaped around one `Actor` type.
 //
-// Only the `member` kind is resolved from a request today: a Better Auth
-// session, from the `baumy.session_token` cookie or from `Authorization:
-// Bearer <token>` (the bearer plugin turns the header into the same session).
-// The kiosk, service and MCP kinds are declared here so the gates
-// (lib/auth/gates.ts) already handle them; their credentials arrive with
-// their own issues (kiosk devices #10, MCP OAuth #23, brain tokens #27).
+// Two kinds are resolved from a request today:
+// - `member`: a Better Auth session, from the `baumy.session_token` cookie or
+//   from `Authorization: Bearer <token>` (the bearer plugin turns the header
+//   into the same session);
+// - `kiosk`: a paired kiosk device, from the `baumy_kiosk` cookie, with the
+//   member whose avatar was tapped, if any (getKioskActor).
+// A person's own session wins when a browser carries both. The service and
+// MCP kinds are declared here so the gates (lib/auth/gates.ts) already handle
+// them; their credentials arrive with their own issues (MCP OAuth #23, brain
+// tokens #27).
 // Deciding what an actor may DO is not this file's job: that is `runAction`
 // and its gates.
 
@@ -50,11 +70,21 @@ export interface MemberActor {
   displayName?: string;
 }
 
-/** A paired kiosk device; `memberId` is the avatar tapped on it, if any. */
+/**
+ * A paired kiosk device. `memberId` is the member whose avatar was tapped on
+ * it, if any (the issue calls it `selectedMemberId`; it is `memberId` here so
+ * every gate reads one field for every actor). Tapping an avatar is enough
+ * for self-claims; anything attested also needs that member's PIN, sent
+ * with the request (`RequestCtx.pin`).
+ */
 export interface KioskActor {
   kind: "kiosk";
   deviceId: string;
+  /** What the admin named the device. */
+  deviceName?: string;
   memberId?: string;
+  /** The picked member's display name, with `memberId`. */
+  displayName?: string;
 }
 
 /** A service token (baumy-brain); `memberId` is the Telegram-linked member. */
@@ -76,37 +106,78 @@ export type Actor = MemberActor | KioskActor | ServiceActor | McpActor;
 /**
  * The actor for the current request, or null when nobody is signed in.
  *
- * Returns null without reading anything when auth may not serve on this
- * deployment (`authMayServe`): a Vercel deployment without BETTER_AUTH_SECRET
- * fails closed rather than trust a cookie signed with the public placeholder.
- * The session's user is then matched to its active `members` row. A THROW
- * (the database is down) propagates to the error page rather than
- * quietly showing everyone as signed out.
+ * A Better Auth session comes first. It is read only when auth may serve on
+ * this deployment (`authMayServe`): a Vercel deployment without
+ * BETTER_AUTH_SECRET fails closed rather than trust a cookie signed with the
+ * public placeholder. The session's user is then matched to its active
+ * `members` row. Without a session, a paired kiosk cookie makes a kiosk
+ * actor. A THROW (the database is down) propagates to the error page rather
+ * than quietly showing everyone as signed out.
  *
  * `cache()` scopes the result to one request, so the layout, the page and a
  * route helper share one read, and React discards it when the request ends.
  */
 export const getActor = cache(async (): Promise<Actor | null> => {
-  if (!authMayServe(process.env)) return null;
-  const session = await getAuth().api.getSession({
-    headers: await headers(),
-  });
-  if (!session) return null;
-  const member = await findActiveMemberByAuthUserId(session.user.id);
+  if (authMayServe(process.env)) {
+    const session = await getAuth().api.getSession({
+      headers: await headers(),
+    });
+    if (session) {
+      const member = await findActiveMemberByAuthUserId(session.user.id);
+      return {
+        kind: "member",
+        userId: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        emailVerified: session.user.emailVerified,
+        sessionCreatedAt: new Date(session.session.createdAt).toISOString(),
+        ...(member
+          ? {
+              memberId: member.id,
+              role: member.role,
+              displayName: member.displayName,
+            }
+          : {}),
+      };
+    }
+  }
+  return getKioskActor();
+});
+
+/**
+ * The kiosk device this browser is paired as, or null. The kiosk's own pages
+ * and server actions use this, not getActor, so a person signed in on the
+ * iPad's browser does not turn the kiosk into their phone.
+ *
+ * The token is looked up by its sha256; a revoked device is not found. The
+ * picked member counts only while they are an active member of the device's
+ * household. `last_seen_at` is refreshed at most every 5 minutes, and a
+ * failure to write it never fails the request.
+ */
+export const getKioskActor = cache(async (): Promise<KioskActor | null> => {
+  const jar = await cookies();
+  const token = jar.get(KIOSK_COOKIE)?.value;
+  if (!token || token.length > KIOSK_TOKEN_MAX_LENGTH) return null;
+  const device = await findPairedKioskDevice(hashKioskToken(token));
+  if (!device) return null;
+  try {
+    await touchKioskDevice(device, now());
+  } catch (err) {
+    console.error("[kiosk] could not record last_seen_at", err);
+  }
+  const picked = jar.get(KIOSK_MEMBER_COOKIE)?.value;
+  const member = isMemberId(picked)
+    ? await findActiveMember(
+        createHttpDb() as unknown as Queryable,
+        device.householdId,
+        picked,
+      )
+    : null;
   return {
-    kind: "member",
-    userId: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    emailVerified: session.user.emailVerified,
-    sessionCreatedAt: new Date(session.session.createdAt).toISOString(),
-    ...(member
-      ? {
-          memberId: member.id,
-          role: member.role,
-          displayName: member.displayName,
-        }
-      : {}),
+    kind: "kiosk",
+    deviceId: device.id,
+    deviceName: device.name,
+    ...(member ? { memberId: member.id, displayName: member.displayName } : {}),
   };
 });
 
@@ -117,7 +188,10 @@ export async function getActorOrRedirect(): Promise<Actor> {
   return actor;
 }
 
-/** For the sign-in and sign-up pages: someone already signed in goes home. */
+/**
+ * For the sign-in and sign-up pages: a person already signed in goes home. A
+ * paired kiosk is not a person, so someone may still sign in on its browser.
+ */
 export async function redirectIfSignedIn(): Promise<void> {
-  if (await getActor()) redirect("/");
+  if ((await getActor())?.kind === "member") redirect("/");
 }

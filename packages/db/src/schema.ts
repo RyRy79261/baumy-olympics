@@ -276,6 +276,53 @@ export const telegramLinkCodes = pgTable(
   (t) => [index("telegram_link_codes_member_id_idx").on(t.memberId)],
 );
 
+/**
+ * A kitchen kiosk (SPEC §5, §6.2, §8): an iPad that stays signed in as a
+ * DEVICE, not a person. An admin's `pair_kiosk` creates the row holding only
+ * the sha256 of an 8-character pairing code (10 minutes, one use). The iPad
+ * exchanges the code at `/kiosk/pair` with ONE `UPDATE … WHERE paired_at IS
+ * NULL … RETURNING` (kiosk-devices.ts), which clears the code and stores the
+ * sha256 of the random token its `baumy_kiosk` cookie carries. Neither the
+ * code nor the token is ever stored. `revoke_kiosk` sets `revoked_at`, which
+ * signs the device out (and cancels a code not yet used).
+ *
+ * Both hashes are nullable and unique: Postgres lets many rows hold NULL in
+ * a unique column, which is exactly "no code" or "not paired yet".
+ */
+export const kioskDevices = pgTable(
+  "kiosk_devices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    name: text("name").notNull(),
+    /** sha256 hex of the device token; set when the device pairs. */
+    tokenHash: text("token_hash").unique(),
+    /** sha256 hex of the pairing code; cleared when it is used. */
+    pairingCodeHash: text("pairing_code_hash").unique(),
+    pairingExpiresAt: timestamp("pairing_expires_at", { withTimezone: true }),
+    /** The admin who created the pairing code. */
+    pairedBy: uuid("paired_by")
+      .notNull()
+      .references(() => members.id),
+    pairedAt: timestamp("paired_at", { withTimezone: true }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("kiosk_devices_household_id_idx").on(t.householdId),
+    // A device is paired exactly when it has a token.
+    check(
+      "kiosk_devices_paired_has_token",
+      sql`(${t.pairedAt} IS NULL) = (${t.tokenHash} IS NULL)`,
+    ),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // Platform
 // ---------------------------------------------------------------------------

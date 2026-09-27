@@ -2,8 +2,9 @@ import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
 // Kiosk PIN hashing (SPEC §5 `members.kiosk_pin_hash`, §6.2). A PIN has only
 // 4 to 6 digits, so the hash is salted scrypt: a leaked row still costs a
-// memory-hard hash per guess, and the attempt limits (issue #10) stop online
-// guessing. `set_kiosk_pin` writes it; kiosk attestation (issue #10) checks it.
+// memory-hard hash per guess, and the attempt limits (apps/web/lib/auth/pin.ts)
+// stop online guessing. `set_kiosk_pin` writes it; kiosk attestation checks
+// it.
 //
 // Stored as `scrypt$N$r$p$<salt base64>$<hash base64>`, so the cost can be
 // raised later without breaking stored PINs.

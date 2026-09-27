@@ -46,6 +46,13 @@ describe("Card", () => {
   });
 });
 
+describe("Input", () => {
+  it("has a kiosk size of 56px", () => {
+    expect(html(<Input kiosk />)).toContain("min-h-14");
+    expect(html(<Input />)).not.toContain("min-h-14");
+  });
+});
+
 describe("Field", () => {
   it("ties the label, hint and errors to the control", () => {
     const out = html(

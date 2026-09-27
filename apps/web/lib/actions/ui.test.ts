@@ -5,7 +5,7 @@ import type { Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { auditEvents } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
-import { seedMember, sessionActor } from "@/test-utils/actions";
+import { kioskActor, seedMember, sessionActor } from "@/test-utils/actions";
 import type { Actor } from "@/lib/auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import { fieldErrors } from "./result";
@@ -72,6 +72,11 @@ describe("uiRequestCtx", () => {
   it("is null when nobody is signed in", async () => {
     getActor.mockResolvedValue(null);
     await expect(uiRequestCtx(undefined)).resolves.toBeNull();
+  });
+
+  it("is null for a paired kiosk: it has its own adapter and surface", async () => {
+    getActor.mockResolvedValue(kioskActor("m1"));
+    await expect(uiRequestCtx("req-12345678")).resolves.toBeNull();
   });
 });
 

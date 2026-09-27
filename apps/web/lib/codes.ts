@@ -30,3 +30,11 @@ export function generateInviteCode(): string {
 export function generateTelegramLinkCode(): string {
   return randomCode(10).toUpperCase();
 }
+
+/**
+ * A kiosk pairing code: 8 random characters (about 40 bits), uppercase, shown
+ * as `ABCD-EFGH`. It lives 10 minutes and only its hash is stored.
+ */
+export function generateKioskPairingCode(): string {
+  return randomCode(8).toUpperCase();
+}
