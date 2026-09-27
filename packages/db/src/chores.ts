@@ -335,6 +335,27 @@ export async function listChoreBoard(
   );
 }
 
+/**
+ * The ids and names of the chores that are not archived, by name. What the
+ * Baumy command's system prompt lists (SPEC §6.3), without the board's
+ * scoring reads.
+ */
+export async function listChoreNames(
+  db: Queryable,
+  householdId: string,
+): Promise<{ id: string; name: string }[]> {
+  return db
+    .select({ id: chores.id, name: chores.name })
+    .from(chores)
+    .where(
+      and(
+        eq(chores.householdId, householdId),
+        sql`${chores.archivedAt} IS NULL`,
+      ),
+    )
+    .orderBy(asc(sql`lower(${chores.name})`), asc(chores.id));
+}
+
 /** A chore of the household by id, row-locked for the change to follow. */
 export async function lockChoreRow(
   db: Queryable,

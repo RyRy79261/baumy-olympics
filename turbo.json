@@ -27,6 +27,8 @@
     "GOOGLE_CALENDAR_PRIVATE_KEY",
     "BLOB_READ_WRITE_TOKEN",
     "CRON_SECRET",
+    "ANTHROPIC_API_KEY",
+    "AI_DAILY_COMMANDS_PER_MEMBER",
     "E2E_*"
   ],
   "tasks": {

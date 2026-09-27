@@ -6,6 +6,7 @@ import {
   choreNameTaken,
   createChore,
   listChoreBoard,
+  listChoreNames,
   lockChoreRow,
   seedStarterChores,
   setChoreArchived,
@@ -162,6 +163,30 @@ describe("seedStarterChores", () => {
         now: NOW,
       }),
     ).rejects.toThrow("not found");
+  });
+});
+
+describe("listChoreNames", () => {
+  it("lists the chores that are not archived by name, with their ids", async () => {
+    const { choreId: trash } = await seedChore(db(), SEED_CHORES.trash);
+    const { choreId: dishes } = await seedChore(db(), SEED_CHORES.dishes);
+    const { choreId: bath } = await seedChore(db(), {
+      ...SEED_CHORES.dishes,
+      name: "bathroom",
+    });
+    expect(await listChoreNames(db(), HOUSEHOLD_ID)).toEqual([
+      { id: bath, name: "bathroom" },
+      { id: dishes, name: SEED_CHORES.dishes.name },
+      { id: trash, name: SEED_CHORES.trash.name },
+    ]);
+    await seedChore(db(), {
+      ...SEED_CHORES.dishes,
+      name: "Attic",
+      archivedAt: NOW,
+    });
+    expect((await listChoreNames(db(), HOUSEHOLD_ID)).map((c) => c.id)).toEqual(
+      [bath, dishes, trash],
+    );
   });
 });
 

@@ -24,7 +24,8 @@
     "./sweep": "./src/sweep.ts",
     "./test-harness": "./src/__tests__/_harness.ts",
     "./game-fixtures": "./src/__tests__/_game-fixtures.ts",
-    "./notes": "./src/notes.ts"
+    "./notes": "./src/notes.ts",
+    "./ai-usage": "./src/ai-usage.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
