@@ -1,1 +1,5 @@
 @import "tailwindcss";
+
+/* Tailwind v4 scans this app by default; the UI kit lives in a workspace
+   package, so its classes are added here (camp-404's pattern). */
+@source "../../../packages/ui/src";

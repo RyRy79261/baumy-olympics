@@ -21,6 +21,7 @@
     "@baumy/auth": "workspace:*",
     "@baumy/db": "workspace:*",
     "@baumy/types": "workspace:*",
+    "@baumy/ui": "workspace:*",
     "better-auth": "1.6.25",
     "drizzle-orm": "^0.45.3",
     "next": "^16.3.6",
