@@ -21,6 +21,7 @@
     "AUTH_RATE_LIMIT_WINDOW_SECONDS",
     "AUTH_RATE_LIMIT_MAX",
     "AUTH_EMAIL_CAPTURE_FILE",
+    "FOUNDER_EMAILS",
     "E2E_*"
   ],
   "tasks": {

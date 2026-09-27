@@ -24,8 +24,12 @@ async function signIn(page: Page, email: string, pw: string) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
+/**
+ * Signed in, but not in the household: the gate sends a new account to /join
+ * (issue #9), which says who is signed in.
+ */
 async function expectSignedInAs(page: Page, email: string) {
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/join$/);
   await expect(page.getByTestId("signed-in-as")).toHaveText(email);
   const me = await page.request.get("/api/me");
   expect(me.status()).toBe(200);
