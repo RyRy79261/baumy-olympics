@@ -29,6 +29,8 @@ export {
   CompletionNote,
   ConfirmMode,
   CooldownHours,
+  DISPUTE_REASON_MAX,
+  DisputeReason,
   EFFORT_FACTOR_MAX,
   EFFORT_FACTOR_MIN,
   EffortFactorPct,
