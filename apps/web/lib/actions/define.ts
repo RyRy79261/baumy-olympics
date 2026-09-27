@@ -11,7 +11,17 @@ import type { ActionFailure } from "./result";
  * Every registered action. registry.ts is typed against this list, so an
  * entry cannot be missing from either side.
  */
-export const ACTION_NAMES = ["whoami", "update_my_profile"] as const;
+export const ACTION_NAMES = [
+  "whoami",
+  "update_my_profile",
+  "redeem_invite",
+  "join_as_founder",
+  "mint_invite",
+  "revoke_invite",
+  "manage_members",
+  "set_kiosk_pin",
+  "create_telegram_link_code",
+] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 
 /** A valid Claude and MCP tool name. */

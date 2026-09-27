@@ -53,7 +53,11 @@ describe("the registry", () => {
 
   it("guards writes that need a real session to the ui", () => {
     for (const [, def] of entries) {
-      if (def.requires === "session" || def.requires === "admin") {
+      if (
+        def.requires === "session" ||
+        def.requires === "admin" ||
+        def.requires === "account"
+      ) {
         expect(def.surfaces).toEqual(["ui"]);
       }
     }
