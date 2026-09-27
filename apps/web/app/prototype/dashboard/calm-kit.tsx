@@ -154,7 +154,7 @@ function Footer() {
           );
         })}
       </nav>
-      <BaumyCat scale={4} />
+      <BaumyCat scale={7} />
     </>
   );
 }

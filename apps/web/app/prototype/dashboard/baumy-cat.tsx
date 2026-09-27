@@ -1,92 +1,36 @@
 "use client";
 
-// PROTOTYPE (issue #7), throwaway. Baumy as a full-body 16-bit cat (a chibi
-// sitting pose in the spirit of Camp 404's INKBLOT cat): black fluffy coat,
-// one green and one blue-violet eye, a pastel party hat and a collar of
-// fairy lights (design/baumy-reference.png). It just sits there, blinks and
-// breathes; tap it and it listens, then shows what it understood as changes
-// to approve.
+// PROTOTYPE (issue #7), throwaway. Baumy is Camp 404's INKBLOT cat, as it is
+// (baumy-cat-frames.ts, same colours): a small black cat seen from the side,
+// sitting on a cushion in the corner. It just sits there; tap it and it
+// listens, then shows what it understood as changes to approve.
 
 import { useEffect, useState, type ReactNode } from "react";
+import { CAT_FRAMES, CAT_H, CAT_W } from "./baumy-cat-frames";
 
+// The idle frames leave their top 4 rows empty; crop them so the cat fills its spot.
+const CROP = 4;
+const IDLE = CAT_FRAMES.idle.map((f) => f.slice(CROP));
+const H = CAT_H - CROP;
+
+// camp-404 apps/join/components/os/inkblot-sprites.ts COLOURS.
 const COL: Record<string, string> = {
-  O: "#4a3b78", // outline, light enough that the black cat reads on the dark screen
-  K: "#1e1530", // coat
-  D: "#3b2d58", // sheen
-  R: "#7a66b8", // ear rim
-  G: "#43f0a0", // green eye
-  g: "#1f9e66",
-  V: "#8f7dff", // blue-violet eye
-  v: "#5842d8",
-  W: "#ffffff",
-  P: "#ff8fc7", // nose, pink lights
-  p: "#8a3a6e", // inner ear, open mouth
-  H: "#ffb8e0", // hat
-  h: "#c9a7ff",
-  Y: "#ffe46b", // star, yellow lights
-  T: "#4ff5e6", // teal lights
-  M: "#9d90bf", // whiskers
+  K: "oklch(0.13 0.02 295)",
+  D: "oklch(0.3 0.06 295)",
+  O: "oklch(0.05 0.01 295)",
+  E: "oklch(0.75 0.24 340)",
 };
 
-const BASE = [
-  "..............Y...............",
-  ".............YWY..............",
-  "..............H...............",
-  ".............HhH..............",
-  ".....O.......hHY.......O......",
-  "....ORO.....HHhHH.....ORO.....",
-  "....OpRO...OOOOOOO...ORpO.....",
-  "....OppROOOKKKKKKKOOORppO.....",
-  "....OppDKKKKKKKKKKKKKDppO.....",
-  "....ODKKKKKKKKKKKKKKKKKDO.....",
-  "...ODKKKKKKKKKKKKKKKKKKKDO....",
-  "...OKKKKKKKKKKKKKKKKKKKKKO....",
-  "...OKKKGGGKKKKKKKKVVVKKKKO....",
-  "..MOKKGWGGKKKKKKKKVWVVKKKOM...",
-  "...OKKGGGGKKKKKKKKVVVVKKKO....",
-  "..MOKKKGGKKKKPPKKKKVVKKKKOM...",
-  "...OKKKKKKKKKOOKKKKKKKKKKO....",
-  "....ODKKKKKKKKKKKKKKKKKKO.....",
-  ".....OODKKKKKKKKKKKKKKOO......",
-  ".....OTOOPOOYOOTOOPOOYO.......",
-  "....ODKKKKKKKKKKKKKKKKDO......",
-  "...ODKKKKKKKKKKKKKKKKKKDO.....",
-  "...OKKKKKKKKKKKKKKKKKKKKO..OO.",
-  "..ODKKKKKKKKKKKKKKKKKKKKDO.ODO",
-  "..OKKKKKKKKKKKKKKKKKKKKKKO.OKO",
-  "..OKKKKKKKKKKKKKKKKKKKKKKO.OKO",
-  "..OKKKKKKKKKKKKKKKKKKKKKKOOKKO",
-  "..ODKKKKOKKKKKKKKKKOKKKKDOKKO.",
-  "...OKKKKOKKKKKKKKKKOKKKKKKKO..",
-  "...OKDDKOKKKKKKKKKKOKDDKKOO...",
-  "....OOOO.OOOOOOOOOO.OOOOO.....",
-];
-const W = 30;
-const H = BASE.length;
-
-const edit = (rows: string[], y: number, x: number, s: string) => {
-  rows[y] = rows[y]!.slice(0, x) + s + rows[y]!.slice(x + s.length);
-};
-
-/** Eyes shut: content little lines where the eyes were. */
-const BLINK = (() => {
-  const r = [...BASE];
-  for (let y = 12; y <= 15; y++) r[y] = r[y]!.replace(/[GgWVv]/g, "K");
-  edit(r, 14, 6, "gggg");
-  edit(r, 14, 18, "vvvv");
-  return r;
-})();
-
-/** Mouth open, for talking. */
-const TALK = (() => {
-  const r = [...BASE];
-  edit(r, 16, 13, "pp");
-  return r;
-})();
-
-function Sprite({ rows, scale }: { rows: string[]; scale: number }) {
+function Sprite({ rows, scale, flip }: { rows: readonly string[]; scale: number; flip?: boolean }) {
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width={W * scale} height={H * scale} shapeRendering="crispEdges" aria-hidden>
+    <svg
+      viewBox={`0 0 ${CAT_W} ${H}`}
+      width={CAT_W * scale}
+      height={H * scale}
+      shapeRendering="crispEdges"
+      aria-hidden
+      style={flip ? { transform: "scaleX(-1)" } : undefined}
+    >
       {rows.flatMap((row, y) =>
         [...row].map((ch, x) =>
           COL[ch] ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={COL[ch]} /> : null,
@@ -140,12 +84,10 @@ export function BaumyCat({ scale = 5 }: { scale?: number }) {
     return () => window.clearTimeout(t);
   }, [mode]);
 
-  // Blink for one tick every 4 s; while listening, the mouth moves.
-  const rows =
-    mode === "listening" ? (tick % 2 ? TALK : BASE) : tick % 20 === 0 ? BLINK : BASE;
+  const rows = IDLE[Math.floor(tick / 3) % IDLE.length]!;
 
   return (
-    <div className="absolute bottom-[4px] right-[18px] z-30" data-voice-cat>
+    <div className="absolute bottom-[0px] right-[28px] z-30" data-voice-cat>
       {mode === "listening" && (
         <Bubble>
           <div className="flex items-center gap-4">
@@ -205,10 +147,19 @@ export function BaumyCat({ scale = 5 }: { scale?: number }) {
         type="button"
         onClick={() => setMode((m) => (m === "idle" || m === "done" ? "listening" : m))}
         aria-label="Talk to Baumy"
-        className="proto-bob block"
+        className="relative block"
         style={{ touchAction: "manipulation" }}
       >
-        <Sprite rows={rows} scale={scale} />
+        {/* a soft lit patch of wall, so the black cat reads on the dark screen */}
+        <span
+          className="absolute inset-x-[-14px] bottom-0 top-[-8px] block"
+          style={{ background: "oklch(0.32 0.08 295)", clipPath: "polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% 100%,0 100%,0 8px)" }}
+        />
+        <span className="relative block">
+          <Sprite rows={rows} scale={scale} flip />
+        </span>
+        {/* the cushion */}
+        <span className="absolute inset-x-[-14px] bottom-0 block h-[10px]" style={{ background: "oklch(0.52 0.22 340)", boxShadow: "inset 0 -4px 0 oklch(0.38 0.17 340)" }} />
       </button>
     </div>
   );
