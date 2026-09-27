@@ -31,6 +31,7 @@ import {
   updateNote,
 } from "./notes";
 import { pairKiosk } from "./pair-kiosk";
+import { createProposer } from "./propose";
 import { redeemInvite } from "./redeem-invite";
 import { revokeInvite } from "./revoke-invite";
 import { revokeKiosk } from "./revoke-kiosk";
@@ -121,4 +122,17 @@ export function runAction(
   ctx: RequestCtx,
 ): Promise<ActionResult<unknown>> {
   return runner(name, rawInput, ctx);
+}
+
+/**
+ * Check a write Claude asked for and preview it, without running it (the AI
+ * command's proposals, SPEC §6.3). Approving runs it through `runAction`.
+ */
+export const proposeAction = createProposer(REGISTRY);
+
+/** Whether `name` is a registered read, a write, or nothing at all. */
+export function actionKind(name: string): "read" | "write" | undefined {
+  return Object.hasOwn(REGISTRY, name)
+    ? REGISTRY[name as ActionName].kind
+    : undefined;
 }
