@@ -5,6 +5,10 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { kioskActionForm } from "@/lib/actions/kiosk";
 import type { ActionResult } from "@/lib/actions/result";
+import type {
+  CalendarWriteData,
+  DeleteEventData,
+} from "@/lib/actions/calendar";
 import type { CheckKioskPinData } from "@/lib/actions/check-kiosk-pin";
 import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
@@ -136,4 +140,34 @@ export async function kioskConcedeClaimAction(
   form: FormData,
 ): Promise<ClaimResult> {
   return claimEvent("concede_completion", form);
+}
+
+type CalendarWriteResult = ActionResult<CalendarWriteData>;
+
+/** The kiosk calendar: add, change and delete as the acting member. */
+export async function kioskCreateEventAction(
+  _prev: CalendarWriteResult | null,
+  form: FormData,
+): Promise<CalendarWriteResult> {
+  const result = await kioskActionForm("create_event", form);
+  if (result.ok) revalidatePath("/kiosk/calendar");
+  return result;
+}
+
+export async function kioskUpdateEventAction(
+  _prev: CalendarWriteResult | null,
+  form: FormData,
+): Promise<CalendarWriteResult> {
+  const result = await kioskActionForm("update_event", form);
+  if (result.ok) revalidatePath("/kiosk/calendar");
+  return result;
+}
+
+export async function kioskDeleteEventAction(
+  _prev: ActionResult<DeleteEventData> | null,
+  form: FormData,
+): Promise<ActionResult<DeleteEventData>> {
+  const result = await kioskActionForm("delete_event", form);
+  if (result.ok) revalidatePath("/kiosk/calendar");
+  return result;
 }
