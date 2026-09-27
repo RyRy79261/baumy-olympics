@@ -341,7 +341,9 @@ describe("the ai tool list", () => {
     const [tool] = claudeTools([
       {
         name: "x",
+        title: "X",
         description: "d",
+        kind: "read",
         risk: "safe",
         input_schema: { $schema: "s", type: "object", properties: {} },
       },

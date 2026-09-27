@@ -1,6 +1,7 @@
 [
   {
     "name": "whoami",
+    "title": "Who am I",
     "description": "Returns the household member making this request: their member id, display name, role (admin or member), colour and avatar sprite. Use it to learn who 'me' is before acting for them.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -8,10 +9,12 @@
       "properties": {},
       "additionalProperties": false
     },
+    "kind": "read",
     "risk": "safe"
   },
   {
     "name": "list_chores",
+    "title": "List chores",
     "description": "Lists the household's chores with their ids, base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -24,10 +27,12 @@
       },
       "additionalProperties": false
     },
+    "kind": "read",
     "risk": "safe"
   },
   {
     "name": "log_completion",
+    "title": "Log a chore",
     "description": "Logs that a household member did a chore and scores it (streaks and break bonuses). doneBy defaults to you; logging for someone else vouches for them. Refused with COOLDOWN (and retryAt) if the chore was done too recently, and with other codes for times in the future, more than 24h ago, or before the chore's last completion. Get chore and member ids from list_chores and whoami.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -62,10 +67,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "get_pending_confirmations",
+    "title": "Claims waiting for an OK",
     "description": "Lists the household's chore claims still waiting to settle (pending or disputed), with who did and logged each, when its dispute window ends, any open dispute and its reason, and `can`: which of confirm, dispute, withdraw, concede, undo and attach a photo you may do to it now. `needsYou` marks the ones waiting on you. `recent` lists your own claims of the last 7 days that have settled (finalized, confirmed or voided). Times are ISO 8601 in UTC.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -73,10 +80,12 @@
       "properties": {},
       "additionalProperties": false
     },
+    "kind": "read",
     "risk": "safe"
   },
   {
     "name": "confirm_completion",
+    "title": "Confirm a chore",
     "description": "Confirms a housemate's self-claimed chore that is waiting for an OK (pending), which verifies it. You cannot confirm your own. Refused with INVALID_STATE once it has finalized, expired or been disputed. Get ids from get_pending_confirmations.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -94,10 +103,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "dispute_completion",
+    "title": "Dispute a chore",
     "description": "Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -122,10 +133,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "undo_completion",
+    "title": "Undo a logged chore",
     "description": "Undoes a chore you logged yourself, within 10 minutes of logging it. It is voided and scores nothing. Refused with WINDOW_CLOSED after 10 minutes and FORBIDDEN for anyone but the person who logged it.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -143,10 +156,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "withdraw_dispute",
+    "title": "Withdraw a dispute",
     "description": "Withdraws a dispute you raised. The claim goes back to pending and counts again; it finalizes at the later of its original time and one hour from now. Only the person who disputed it can withdraw.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -164,10 +179,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "concede_completion",
+    "title": "Concede a dispute",
     "description": "Concedes a dispute on your own chore claim: the claim is voided and scores nothing. Only the person who did the chore can concede.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -185,10 +202,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "get_standings",
+    "title": "Get the standings",
     "description": "Returns the season scoreboard: each member's rank and points (scored completions plus approved adjustments), the part of those points that is still provisional (claims that can still be disputed), how far each member is behind the leader, the leader (who would take the pot now, or null on a tie), the prize mode, dispute counts this month, the latest scored completions with their breakdown (base, streak bonus, break bonus) and the point adjustments. Times are ISO 8601 in UTC; the household lives in Europe/Berlin.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -209,10 +228,12 @@
       },
       "additionalProperties": false
     },
+    "kind": "read",
     "risk": "safe"
   },
   {
     "name": "get_streaks",
+    "title": "Get the streaks",
     "description": "Returns the season's streak board: who holds each chore's streak now and how long it is, and the season's best runs (current or already broken), longest first, each with its chore, member, length, weight (base points added up) and dates. Times are ISO 8601 in UTC.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -233,10 +254,12 @@
       },
       "additionalProperties": false
     },
+    "kind": "read",
     "risk": "safe"
   },
   {
     "name": "get_pot",
+    "title": "Get the pot",
     "description": "Returns the season's savings pot: each month's contributions (amounts in euro cents, who paid, notes), the running total after each month, the total, and the current leader who would take the whole pot at the end of the season (null when nobody leads outright). The pot is a ledger only; money moves at the bank.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -251,10 +274,12 @@
       },
       "additionalProperties": false
     },
+    "kind": "read",
     "risk": "safe"
   },
   {
     "name": "list_events",
+    "title": "Calendar",
     "description": "Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM) and who added it (a member id). Private events are left out.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -271,10 +296,12 @@
       },
       "additionalProperties": false
     },
+    "kind": "read",
     "risk": "safe"
   },
   {
     "name": "create_event",
+    "title": "Add a calendar event",
     "description": "Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -329,10 +356,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "update_event",
+    "title": "Change a calendar event",
     "description": "Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -393,10 +422,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "delete_event",
+    "title": "Delete a calendar event",
     "description": "Deletes an event from the house calendar, by its id from list_events. Always confirm with the person first.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -413,10 +444,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "destructive"
   },
   {
     "name": "list_notes",
+    "title": "Notes",
     "description": "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created and last changed (ISO 8601, UTC). Notes are shared household text, never secrets.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -447,10 +480,12 @@
       },
       "additionalProperties": false
     },
+    "kind": "read",
     "risk": "safe"
   },
   {
     "name": "create_note",
+    "title": "Add a note",
     "description": "Adds a note for the household: a short title, an optional markdown body (bold, italic, lists, links), an optional colour and whether to pin it to the hub and the kitchen screen. Never put secrets (passwords, codes that unlock anything) in a note.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -509,10 +544,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "safe"
   },
   {
     "name": "update_note",
+    "title": "Change a note",
     "description": "Rewrites a note: its title, markdown body and colour are all replaced, so send the whole note (a body or colour left out is emptied). Pinning is pin_note. Anyone in the household may change any note.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -562,10 +599,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "confirm"
   },
   {
     "name": "pin_note",
+    "title": "Pin a note",
     "description": "Pins a note to the hub and the kitchen screen (pinned: true), or takes it off (pinned: false).",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -600,10 +639,12 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "safe"
   },
   {
     "name": "delete_note",
+    "title": "Delete a note",
     "description": "Deletes a note for everyone in the household. Always ask before doing this.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -621,6 +662,7 @@
       ],
       "additionalProperties": false
     },
+    "kind": "write",
     "risk": "destructive"
   }
 ]
