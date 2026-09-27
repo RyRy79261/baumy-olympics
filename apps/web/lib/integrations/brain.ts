@@ -4,7 +4,7 @@ import { z } from "zod";
 import { now } from "@/lib/clock";
 import { redactSecrets } from "@/lib/redact";
 import { isTestMode } from "@/lib/test-mode";
-import { memoryBrain } from "./brain-memory";
+import { downWhenAsked, memoryBrain } from "./brain-memory";
 
 // baumy-brain's kitchen shopping API (SPEC §3.4, §6.6, ADR 0003, issue #26).
 // Brain owns the house shopping list (`baumy_list_items`); Telegram and the
@@ -347,7 +347,7 @@ export function setBrainClientForTests(client: BrainClient | null): void {
 
 export function brainClient(env: EnvBag = process.env): BrainClient {
   if (override) return override;
-  if (isTestMode(env)) return cachedBrain(memoryBrain());
+  if (isTestMode(env)) return downWhenAsked(cachedBrain(memoryBrain()));
   const config = brainConfig(env);
   return config ? cachedBrain(httpBrain(config, { env })) : unconfiguredBrain;
 }

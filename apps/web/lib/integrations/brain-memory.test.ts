@@ -23,6 +23,7 @@ vi.mock("next/headers", () => ({
 const {
   BRAIN_DOWN_COOKIE,
   clearMemoryShopping,
+  downWhenAsked,
   memoryAdd,
   memoryBrain,
   memoryCheckOff,
@@ -77,7 +78,7 @@ describe("the fake brain", () => {
 
   it("is down for a browser with the cookie, and only for it", async () => {
     memoryAdd(["milk"]);
-    const brain = memoryBrain();
+    const brain = downWhenAsked(memoryBrain());
     expect(BRAIN_DOWN_COOKIE).toBe("baumy_e2e_brain");
     jar.value = "down";
     const down = { ok: false, reason: "unavailable" };

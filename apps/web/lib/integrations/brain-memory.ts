@@ -13,7 +13,8 @@ import type { BrainClient, BrainResult, ShoppingEntry } from "./brain";
 //
 // Brain being DOWN is per browser, not per server, so specs running in
 // parallel do not see each other's outage: a request whose browser carries
-// the cookie `baumy_e2e_brain=down` gets `unavailable` from every call.
+// the cookie `baumy_e2e_brain=down` gets `unavailable` from every call
+// (`downWhenAsked`, in front of the read cache).
 //
 // The list lives on globalThis, so every route bundle of one server shares
 // it (as lib/clock.ts does).
@@ -118,17 +119,24 @@ async function isDown(): Promise<boolean> {
 
 const DOWN = { ok: false, reason: "unavailable" } as const;
 
-async function answer<T>(fn: () => T): Promise<BrainResult<T>> {
-  if (await isDown()) return DOWN;
-  return { ok: true, data: fn() };
+/** `inner`, but `unavailable` for a browser that asked for brain to be down. */
+export function downWhenAsked(inner: BrainClient): BrainClient {
+  return {
+    listShopping: async () => ((await isDown()) ? DOWN : inner.listShopping()),
+    addShopping: async (items) =>
+      (await isDown()) ? DOWN : inner.addShopping(items),
+    checkOffShopping: async (items) =>
+      (await isDown()) ? DOWN : inner.checkOffShopping(items),
+  };
 }
+
+const ok = async <T>(data: T): Promise<BrainResult<T>> => ({ ok: true, data });
 
 export function memoryBrain(): BrainClient {
   return {
-    listShopping: () => answer(view),
-    addShopping: (items) =>
-      answer(() => ({ ...memoryAdd(items), items: view() })),
+    listShopping: () => ok(view()),
+    addShopping: (items) => ok({ ...memoryAdd(items), items: view() }),
     checkOffShopping: (items) =>
-      answer(() => ({ ...memoryCheckOff(items), items: view() })),
+      ok({ ...memoryCheckOff(items), items: view() }),
   };
 }
