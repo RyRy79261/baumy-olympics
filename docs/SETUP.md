@@ -54,3 +54,24 @@ succeeds and any real query fails loudly.
   ```
 
   Then check that `households` holds exactly one row, `Baumy household`.
+
+## E2E (issue #4)
+
+Nothing here needs an account: the suite runs on Docker Postgres, locally and
+in the CI `e2e` job, and `CI pass` already aggregates it, so the ruleset needs
+no change.
+
+- [ ] **Never set `E2E_TEST_MODE` in any Vercel environment.** With it set,
+      `next build` and `next start` refuse to run (`apps/web/lib/test-mode.ts`),
+      so a stray value breaks the deploy rather than exposing the test clock.
+      Check once under Project → Settings → Environment Variables when the
+      Vercel project is created (issue #5).
+- [ ] **After this PR merges, check the first `e2e` run on `main`** is green
+      and uploads its `playwright-report` artifact.
+
+Run it locally with:
+
+```sh
+pnpm --filter @baumy/web e2e:install   # once: Playwright Chromium
+E2E_RESET_DB=1 E2E_SERVE=build ./scripts/e2e-local.sh
+```

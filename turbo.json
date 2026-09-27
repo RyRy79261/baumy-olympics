@@ -2,7 +2,13 @@
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
   "globalDependencies": ["**/.env.*local", ".env"],
-  "globalEnv": ["DATABASE_URL", "DATABASE_URL_UNPOOLED", "NEON_LOCAL_PROXY"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "DATABASE_URL_UNPOOLED",
+    "NEON_LOCAL_PROXY",
+    "VERCEL_ENV",
+    "E2E_*"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
