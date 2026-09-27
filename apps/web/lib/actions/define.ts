@@ -41,6 +41,10 @@ export const ACTION_NAMES = [
   "adjust_points",
   "add_pot_contribution",
   "set_prize_mode",
+  "get_weights",
+  "schedule_weight",
+  "dismiss_weight",
+  "veto_weight",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 

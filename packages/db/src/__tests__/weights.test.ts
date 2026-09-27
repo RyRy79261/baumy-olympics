@@ -22,6 +22,7 @@ import {
   applyDueSuggestions,
   computeSuggestions,
   dismissSuggestion,
+  findSuggestion,
   lastAppliedAt,
   listScheduledChanges,
   listWeightPanel,
@@ -516,6 +517,16 @@ describe("schedule, dismiss and veto", () => {
     await expect(
       lockSuggestion(db(), HOUSEHOLD_ID, suggestion.id),
     ).resolves.toMatchObject({ id: suggestion.id });
+    await expect(
+      findSuggestion(db(), HOUSEHOLD_ID, suggestion.id),
+    ).resolves.toMatchObject({ id: suggestion.id });
+    await expect(
+      findSuggestion(
+        db(),
+        "00000000-0000-4000-8000-000000000000",
+        suggestion.id,
+      ),
+    ).resolves.toBeNull();
     await expect(
       lockSuggestion(
         db(),
