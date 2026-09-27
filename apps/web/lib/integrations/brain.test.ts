@@ -85,6 +85,30 @@ describe("brainConfig", () => {
       }),
     ).toBeNull();
   });
+
+  it("sends the token over plain http to this machine only", () => {
+    expect(
+      brainConfig({
+        BRAIN_BASE_URL: "http://b.example.com",
+        KITCHEN_API_TOKEN: "t",
+      }),
+    ).toBeNull();
+    expect(
+      brainConfig({
+        BRAIN_BASE_URL: "http://localhost:3001/",
+        KITCHEN_API_TOKEN: "t",
+      }),
+    ).toEqual({ baseUrl: "http://localhost:3001", token: "t" });
+    for (const url of [
+      "https://b.example.com/?x=1",
+      "https://b.example.com/#top",
+      "https://user:pw@b.example.com",
+    ]) {
+      expect(
+        brainConfig({ BRAIN_BASE_URL: url, KITCHEN_API_TOKEN: "t" }),
+      ).toBeNull();
+    }
+  });
 });
 
 describe("httpBrain", () => {
