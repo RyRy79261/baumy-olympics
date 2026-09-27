@@ -1,5 +1,6 @@
 import {
   initialVerification,
+  isCounted,
   isLive,
   replayChore,
   seasonBounds,
@@ -339,6 +340,118 @@ export async function logCompletion(
     completion: inserted,
     score: scores.find((s) => s.completionId === inserted.id) ?? null,
   };
+}
+
+export type PreviewCompletionResult =
+  | {
+      ok: true;
+      choreName: string;
+      /** What the completion would score, as `logCompletion` would store it. */
+      score: CompletionScore;
+      /**
+       * False for a partner-mode self-claim: it scores nothing until another
+       * member confirms it, and then scores `score` if nothing changed.
+       */
+      counted: boolean;
+    }
+  | Exclude<LogCompletionFailure, { code: "REQUEST_ID_REUSED" }>;
+
+/** Stands in for the not-yet-inserted completion in the preview's replay. */
+const PREVIEW_ID = "preview";
+
+/**
+ * What `logCompletion` would do with this completion now, without writing or
+ * locking anything: the same validation, then the same replay of the
+ * (chore, season) with the completion appended. The number a person approves
+ * ("+25, streak 2") is therefore the number stored, unless someone logs the
+ * same chore in between.
+ */
+export async function previewCompletion(
+  db: Queryable,
+  input: Omit<LogCompletionInput, "source" | "clientRequestId">,
+): Promise<PreviewCompletionResult> {
+  const [chore] = await db
+    .select()
+    .from(chores)
+    .where(
+      and(
+        eq(chores.id, input.choreId),
+        eq(chores.householdId, input.householdId),
+      ),
+    )
+    .limit(1);
+  if (!chore) return { ok: false, code: "CHORE_NOT_FOUND" };
+  const ruleVersions = await loadRuleVersions(db, chore.id);
+  if (
+    !ruleVersions.some(
+      (v) => v.effectiveFrom.getTime() <= input.occurredAt.getTime(),
+    )
+  ) {
+    return { ok: false, code: "NO_RULE_VERSION" };
+  }
+  const year = seasonYear(input.occurredAt);
+  const season = await findSeason(db, input.householdId, year);
+  const verdict = validateNewCompletion({
+    now: input.now,
+    occurredAt: input.occurredAt,
+    chore: { archivedAt: chore.archivedAt, proofMode: chore.proofMode },
+    hasPhoto: Boolean(input.photoPathname),
+    seasonStatus: season?.status ?? "active",
+    ruleVersions,
+    completions: await loadLiveCompletions(
+      db,
+      chore,
+      seasonBounds(year).startsAt,
+      input.now,
+    ),
+  });
+  if (!verdict.ok) return verdict;
+
+  const rows = season
+    ? await db
+        .select({
+          id: completions.id,
+          doneBy: completions.doneBy,
+          occurredAt: completions.occurredAt,
+          loggedAt: completions.loggedAt,
+          status: completions.status,
+        })
+        .from(completions)
+        .where(
+          and(
+            eq(completions.choreId, chore.id),
+            eq(completions.seasonId, season.id),
+          ),
+        )
+    : [];
+  const v = initialVerification({
+    doneBy: input.doneBy,
+    loggedBy: input.loggedBy,
+    confirmMode: chore.confirmMode,
+    loggedAt: input.now,
+    photoAttachedAt: input.photoPathname ? input.now : null,
+  });
+  const counted = isCounted({
+    status: v.status,
+    confirmMode: chore.confirmMode,
+  });
+  const scores = replayChore(
+    [
+      ...rows.map((r) => ({ ...r, confirmMode: chore.confirmMode })),
+      {
+        id: PREVIEW_ID,
+        doneBy: input.doneBy,
+        occurredAt: input.occurredAt,
+        loggedAt: input.now,
+        // Scored as if counted; `counted` says whether it will be yet.
+        status: "confirmed",
+        confirmMode: chore.confirmMode,
+      },
+    ],
+    ruleVersions,
+  );
+  const score = scores.find((s) => s.completionId === PREVIEW_ID)!;
+  return { ok: true, choreName: chore.name, score, counted };
 }
 
 function toRow(score: CompletionScore, now: Date): CompletionScoreRow {

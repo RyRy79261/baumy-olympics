@@ -11,6 +11,15 @@ export {
   type ButtonVariant,
 } from "./button";
 export { Card } from "./card";
+export {
+  ChoiceGroup,
+  ChoreTile,
+  ScorePop,
+  StreakBrokenBanner,
+  type ChoiceOption,
+  type ChoreTileProps,
+  type ChoreTileState,
+} from "./chores";
 export { cx } from "./cx";
 export { Dialog } from "./dialog";
 export { Field, FormMessage, Input, Select } from "./field";

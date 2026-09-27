@@ -280,6 +280,14 @@ jobs:
           pnpm db:local:migrate
           pnpm db:local:migrate
 
+      # The starter chores (SPEC §4.7): the second run must add nothing.
+      - name: Seed, twice
+        run: |
+          pnpm db:local:seed | tee "$RUNNER_TEMP/seed1.log"
+          grep -q "added 11 starter chores" "$RUNNER_TEMP/seed1.log"
+          pnpm db:local:seed | tee "$RUNNER_TEMP/seed2.log"
+          grep -q "nothing to do" "$RUNNER_TEMP/seed2.log"
+
       - name: Run the Docker Postgres tests
         run: pnpm db:local:test
 
@@ -305,6 +313,12 @@ jobs:
             echo "::error::next build started after the guard refused"
             exit 1
           fi
+          if VERCEL_ENV=preview PROD_DB_HOST=localhost \
+            pnpm --filter @baumy/db db:seed > "$RUNNER_TEMP/seed-guard.log" 2>&1; then
+            echo "::error::db:seed ran on a preview pointed at PROD_DB_HOST"
+            exit 1
+          fi
+          grep -q "points at the production host" "$RUNNER_TEMP/seed-guard.log"
           VERCEL_ENV=preview PROD_DB_HOST=ep-prod.eu-central-1.aws.neon.tech \
             pnpm --filter @baumy/db db:migrate
           VERCEL_ENV=production pnpm --filter @baumy/db db:migrate
