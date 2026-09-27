@@ -1,0 +1,12 @@
+/* PROTOTYPE (issue #7), throwaway. Shared keyframes for the mockups. */
+@keyframes proto-blink {
+  0%, 92%, 100% { opacity: 0; }
+  94%, 98% { opacity: 1; }
+}
+.proto-blink-shut { animation: proto-blink 4s steps(1) infinite; }
+.proto-blink-open { display: block; }
+@keyframes proto-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.proto-bob { animation: proto-bob 1.6s steps(2) infinite; }
+@keyframes proto-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.proto-twinkle { animation: proto-twinkle 1.2s steps(2) infinite; }
+.proto-pixelated { image-rendering: pixelated; }
