@@ -171,6 +171,13 @@ A photo attached after the challenge window has no effect on the timeout. Time-d
 - **`resolve_dispute`** (admin, UI only): `uphold` makes the claim `confirmed` with the admin as `verified_by`; `void` makes it `voided` (`disputed`). An admin may not rule on a claim they did themselves.
 - A withdrawn partner-mode dispute returns to `pending` with no `finalizes_at`; the 72h expiry still runs from `logged_at`.
 
+**The honesty actions** (added 2026-09-27, issue #15):
+
+- `confirm_completion`, `dispute_completion` `{completionId, reason}`, `undo_completion`, `withdraw_dispute` and `concede_completion` are `confirm`-risk writes on every surface with `requires: "attested"`: on the kiosk each needs the acting member's PIN in that request (SPEC §6.2), a phone session, MCP or brain vouches for itself. `resolve_dispute` `{completionId, outcome: uphold|void}` is admin and UI only. Each runs `applyCompletionEvent` (`packages/db/src/confirmations.ts`): lock the chore, read the claim again under the lock, `transition` at `now`, compare-and-set on the stored status, open or close the `disputes` row (`created_at`/`resolved_at` = `now`), re-score the (chore, season). The codes are `INVALID_STATE`, `WINDOW_CLOSED`, `FORBIDDEN`, `REASON_REQUIRED` (a blank reason is already `INVALID_INPUT` at the Zod boundary) and `NOT_FOUND`; a lost compare-and-set is `INVALID_STATE` ("Someone else just changed this claim").
+- `get_pending_confirmations` (read, every surface) returns every claim still `pending` or `disputed` by `effectiveStatus(now)`, each with `can` (confirm, dispute, withdraw, concede, undo, resolve, attachPhoto), computed with the same `transition` the writes run, and `needsYou` (it can confirm, withdraw, concede or resolve). `resolve` is offered only to an admin on the `ui` surface. It also returns `recent`: the asker's own claims of the last 7 days that have settled, with their effective status. Photos appear only as `/api/blob?pathname=…`.
+- `attach_completion_photo` `{completionId}` (UI and kiosk, `member`): the doer or the logger, while the claim is not voided at `now`, once (`PHOTO_ALREADY_ATTACHED`). The pathname is never input: the upload route stores the file and passes it in `RequestCtx.photo`, and anything else is `PHOTO_MISSING`. `log_completion` takes a photo the same way, so a `proof_mode=required` chore can only be logged through the upload route.
+- "Needs your OK" is `/inbox` on the phone (with a count in the nav) and a banner above the kiosk's chore grid for the member whose avatar is picked.
+
 ### 4.4 Frequency-derived weights
 
 The natural interval is measured over finalized or confirmed, never-disputed completions by everyone:
@@ -494,8 +501,12 @@ export interface ActionDef<I extends z.ZodType, O> {
 - The store is private, and the token is passed explicitly on each call. Port camp-404 `apps/web/app/api/uploads/avatar/route.ts` and `app/api/avatar/route.ts`.
 - **Completion photos:**
   - Accepted as `image/webp`, `image/jpeg` or `image/png`, up to 5 MB. They are downscaled to 1280px on the client first.
-  - Stored at `completions/{completionId}/{rand}.webp`.
+  - Stored at `completions/{completionId}/{rand}.webp` ([CORRECTION 2026-09-27] issue #15: or `.jpg`/`.png` when the browser cannot encode WebP).
   - Served only through `/api/blob?pathname=`, with `nosniff` and `private, immutable`. Like camp-404's proxy, it rejects unsafe paths (`UNSAFE_PATH`: `..`, `//`, `\`, `%`) and anything off the `completions/{id}/` allow-list, and returns 401 unless the caller is a household member or a paired, non-revoked kiosk and the completion is in their household.
+- **Upload and proxy details** (added 2026-09-27, issue #15):
+  - `POST /api/uploads/completion-photo` (multipart `image`, `requestId`, `surface=kiosk` and `pin` on the kiosk, then either `completionId` to attach or the `log_completion` fields to log a new claim) checks `Origin`/`Sec-Fetch-Site`, needs a member (or a kiosk with a member picked), and allows 20 uploads per member and 40 per IP per hour. It stores the file FIRST, under the completion id it names or picks, then runs the action with the pathname in `ctx.photo`; if the action refuses (or was a replay that kept an earlier photo) it deletes the file again. The answer is the action's result. With no `BLOB_READ_WRITE_TOKEN` it answers 501 `NOT_CONFIGURED` and stores nothing.
+  - `/api/blob` answers 404 for an unsafe or off-list pathname before asking who is there, 401 for no member session and no paired kiosk (a kiosk with nobody picked may look), and 404 unless the pathname is exactly the one stored on that completion of the household. The stored name is `completions/{id}/{16 hex}.{webp|jpg|png}`.
+  - Blob sits behind `lib/photos/blob-store.ts` (`ok`/`not_configured`/`unavailable`); under `E2E_TEST_MODE=1` an in-memory store stands in.
 - Pixel sprites are **static files** in `apps/web/public/sprites/`, not stored in Blob.
 - The daily cron deletes photos 90 days after a completion is finalized.
 

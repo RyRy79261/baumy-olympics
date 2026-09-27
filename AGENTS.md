@@ -57,7 +57,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 - E2E runs against Docker Postgres, never against production. External services are faked when `E2E_TEST_MODE=1`, and the app refuses to boot with that flag set on Vercel.
   - Specs live in `apps/web/e2e/specs/`; the config (`apps/web/playwright.config.ts`) refuses any non-localhost `E2E_BASE_URL`.
   - First run: `pnpm --filter @baumy/web e2e:install` for Chromium.
-  - To move server time, use `advanceClock(page, ms)` from `apps/web/e2e/lib/clock.ts`; `page.clock` only moves the browser. The offset is shared by the whole server, so such specs run serially in `desktop-chromium` only.
+  - To move server time, use `advanceClock(page, ms)` from `apps/web/e2e/lib/clock.ts`; `page.clock` only moves the browser. The offset is shared by the whole server, so such specs run serially in `desktop-chromium` only (add them to `SHARED_CLOCK_SPECS` in `playwright.config.ts`).
 
 ## Database rules
 
@@ -79,6 +79,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
   - `runAction` alone writes `audit_events` and `action_requests`. Domain functions take the caller's `tx` and write neither. The one audit row written outside `execute` is the kiosk PIN lock, by runAction's attestation step (`lib/auth/pin.ts`).
   - Declare an action with `defineAction` (`lib/actions/define.ts`), add its name to `ACTION_NAMES` and its entry to `lib/actions/registry.ts`. A write's `execute` returns `audit: {entity, entityId}`; returning `{ok: false}` rolls the whole transaction back.
   - Server actions call `actionForm(name, formData)` (`lib/actions/ui.ts`); the form carries a hidden `requestId`. Client forms get it from `useActionForm` (`components/use-action-form.ts`).
+  - A proof photo never arrives as action input: `app/api/uploads/completion-photo` stores the file, then runs `log_completion` or `attach_completion_photo` with the stored pathname in `RequestCtx.photo` (`lib/photos/upload.ts`). Photos are shown only through `/api/blob` (`photoProxyUrl`).
   - An input holding a secret (a PIN, a password) sets `fingerprint` so neither `input_hash` nor the audit payload sees it; a result holding a one-time code sets `storedData` so the ledger never stores it.
   - Actions that call Google or brain set `transactional: false`; never hold a transaction across a network call.
   - Admin-only actions have `surfaces: ["ui"]`.
