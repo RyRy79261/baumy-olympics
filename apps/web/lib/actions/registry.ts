@@ -2,8 +2,18 @@ import "server-only";
 
 import type { ActionResult } from "./result";
 import type { ActionDef, ActionName, AnyActionDef, RequestCtx } from "./define";
+import { attachCompletionPhoto } from "./attach-completion-photo";
 import { checkKioskPin } from "./check-kiosk-pin";
+import {
+  concedeCompletion,
+  confirmCompletion,
+  disputeCompletion,
+  resolveDispute,
+  undoCompletion,
+  withdrawDispute,
+} from "./confirmations";
 import { createTelegramLinkCode } from "./create-telegram-link-code";
+import { getPendingConfirmations } from "./get-pending-confirmations";
 import { joinAsFounder } from "./join-as-founder";
 import { listChores } from "./list-chores";
 import { logCompletionAction } from "./log-completion";
@@ -38,6 +48,14 @@ export const REGISTRY = {
   list_chores: listChores,
   log_completion: logCompletionAction,
   manage_chore: manageChore,
+  get_pending_confirmations: getPendingConfirmations,
+  confirm_completion: confirmCompletion,
+  dispute_completion: disputeCompletion,
+  undo_completion: undoCompletion,
+  withdraw_dispute: withdrawDispute,
+  concede_completion: concedeCompletion,
+  resolve_dispute: resolveDispute,
+  attach_completion_photo: attachCompletionPhoto,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =

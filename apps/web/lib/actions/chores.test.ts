@@ -248,6 +248,7 @@ describe("log_completion", () => {
       status: "pending",
       occurredAt: FIXED_NOW.toISOString(),
       counted: true,
+      hasPhoto: false,
       totalPts: TRASH.basePoints,
       streakLen: 1,
       breakPts: 0,

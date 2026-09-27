@@ -27,6 +27,14 @@ export const ACTION_NAMES = [
   "list_chores",
   "log_completion",
   "manage_chore",
+  "get_pending_confirmations",
+  "confirm_completion",
+  "dispute_completion",
+  "undo_completion",
+  "withdraw_dispute",
+  "concede_completion",
+  "resolve_dispute",
+  "attach_completion_photo",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 
@@ -62,6 +70,13 @@ export interface RequestCtx {
   pin?: string;
   /** The client address, for the per-IP rate limit. */
   ip?: string;
+  /**
+   * A proof photo the upload route (app/api/uploads/completion-photo) has
+   * just stored in Blob for this request. Only that route sets it, after
+   * checking the file; it never comes from an action's input, so no other
+   * surface can name a photo it did not upload.
+   */
+  photo?: { completionId: string; pathname: string };
   /** From lib/clock.ts, never `new Date()`. */
   now: Date;
 }

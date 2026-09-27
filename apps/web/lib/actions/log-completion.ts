@@ -20,6 +20,11 @@ import { fail, type ActionFailure } from "./result";
 // them, so it needs attestation: a session, MCP or brain actor is its own
 // member, and the kiosk must send the LOGGER's PIN with this request.
 //
+// With a proof photo, the upload route (app/api/uploads/completion-photo)
+// stores the file first, under the completion id it picks, and runs this
+// action with both in `ctx.photo`; a chore whose proof is `required` is
+// refused with PHOTO_REQUIRED without one.
+//
 // The write path is `logCompletion` (packages/db): it locks the chore,
 // validates, inserts and re-scores in runAction's transaction, and a refusal
 // rolls everything back, so a cooldown stores nothing.
@@ -56,6 +61,8 @@ export interface LogCompletionData {
   occurredAt: string;
   /** False while a partner-mode claim waits for someone to confirm it. */
   counted: boolean;
+  /** Whether a proof photo came with it. */
+  hasPhoto: boolean;
   /** The stored `completion_scores` row; null while not counted. */
   totalPts: number | null;
   streakLen: number | null;
@@ -207,6 +214,13 @@ export const logCompletionAction = defineAction({
       clientRequestId: ctx.requestId!,
       now: ctx.now,
       note: i.note ?? null,
+      // Set only by the photo upload route, which stored it for this claim.
+      ...(ctx.photo
+        ? {
+            completionId: ctx.photo.completionId,
+            photoPathname: ctx.photo.pathname,
+          }
+        : {}),
     });
     if (!r.ok) {
       return completionFailure(r, await choreName(ctx.db, i.choreId));
@@ -224,6 +238,7 @@ export const logCompletionAction = defineAction({
       status: c.status,
       occurredAt: c.occurredAt.toISOString(),
       counted: s !== null,
+      hasPhoto: c.photoPathname !== null,
       totalPts: s?.totalPts ?? null,
       streakLen: s?.streakLen ?? null,
       breakPts: s?.breakPts ?? null,
