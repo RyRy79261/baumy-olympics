@@ -45,15 +45,13 @@ succeeds and any real query fails loudly.
 - [ ] **Set the database env vars in Vercel** (Production scope):
       `DATABASE_URL` = the pooled string, `DATABASE_URL_UNPOOLED` = the direct
       string. Never set `NEON_LOCAL_PROXY` on Vercel. Preview-scope values and
-      the prod-host guard (`PROD_DB_HOST`) come with issue #5 (ADR 0004).
-- [ ] **Apply the migrations to Neon once** until migrate-on-build lands
-      (issue #5), from a machine with the direct string:
-
-  ```sh
-  DATABASE_URL_UNPOOLED='postgres://…' pnpm --filter @baumy/db db:migrate
-  ```
-
-  Then check that `households` holds exactly one row, `Baumy household`.
+      the prod-host guard (`PROD_DB_HOST`) are under "Vercel and Neon
+      previews" below.
+- [ ] **Check the first production migration.** Since issue #5 every deploy
+      runs `db:migrate` (`vercel-build`), so there is no manual step. After the
+      first production deploy, check its build log shows
+      `[migrate] VERCEL_ENV=production, target host: ep-…` and that
+      `households` holds exactly one row, `Baumy household`.
 
 ## E2E (issue #4)
 
@@ -75,3 +73,44 @@ Run it locally with:
 pnpm --filter @baumy/web e2e:install   # once: Playwright Chromium
 E2E_RESET_DB=1 E2E_SERVE=build ./scripts/e2e-local.sh
 ```
+
+## Vercel and Neon previews (issue #5)
+
+What each piece does, and why, is in [deploy.md](deploy.md). Until these are
+done, both Neon workflows exit 0 with a notice, previews are skipped
+("Ignored") because nothing marks them ready, and CI is unaffected.
+
+- [ ] **Create the Vercel project** from this repository: Root Directory
+      `apps/web`, framework Next.js. `apps/web/vercel.json` sets the build
+      command (`pnpm run vercel-build`) and the ignored-build step; leave both
+      unset in the dashboard. Turn **off** the Vercel–Neon integration's
+      preview branching if the integration is installed.
+- [ ] **Production env** (Production scope): `DATABASE_URL` and
+      `DATABASE_URL_UNPOOLED` as in "Database" above.
+- [ ] **Preview env** (Preview scope, no git branch):
+  - `PROD_DB_HOST` = the production **direct** host, for example
+    `ep-xxx.eu-central-1.aws.neon.tech`. Without it every preview's
+    `db:migrate` fails closed.
+  - `DATABASE_URL` / `DATABASE_URL_UNPOOLED`: leave **unset**, or point them
+    at a throwaway Neon branch named `preview-default`. Never production.
+  - Never `NEON_PREVIEW_READY`, `NEON_LOCAL_PROXY` or `E2E_TEST_MODE`.
+- [ ] **Repository secrets** (Settings → Secrets and variables → Actions):
+      `NEON_API_KEY`, `NEON_PROJECT_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`
+      (`team_…`), `VERCEL_PROJECT_IDS` (the project's `prj_…` id).
+- [ ] **Verify a normal PR.** Open a throwaway PR. Expect: the first Vercel
+      deployment Ignored; the `Neon preview branch for PR` run creates
+      `preview/<branch>` and logs only hosts; a new deployment whose build log
+      shows `[migrate] VERCEL_ENV=preview, target host: ep-…` with a host that
+      is **not** `PROD_DB_HOST`. Close it and check the cleanup run
+      removes the branch and the three env rows.
+- [ ] **Verify the Dependabot skip.** Push a branch named
+      `dependabot/test-guard` and open a PR from it. Expect: the preview job is
+      skipped, no `preview/dependabot/*` branch in Neon, and the Vercel
+      deployment shows as "Ignored". Screenshot both for issue #5, then close
+      the PR and delete the branch.
+- [ ] **Verify the guard on Vercel** (optional; CI already proves it against
+      Docker Postgres): temporarily set a branch-scoped Preview
+      `DATABASE_URL_UNPOOLED` equal to the production string on a throwaway
+      branch that already has `NEON_PREVIEW_READY`, redeploy, and check the
+      build fails with `points at the production host`. Delete the row
+      afterwards.
