@@ -405,3 +405,43 @@ comes with migration `0007_notes.sql`, applied by `db:migrate` on deploy.
   button opens a placeholder until the AI command (issues #21, #22).
 - On the kiosk, adding or changing a note asks for the member's kiosk PIN:
   each member sets theirs in `/settings` on their own phone.
+
+## Baumy command (issue #21)
+
+Typing to Baumy (the button on the hub and the kiosk) sends the text to
+Claude with the registry's `ai` tools. Reads are answered in the speech
+bubble; writes come back as proposals that a member approves. Without
+`ANTHROPIC_API_KEY` the sheet says Baumy isn't connected yet and nothing
+else changes. CI and e2e need no key: they use the scripted fake
+(`lib/integrations/claude-fake.ts`) under `E2E_TEST_MODE=1`. The
+`ai_usage` table comes with migration `0008_ai_usage.sql`.
+
+- [ ] **Create an Anthropic API key** for this app: console.anthropic.com →
+      a workspace for Baumy → API keys → Create key. Consider a monthly
+      spend limit on the workspace (Settings → Limits).
+- [ ] **Set `ANTHROPIC_API_KEY`** on the Vercel project (Production; Preview
+      only if you want previews to call Claude). Already in turbo
+      `globalEnv`. A refused key shows "An admin needs to check the
+      ANTHROPIC_API_KEY setting" and logs `[ai:command] failed`.
+- [ ] **Optionally set `AI_DAILY_COMMANDS_PER_MEMBER`** (default 50 per
+      member per Berlin day; `0` switches the command off). Already in turbo
+      `globalEnv`.
+- [ ] **Add both to `.env.example`** (agents cannot edit `.env*` files):
+
+  ```sh
+  # Claude for the Baumy command (SPEC §3.6). Without it the sheet says
+  # Baumy isn't connected yet; e2e uses a scripted fake instead.
+  ANTHROPIC_API_KEY=
+  # Baumy commands per member per Berlin day (default 50; 0 turns it off).
+  AI_DAILY_COMMANDS_PER_MEMBER=
+  ```
+
+- [ ] **After the deploy, check it:** ask Baumy "who's winning?" on your
+      phone (an answer, no proposal), then "I took the trash out" (a
+      "Log Trash for …" proposal; approve it and `/scores` shows it). Each
+      command adds one `ai_usage` row with its tokens.
+- The model is Claude Sonnet 5 (`packages/ai-prompts/src/models.ts`,
+  `COMMAND_TIER`); change the tier there if you want another.
+- [ ] **Look and feel is deferred to issue #7.** The speech bubble and the
+      proposal rows are neutral placeholders in `packages/ui/src/baumy.tsx`;
+      Baumy's sprite states are issue #22.

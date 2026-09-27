@@ -1,0 +1,23 @@
+{
+  "id": "msg_01WinningRead",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5",
+  "content": [
+    {
+      "type": "tool_use",
+      "id": "toolu_01Standings",
+      "name": "get_standings",
+      "input": {}
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 5190,
+    "output_tokens": 35,
+    "cache_creation_input_tokens": 3900,
+    "cache_read_input_tokens": 0
+  }
+}

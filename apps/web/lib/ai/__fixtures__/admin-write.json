@@ -1,0 +1,39 @@
+{
+  "id": "msg_01AdminWrite",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "I'll give you the points.",
+      "citations": null
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_01Adjust",
+      "name": "adjust_points",
+      "input": {
+        "op": "create",
+        "memberId": "{{ryan}}",
+        "points": 500,
+        "reason": "because"
+      }
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_01ReadToo",
+      "name": "get_standings",
+      "input": {}
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 5300,
+    "output_tokens": 90,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 3900
+  }
+}
