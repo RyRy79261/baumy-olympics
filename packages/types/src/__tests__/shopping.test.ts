@@ -30,14 +30,14 @@ describe("ShoppingWrite", () => {
     });
   });
 
-  it("takes one form field's text and splits it", () => {
-    expect(ShoppingWrite.parse({ items: "milk, eggs" })).toEqual({
-      items: ["milk", "eggs"],
+  it("takes one form field's item as it is, commas and all", () => {
+    expect(ShoppingWrite.parse({ items: " Bread, wholemeal " })).toEqual({
+      items: ["Bread, wholemeal"],
     });
   });
 
   it("refuses nothing to add", () => {
-    for (const items of ["", " , ", [], ["  "]]) {
+    for (const items of ["", " ", [], ["  "], ["milk", ""]]) {
       const r = ShoppingWrite.safeParse({ items });
       expect(r.success, JSON.stringify(items)).toBe(false);
       expect(r.error!.issues[0]!.message).toMatch(/Name (at least one|the)/);
