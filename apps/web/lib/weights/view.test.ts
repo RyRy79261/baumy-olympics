@@ -55,8 +55,8 @@ describe("weights view", () => {
 
   it("puts the gaps into words for screen readers", () => {
     expect(intervalsLabel([])).toBe("No gaps measured yet.");
-    expect(intervalsLabel([6 * DAY_MIN, 3.5 * DAY_MIN])).toBe(
-      "Gaps between completions, in days: 6, 3.5.",
+    expect(intervalsLabel([6 * DAY_MIN, 12 * 60])).toBe(
+      "Gaps between completions: 6 days, 12 h.",
     );
   });
 

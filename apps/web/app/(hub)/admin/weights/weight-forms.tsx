@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
 import {
   BASE_POINTS_MAX,
   BASE_POINTS_MIN,
   COOLDOWN_HOURS_MAX,
 } from "@baumy/types";
 import { Button, Field, FormMessage, Input } from "@baumy/ui";
-import { useActionForm } from "@/components/use-action-form";
+import { useActionForm, type FormAction } from "@/components/use-action-form";
+import type { WeightDecisionData } from "@/lib/actions/weights";
 import { toast } from "@/lib/ui/toast";
 import { appliesLabel, hoursField } from "@/lib/weights/view";
 import {
@@ -19,6 +19,31 @@ import {
 // The weight decisions (SPEC §4.4): an admin schedules a suggestion, as it
 // is or edited, or dismisses it; another member vetoes a scheduled change.
 // The form shows its errors inline; the one-tap buttons report by toast.
+//
+// Success is toasted as soon as the action answers, not from an effect: the
+// page re-renders with the new status and the form that asked is gone
+// before an effect of its own could run (as in components/claims).
+
+type Action = FormAction<WeightDecisionData>;
+
+function reporting(
+  action: Action,
+  success: (data: WeightDecisionData) => string,
+  errorsToo: boolean,
+): Action {
+  return async (prev, form) => {
+    const result = await action(prev, form);
+    if (result.ok) toast.success(success(result.data));
+    else if (errorsToo) toast.error(result.message);
+    return result;
+  };
+}
+
+const scheduleReporting = reporting(
+  scheduleWeightAction,
+  (d) => appliesLabel(d.appliesAt!),
+  false,
+);
 
 /** "Schedule" and "Edit & schedule" in one: the fields start at the suggestion. */
 export function ScheduleWeightForm({
@@ -33,10 +58,7 @@ export function ScheduleWeightForm({
   suggestedCooldownMinutes: number;
 }) {
   const { state, formAction, pending, requestId, errors } =
-    useActionForm(scheduleWeightAction);
-  useEffect(() => {
-    if (state?.ok) toast.success(appliesLabel(state.data.appliesAt!));
-  }, [state]);
+    useActionForm(scheduleReporting);
   const id = `schedule-${suggestionId}`;
   return (
     <form
@@ -100,22 +122,15 @@ function OneTap({
   suggestionId,
   label,
   accessibleName,
-  done,
   variant = "secondary",
 }: {
-  action: typeof dismissWeightAction;
+  action: Action;
   suggestionId: string;
   label: string;
   accessibleName: string;
-  done: string;
   variant?: "secondary" | "danger";
 }) {
-  const { state, formAction, pending, requestId } = useActionForm(action);
-  useEffect(() => {
-    if (!state) return;
-    if (!state.ok) toast.error(state.message);
-    else toast.success(done);
-  }, [state, done]);
+  const { formAction, pending, requestId } = useActionForm(action);
   return (
     <form action={formAction}>
       <input type="hidden" name="requestId" value={requestId} />
@@ -132,6 +147,22 @@ function OneTap({
   );
 }
 
+const dismissReporting = reporting(
+  dismissWeightAction,
+  () => "Dismissed.",
+  true,
+);
+const cancelReporting = reporting(
+  dismissWeightAction,
+  () => "Cancelled. The points stay.",
+  true,
+);
+const vetoReporting = reporting(
+  vetoWeightAction,
+  () => "Vetoed. The points stay as they are.",
+  true,
+);
+
 export function DismissWeightButton({
   suggestionId,
   choreName,
@@ -145,11 +176,10 @@ export function DismissWeightButton({
   const label = scheduled ? "Cancel" : "Dismiss";
   return (
     <OneTap
-      action={dismissWeightAction}
+      action={scheduled ? cancelReporting : dismissReporting}
       suggestionId={suggestionId}
       label={label}
       accessibleName={`${label} the ${choreName} change`}
-      done={scheduled ? "Cancelled. The points stay." : "Dismissed."}
     />
   );
 }
@@ -163,11 +193,10 @@ export function VetoWeightButton({
 }) {
   return (
     <OneTap
-      action={vetoWeightAction}
+      action={vetoReporting}
       suggestionId={suggestionId}
       label="Veto"
       accessibleName={`Veto the ${choreName} change`}
-      done="Vetoed. The points stay as they are."
       variant="danger"
     />
   );
