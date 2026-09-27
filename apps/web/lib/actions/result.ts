@@ -33,7 +33,17 @@ export type PlatformErrorCode =
   /** An integration failed just now; trying again may work. */
   | "UNAVAILABLE"
   /** Something threw. The message is generic; the log has the detail. */
-  | "INTERNAL";
+  | "INTERNAL"
+  /**
+   * Brain (`/api/v1/actions`): a `confirm`-risk action sent without
+   * `X-Baumy-Confirmed: 1`. Ask the person, then send it again with it.
+   */
+  | "CONFIRMATION_REQUIRED"
+  /**
+   * Brain: the Telegram user is not linked to a member. Only `link_telegram`
+   * works until they send `/link <code>`.
+   */
+  | "TELEGRAM_NOT_LINKED";
 
 /** Codes the actions themselves return, each with a sentence to act on. */
 export type DomainErrorCode =
@@ -89,7 +99,11 @@ export type DomainErrorCode =
   /** An admin tried to approve their own point adjustment. */
   | "SELF_APPROVAL"
   /** The member who scheduled a weight change tried to veto it. */
-  | "SELF_VETO";
+  | "SELF_VETO"
+  /** `link_telegram`: the code is wrong, used or expired. */
+  | "LINK_CODE_INVALID"
+  /** That Telegram user id is already linked to another member. */
+  | "TELEGRAM_ALREADY_LINKED";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 

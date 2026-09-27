@@ -40,8 +40,10 @@ import { fail, type ActionFailure, type ActionResult } from "./result";
 // transaction, then finds its row.
 //
 // An `account` action from an account with no member yet (joining the
-// household) has nothing to key the claim on, so it executes first and keys
-// the ledger and the audit row on the member it created (`runJoining`).
+// household), or a `service` action from a Telegram user not linked yet
+// (`link_telegram`), has nothing to key the claim on, so it executes first
+// and keys the ledger and the audit row on the member it names in `joinedAs`
+// (`runJoining`).
 //
 // `transactional: false` actions (Google, brain) commit the claim as
 // `pending`, run `execute` with NO transaction open, then write the audit row
@@ -101,6 +103,11 @@ class ActionAbort extends Error {
 
 /** The key rate limits and logs use for an actor. */
 export function actorKey(actor: Actor): string {
+  // A service acts for a Telegram user, linked or not: key on that user, so
+  // an unlinked one trying link codes has a bucket of its own (issue #27).
+  if (actor.kind === "service" && actor.telegramUserId !== undefined) {
+    return `service:${actor.tokenName}:tg:${actor.telegramUserId}`;
+  }
   if (actor.memberId) return `member:${actor.memberId}`;
   switch (actor.kind) {
     case "kiosk":
@@ -338,7 +345,10 @@ export function createRunner(
       const hash = inputHash(def.name, seen);
       const actorMemberId = ctx.actor.memberId;
       if (!actorMemberId) {
-        if (gate === "account" && def.transactional !== false) {
+        if (
+          (gate === "account" || gate === "service") &&
+          def.transactional !== false
+        ) {
           return await runJoining(def, ctx, input, seen, hash, deps);
         }
         return fail("FORBIDDEN", "Only household members can do this.");
@@ -374,11 +384,13 @@ export function createRunner(
 
 /**
  * An `account` action from an account with no member yet (joining the
- * household). There is no member to key the claim on before `execute`, so it
- * runs first, in the transaction, and must create the member and name it in
- * `joinedAs`; the ledger row and the audit row are then keyed on that member,
- * in the same transaction. A retry with the same request id comes back as
- * that member and replays the stored result through the normal claim.
+ * household), or a `service` action for a Telegram user not linked yet
+ * (`link_telegram`, whose member comes from the code it redeems). There is no
+ * member to key the claim on before `execute`, so it runs first, in the
+ * transaction, and must name the member in `joinedAs`; the ledger row and the
+ * audit row are then keyed on that member, in the same transaction. A retry
+ * with the same request id comes back as that member and replays the stored
+ * result through the normal claim.
  *
  * Two joins by the same account at once meet at the unique
  * `members.auth_user_id`: the second waits for the first, then creates
@@ -397,7 +409,7 @@ async function runJoining(
     const out = await def.execute({ ...ctx, db }, input);
     if (!out.ok) throw new ActionAbort(out);
     if (!out.joinedAs) {
-      throw new Error(`${def.name} ran for an account but created no member`);
+      throw new Error(`${def.name} ran without a member but named none`);
     }
     const key: ClaimKey = {
       actorMemberId: out.joinedAs,

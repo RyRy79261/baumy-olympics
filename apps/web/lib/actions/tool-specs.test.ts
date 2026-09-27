@@ -24,6 +24,19 @@ describe("toolSpecs", () => {
     );
   });
 
+  it("builds the brain tools: link_telegram, and nothing destructive or admin", async () => {
+    const specs = toolSpecs("brain");
+    const names = specs.map((s) => s.name);
+    expect(names).toContain("link_telegram");
+    expect(names).toContain("create_event");
+    expect(names).not.toContain("delete_event");
+    expect(names).not.toContain("manage_members");
+    expect(specs.find((s) => s.name === "create_event")?.risk).toBe("confirm");
+    await expect(`${JSON.stringify(specs, null, 2)}\n`).toMatchFileSnapshot(
+      "./__snapshots__/tool-specs.brain.json",
+    );
+  });
+
   it("includes only actions offered on the surface", () => {
     // update_my_profile is ui only.
     expect(toolSpecs("ui").map((s) => s.name)).toContain("update_my_profile");
