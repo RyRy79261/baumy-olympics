@@ -487,3 +487,41 @@ No migration: `ai_usage.audio_seconds` came with `0008_ai_usage.sql`.
       `SPRITE_MOTION`); the drawn sprite sheet from
       `design/baumy-reference.png` replaces it there. The microphone button
       and level meter are `packages/ui/src/voice.tsx`.
+
+## MCP OAuth (issue #23)
+
+Chatbots (claude.ai's custom connectors, Claude Desktop, Claude Code) get a
+token for one member through Baumy's own OAuth server: they register
+themselves, the member approves them on `/oauth/consent` (ticking read, and
+write if wanted), and `/settings/connections` lists and disconnects them.
+The MCP endpoint that uses the token is issue #24. No outside account or
+key is needed; the tables come with migration `0009_mcp_oauth.sql`. CI and
+e2e need nothing: off Vercel the issuer is the request's own address.
+
+- [ ] **Set `MCP_PUBLIC_URL`** on the Vercel project (Production) to the
+      address people use, for example `https://baumy.example.com` (the
+      custom domain, never the `*.vercel.app` deployment address, which is
+      behind Vercel's login). Without it every `/api/mcp/oauth/*` and
+      `/.well-known/oauth-*` answer is 503 "MCP is not configured". Set it
+      on Preview only if you want to connect a preview (its own address).
+      Already in turbo `globalEnv`.
+- [ ] **Add it to `.env.example`** (agents cannot edit `.env*` files):
+
+  ```sh
+  # The OAuth issuer for MCP connectors (SPEC §6.3): the public address,
+  # never VERCEL_URL. Unset on Vercel, MCP answers 503; unset locally, the
+  # request's own address is used.
+  MCP_PUBLIC_URL=
+  ```
+
+- [ ] **After the deploy, check it:**
+      `curl https://<your-domain>/.well-known/oauth-authorization-server`
+      shows `"issuer": "https://<your-domain>"` and
+      `"code_challenge_methods_supported": ["S256"]`. Connecting Claude
+      end to end waits for issue #24 (the `/api/mcp/mcp` endpoint).
+- If a firewall or Cloudflare sits in front of Vercel, let
+  `/.well-known/oauth-*` and `/api/mcp/*` through: claude.ai's probes look
+  like bots (intake-tracker's gotcha #10).
+- [ ] **Look and feel is deferred to issue #7.** The consent page
+      (`app/oauth/consent/page.tsx`) and `/settings/connections` use the
+      neutral `packages/ui` placeholders, including the new `Checkbox`.
