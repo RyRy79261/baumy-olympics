@@ -57,7 +57,7 @@ export function Sprite({
   name: string;
   state?: SpriteState;
   /** How many times the 16px cell is scaled. */
-  size?: 1 | 2 | 3 | 4;
+  size?: 1 | 2 | 3 | 4 | 6 | 8;
   /** The member's colour, as the tile background. */
   color?: string;
   /** Accessible name; without it the sprite is decorative. */
