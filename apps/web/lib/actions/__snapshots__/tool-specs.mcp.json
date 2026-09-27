@@ -57,7 +57,9 @@
           "maxLength": 280
         }
       },
-      "required": ["choreId"],
+      "required": [
+        "choreId"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -87,7 +89,9 @@
           "description": "The completion's id, from get_pending_confirmations."
         }
       },
-      "required": ["completionId"],
+      "required": [
+        "completionId"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -112,7 +116,10 @@
           "description": "Why you think it was not done."
         }
       },
-      "required": ["completionId", "reason"],
+      "required": [
+        "completionId",
+        "reason"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -131,7 +138,9 @@
           "description": "The completion's id, from get_pending_confirmations."
         }
       },
-      "required": ["completionId"],
+      "required": [
+        "completionId"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -150,7 +159,9 @@
           "description": "The completion's id, from get_pending_confirmations."
         }
       },
-      "required": ["completionId"],
+      "required": [
+        "completionId"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -169,7 +180,9 @@
           "description": "The completion's id, from get_pending_confirmations."
         }
       },
-      "required": ["completionId"],
+      "required": [
+        "completionId"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -284,7 +297,10 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["timed", "all_day"],
+          "enum": [
+            "timed",
+            "all_day"
+          ],
           "description": "`timed` needs startTime and endTime; `all_day` fills whole days."
         },
         "date": {
@@ -306,7 +322,11 @@
           "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
         }
       },
-      "required": ["title", "kind", "date"],
+      "required": [
+        "title",
+        "kind",
+        "date"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -340,7 +360,10 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["timed", "all_day"],
+          "enum": [
+            "timed",
+            "all_day"
+          ],
           "description": "`timed` needs startTime and endTime; `all_day` fills whole days."
         },
         "date": {
@@ -362,7 +385,12 @@
           "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
         }
       },
-      "required": ["eventId", "title", "kind", "date"],
+      "required": [
+        "eventId",
+        "title",
+        "kind",
+        "date"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -382,7 +410,11 @@
             },
             {
               "type": "string",
-              "enum": ["true", "false", "on"]
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
             }
           ]
         },
@@ -420,7 +452,14 @@
           "anyOf": [
             {
               "type": "string",
-              "enum": ["yellow", "pink", "blue", "green", "orange", "purple"]
+              "enum": [
+                "yellow",
+                "pink",
+                "blue",
+                "green",
+                "orange",
+                "purple"
+              ]
             },
             {
               "type": "string",
@@ -436,12 +475,18 @@
             },
             {
               "type": "string",
-              "enum": ["true", "false", "on"]
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
             }
           ]
         }
       },
-      "required": ["title"],
+      "required": [
+        "title"
+      ],
       "additionalProperties": false
     },
     "risk": "safe"
@@ -475,7 +520,14 @@
           "anyOf": [
             {
               "type": "string",
-              "enum": ["yellow", "pink", "blue", "green", "orange", "purple"]
+              "enum": [
+                "yellow",
+                "pink",
+                "blue",
+                "green",
+                "orange",
+                "purple"
+              ]
             },
             {
               "type": "string",
@@ -484,7 +536,10 @@
           ]
         }
       },
-      "required": ["noteId", "title"],
+      "required": [
+        "noteId",
+        "title"
+      ],
       "additionalProperties": false
     },
     "risk": "confirm"
@@ -510,12 +565,19 @@
             },
             {
               "type": "string",
-              "enum": ["true", "false", "on"]
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
             }
           ]
         }
       },
-      "required": ["noteId", "pinned"],
+      "required": [
+        "noteId",
+        "pinned"
+      ],
       "additionalProperties": false
     },
     "risk": "safe"
