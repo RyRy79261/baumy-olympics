@@ -123,7 +123,9 @@ describe("transcriber", () => {
   });
 
   it("calls Groq with the key when one is set", async () => {
-    const fetchImpl = vi.fn(async () => json({ text: "hallo", duration: 1 }));
+    const fetchImpl = vi.fn(async (_url: string, _init: RequestInit) =>
+      json({ text: "hallo", duration: 1 }),
+    );
     const t = transcriber({ GROQ_API_KEY: " gsk_live " }, fetchImpl);
     expect(t).toMatchObject({ ok: true, kind: "groq" });
     expect(voiceConfigured({ GROQ_API_KEY: "gsk_live" })).toBe(true);
@@ -133,7 +135,7 @@ describe("transcriber", () => {
       text: "hallo",
       audioSeconds: 1,
     });
-    const init = fetchImpl.mock.calls[0]![1] as RequestInit;
+    const init = fetchImpl.mock.calls[0]![1];
     expect(init.headers).toEqual({ authorization: "Bearer gsk_live" });
   });
 

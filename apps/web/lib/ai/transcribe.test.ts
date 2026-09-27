@@ -192,7 +192,7 @@ describe("POST /api/ai/transcribe", () => {
   });
 
   it("refuses a missing, empty or unreadable upload", async () => {
-    for (const fields of [
+    for (const fields of <Record<string, string | File>[]>[
       {},
       { audio: clip("audio/webm", 0) },
       { audio: "x" },
