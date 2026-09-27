@@ -52,9 +52,11 @@ test("pin a note on the phone and see it on the kiosk home after a refresh", asy
   }
   await expect(page.getByTestId("hub-pot")).toContainText("Pot: €");
   await page.getByRole("button", { name: "Ask Baumy" }).click();
-  const baumy = page.getByRole("dialog", { name: "Baumy" });
-  await expect(baumy).toContainText("Baumy is still asleep");
-  await baumy.getByRole("button", { name: "OK" }).click();
+  const baumy = page.getByRole("dialog", { name: "Ask Baumy" });
+  await expect(baumy.getByTestId("baumy-says")).toContainText(
+    "Tell me what you did",
+  );
+  await baumy.getByRole("button", { name: "Close" }).click();
   await expect(baumy).toBeHidden();
 
   // The kitchen screen, before anyone taps in: the widgets, and no scroll.

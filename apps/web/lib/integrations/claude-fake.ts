@@ -13,7 +13,8 @@ import type { MessageParams } from "./claude";
 //   - "who's winning?" (win, lead, standings, score): reads get_standings,
 //     then answers with the leader;
 //   - "confirm …": reads get_pending_confirmations, then proposes
-//     confirm_completion for the first claim the asker may confirm;
+//     confirm_completion for the claim the asker may confirm whose chore the
+//     text names (else the first one);
 //   - "I did/took/cleaned … the <chore>": reads list_chores, then proposes
 //     log_completion for every chore named in the text (the longest names
 //     first), or asks which chore when none is.
@@ -174,7 +175,10 @@ export async function fakeClaude(
         "tool_use",
       );
     }
-    const claim = pending.data?.claims.find((c) => c.can.confirm);
+    const mine = (pending.data?.claims ?? []).filter((c) => c.can.confirm);
+    // The claim whose chore the text names, else the first one.
+    const claim =
+      mine.find((c) => said.includes(c.choreName.toLowerCase())) ?? mine[0];
     if (!claim) {
       return message(
         model,
