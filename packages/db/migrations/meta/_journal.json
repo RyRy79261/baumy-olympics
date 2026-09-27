@@ -36,6 +36,13 @@
       "when": 1790477720770,
       "tag": "0004_kiosk_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790481418284,
+      "tag": "0005_game_tables",
+      "breakpoints": true
     }
   ]
 }
