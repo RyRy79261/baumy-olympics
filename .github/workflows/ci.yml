@@ -10,6 +10,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # `edited` as well as the defaults, so renaming a PR re-runs commitlint on
+    # the new title. Without it a PR retitled after a green run keeps its
+    # green check.
+    types: [opened, synchronize, reopened, edited]
 
 # LEAST PRIVILEGE. Nothing here writes back except the coverage comment, which
 # asks for `pull-requests: write` on its own job. A compromised dependency in a
