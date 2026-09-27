@@ -35,6 +35,16 @@ export E2E_TEST_MODE=1
 unset VERCEL_ENV
 # The only target the harness accepts (apps/web/e2e/lib/env.ts).
 export E2E_BASE_URL="http://localhost:$PORT"
+# Auth (packages/auth). No BETTER_AUTH_SECRET: off Vercel the public
+# placeholder is allowed. The explicit http:// base URL keeps session cookies
+# off the Secure flag for plain-http localhost. Auth emails go to a capture
+# file the specs read (apps/web/e2e/lib/mail.ts), emptied per run. The rate
+# limits are raised because every spec signs in from the same address.
+export BETTER_AUTH_URL="http://localhost:$PORT"
+export AUTH_EMAIL_CAPTURE_FILE="$LOG_DIR/auth-mail.jsonl"
+: >"$AUTH_EMAIL_CAPTURE_FILE"
+export AUTH_RATE_LIMIT_WINDOW_SECONDS=60
+export AUTH_RATE_LIMIT_MAX=10000
 
 # 1. Database up, and wait until Postgres itself answers.
 echo "==> database stack"
