@@ -11,8 +11,13 @@ export const RULESET_V1 = {
   breakLenCap: 10,
   /** Breaking a 1-streak already pays (SPEC §12.2). */
   minBrokenStreak: 1,
+  /** The logger may undo a pending or disputed completion this long after logging. */
   undoWindowMin: 10,
+  /** Optimistic claims finalize, and disputes may be raised, this long after logging. */
   challengeWindowH: 24,
+  /** A withdrawn dispute leaves at least this long before the claim finalizes. */
+  withdrawGraceH: 1,
+  /** A partner-mode claim nobody confirms is voided this long after logging. */
   partnerConfirmExpiryH: 72,
   /** A completion may be logged at most 24h after it happened. */
   maxBackdateH: 24,
