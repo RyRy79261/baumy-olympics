@@ -31,6 +31,12 @@ import { getPot, getStandings, getStreaks } from "./scoreboard";
 import { setKioskPin } from "./set-kiosk-pin";
 import { setPrizeMode } from "./set-prize-mode";
 import { updateMyProfile } from "./update-my-profile";
+import {
+  dismissWeight,
+  getWeights,
+  scheduleWeight,
+  vetoWeight,
+} from "./weights";
 import { whoami } from "./whoami";
 
 // Every action the product offers (ADR 0002). Typed against ACTION_NAMES in
@@ -66,6 +72,10 @@ export const REGISTRY = {
   adjust_points: adjustPoints,
   add_pot_contribution: addPotContribution,
   set_prize_mode: setPrizeMode,
+  get_weights: getWeights,
+  schedule_weight: scheduleWeight,
+  dismiss_weight: dismissWeight,
+  veto_weight: vetoWeight,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =

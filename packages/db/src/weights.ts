@@ -383,7 +383,29 @@ export async function applyDueSuggestions(
   return applied;
 }
 
-/** A suggestion of the household by id, row-locked for a decision. */
+/** A suggestion of the household by id, without a lock. */
+export async function findSuggestion(
+  db: Queryable,
+  householdId: string,
+  suggestionId: string,
+): Promise<WeightSuggestionRow | null> {
+  const [row] = await db
+    .select()
+    .from(weightSuggestions)
+    .where(
+      and(
+        eq(weightSuggestions.id, suggestionId),
+        eq(weightSuggestions.householdId, householdId),
+      ),
+    );
+  return row ?? null;
+}
+
+/**
+ * A suggestion of the household by id, row-locked for a decision. A caller
+ * that also locks the chore locks it FIRST, as `computeSuggestions` does, so
+ * the two can never wait on each other.
+ */
 export async function lockSuggestion(
   db: Queryable,
   householdId: string,
