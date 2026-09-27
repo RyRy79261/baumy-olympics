@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@baumy/auth": "workspace:*",
+    "@baumy/core": "workspace:*",
     "@baumy/db": "workspace:*",
     "@baumy/types": "workspace:*",
     "@baumy/ui": "workspace:*",
