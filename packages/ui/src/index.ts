@@ -30,5 +30,6 @@ export {
 } from "./kiosk-shell";
 export { PageHeading } from "./page-heading";
 export { ProofPhoto } from "./proof-photo";
+export { Points, Stat, StreakFlame, Table, Td, Th } from "./scores";
 export { PIN_MAX_LENGTH, PIN_MIN_LENGTH, PinPad } from "./pin-pad";
 export { Sprite, type SpriteState } from "./sprite";
