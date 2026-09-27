@@ -45,12 +45,14 @@ export default {
   },
   // Bot-written headers that cannot be conventional or use our vocabulary:
   // GitHub merge commits, git-generated reverts, and Dependabot's
-  // `chore(deps): bump …` / `chore(deps-dev): bump …` (its scope names no
-  // workspace and a grouped update runs past 72 characters). Matched on the
-  // exact bot form, not on `chore(deps)` in general.
+  // `chore(deps): Bump …` / `chore(deps-dev): Bump …` (its scope names no
+  // workspace, it capitalises the verb, and a long action or grouped update
+  // runs past 72 characters). Dependabot writes `Bump` with a capital B in both
+  // the PR title and the commit; the lower-case form is accepted too. Matched on
+  // the exact bot form, not on `chore(deps)` in general.
   ignores: [
     (message) => /^Merge (branch|pull request|remote-tracking)/.test(message),
     (message) => /^Revert "/.test(message),
-    (message) => /^chore\(deps(-dev)?\): bump /.test(message),
+    (message) => /^chore\(deps(-dev)?\): [Bb]ump /.test(message),
   ],
 };
