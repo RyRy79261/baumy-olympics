@@ -28,6 +28,10 @@ export type PlatformErrorCode =
   /** The same request is still running elsewhere. */
   | "IN_PROGRESS"
   | "NOT_FOUND"
+  /** An integration has no credentials on this deployment (Blob, Google). */
+  | "NOT_CONFIGURED"
+  /** An integration failed just now; trying again may work. */
+  | "UNAVAILABLE"
   /** Something threw. The message is generic; the log has the detail. */
   | "INTERNAL";
 
