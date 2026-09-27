@@ -27,8 +27,8 @@ import {
 
 /**
  * Where a request came from (SPEC §6.3). Every `source` column uses this one
- * pg enum. The Zod mirror (`Surface` in packages/types) arrives with the action
- * registry and must list the same values in the same order.
+ * pg enum. The Zod mirror is `Surface` in packages/types, which must list the
+ * same values in the same order (a test in apps/web/lib/actions compares them).
  */
 export const surface = pgEnum("surface", ["ui", "kiosk", "ai", "mcp", "brain"]);
 

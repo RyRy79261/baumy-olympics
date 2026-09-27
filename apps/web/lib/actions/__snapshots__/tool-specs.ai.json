@@ -1,0 +1,13 @@
+[
+  {
+    "name": "whoami",
+    "description": "Returns the household member making this request: their member id, display name, role (admin or member), colour and avatar sprite. Use it to learn who 'me' is before acting for them.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  }
+]

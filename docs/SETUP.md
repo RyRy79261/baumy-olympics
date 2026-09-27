@@ -147,3 +147,15 @@ nobody is signed in (CI checks this against the real build).
 - [ ] **After the first production deploy**, sign up at `/auth/sign-up`,
       sign out, sign in, and request a password reset to check the email
       arrives. The deploy log should show no `[auth]` warning.
+
+## Action registry (issue #8)
+
+Nothing here needs an account: `runAction`, the idempotency ledger and the
+audit trail are tested on PGlite and, for concurrent requests, on Docker
+Postgres in the CI `db · docker postgres` job (`pnpm db:local:test`).
+
+- [ ] **After this PR merges, check the first `db · docker postgres` run on
+      `main`** lists `apps/web test:local` with its four concurrency tests
+      passing.
+- Kiosk PIN attestation fails closed (every PIN is refused) until issue #10
+  wires the real check; that is code, not an owner step.

@@ -2,11 +2,19 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 export default defineConfig({
+  // tsconfig keeps JSX as written for Next; components under test need it
+  // compiled to the React 19 automatic runtime.
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "jsdom",
     globals: true,
     include: ["**/*.test.{ts,tsx}"],
-    exclude: ["**/node_modules/**", "**/.next/**"],
+    // Docker Postgres only: `pnpm db:local:test` (vitest.local.config.ts).
+    exclude: ["**/node_modules/**", "**/.next/**", "**/*.local.test.ts"],
+    // PGlite boots and replays the migrations per file, which can pass the
+    // 10s hook default on a loaded CI runner.
+    hookTimeout: 60_000,
+    testTimeout: 30_000,
     coverage: {
       provider: "v8",
       include: ["{lib,app,components}/**/*.{ts,tsx}"],
@@ -14,6 +22,15 @@ export default defineConfig({
       // json-summary for the totals, json for the per-file table the CI
       // coverage comment shows (file-coverage-mode: changes).
       reporter: ["text-summary", "json-summary", "json"],
+      // SPEC §10, AGENTS.md: `lib/**` is floored at 90%. Floors only go up.
+      thresholds: {
+        "lib/**": {
+          statements: 90,
+          branches: 90,
+          functions: 90,
+          lines: 90,
+        },
+      },
     },
   },
   resolve: {
