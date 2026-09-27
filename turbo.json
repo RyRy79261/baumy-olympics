@@ -30,6 +30,7 @@
     "ANTHROPIC_API_KEY",
     "AI_DAILY_COMMANDS_PER_MEMBER",
     "GROQ_API_KEY",
+    "MCP_PUBLIC_URL",
     "E2E_*"
   ],
   "tasks": {
