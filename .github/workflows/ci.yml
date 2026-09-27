@@ -189,6 +189,17 @@ jobs:
           working-directory: apps/web
           file-coverage-mode: changes
 
+      - name: Report coverage for @baumy/auth
+        if: >-
+          always() && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: davelosert/vitest-coverage-report-action@8b157684c6a6b259b97d45e72b44242865c0f6a5 # v2.12.2
+        with:
+          name: "@baumy/auth"
+          working-directory: packages/auth
+          file-coverage-mode: changes
+
       - name: Report coverage for @baumy/db
         if: >-
           always() && github.event_name == 'pull_request'
@@ -318,6 +329,32 @@ jobs:
           fi
           grep -q "refuses to boot" "$RUNNER_TEMP/boot.log"
           echo "next start refused to boot (exit $code)."
+
+      # Auth fails closed (packages/auth `authMayServe`), against the real
+      # build: on a Vercel environment without BETTER_AUTH_SECRET every
+      # /api/auth/* answers 503 and /api/me finds nobody signed in.
+      - name: Auth fails closed on Vercel without a secret
+        working-directory: apps/web
+        run: |
+          env -u E2E_TEST_MODE -u BETTER_AUTH_SECRET VERCEL_ENV=preview \
+            pnpm exec next start --port 3098 > "$RUNNER_TEMP/closed.log" 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:3098/api/health && break
+            sleep 1
+          done
+          get=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3098/api/auth/get-session)
+          post=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'content-type: application/json' -d '{"email":"a@b.c","password":"x"}' \
+            http://localhost:3098/api/auth/sign-in/email)
+          me=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3098/api/me)
+          echo "get-session=$get sign-in=$post me=$me"
+          if [ "$get" != 503 ] || [ "$post" != 503 ] || [ "$me" != 401 ]; then
+            cat "$RUNNER_TEMP/closed.log"
+            echo "::error::auth did not fail closed with VERCEL_ENV=preview and no BETTER_AUTH_SECRET"
+            exit 1
+          fi
 
       # The server's side of a failure: without it a red run shows only the
       # browser's "page.goto timed out".
