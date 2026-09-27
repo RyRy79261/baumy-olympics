@@ -7,7 +7,7 @@ import { cx } from "../cx";
 import { Field, FormMessage, Input, Select, Textarea } from "../field";
 import { PageHeading } from "../page-heading";
 import { ProofPhoto } from "../proof-photo";
-import { Sprite } from "../sprite";
+import { BAUMY_STATES, SPRITE_MOTION, Sprite } from "../sprite";
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 
@@ -173,5 +173,38 @@ describe("Sprite (placeholder)", () => {
     expect(out).toContain('aria-hidden="true"');
     expect(out).toContain('data-state="idle"');
     expect(out).toContain("width:32px");
+  });
+
+  it("has Baumy's seven states, each moving only when motion is allowed", () => {
+    expect(BAUMY_STATES).toEqual([
+      "idle",
+      "listening",
+      "thinking",
+      "talking",
+      "happy",
+      "sad",
+      "sleeping",
+    ]);
+    for (const state of BAUMY_STATES) {
+      const out = html(<Sprite name="baumy" state={state} label="Baumy" />);
+      expect(out).toContain(`data-state="${state}"`);
+      const motion = SPRITE_MOTION[state];
+      if (motion) {
+        expect(motion.startsWith("motion-safe:")).toBe(true);
+        expect(out).toContain(motion);
+        expect(out).toContain('data-motion="animated"');
+      } else {
+        expect(out).toContain('data-motion="still"');
+        expect(out).not.toMatch(/animate-/);
+      }
+      // No animation class outside motion-safe.
+      expect(out.replace(/motion-safe:animate-\w+/g, "")).not.toMatch(
+        /animate-/,
+      );
+    }
+    // A still state is marked some other way than motion.
+    expect(html(<Sprite name="baumy" state="sad" />)).toContain("×");
+    expect(html(<Sprite name="baumy" state="sleeping" />)).toContain("z");
+    expect(html(<Sprite name="baumy" state="idle" />)).not.toContain("×");
   });
 });
