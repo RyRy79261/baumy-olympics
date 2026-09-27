@@ -55,12 +55,15 @@ export function HubDashboard({
   links,
   kiosk = false,
   actingName,
+  voice = false,
 }: {
   hub: HubData;
   links: HubLinks;
   kiosk?: boolean;
   /** The kiosk's acting member, for the PIN pad of Baumy's proposals. */
   actingName?: string;
+  /** Offer hold-to-speak in the Baumy sheet (a transcriber is configured). */
+  voice?: boolean;
 }) {
   const { events, chores, standings, pot, notes } = hub;
   return (
@@ -199,7 +202,7 @@ export function HubDashboard({
           message="The shopping list moves in here soon."
         />
       </HubGrid>
-      <BaumySheet kiosk={kiosk} actingName={actingName} />
+      <BaumySheet kiosk={kiosk} actingName={actingName} voice={voice} />
     </>
   );
 }

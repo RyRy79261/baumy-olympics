@@ -60,3 +60,29 @@ export function runProposal(
     ...(pin ? { pin } : {}),
   });
 }
+
+/** A clip's file name, so the route and Groq see its container. */
+function clipName(mime: string): string {
+  return mime.startsWith("audio/mp4") ? "clip.mp4" : "clip.webm";
+}
+
+/** Send a held-to-speak clip to be transcribed (lib/ai/transcribe.ts). */
+export async function transcribeClip(
+  clip: Blob,
+  mime: string,
+  surface: Device,
+): Promise<ActionResult<{ text: string }>> {
+  const form = new FormData();
+  form.append("audio", new File([clip], clipName(mime), { type: mime }));
+  form.append("surface", surface);
+  try {
+    const res = await fetch("/api/ai/transcribe", {
+      method: "POST",
+      body: form,
+      credentials: "same-origin",
+    });
+    return (await res.json()) as ActionResult<{ text: string }>;
+  } catch {
+    return OFFLINE;
+  }
+}

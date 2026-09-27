@@ -4,6 +4,7 @@ import { HubDashboard } from "@/components/hub/hub-dashboard";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { loadHub } from "@/lib/hub/load";
+import { voiceConfigured } from "@/lib/integrations/groq";
 
 // The hub home (SPEC §3.1, issue #20): the clock, today's events, the chores
 // that are due, the leaderboard and the pot, the pinned notes, the shopping
@@ -25,6 +26,7 @@ export default async function HubPage() {
       />
       <HubDashboard
         hub={hub}
+        voice={voiceConfigured()}
         links={{
           calendar: "/calendar",
           chores: "/chores",

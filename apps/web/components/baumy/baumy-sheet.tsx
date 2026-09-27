@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import {
   BaumyButton,
   Button,
   Dialog,
   Input,
+  ScorePop,
   SpeechBubble,
-  type SpriteState,
 } from "@baumy/ui";
 import type { HistoryTurn } from "@/lib/ai/command";
 import type { Proposal } from "@/lib/ai/proposal";
@@ -21,9 +21,12 @@ import {
   savedMessage,
   type ReviewRow,
 } from "@/lib/ai/review";
+import { canRecord } from "@/lib/ai/voice";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
-import { askBaumy, recheckProposal, runProposal } from "./api";
+import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
 import { ProposalRow } from "./proposal-row";
+import { useBaumyMood } from "./use-mood";
+import { VoiceRecorder } from "./voice-recorder";
 
 // The Baumy sheet (SPEC §3.6), after intake-tracker's
 // `components/voice/voice-panel.tsx`: type to Baumy, read the answer in its
@@ -33,15 +36,31 @@ import { ProposalRow } from "./proposal-row";
 // saved and a retry never saves a row twice. After a save the page re-reads
 // itself, so the scoreboard and the widgets show it.
 //
-// Typing only: holding to speak (Groq Whisper) is issue #22.
+// Or hold to speak (issue #22): the clip is transcribed by Groq Whisper
+// (POST /api/ai/transcribe) and the words are sent as if typed. The
+// microphone is only offered when the deployment has a transcriber
+// (`voice`) and the browser can record; a blocked microphone or a
+// transcriber that went away hides it again, and typing carries on.
+//
+// Baumy's sprite follows lib/ai/mood.ts: listening while held, thinking
+// while transcribing and asking, talking with the answer, sad on an error,
+// happy (with the "+N" pop) when an approved row scores points.
+
+/** How long the "+N" stays after a save that scored. */
+const POP_MS = 1_600;
+
+const noSubscribe = () => () => {};
 
 export function BaumySheet({
   kiosk = false,
   actingName,
+  voice = false,
 }: {
   kiosk?: boolean;
   /** The kiosk's acting member, for "Ryan's PIN". */
   actingName?: string;
+  /** This deployment can transcribe speech (GROQ_API_KEY, or the e2e fake). */
+  voice?: boolean;
 }) {
   const router = useRouter();
   const surface = kiosk ? "kiosk" : "ui";
@@ -52,7 +71,20 @@ export function BaumySheet({
   const [reply, setReply] = useState<{ text: string; error: boolean } | null>(
     null,
   );
-  const [mood, setMood] = useState<SpriteState>("idle");
+  const [mood, feel] = useBaumyMood();
+  const [heard, setHeard] = useState<string | null>(null);
+  const [transcribing, setTranscribing] = useState(false);
+  const [micOff, setMicOff] = useState<string | null>(null);
+  const [micHint, setMicHint] = useState<string | null>(null);
+  const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
+  const textRef = useRef<HTMLInputElement>(null);
+  // Whether this browser can record; false while rendering on the server.
+  const recordable = useSyncExternalStore(
+    noSubscribe,
+    () => canRecord(window as unknown as Parameters<typeof canRecord>[0]),
+    () => false,
+  );
+  const showMic = voice && recordable && micOff === null;
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [history, setHistory] = useState<HistoryTurn[]>([]);
   const [bulk, setBulk] = useState(false);
@@ -65,24 +97,53 @@ export function BaumySheet({
       rs.map((r) => (r.proposal.proposalId === id ? { ...r, ...patch } : r)),
     );
 
-  async function ask(e: React.FormEvent) {
-    e.preventDefault();
-    const said = text.trim();
-    if (!said || asking) return;
+  /** Send what was typed or said; true when Baumy answered. */
+  async function send(said: string): Promise<boolean> {
     setAsking(true);
-    setMood("thinking");
+    feel({ type: "ask" });
     const result = await askBaumy(said, history, surface);
     setAsking(false);
     if (!result.ok) {
       setReply({ text: result.message, error: true });
-      setMood("sad");
-      return;
+      feel({ type: "error" });
+      return false;
     }
-    setText("");
     setReply({ text: result.data.reply, error: false });
-    setMood(result.data.proposals.length > 0 ? "listening" : "idle");
+    feel({ type: "reply" });
     setRows(rowsFor(result.data.proposals));
     setHistory((h) => nextHistory(h, said, result.data.reply));
+    return true;
+  }
+
+  async function ask(e: React.FormEvent) {
+    e.preventDefault();
+    const said = text.trim();
+    if (!said || asking || transcribing) return;
+    setHeard(null);
+    if (await send(said)) setText("");
+  }
+
+  function micUnavailable(message: string) {
+    feel({ type: "record_cancel" });
+    setMicOff(message);
+    setMicHint(null);
+    textRef.current?.focus();
+  }
+
+  async function heardClip(clip: Blob, mime: string) {
+    feel({ type: "record_stop" });
+    setTranscribing(true);
+    const result = await transcribeClip(clip, mime, surface);
+    setTranscribing(false);
+    if (!result.ok) {
+      setReply({ text: result.message, error: true });
+      feel({ type: "error" });
+      // The transcriber went away (the key was removed): type instead.
+      if (result.code === "NOT_CONFIGURED") setMicOff(result.message);
+      return;
+    }
+    setHeard(result.data.text);
+    await send(result.data.text);
   }
 
   /** Approve one row; true when it saved. */
@@ -92,7 +153,14 @@ export function BaumySheet({
     const result = await runProposal(row.proposal, surface, pin);
     if (result.ok) {
       update(id, { state: "saved", message: savedMessage(result.data) });
-      setMood("happy");
+      const pts = (result.data as { totalPts?: unknown } | null)?.totalPts;
+      const points = typeof pts === "number" ? pts : null;
+      feel({ type: "points", points });
+      if (points !== null && points > 0) {
+        const key = Date.now();
+        setPop({ key, points });
+        setTimeout(() => setPop((p) => (p?.key === key ? null : p)), POP_MS);
+      }
       router.refresh();
       return true;
     }
@@ -101,7 +169,7 @@ export function BaumySheet({
       return false;
     }
     update(id, { state: "failed", message: result.message });
-    setMood("sad");
+    feel({ type: "error" });
     return false;
   }
 
@@ -133,32 +201,80 @@ export function BaumySheet({
     );
   }
 
+  const busy = asking || transcribing;
+
+  function close() {
+    // A recording in progress is dropped when the recorder unmounts.
+    feel({ type: "record_cancel" });
+    setMicHint(null);
+    setOpen(false);
+  }
+
   const targets = approveAllTargets(rows, kiosk);
   const skips = approveAllSkips(rows, kiosk);
 
   return (
     <>
       <BaumyButton
-        state={open ? (asking ? "thinking" : "listening") : "idle"}
-        onClick={() => setOpen(true)}
+        state={mood}
+        onClick={() => {
+          feel({ type: "wake" });
+          setOpen(true);
+        }}
       />
-      <Dialog open={open} onClose={() => setOpen(false)} title="Ask Baumy">
+      <Dialog open={open} onClose={close} title="Ask Baumy">
         <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">
+          {pop ? <ScorePop key={pop.key} points={pop.points} /> : null}
           <SpeechBubble
-            state={asking ? "thinking" : mood}
-            tone={reply?.error ? "error" : "normal"}
+            state={mood}
+            tone={reply?.error && !busy ? "error" : "normal"}
           >
-            {asking
-              ? "Hmm, let me think…"
-              : (reply?.text ??
-                'Tell me what you did ("I took the trash out") or ask me something ("Who\'s winning?").')}
+            {transcribing
+              ? "Listening back…"
+              : asking
+                ? "Hmm, let me think…"
+                : mood === "listening"
+                  ? "I'm listening…"
+                  : (reply?.text ??
+                    (showMic
+                      ? 'Hold the button and tell me what you did ("I took the trash out"), or type to me.'
+                      : 'Tell me what you did ("I took the trash out") or ask me something ("Who\'s winning?").'))}
           </SpeechBubble>
+
+          {heard ? (
+            <p className="text-sm text-neutral-700" data-testid="baumy-heard">
+              You said: “{heard}”
+            </p>
+          ) : null}
+
+          {open && showMic ? (
+            <VoiceRecorder
+              kiosk={kiosk}
+              sending={busy}
+              onStart={() => {
+                setMicHint(null);
+                feel({ type: "record_start" });
+              }}
+              onClip={(clip, mime) => void heardClip(clip, mime)}
+              onCancel={(message) => {
+                feel({ type: "record_cancel" });
+                setMicHint(message);
+              }}
+              onUnavailable={micUnavailable}
+            />
+          ) : null}
+          {micHint || (voice && micOff) ? (
+            <p role="status" className="text-sm text-neutral-700">
+              {micHint ?? micOff}
+            </p>
+          ) : null}
 
           <form onSubmit={ask} className="flex gap-2" aria-label="Ask Baumy">
             <label htmlFor="baumy-text" className="sr-only">
               Message to Baumy
             </label>
             <Input
+              ref={textRef}
               id="baumy-text"
               kiosk={kiosk}
               autoComplete="off"
@@ -166,12 +282,12 @@ export function BaumySheet({
               placeholder="Type to Baumy"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              disabled={asking}
+              disabled={busy}
             />
             <Button
               type="submit"
               size={size}
-              disabled={asking || text.trim() === ""}
+              disabled={busy || text.trim() === ""}
             >
               Send
             </Button>
@@ -215,11 +331,7 @@ export function BaumySheet({
             </section>
           ) : null}
 
-          <Button
-            variant="secondary"
-            size={size}
-            onClick={() => setOpen(false)}
-          >
+          <Button variant="secondary" size={size} onClick={close}>
             Close
           </Button>
         </div>

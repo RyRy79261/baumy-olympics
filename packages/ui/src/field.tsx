@@ -1,5 +1,5 @@
 import type {
-  InputHTMLAttributes,
+  ComponentPropsWithRef,
   ReactNode,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
@@ -16,7 +16,7 @@ export function Input({
   className,
   kiosk = false,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { kiosk?: boolean }) {
+}: ComponentPropsWithRef<"input"> & { kiosk?: boolean }) {
   return (
     <input
       className={cx(CONTROL, kiosk && "min-h-14 text-xl", className)}
