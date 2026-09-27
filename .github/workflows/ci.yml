@@ -1,9 +1,8 @@
 name: CI
 
 # Copied from afrikaburn-contributors-app (origin/main:.github/workflows/ci.yml)
-# and trimmed to what this repo has today. The e2e matrix and the migration
-# drift check arrive with the issues that add Playwright and packages/db; each
-# one joins `CI pass`'s needs list when it lands.
+# and trimmed to what this repo has today. The e2e matrix arrives with the
+# issue that adds Playwright and joins `CI pass`'s needs list when it lands.
 
 on:
   push:
@@ -107,6 +106,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # MIGRATION DRIFT. schema.ts is the only source of truth and migrations
+      # are generated from it, so regenerating must change nothing. An edited
+      # schema without its migration shows up here as a new or modified file
+      # under migrations/ (`--porcelain` lists untracked files too). Copied
+      # from camp-404 `.github/workflows/ci.yml`. Needs no database.
+      - name: Check migrations match schema.ts
+        run: |
+          pnpm --filter @baumy/db exec drizzle-kit generate
+          if [ -n "$(git status --porcelain packages/db/migrations/)" ]; then
+            echo "::error::packages/db/migrations is out of date with src/schema.ts. Run 'pnpm --filter @baumy/db db:generate' and commit the result."
+            git status --porcelain packages/db/migrations/
+            git diff packages/db/migrations/ | head -100
+            exit 1
+          fi
+          echo "packages/db/migrations is up to date with src/schema.ts."
+
       # The same command AGENTS.md calls the gate.
       - name: CI gate
         run: pnpm turbo run format:check lint typecheck test build
@@ -162,6 +177,56 @@ jobs:
           working-directory: apps/web
           file-coverage-mode: changes
 
+      - name: Report coverage for @baumy/db
+        if: >-
+          always() && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: davelosert/vitest-coverage-report-action@8b157684c6a6b259b97d45e72b44242865c0f6a5 # v2.12.2
+        with:
+          name: "@baumy/db"
+          working-directory: packages/db
+          file-coverage-mode: changes
+
+  # THE LOCAL STACK, AS A DEVELOPER RUNS IT. Starts docker-compose.local.yml
+  # (Postgres 17 and both Neon proxies), applies every migration from empty
+  # through the app's own driver, applies them again (a second run must be a
+  # no-op), then runs the tests PGlite cannot: concurrent calls on separate
+  # connections. No secrets: this is Docker on the runner, never Neon.
+  db-local:
+    name: db · docker postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start the local database
+        run: pnpm db:local:up
+
+      - name: Migrate from empty, twice
+        run: |
+          pnpm db:local:migrate
+          pnpm db:local:migrate
+
+      - name: Run the Docker Postgres tests
+        run: pnpm db:local:test
+
+      - name: Show container logs
+        if: failure()
+        run: docker compose -f docker-compose.local.yml logs --no-color | tail -200
+
   # THE ONE REQUIRED CHECK. Rulesets require checks by name, so requiring each
   # job means re-editing the ruleset whenever a job is added, and a job nobody
   # marked required can go red without blocking. So the ruleset requires
@@ -172,7 +237,7 @@ jobs:
   ci-pass:
     name: CI pass
     if: always()
-    needs: [commitlint, ci, coverage]
+    needs: [commitlint, ci, coverage, db-local]
     runs-on: ubuntu-latest
     steps:
       - name: Check every job passed
@@ -180,14 +245,16 @@ jobs:
           COMMITLINT: ${{ needs.commitlint.result }}
           CI_RESULT: ${{ needs.ci.result }}
           COVERAGE: ${{ needs.coverage.result }}
+          DB_LOCAL: ${{ needs.db-local.result }}
         run: |
           echo "commit conventions : $COMMITLINT"
           echo "format/lint/...    : $CI_RESULT"
           echo "coverage floors    : $COVERAGE"
+          echo "docker postgres    : $DB_LOCAL"
           echo
 
           # Unconditional: these run on every event and must succeed.
-          for job in "ci:$CI_RESULT" "coverage:$COVERAGE"; do
+          for job in "ci:$CI_RESULT" "coverage:$COVERAGE" "db-local:$DB_LOCAL"; do
             name="${job%%:*}"; result="${job#*:}"
             if [ "$result" != "success" ]; then
               echo "::error::$name did not pass (result: $result)"
