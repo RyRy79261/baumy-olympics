@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import {
   ChoiceGroup,
   ChoreTile,
@@ -9,6 +10,8 @@ import {
   StreakBrokenBanner,
 } from "@baumy/ui";
 import { AttestedForm } from "@/components/kiosk/attested-form";
+import { PhotoPicker } from "@/components/photos/photo-picker";
+import { photoUploadAction } from "@/components/photos/upload-action";
 import type { FormAction } from "@/components/use-action-form";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
@@ -52,6 +55,22 @@ export function ChoreGrid({
   const [doneBy, setDoneBy] = useState(actorId);
   const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
   const [broken, setBroken] = useState<LogCompletionData | null>(null);
+  const router = useRouter();
+  const photo = useRef<Blob | null>(null);
+  const [hasPhoto, setHasPhoto] = useState(false);
+  // One form action for the sheet: the upload route when a photo is picked,
+  // else the page's server action. Read through refs, so it never goes stale.
+  const serverAction = useRef(action);
+  serverAction.current = action;
+  const [logAction] = useState<FormAction<LogCompletionData>>(() => {
+    const upload = photoUploadAction<LogCompletionData>(
+      () => photo.current,
+      kiosk,
+    );
+    const send: FormAction<LogCompletionData> = (prev, form) =>
+      photo.current ? upload(prev, form) : serverAction.current(prev, form);
+    return send;
+  });
 
   useEffect(() => {
     if (!pop) return;
@@ -69,8 +88,16 @@ export function ChoreGrid({
   const nameOf = (id: string) =>
     members.find((m) => m.id === id)?.displayName ?? "someone";
 
+  function choosePhoto(p: Blob | null) {
+    photo.current = p;
+    setHasPhoto(p !== null);
+  }
+
   function onResult(result: ActionResult<LogCompletionData>) {
     setOpenId(null);
+    const sentPhoto = photo.current !== null;
+    choosePhoto(null);
+    if (sentPhoto && result.ok) router.refresh();
     if (!result.ok) {
       toast.error(result.message);
       return;
@@ -131,6 +158,7 @@ export function ChoreGrid({
               disabled={c.state === "unavailable"}
               onClick={() => {
                 setDoneBy(actorId);
+                choosePhoto(null);
                 setOpenId(c.id);
               }}
             />
@@ -175,9 +203,29 @@ export function ChoreGrid({
                   : `You are vouching that ${nameOf(doneBy)} did it.`}
               </p>
             ) : null}
+            {open.proofMode !== "none" ? (
+              <div className="flex flex-col gap-1">
+                <PhotoPicker
+                  key={open.id}
+                  kiosk={kiosk}
+                  label={
+                    open.proofMode === "required"
+                      ? "Add a photo (required)"
+                      : "Add a photo (optional)"
+                  }
+                  onPhoto={choosePhoto}
+                />
+                {open.proofMode === "required" && !hasPhoto ? (
+                  <p className="text-sm text-neutral-700">
+                    {open.name} needs a photo as proof.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <AttestedForm
               key={`${open.id}:${doneBy}`}
-              action={action}
+              action={logAction}
+              disabled={open.proofMode === "required" && !hasPhoto}
               label="Log it"
               pinLabel={`${nameOf(actorId)}'s PIN`}
               fields={
