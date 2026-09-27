@@ -215,6 +215,17 @@ jobs:
           working-directory: packages/types
           file-coverage-mode: changes
 
+      - name: Report coverage for @baumy/core
+        if: >-
+          always() && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2.13.0
+        with:
+          name: "@baumy/core"
+          working-directory: packages/core
+          file-coverage-mode: changes
+
       - name: Report coverage for @baumy/db
         if: >-
           always() && github.event_name == 'pull_request'
