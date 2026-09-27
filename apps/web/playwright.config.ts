@@ -9,7 +9,7 @@ import { IS_CI, TIMEOUTS, assertLocalBaseUrl, baseUrl } from "./e2e/lib/env";
 // Fail before any spec runs if the target is not this machine.
 assertLocalBaseUrl();
 
-const SHARED_CLOCK_SPECS = ["**/clock.spec.ts"];
+const SHARED_CLOCK_SPECS = ["**/clock.spec.ts", "**/claims.spec.ts"];
 
 export default defineConfig({
   testDir: "./e2e",
