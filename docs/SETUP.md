@@ -157,8 +157,7 @@ Postgres in the CI `db · docker postgres` job (`pnpm db:local:test`).
 - [ ] **After this PR merges, check the first `db · docker postgres` run on
       `main`** lists `apps/web test:local` with its four concurrency tests
       passing.
-- Kiosk PIN attestation fails closed (every PIN is refused) until issue #10
-  wires the real check; that is code, not an owner step.
+- Kiosk PIN attestation is wired since issue #10 (see "Kiosk" below).
 
 ## Membership (issue #9)
 
@@ -188,3 +187,24 @@ first admin, so everyone who signs up waits on `/join`.
       second account can redeem it.
 - `INVITE_CODES` in SPEC §6.8 is not read by anything yet (marked
   UNRESOLVED there): say whether it should go, or what it should seed.
+
+## Kiosk (issue #10)
+
+Nothing here needs an account or a secret, and no new env var: pairing,
+the device cookie and PIN attestation are tested on PGlite, on Docker
+Postgres (concurrent claims and guesses) and end to end in `ipad-landscape`.
+
+- [ ] **Serve the kiosk over HTTPS.** The `baumy_kiosk` cookie is `Secure`,
+      so the iPad can pair only over HTTPS (production or a preview URL).
+      `http://localhost` works for development; a dev machine reached over
+      plain http on the LAN does not.
+- [ ] **After the first production deploy, pair the iPad:** on your phone open
+      `/admin/members` → "Pair a kiosk", name it, create the code; on the iPad
+      open `/kiosk/pair` within 10 minutes and type it. Add `/kiosk` to the
+      home screen. Each housemate sets a kiosk PIN in `/settings` on their own
+      phone, then taps their avatar on the iPad and tries "Check my PIN".
+- [ ] **Keep the iPad awake** until issue #29 adds the wake lock: Settings →
+      Display & Brightness → Auto-Lock → Never, and Guided Access if you want
+      it locked to the app.
+- If the iPad is lost, revoke it on `/admin/members` ("Revoke"); it is sent
+  back to `/kiosk/pair` on its next request.
