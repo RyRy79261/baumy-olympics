@@ -12,7 +12,7 @@
 // load this module more than once in one server (one copy per route bundle);
 // a module variable would give the route that sets it and the page that reads
 // it different clocks. It is per process, which matches `next start` in the
-// e2e harness. Specs that move it run serially (e2e/specs/clock.spec.ts).
+// e2e harness. Specs that move it run alone (apps/web/playwright.config.ts).
 
 import { isTestMode } from "./test-mode";
 

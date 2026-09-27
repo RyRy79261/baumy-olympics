@@ -3,7 +3,8 @@
 // (ActionCtx.now, read paths) needs this instead, or as well.
 //
 // The offset is per server process and shared by every worker, so a spec that
-// moves it must run serially and reset it afterwards (see specs/clock.spec.ts).
+// moves it runs in the server-clock project, which finishes before any other
+// project starts (playwright.config.ts), and resets it afterwards.
 
 import { expect, type Page } from "@playwright/test";
 
