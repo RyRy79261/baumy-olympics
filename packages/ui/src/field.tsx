@@ -10,11 +10,18 @@ const CONTROL =
   "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-neutral-900 " +
   "aria-[invalid=true]:border-red-700 disabled:opacity-50";
 
+/** A text input; `kiosk` makes it a 56px touch target with larger text. */
 export function Input({
   className,
+  kiosk = false,
   ...props
-}: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cx(CONTROL, className)} {...props} />;
+}: InputHTMLAttributes<HTMLInputElement> & { kiosk?: boolean }) {
+  return (
+    <input
+      className={cx(CONTROL, kiosk && "min-h-14 text-xl", className)}
+      {...props}
+    />
+  );
 }
 
 export function Select({
