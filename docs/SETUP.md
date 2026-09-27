@@ -403,6 +403,8 @@ comes with migration `0007_notes.sql`, applied by `db:migrate` on deploy.
   Calendar settings above are set; the rest of the hub works without them.
 - The shopping widget is an empty slot until issue #26, and the Baumy
   button opens a placeholder until the AI command (issues #21, #22).
+  [CORRECTION 2026-09-27] issue #26: the widget is brain's shopping list;
+  see "Shopping list" below.
 - On the kiosk, adding or changing a note asks for the member's kiosk PIN:
   each member sets theirs in `/settings` on their own phone.
 
@@ -547,3 +549,45 @@ drive it with a scripted client (`apps/web/e2e/specs/mcp-server.spec.ts`).
       `/chores`, and its audit row has `source = mcp`.
 - [ ] **Check revoking:** disconnect it on `/settings/connections`; Claude's
       next tool call fails and it asks to reconnect.
+
+## Shopping list (issue #26)
+
+The hub widget, `/shopping` and `/kiosk/shopping` show baumy-brain's house
+shopping list through brain's kitchen API (baumy-brain PR
+RyRy79261/baumy-brain#7, issue #25). Without the two variables below the
+widget says the list is not connected yet and the rest of the hub works. CI
+and e2e need neither: under `E2E_TEST_MODE=1` an in-memory brain stands in
+(`apps/web/lib/integrations/brain-memory.ts`), and `/api/test/brain` plays the
+Telegram group. No migration.
+
+- [ ] **Merge and deploy the brain side first** (baumy-brain PR #7), and add
+      Baumy to the house Telegram group: until then brain answers
+      503 `not_configured` and the widget says the list is not connected.
+- [ ] **Make one token and give it to both apps:** `openssl rand -hex 32`.
+      In baumy-brain's Vercel project set `KITCHEN_API_TOKEN` to it
+      (Production) and redeploy.
+- [ ] **In this app's Vercel project** (Production and Preview) set
+      `BRAIN_BASE_URL` to brain's production URL, for example
+      `https://baumy-brain.vercel.app` (no trailing path), and
+      `KITCHEN_API_TOKEN` to the same token.
+- [ ] **Add these lines to `.env.example`** by hand (agents cannot edit
+      `.env*` files); both are already in turbo `globalEnv`:
+
+      ```
+      # baumy-brain's kitchen shopping API (issue #26). Both unset: the
+      # shopping list says it is not connected.
+      BRAIN_BASE_URL=
+      KITCHEN_API_TOKEN=
+      ```
+
+- [ ] **After the deploy, check it:** add "milk" in the Telegram group; the
+      kitchen screen shows it within a minute (its 60s re-read skips the 30s
+      cache). Tick it off on the kiosk; it is gone when you ask Baumy for
+      the list in Telegram. A failure is logged as
+      `[brain] <op> failed: HTTP <status>`; 401 means the two
+      `KITCHEN_API_TOKEN`s differ.
+- Kitchen writes reach brain with no author for now (brain records
+  `added_by` as null); sending the member's Telegram id waits for Telegram
+  linking (issue #27).
+- [ ] **Look and feel is deferred to issue #7.** The tap-to-check rows are
+      neutral placeholders in `packages/ui/src/check-list.tsx`.
