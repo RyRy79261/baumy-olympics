@@ -236,9 +236,7 @@ export function BaumySheet({
                 : mood === "listening"
                   ? "I'm listening…"
                   : (reply?.text ??
-                    (showMic
-                      ? 'Hold the button and tell me what you did ("I took the trash out"), or type to me.'
-                      : 'Tell me what you did ("I took the trash out") or ask me something ("Who\'s winning?").'))}
+                    `Tell me what you did ("I took the trash out") or ask me something ("Who's winning?").${showMic ? " Hold the button to speak, or type." : ""}`)}
           </SpeechBubble>
 
           {heard ? (
