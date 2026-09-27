@@ -7,15 +7,16 @@ account steps are in [SETUP.md](SETUP.md).
 
 ## The pieces
 
-| File                                    | What it does                                                                                                                                  |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/vercel.json`                  | Build command `pnpm run vercel-build`; ignored-build step `bash ../../scripts/vercel-ignore-build.sh`.                                        |
-| `apps/web/package.json` `vercel-build`  | `pnpm --filter @baumy/db db:migrate && next build`. Migrations run on every deploy.                                                           |
-| `packages/db/scripts/migrate.ts`        | `db:migrate`. Asks the guard (`src/migrate-guard.ts`), logs the target **host** only, then applies the migrations to `DATABASE_URL_UNPOOLED`. |
-| `scripts/vercel-ignore-build.sh`        | Skips `dependabot/*` refs, and previews until `NEON_PREVIEW_READY=1`. Production always builds.                                               |
-| `.github/workflows/neon-pr-preview.yml` | On PR open/push: creates `preview/<branch>` in Neon, writes branch-scoped Preview env, then deploys.                                          |
-| `scripts/neon-preview-env.sh`           | The work behind that workflow.                                                                                                                |
-| `.github/workflows/neon-pr-cleanup.yml` | On PR close: deletes the Neon branch and its branch-scoped Vercel env rows.                                                                   |
+| File                                    | What it does                                                                                                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/vercel.json`                  | Build command `pnpm run vercel-build`; ignored-build step `bash ../../scripts/vercel-ignore-build.sh`.                                                        |
+| `apps/web/package.json` `vercel-build`  | `pnpm --filter @baumy/db db:migrate && pnpm --filter @baumy/db db:seed && next build`. Migrations run on every deploy; the seed adds the starter chores once. |
+| `packages/db/scripts/seed.ts`           | `db:seed` (issue #14). Same guard as `db:migrate`; adds the SPEC §4.7 starter chores only while the household has no chores at all.                           |
+| `packages/db/scripts/migrate.ts`        | `db:migrate`. Asks the guard (`src/migrate-guard.ts`), logs the target **host** only, then applies the migrations to `DATABASE_URL_UNPOOLED`.                 |
+| `scripts/vercel-ignore-build.sh`        | Skips `dependabot/*` refs, and previews until `NEON_PREVIEW_READY=1`. Production always builds.                                                               |
+| `.github/workflows/neon-pr-preview.yml` | On PR open/push: creates `preview/<branch>` in Neon, writes branch-scoped Preview env, then deploys.                                                          |
+| `scripts/neon-preview-env.sh`           | The work behind that workflow.                                                                                                                                |
+| `.github/workflows/neon-pr-cleanup.yml` | On PR close: deletes the Neon branch and its branch-scoped Vercel env rows.                                                                                   |
 
 All three were copied from afrikaburn-contributors-app
 (`origin/main:.github/workflows/neon-pr-*.yml`,

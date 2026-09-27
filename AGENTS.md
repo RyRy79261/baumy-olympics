@@ -21,6 +21,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 | `pnpm i`                                                | Install dependencies. Uses pnpm 10 (`packageManager`) and Node 22 or later. |
 | `pnpm dev`                                              | Start the web app on :3000.                                                 |
 | `pnpm db:local:up`, then `pnpm db:local:migrate`        | Start Docker Postgres and the Neon proxies, then migrate.                   |
+| `pnpm db:local:seed`                                    | Add the SPEC §4.7 starter chores, if the household has no chores yet.       |
 | `pnpm db:local:test`                                    | Run the `*.local.test.ts` files (db, web) that need Docker Postgres.        |
 | `pnpm --filter @baumy/db db:generate`                   | Generate a migration after editing `schema.ts`.                             |
 | `pnpm turbo run format:check lint typecheck test build` | **The gate.** Run it before every push.                                     |
@@ -69,7 +70,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 - Postgres traps:
   - a nullable column inside a unique index;
   - `ON CONFLICT` against a partial unique index needs `targetWhere`.
-- Migrations run on deploy (`vercel-build`: `db:migrate && next build`). On previews the migrate wrapper refuses to run against the prod host (ADR 0004).
+- Migrations run on deploy (`vercel-build`: `db:migrate && db:seed && next build`). On previews the migrate wrapper refuses to run against the prod host (ADR 0004), and so does `db:seed`, which adds the starter chores only while the household has none.
 
 ## Code conventions
 
