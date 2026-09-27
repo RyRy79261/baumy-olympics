@@ -1,0 +1,66 @@
+# The local database: Postgres plus the two Neon proxies, so the app's own Neon
+# drivers (HTTP and WebSocket) talk to it unchanged. Copied from afrikaburn
+# (origin/main docker-compose.local.yml) and camp-404.
+#
+#   pnpm db:local:up        start it and wait until it is healthy
+#   pnpm db:local:migrate   apply every committed migration
+#   pnpm db:local:down      stop it (the data volume stays; add -v to drop it)
+#
+# Then run the app with (see .env.example):
+#   DATABASE_URL=postgres://postgres:postgres@localhost:54329/baumy
+#   DATABASE_URL_UNPOOLED=postgres://postgres:postgres@localhost:54329/baumy
+#   NEON_LOCAL_PROXY=1
+#
+# Why three containers for one database: @neondatabase/serverless speaks two
+# protocols, SQL over HTTP for the stateless driver and WebSocket for the
+# pooled one, and no single local proxy implements both. NEON_LOCAL_PROXY=1
+# points the drivers at localhost:5433 and localhost:4444 whatever host the
+# URL names (packages/db/src/index.ts). Postgres itself is published on 54329,
+# not 5432, so it does not collide with another project's database; only
+# psql and similar tools use that port.
+name: baumy-local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: baumy
+    ports:
+      - "54329:5432"
+    volumes:
+      - baumy-local-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d baumy"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # WebSocket endpoint (/v1) for the pooled, transactional driver. The driver
+  # sends no address, so wsproxy always connects to APPEND_PORT.
+  wsproxy:
+    image: ghcr.io/neondatabase/wsproxy:latest
+    environment:
+      APPEND_PORT: "postgres:5432"
+      ALLOW_ADDR_REGEX: ".*"
+      LOG_TRAFFIC: "false"
+    ports:
+      - "5433:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # SQL-over-HTTP endpoint (/sql) for the stateless driver.
+  httpproxy:
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    environment:
+      PG_CONNECTION_STRING: postgres://postgres:postgres@postgres:5432/baumy
+    ports:
+      - "4444:4444"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  baumy-local-pg:
