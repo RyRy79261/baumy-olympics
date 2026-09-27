@@ -142,8 +142,8 @@ nobody is signed in (CI checks this against the real build).
       when both are set. Previews cannot finish a Google sign-in (Google only
       calls back registered URIs); use email and password there.
 - [ ] **Never set** `AUTH_EMAIL_CAPTURE_FILE`, `AUTH_RATE_LIMIT_WINDOW_SECONDS`
-      or `AUTH_RATE_LIMIT_MAX` on Vercel. The capture file is refused there
-      anyway; the rate-limit knobs exist only for the e2e harness.
+      or `AUTH_RATE_LIMIT_MAX` on Vercel. All three are ignored
+      there anyway; they exist only for the e2e harness.
 - [ ] **After the first production deploy**, sign up at `/auth/sign-up`,
       sign out, sign in, and request a password reset to check the email
       arrives. The deploy log should show no `[auth]` warning.

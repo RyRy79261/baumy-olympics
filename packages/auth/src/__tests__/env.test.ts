@@ -198,6 +198,17 @@ describe("resolveRateLimit", () => {
     }
   });
 
+  it("ignores the tuning on any Vercel deployment", () => {
+    const knobs = {
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: "30",
+      AUTH_RATE_LIMIT_MAX: "500",
+    };
+    expect(resolveRateLimit(knobs).max).toBe(500);
+    for (const VERCEL_ENV of ["production", "preview", "development"]) {
+      expect(resolveRateLimit({ ...knobs, VERCEL_ENV })).toEqual({});
+    }
+  });
+
   it("gives the sensitive paths a 60s window when only max is set", () => {
     const out = resolveRateLimit({ AUTH_RATE_LIMIT_MAX: "50" });
     expect(out.window).toBeUndefined();
