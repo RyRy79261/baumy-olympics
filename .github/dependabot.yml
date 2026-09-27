@@ -1,0 +1,53 @@
+# Copied from afrikaburn-contributors-app (origin/main:.github/dependabot.yml).
+# Only the `@radix-ui/react-slot` pin was dropped: it guarded a typecheck break
+# in that repo that we have not hit.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Propose a release only once it is 2 days old. Most malicious publishes
+    # are caught and pulled within that window. Security-update PRs ignore
+    # cooldown and still open immediately, so this never delays a CVE fix.
+    cooldown:
+      default-days: 2
+    # One PR for the routine noise, individual PRs for majors. Without the
+    # group, a weekly run opens a dozen PRs and every one burns a full CI run.
+    groups:
+      # vitest and its @vitest/* plugins must move in lockstep, majors included:
+      # coverage-v8 5 against vitest 4 (or the reverse) throws inside the
+      # coverage provider and every coverage job reports 0%. Listed first so it
+      # wins over minor-and-patch for these packages.
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    # DO NOT REMOVE THESE IGNORES (AGENTS.md "Security").
+    #
+    # `better-auth` is pinned to 1.6.25 EXACTLY. It mints and verifies our
+    # sessions and has a track record of high-severity auth advisories; every
+    # bump needs a manual read of the changelog against packages/auth, not a
+    # green CI run.
+    #
+    # `@better-auth/*` moves in lockstep with it: the plugins declare exact peer
+    # ranges on better-auth, so a grouped bump of a plugin alone installs a
+    # mismatched pair against the pinned core. Bump them together, by hand.
+    ignore:
+      - dependency-name: "better-auth"
+      - dependency-name: "@better-auth/*"
+
+  # Actions pinned by major tag still drift; this catches the ones that go
+  # unmaintained or ship a breaking v-next while nobody is looking.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 2

@@ -1,0 +1,208 @@
+name: CI
+
+# Copied from afrikaburn-contributors-app (origin/main:.github/workflows/ci.yml)
+# and trimmed to what this repo has today. The e2e matrix and the migration
+# drift check arrive with the issues that add Playwright and packages/db; each
+# one joins `CI pass`'s needs list when it lands.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    # `edited` as well as the defaults, so renaming a PR re-runs commitlint on
+    # the new title. Without it a PR retitled after a green run keeps its
+    # green check.
+    types: [opened, synchronize, reopened, edited]
+
+# LEAST PRIVILEGE. Nothing here writes back except the coverage comment, which
+# asks for `pull-requests: write` on its own job. A compromised dependency in a
+# build step then has no token worth stealing.
+permissions:
+  contents: read
+
+# One run per branch. Pushing again cancels the superseded run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Conventional Commits with a closed scope list (AGENTS.md,
+  # commitlint.config.mjs). BOTH halves are checked, because PRs are merged
+  # rather than squashed: every commit lands on `main`, so linting only the
+  # title would let unconventional history through, and linting only the
+  # commits would leave the PR list unchecked. The husky hook covers the same
+  # ground locally, but `--no-verify` skips it. This does not.
+  commitlint:
+    name: commit conventions
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      # `fetch-depth: 0`: the range check needs the merge base.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # No `version:`, so the action reads `packageManager` from package.json
+      # and CI cannot drift from what developers run.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # A config that accepts everything would make both steps below pass by
+      # not checking anything. Prove it still separates good from bad, and that
+      # Dependabot's header (which names no workspace scope) gets through.
+      - name: Self-test the commitlint config
+        run: |
+          set -euo pipefail
+          printf '%s' 'chore(deps): bump next from 16.3.6 to 16.4.0' | pnpm exec commitlint
+          printf '%s' 'chore(deps-dev): bump the minor-and-patch group across 1 directory with 12 updates' | pnpm exec commitlint
+          printf '%s' 'ci(repo): add the ci pass gate' | pnpm exec commitlint
+          if printf '%s' 'Bad Title' | pnpm exec commitlint >/dev/null 2>&1; then
+            echo "::error::commitlint accepted 'Bad Title'"
+            exit 1
+          fi
+          echo "commitlint config accepts bot and conventional headers and rejects 'Bad Title'."
+
+      # The title goes through env, never interpolated into the script: a PR
+      # title is attacker-controlled text.
+      - name: Lint the pull-request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s' "$PR_TITLE" | pnpm exec commitlint
+
+      # Every commit the PR adds, from the base sha to the head sha. Anything
+      # already on main is out of scope.
+      - name: Lint the commits in this pull request
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+  ci:
+    name: format · lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # `--frozen-lockfile`: a package.json change without a lockfile update
+      # fails here instead of resolving to something nobody has run locally.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The same command AGENTS.md calls the gate.
+      - name: CI gate
+        run: pnpm turbo run format:check lint typecheck test build
+
+  # COVERAGE AS A RATCHET. The floors live in each workspace's
+  # `vitest.config.ts`, so `pnpm test:coverage` enforces them identically on a
+  # laptop and here. `turbo run test:coverage` covers every workspace that has
+  # the script, so a new package is gated the moment it adds one; only the PR
+  # comment below needs a step per workspace.
+  #
+  # This job is in `CI pass`'s needs, so a breached floor blocks the merge.
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run coverage against the floors
+        run: pnpm turbo run test:coverage
+
+      # PINNED TO A COMMIT, NOT A TAG: this step holds `pull-requests: write`
+      # and a tag can be repointed. The comment keeps the version for
+      # Dependabot.
+      #
+      # Same-repo PRs only: a fork's `pull_request` token is read-only whatever
+      # this job asks for. Dependabot PRs are same-repo but also get a read-only
+      # token, hence `continue-on-error`: a reporting failure must never be
+      # what blocks a branch with green floors. The floors step above is the
+      # one allowed to fail this job.
+      - name: Report coverage for @baumy/web
+        if: >-
+          always() && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: davelosert/vitest-coverage-report-action@8b157684c6a6b259b97d45e72b44242865c0f6a5 # v2.12.2
+        with:
+          name: "@baumy/web"
+          working-directory: apps/web
+          file-coverage-mode: changes
+
+  # THE ONE REQUIRED CHECK. Rulesets require checks by name, so requiring each
+  # job means re-editing the ruleset whenever a job is added, and a job nobody
+  # marked required can go red without blocking. So the ruleset requires
+  # exactly `CI pass`.
+  #
+  # `if: always()` is what makes it work: without it this job is SKIPPED when
+  # an upstream job fails, and a skipped required check does not block a merge.
+  ci-pass:
+    name: CI pass
+    if: always()
+    needs: [commitlint, ci, coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check every job passed
+        env:
+          COMMITLINT: ${{ needs.commitlint.result }}
+          CI_RESULT: ${{ needs.ci.result }}
+          COVERAGE: ${{ needs.coverage.result }}
+        run: |
+          echo "commit conventions : $COMMITLINT"
+          echo "format/lint/...    : $CI_RESULT"
+          echo "coverage floors    : $COVERAGE"
+          echo
+
+          # Unconditional: these run on every event and must succeed.
+          for job in "ci:$CI_RESULT" "coverage:$COVERAGE"; do
+            name="${job%%:*}"; result="${job#*:}"
+            if [ "$result" != "success" ]; then
+              echo "::error::$name did not pass (result: $result)"
+              exit 1
+            fi
+          done
+
+          # `commitlint` only runs on pull requests, so `skipped` is legitimate
+          # on a push to main. Anything else (failure, cancelled) fails.
+          case "$COMMITLINT" in
+            success|skipped) ;;
+            *)
+              echo "::error::commit conventions did not pass (result: $COMMITLINT)"
+              exit 1
+              ;;
+          esac
+
+          echo "All jobs passed."

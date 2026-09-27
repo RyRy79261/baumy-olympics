@@ -11,7 +11,9 @@ export default defineConfig({
       provider: "v8",
       include: ["{lib,app,components}/**/*.{ts,tsx}"],
       exclude: ["**/*.test.{ts,tsx}"],
-      reporter: ["text-summary", "json-summary"],
+      // json-summary for the totals, json for the per-file table the CI
+      // coverage comment shows (file-coverage-mode: changes).
+      reporter: ["text-summary", "json-summary", "json"],
     },
   },
   resolve: {

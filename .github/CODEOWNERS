@@ -1,0 +1,23 @@
+# The places where a mistake is expensive or hard to undo. Copied in shape from
+# afrikaburn-contributors-app (origin/main:.github/CODEOWNERS).
+#
+# Informational only: the `main` ruleset (scripts/github-ruleset.json) does NOT
+# require code-owner review, because there is a single maintainer. It still
+# auto-requests review, and it names what a second maintainer must read.
+
+# MIGRATIONS AND SCHEMA. Append-only, applied on deploy (AGENTS.md "Database
+# rules"). An applied migration can only be corrected by another migration.
+/packages/db/migrations/  @RyRy79261
+/packages/db/src/schema.ts @RyRy79261
+
+# AUTH. Better Auth pinned to an exact version; we own the patch watch.
+/packages/auth/           @RyRy79261
+
+# CORE. Pure scoring rules; a change here rewrites every standing on replay.
+/packages/core/           @RyRy79261
+
+# CI and the rules themselves.
+/.github/                 @RyRy79261
+/scripts/github-ruleset.json @RyRy79261
+/AGENTS.md                @RyRy79261
+/turbo.json               @RyRy79261
