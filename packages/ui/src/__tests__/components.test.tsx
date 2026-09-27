@@ -4,8 +4,9 @@ import { AppShell, navItemClass } from "../app-shell";
 import { Button, buttonClass } from "../button";
 import { Card } from "../card";
 import { cx } from "../cx";
-import { Field, FormMessage, Input, Select } from "../field";
+import { Field, FormMessage, Input, Select, Textarea } from "../field";
 import { PageHeading } from "../page-heading";
+import { ProofPhoto } from "../proof-photo";
 import { Sprite } from "../sprite";
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
@@ -50,6 +51,22 @@ describe("Input", () => {
   it("has a kiosk size of 56px", () => {
     expect(html(<Input kiosk />)).toContain("min-h-14");
     expect(html(<Input />)).not.toContain("min-h-14");
+  });
+});
+
+describe("Textarea", () => {
+  it("is a control, larger on the kiosk", () => {
+    expect(html(<Textarea name="reason" />)).toContain("<textarea");
+    expect(html(<Textarea kiosk />)).toContain("text-xl");
+    expect(html(<Textarea />)).not.toContain("text-xl");
+  });
+});
+
+describe("ProofPhoto", () => {
+  it("shows the proxied photo with its alt text", () => {
+    const out = html(<ProofPhoto src="/api/blob?pathname=x" alt="Proof" />);
+    expect(out).toContain('src="/api/blob?pathname=x"');
+    expect(out).toContain('alt="Proof"');
   });
 });
 

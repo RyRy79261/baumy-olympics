@@ -2,6 +2,7 @@ import type {
   InputHTMLAttributes,
   ReactNode,
   SelectHTMLAttributes,
+  TextareaHTMLAttributes,
 } from "react";
 import { cx } from "./cx";
 
@@ -19,6 +20,20 @@ export function Input({
   return (
     <input
       className={cx(CONTROL, kiosk && "min-h-14 text-xl", className)}
+      {...props}
+    />
+  );
+}
+
+/** A multi-line text input; `kiosk` makes it larger for touch. */
+export function Textarea({
+  className,
+  kiosk = false,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { kiosk?: boolean }) {
+  return (
+    <textarea
+      className={cx(CONTROL, "min-h-20 py-2", kiosk && "text-xl", className)}
       {...props}
     />
   );

@@ -63,5 +63,128 @@
       "additionalProperties": false
     },
     "risk": "confirm"
+  },
+  {
+    "name": "get_pending_confirmations",
+    "description": "Lists the household's chore claims still waiting to settle (pending or disputed), with who did and logged each, when its dispute window ends, any open dispute and its reason, and `can`: which of confirm, dispute, withdraw, concede, undo and attach a photo you may do to it now. `needsYou` marks the ones waiting on you. `recent` lists your own claims of the last 7 days that have settled (finalized, confirmed or voided). Times are ISO 8601 in UTC.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  },
+  {
+    "name": "confirm_completion",
+    "description": "Confirms a housemate's self-claimed chore that is waiting for an OK (pending), which verifies it. You cannot confirm your own. Refused with INVALID_STATE once it has finalized, expired or been disputed. Get ids from get_pending_confirmations.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "completionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The completion's id, from get_pending_confirmations."
+        }
+      },
+      "required": [
+        "completionId"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
+  },
+  {
+    "name": "dispute_completion",
+    "description": "Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "completionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The completion's id, from get_pending_confirmations."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 280,
+          "description": "Why you think it was not done."
+        }
+      },
+      "required": [
+        "completionId",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
+  },
+  {
+    "name": "undo_completion",
+    "description": "Undoes a chore you logged yourself, within 10 minutes of logging it. It is voided and scores nothing. Refused with WINDOW_CLOSED after 10 minutes and FORBIDDEN for anyone but the person who logged it.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "completionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The completion's id, from get_pending_confirmations."
+        }
+      },
+      "required": [
+        "completionId"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
+  },
+  {
+    "name": "withdraw_dispute",
+    "description": "Withdraws a dispute you raised. The claim goes back to pending and counts again; it finalizes at the later of its original time and one hour from now. Only the person who disputed it can withdraw.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "completionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The completion's id, from get_pending_confirmations."
+        }
+      },
+      "required": [
+        "completionId"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
+  },
+  {
+    "name": "concede_completion",
+    "description": "Concedes a dispute on your own chore claim: the claim is voided and scores nothing. Only the person who did the chore can concede.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "completionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The completion's id, from get_pending_confirmations."
+        }
+      },
+      "required": [
+        "completionId"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
   }
 ]

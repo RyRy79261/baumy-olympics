@@ -28,6 +28,10 @@ export type PlatformErrorCode =
   /** The same request is still running elsewhere. */
   | "IN_PROGRESS"
   | "NOT_FOUND"
+  /** An integration has no credentials on this deployment (Blob, Google). */
+  | "NOT_CONFIGURED"
+  /** An integration failed just now; trying again may work. */
+  | "UNAVAILABLE"
   /** Something threw. The message is generic; the log has the detail. */
   | "INTERNAL";
 
@@ -64,7 +68,20 @@ export type DomainErrorCode =
   /** The chore has no points set for that time. */
   | "NO_RULE_VERSION"
   /** Another chore that is not archived already has that name. */
-  | "CHORE_NAME_TAKEN";
+  | "CHORE_NAME_TAKEN"
+  /**
+   * The claim is not in a state the event applies to at `now` (it already
+   * finalized, expired, was confirmed, or someone else just changed it).
+   */
+  | "INVALID_STATE"
+  /** The 24h dispute window or the 10-minute undo window has passed. */
+  | "WINDOW_CLOSED"
+  /** A dispute needs a reason. */
+  | "REASON_REQUIRED"
+  /** The claim already has its proof photo. */
+  | "PHOTO_ALREADY_ATTACHED"
+  /** `attach_completion_photo` without a photo from the upload route. */
+  | "PHOTO_MISSING";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 

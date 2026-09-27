@@ -17,6 +17,7 @@
     "./kiosk-pin": "./src/kiosk-pin.ts",
     "./seasons": "./src/seasons.ts",
     "./completions": "./src/completions.ts",
+    "./confirmations": "./src/confirmations.ts",
     "./chores": "./src/chores.ts",
     "./test-harness": "./src/__tests__/_harness.ts",
     "./game-fixtures": "./src/__tests__/_game-fixtures.ts"

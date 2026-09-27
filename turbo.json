@@ -22,6 +22,7 @@
     "AUTH_RATE_LIMIT_MAX",
     "AUTH_EMAIL_CAPTURE_FILE",
     "FOUNDER_EMAILS",
+    "BLOB_READ_WRITE_TOKEN",
     "E2E_*"
   ],
   "tasks": {
