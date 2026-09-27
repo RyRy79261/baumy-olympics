@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { addAiTokens, claimAiCommand } from "../ai-usage";
+import { addAiTokens, claimAiCommand, recordAiAudio } from "../ai-usage";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import { aiUsage, members } from "../schema";
@@ -120,5 +120,44 @@ describe("addAiTokens", () => {
       .from(aiUsage)
       .where(eq(aiUsage.id, c.usageId));
     expect(row).toMatchObject({ inputTokens: 1500, outputTokens: 100 });
+  });
+});
+
+describe("recordAiAudio", () => {
+  const audio = (audioSeconds: number | null) =>
+    recordAiAudio(db(), {
+      householdId: HOUSEHOLD_ID,
+      memberId: ryan,
+      model: "whisper-large-v3-turbo",
+      audioSeconds,
+      now: NOW,
+    });
+
+  it("writes one groq row with the clip's seconds", async () => {
+    const id = await audio(3.5);
+    const [row] = await t.db().select().from(aiUsage).where(eq(aiUsage.id, id));
+    expect(row).toMatchObject({
+      memberId: ryan,
+      provider: "groq",
+      model: "whisper-large-v3-turbo",
+      audioSeconds: 3.5,
+      inputTokens: 0,
+      outputTokens: 0,
+      at: NOW,
+    });
+  });
+
+  it("stores an unknown or impossible length as null", async () => {
+    await audio(null);
+    await audio(-1);
+    await audio(Number.NaN);
+    const rows = await t.db().select().from(aiUsage);
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.audioSeconds)).toEqual([null, null, null]);
+  });
+
+  it("does not count against the command limit", async () => {
+    await audio(2);
+    expect(await claim(ryan, 1)).toMatchObject({ ok: true, used: 1 });
   });
 });

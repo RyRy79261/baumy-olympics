@@ -6,7 +6,9 @@ import { aiUsage } from "./schema";
 // What the AI features cost (SPEC §5 `ai_usage`, §6.3). A Baumy command is
 // one `anthropic` row: `claimAiCommand` inserts it before the first Claude
 // call, which is also where the per-member daily limit is enforced, and
-// `addAiTokens` adds each call's tokens to it as the tool loop goes.
+// `addAiTokens` adds each call's tokens to it as the tool loop goes. A
+// transcription is one `groq` row with the clip's length (`recordAiAudio`);
+// it does not count against the command limit.
 
 export type ClaimAiCommand =
   { ok: true; usageId: string; used: number } | { ok: false; used: number };
@@ -69,4 +71,38 @@ export async function addAiTokens(
       outputTokens: sql`${aiUsage.outputTokens} + ${Math.max(0, Math.round(tokens.outputTokens))}`,
     })
     .where(eq(aiUsage.id, usageId));
+}
+
+/**
+ * Record one transcription: a `groq` row with the seconds of audio Groq
+ * billed. A negative or non-finite length is stored as null (unknown).
+ */
+export async function recordAiAudio(
+  db: Queryable,
+  input: {
+    householdId: string;
+    memberId: string;
+    model: string;
+    audioSeconds: number | null;
+    now: Date;
+  },
+): Promise<string> {
+  const seconds =
+    input.audioSeconds !== null &&
+    Number.isFinite(input.audioSeconds) &&
+    input.audioSeconds >= 0
+      ? input.audioSeconds
+      : null;
+  const [row] = await db
+    .insert(aiUsage)
+    .values({
+      householdId: input.householdId,
+      memberId: input.memberId,
+      provider: "groq",
+      model: input.model,
+      audioSeconds: seconds,
+      at: input.now,
+    })
+    .returning({ id: aiUsage.id });
+  return row!.id;
 }
