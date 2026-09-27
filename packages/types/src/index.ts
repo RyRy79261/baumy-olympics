@@ -12,3 +12,9 @@ export {
   MemberColor,
   MemberRole,
 } from "./member";
+export {
+  KIOSK_DEVICE_NAME_MAX,
+  KIOSK_PAIRING_CODE_LENGTH,
+  KioskDeviceName,
+  KioskPairingCode,
+} from "./kiosk";
