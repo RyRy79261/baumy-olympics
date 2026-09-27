@@ -20,6 +20,7 @@
     "./confirmations": "./src/confirmations.ts",
     "./chores": "./src/chores.ts",
     "./scores": "./src/scores.ts",
+    "./weights": "./src/weights.ts",
     "./test-harness": "./src/__tests__/_harness.ts",
     "./game-fixtures": "./src/__tests__/_game-fixtures.ts"
   },

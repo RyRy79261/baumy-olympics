@@ -117,7 +117,7 @@ async function lockChore(
   return row ?? null;
 }
 
-async function loadRuleVersions(
+export async function loadRuleVersions(
   db: Queryable,
   choreId: string,
 ): Promise<RuleVersion[]> {
