@@ -75,12 +75,13 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 
 - **Every capability is an action** in `apps/web/lib/actions/` (ADR 0002).
   - UI server actions, the AI command, MCP and the brain endpoint all call `runAction`. Never call domain writes directly from a route or component.
-  - `runAction` alone writes `audit_events` and `action_requests`. Domain functions take the caller's `tx` and write neither.
+  - `runAction` alone writes `audit_events` and `action_requests`. Domain functions take the caller's `tx` and write neither. The one audit row written outside `execute` is the kiosk PIN lock, by runAction's attestation step (`lib/auth/pin.ts`).
   - Declare an action with `defineAction` (`lib/actions/define.ts`), add its name to `ACTION_NAMES` and its entry to `lib/actions/registry.ts`. A write's `execute` returns `audit: {entity, entityId}`; returning `{ok: false}` rolls the whole transaction back.
   - Server actions call `actionForm(name, formData)` (`lib/actions/ui.ts`); the form carries a hidden `requestId`. Client forms get it from `useActionForm` (`components/use-action-form.ts`).
   - An input holding a secret (a PIN, a password) sets `fingerprint` so neither `input_hash` nor the audit payload sees it; a result holding a one-time code sets `storedData` so the ledger never stores it.
   - Actions that call Google or brain set `transactional: false`; never hold a transaction across a network call.
   - Admin-only actions have `surfaces: ["ui"]`.
+- **Kiosk:** kiosk pages and server actions use `getKioskActor()` and `kioskActionForm(name, formData)` (`lib/actions/kiosk.ts`, surface `kiosk`); a form that needs attestation wraps itself in `AttestedForm` (`components/kiosk/attested-form.tsx`), which opens the `PinPad` and sends the PIN with that one request.
 - **Authorization:** one gate function per concern (`requireMember`, `requireAdmin`, `requireAttested`, `requireSession`, and `requireAccount` for the joining actions only). Never hand-roll a check at a call site. Kiosk actors never pass `requireSession`, `requireAccount` or `requireAdmin`.
   - Pages use the page gate ladder (`lib/auth/page-gate.ts`): `requireMemberPage()` (no session → sign-in, no member row → `/join`), `requireAdminPage()` (non-admins get a 404) and `requireJoiningPage()`.
 - **Writes:**
