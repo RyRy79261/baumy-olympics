@@ -160,3 +160,33 @@ export function formatBerlinDateTime(instant: Date): string {
   const p = berlinParts(instant);
   return `${WEEKDAYS[p.weekday - 1]} ${p.day} ${MONTHS[p.month - 1]}, ${pad2(p.hour)}:${pad2(p.minute)}`;
 }
+
+/** A Berlin calendar month, as "YYYY-MM". */
+export type MonthKey = `${number}-${string}`;
+
+/** The Berlin calendar month an instant falls in, e.g. "2026-09". */
+export function berlinMonthKey(instant: Date): MonthKey {
+  const p = berlinParts(instant);
+  return `${p.year}-${pad2(p.month)}`;
+}
+
+/**
+ * A Berlin calendar month as UTC instants: `startsAt` is the 1st at 00:00
+ * Berlin and `endsAt` the next month's 1st at 00:00 Berlin (exclusive).
+ */
+export function berlinMonthBounds(
+  year: number,
+  month: number,
+): { startsAt: Date; endsAt: Date } {
+  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+  return {
+    startsAt: berlinWallTimeToUtc(year, month, 1),
+    endsAt: berlinWallTimeToUtc(next.y, next.m, 1),
+  };
+}
+
+/** "Sep 2026" for a month key, for people to read. */
+export function formatMonthKey(key: string): string {
+  const [year, month] = key.split("-").map(Number);
+  return `${MONTHS[(month as number) - 1]} ${year}`;
+}
