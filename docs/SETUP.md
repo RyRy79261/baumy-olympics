@@ -444,4 +444,46 @@ else changes. CI and e2e need no key: they use the scripted fake
   `COMMAND_TIER`); change the tier there if you want another.
 - [ ] **Look and feel is deferred to issue #7.** The speech bubble and the
       proposal rows are neutral placeholders in `packages/ui/src/baumy.tsx`;
-      Baumy's sprite states are issue #22.
+      Baumy's sprite states are wired (issue #22) to a placeholder tile.
+
+## Speaking to Baumy (issue #22)
+
+Holding the microphone button in the Baumy sheet records a clip, Groq
+Whisper (`whisper-large-v3-turbo`) turns it into text, and the text goes to
+Baumy as if typed. Without `GROQ_API_KEY` the microphone button is not
+shown and typing works as before. CI and e2e need no key: under
+`E2E_TEST_MODE=1` a fake transcriber hears "Who's winning?" in every clip.
+No migration: `ai_usage.audio_seconds` came with `0008_ai_usage.sql`.
+
+- [ ] **Create a Groq API key:** console.groq.com → API Keys → Create API
+      Key (name it for Baumy). Groq bills transcription per audio hour; a
+      clip is at most a minute, and each member can send 30 per 10 minutes.
+- [ ] **Set `GROQ_API_KEY`** on the Vercel project (Production; Preview
+      only if you want previews to transcribe). Already in turbo
+      `globalEnv`. A refused key shows "An admin needs to check the
+      GROQ_API_KEY setting" and logs `[ai:transcribe] failed invalid_key`.
+- [ ] **Add it to `.env.example`** (agents cannot edit `.env*` files):
+
+  ```sh
+  # Groq Whisper for speaking to Baumy (SPEC §3.6). Without it the
+  # microphone button is hidden; e2e uses a fake transcriber instead.
+  GROQ_API_KEY=
+  ```
+
+- [ ] **After the deploy, check it on the kitchen iPad (Safari):** tap your
+      avatar, open Baumy, hold "Hold to speak", say "who's winning?" and let
+      go. Safari asks for the microphone the first time (the hold then turns
+      into "Tap to send"); allow it. The sheet shows "You said: …" and
+      Baumy's answer, and one `groq` row lands in `ai_usage` with its
+      `audio_seconds`. If you deny the microphone, the sheet says so and
+      the text box takes over; allow it again in Settings → Safari →
+      Microphone.
+- The Whisper prompt is the members' names, the chores' names and a few
+  German place words (`packages/ai-prompts/src/transcribe.ts`); add words
+  there if Whisper keeps mishearing one.
+- [ ] **Look and feel is deferred to issue #7.** Baumy's seven states
+      (`idle`, `listening`, `thinking`, `talking`, `happy`, `sad`,
+      `sleeping`) drive a placeholder tile (`packages/ui/src/sprite.tsx`,
+      `SPRITE_MOTION`); the drawn sprite sheet from
+      `design/baumy-reference.png` replaces it there. The microphone button
+      and level meter are `packages/ui/src/voice.tsx`.

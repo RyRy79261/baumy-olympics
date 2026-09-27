@@ -3,3 +3,20 @@
 /* Tailwind v4 scans this app by default; the UI kit lives in a workspace
    package, so its classes are added here (camp-404's pattern). */
 @source "../../../packages/ui/src";
+
+/* Reduced motion, app-wide (SPEC §7), camp-404's kill switch
+   (packages/ui/src/styles/globals.css). Someone who asks their device for
+   less motion gets it everywhere, including motion added later without a
+   motion-safe: prefix: animations and transitions finish at once. Outside
+   every layer, with !important, so it wins over utilities and inline styles.
+   Baumy's sprite also uses motion-safe:, so it stands still in its state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

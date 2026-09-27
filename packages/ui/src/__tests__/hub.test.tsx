@@ -93,11 +93,11 @@ describe("WidgetList", () => {
 
 describe("BaumyButton", () => {
   it("is a named 64px button with the sprite in its state", () => {
-    const out = html(<BaumyButton state="listen" />);
+    const out = html(<BaumyButton state="listening" />);
     expect(out).toContain('aria-label="Ask Baumy"');
     expect(out).toContain('type="button"');
     expect(out).toContain("min-h-16");
-    expect(out).toContain('data-state="listen"');
+    expect(out).toContain('data-state="listening"');
   });
 });
 

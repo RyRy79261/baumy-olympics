@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./models": "./src/models.ts",
-    "./command": "./src/command.ts"
+    "./command": "./src/command.ts",
+    "./transcribe": "./src/transcribe.ts"
   },
   "scripts": {
     "lint": "eslint .",
