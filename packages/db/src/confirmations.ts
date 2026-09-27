@@ -538,14 +538,18 @@ export async function listSettledClaims(
   return out;
 }
 
-/** The completion a Blob pathname belongs to, if it is in the household. */
-export async function completionInHousehold(
+/**
+ * The photo pathname stored on a completion of the household: null when the
+ * completion has none, undefined when there is no such completion here. The
+ * /api/blob proxy serves a pathname only when it is exactly this.
+ */
+export async function findCompletionPhoto(
   db: Queryable,
   householdId: string,
   completionId: string,
-): Promise<boolean> {
+): Promise<string | null | undefined> {
   const [row] = await db
-    .select({ id: completions.id })
+    .select({ photoPathname: completions.photoPathname })
     .from(completions)
     .where(
       and(
@@ -554,5 +558,5 @@ export async function completionInHousehold(
       ),
     )
     .limit(1);
-  return row !== undefined;
+  return row ? row.photoPathname : undefined;
 }

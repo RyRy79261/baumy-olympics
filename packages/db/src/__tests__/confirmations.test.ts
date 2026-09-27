@@ -6,7 +6,7 @@ import {
   applyCompletionEvent,
   attachCompletionPhoto,
   claimAbilities,
-  completionInHousehold,
+  findCompletionPhoto,
   listOpenClaims,
   listSettledClaims,
   loadForVerification,
@@ -431,12 +431,28 @@ describe("attachCompletionPhoto", () => {
       photo: `completions/${id}/x.webp`,
     });
     expect(c).toMatchObject({ id, photoAttachedAt: NOW });
-    await expect(completionInHousehold(db(), HOUSEHOLD_ID, id)).resolves.toBe(
-      true,
+    await expect(findCompletionPhoto(db(), HOUSEHOLD_ID, id)).resolves.toBe(
+      `completions/${id}/x.webp`,
     );
     await expect(
-      completionInHousehold(db(), "00000000-0000-4000-8000-000000000000", id),
-    ).resolves.toBe(false);
+      findCompletionPhoto(db(), "00000000-0000-4000-8000-000000000000", id),
+    ).resolves.toBeUndefined();
+    const bare = await claim(
+      choreId,
+      ryan,
+      new Date(NOW.getTime() + 49 * HOUR),
+      {
+        photo: `completions/${"2".repeat(8)}/y.webp`,
+      },
+    );
+    await t
+      .db()
+      .update(completions)
+      .set({ photoPathname: null })
+      .where(eq(completions.id, bare.id));
+    await expect(
+      findCompletionPhoto(db(), HOUSEHOLD_ID, bare.id),
+    ).resolves.toBeNull();
   });
 });
 
