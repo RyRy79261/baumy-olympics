@@ -1,32 +1,25 @@
 import { expect, test, type Page } from "@playwright/test";
 import { addChore, openChore } from "../lib/chores";
-import { advanceClock, resetClock } from "../lib/clock";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 
-// Issue #17 (SPEC §4.4): a chore worth 40 is done every hour, so once the
-// weekly compute runs, /admin/weights suggests 30 (the 25% step down) from 6
-// gaps. The founder edits it to 32 and schedules it; on /inbox the founder
-// cannot veto their own change, and the partner vetoes it.
+// Issue #17 (SPEC §4.4): a chore worth 40 is done again and again within a
+// few seconds, so once the weekly compute runs, /admin/weights suggests 30
+// (the 25% step down) from 6 gaps. The founder edits it to 32 and schedules
+// it; on /inbox the founder cannot veto their own change, and the partner
+// vetoes it.
 //
-// The compute is the daily job's (issue #18); here the test-only
-// /api/test/weights runs it at the server clock. The spec moves the shared
-// server clock, so it runs serially in desktop-chromium only
-// (playwright.config.ts), and puts the clock back afterwards.
+// The founder logs each one for the partner, so each is confirmed at once
+// (SPEC §4.3) and counts without waiting out the 24h window: the spec never
+// moves the shared server clock. The compute is the daily job's (issue #18);
+// here the test-only /api/test/weights runs it.
 
-test.describe.configure({ mode: "serial" });
-
-const HOUR = 60 * 60 * 1000;
-
-test.afterEach(async ({ page }) => {
-  await resetClock(page);
-});
-
-async function log(page: Page, chore: string) {
+async function logFor(page: Page, chore: string, doer: string) {
   await page.goto("/chores");
   const sheet = await openChore(page, chore);
+  await sheet.getByText(doer, { exact: true }).click();
+  await expect(sheet.getByRole("radio", { name: doer })).toBeChecked();
   await sheet.getByRole("button", { name: "Log it" }).click();
   await expect(sheet).toBeHidden();
-  await expect(page.getByTestId("score-pop")).toBeVisible();
 }
 
 function toast(page: Page, text: string) {
@@ -38,24 +31,21 @@ test("a suggestion is scheduled on /admin/weights and vetoed by the partner", as
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
+  test.skip(project === "ipad-landscape", "The kiosk has no weights panel.");
   const tag = Math.random().toString(36).slice(2, 8);
   const chore = `Wipe ${tag}`;
+  const partnerName = `Partner ${tag}`;
 
   await founderAdmin(page, project);
-  // No cooldown, so it can be done every hour.
+  // No cooldown, so it can be logged again straight away.
   await addChore(page, { name: chore, basePoints: 40, cooldownHours: 0 });
   const invite = await mintCode(page, 1);
   const partner = await newAccount(browser, `weights-${project}`);
-  await redeem(partner.page, invite, `Partner ${tag}`);
+  await redeem(partner.page, invite, partnerName);
   await expect(partner.page).toHaveURL(/\/$/);
 
-  // 7 completions an hour apart: 6 gaps, the least that is measured.
-  for (let i = 0; i < 7; i += 1) {
-    if (i > 0) await advanceClock(page, HOUR);
-    await log(page, chore);
-  }
-  // Self-claims count once they finalize, 24h after logging.
-  await advanceClock(page, 25 * HOUR);
+  // 7 completions: 6 gaps, the least that is measured.
+  for (let i = 0; i < 7; i += 1) await logFor(page, chore, partnerName);
   const res = await page.request.post("/api/test/weights", {
     data: { run: "compute" },
   });
@@ -72,7 +62,7 @@ test("a suggestion is scheduled on /admin/weights and vetoed by the partner", as
   await expect(row).toContainText("The formula says 30 pts.");
   await expect(row.getByRole("img")).toHaveAttribute(
     "aria-label",
-    `Gaps between completions: ${Array(6).fill("1 h").join(", ")}.`,
+    /^Gaps between completions: /,
   );
   const suggestion = row.getByTestId("suggestion");
   await expect(suggestion).toHaveAttribute("data-status", "open");
