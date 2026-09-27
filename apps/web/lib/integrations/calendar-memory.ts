@@ -5,6 +5,7 @@ import {
   fromGoogle,
   insertBody,
   patchBody,
+  resurrectBody,
   type CalendarClient,
   type CalendarEvent,
   type GoogleEvent,
@@ -101,11 +102,21 @@ export function memoryCalendar(): CalendarClient {
     },
     async create(eventId, spec, memberId) {
       const existing = store().get(eventId);
-      // Google keeps a used id, even after a delete (409).
+      // Google keeps a used id, even after a delete (409); the client then
+      // PATCHes it to the fields asked for, confirmed again.
       if (existing) {
-        return existing.status === "cancelled"
-          ? { ok: false, reason: "unavailable" }
-          : { ok: true, data: read(existing) };
+        const body = resurrectBody(spec);
+        const next: GoogleEvent = {
+          ...existing,
+          status: body.status,
+          summary: body.summary,
+          description: body.description || undefined,
+          location: body.location || undefined,
+          start: stored(body.start),
+          end: stored(body.end),
+        };
+        store().set(eventId, next);
+        return { ok: true, data: read(next) };
       }
       const body = insertBody(eventId, spec, memberId);
       const event: GoogleEvent = {

@@ -231,6 +231,14 @@ export function insertBody(eventId: string, spec: EventSpec, memberId: string) {
   };
 }
 
+/**
+ * The body that makes an id Google already holds (a create retried, maybe
+ * after its undo deleted it) into the event asked for, confirmed again.
+ */
+export function resurrectBody(spec: EventSpec) {
+  return { ...patchBody(spec), status: "confirmed" as const };
+}
+
 /** The events.patch body: every field the sheet edits, cleared when empty. */
 export function patchBody(spec: EventSpec) {
   return {
@@ -544,8 +552,25 @@ export function googleCalendar(
           insertBody(eventId, spec, memberId),
         );
         // 409: Google already has this id, from an earlier try of this very
-        // create whose answer was lost. It is done; read it back.
-        if (res.status === 409) return get(eventId);
+        // create (the id is made from the request id). Its answer may have
+        // been lost, or runAction may have undone it (deleted it) when the
+        // audit failed; Google keeps a deleted id, so a plain read would
+        // find it cancelled for good. PATCH it to the fields asked for and
+        // confirmed, which is the same create done, whichever it was.
+        if (res.status === 409) {
+          const url = eventsUrl(eventId);
+          url.searchParams.set("fields", EVENT_FIELDS);
+          return readEvent(
+            "create",
+            await call(
+              "create",
+              WRITE_SCOPE,
+              "PATCH",
+              url,
+              resurrectBody(spec),
+            ),
+          );
+        }
         return readEvent("create", res);
       });
       forgetCalendarReads();

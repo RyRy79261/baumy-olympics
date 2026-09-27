@@ -200,6 +200,19 @@ describe("create_event", () => {
       reason: "not_found",
     });
     expect(await audits()).toHaveLength(0);
+
+    // The form retries with the same request id: the undone event comes back.
+    const retry = ok(await run("create_event", dinner("2027-01-15"), ctx)) as {
+      event: { id: string; start: string };
+    };
+    expect(retry.event).toMatchObject({
+      id: eventIdFor(ctx),
+      start: "2027-01-15T18:00:00.000Z",
+    });
+    expect(await memoryCalendar().get(eventIdFor(ctx))).toMatchObject({
+      ok: true,
+    });
+    expect(await audits()).toHaveLength(1);
   });
 
   it("says the calendar is not connected, and stores nothing", async () => {

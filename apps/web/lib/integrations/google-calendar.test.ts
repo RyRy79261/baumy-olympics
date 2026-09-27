@@ -425,7 +425,7 @@ describe("writes", () => {
     expect(sentBody(call!)).toEqual(insertBody("evt00001", dinnerJan, "m-1"));
   });
 
-  it("counts a 409 on create as the same create done, and reads it back", async () => {
+  it("counts a 409 on create as the same create, confirming it again", async () => {
     const { c, calls } = client((_url, init) =>
       init.method === "POST" ? json(409) : json(200, googleDinner),
     );
@@ -433,7 +433,14 @@ describe("writes", () => {
       ok: true,
       data: { id: "evt00001" },
     });
-    expect(apiCalls(calls).map((x) => x.init.method)).toEqual(["POST", "GET"]);
+    const sent = apiCalls(calls);
+    expect(sent.map((x) => x.init.method)).toEqual(["POST", "PATCH"]);
+    expect(sent[1]!.url.pathname.endsWith("/events/evt00001")).toBe(true);
+    // A retry after runAction's undo deleted the event brings it back.
+    expect(sentBody(sent[1]!)).toEqual({
+      ...patchBody(dinnerJan),
+      status: "confirmed",
+    });
   });
 
   it("updates with PATCH on the event's own URL", async () => {
