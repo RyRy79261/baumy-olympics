@@ -10,7 +10,7 @@ import type { FormAction } from "@/components/use-action-form";
 import type { AttachPhotoData } from "@/lib/actions/attach-completion-photo";
 import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { ClaimView } from "@/lib/actions/get-pending-confirmations";
-import type { ActionResult } from "@/lib/actions/result";
+import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
 import { claimStatusLine, claimTitle } from "@/lib/claims/view";
 import { toast } from "@/lib/ui/toast";
 
@@ -32,16 +32,31 @@ export interface ClaimActions {
   resolve?: FormAction<ClaimEventData>;
 }
 
-function report<T>(success: (data: T) => string, after?: () => void) {
-  return (result: ActionResult<T>) => {
-    if (!result.ok) {
+/**
+ * The action, reporting its outcome through a toast as soon as it answers.
+ * Not through `AttestedForm`'s `onResult`: a claim that changes loses the
+ * very button that changed it when the page re-renders, before an effect in
+ * that button's form could run. A PIN prompt is the form's own business.
+ */
+function reporting<T>(
+  action: FormAction<T>,
+  success: (data: T) => string,
+  after?: () => void,
+): FormAction<T> {
+  return async (prev, form) => {
+    const result = await action(prev, form);
+    if (result.ok) {
+      toast.success(success(result.data));
+      after?.();
+    } else if (!PIN_PROMPT_CODES.has(result.code)) {
       toast.error(result.message);
-      return;
     }
-    toast.success(success(result.data));
-    after?.();
+    return result;
   };
 }
+
+/** The form reports through `reporting`; nothing is shown inline. */
+const QUIET = () => {};
 
 function Hidden({ id }: { id: string }) {
   return <input type="hidden" name="completionId" value={id} />;
@@ -76,7 +91,7 @@ function DisputeForm({
   return (
     <div className="flex flex-col gap-2">
       <AttestedForm
-        action={action}
+        action={reporting(action, () => `Disputed ${claim.choreName}.`)}
         label="Send dispute"
         pinLabel={pinLabel}
         disabled={reason.trim() === ""}
@@ -97,7 +112,7 @@ function DisputeForm({
             </Field>
           </>
         }
-        onResult={report(() => `Disputed ${claim.choreName}.`)}
+        onResult={QUIET}
       />
       <Button
         variant="ghost"
@@ -123,7 +138,11 @@ function PhotoForm({
   const photo = useRef<Blob | null>(null);
   const [ready, setReady] = useState(false);
   const [action] = useState(() =>
-    photoUploadAction<AttachPhotoData>(() => photo.current, kiosk),
+    reporting(
+      photoUploadAction<AttachPhotoData>(() => photo.current, kiosk),
+      () => `Photo added to ${claim.choreName}.`,
+      () => router.refresh(),
+    ),
   );
   return (
     <div className="flex flex-col gap-2">
@@ -140,10 +159,7 @@ function PhotoForm({
           label="Upload photo"
           pinLabel={pinLabel}
           fields={<Hidden id={claim.completionId} />}
-          onResult={report<AttachPhotoData>(
-            () => `Photo added to ${claim.choreName}.`,
-            () => router.refresh(),
-          )}
+          onResult={QUIET}
         />
       ) : null}
     </div>
@@ -169,11 +185,11 @@ function ClaimCard({
     done: string,
   ) => (
     <AttestedForm
-      action={actions[key]}
+      action={reporting(actions[key], () => done)}
       label={label}
       pinLabel={pinLabel}
       fields={<Hidden id={claim.completionId} />}
-      onResult={report(() => done)}
+      onResult={QUIET}
     />
   );
   return (
@@ -218,7 +234,7 @@ function ClaimCard({
           {can.resolve && actions.resolve ? (
             <>
               <AttestedForm
-                action={actions.resolve}
+                action={reporting(actions.resolve, () => `Upheld ${title}.`)}
                 label="Uphold"
                 pinLabel={pinLabel}
                 fields={
@@ -227,10 +243,10 @@ function ClaimCard({
                     <input type="hidden" name="outcome" value="uphold" />
                   </>
                 }
-                onResult={report(() => `Upheld ${title}.`)}
+                onResult={QUIET}
               />
               <AttestedForm
-                action={actions.resolve}
+                action={reporting(actions.resolve, () => `Voided ${title}.`)}
                 label="Void"
                 pinLabel={pinLabel}
                 fields={
@@ -239,7 +255,7 @@ function ClaimCard({
                     <input type="hidden" name="outcome" value="void" />
                   </>
                 }
-                onResult={report(() => `Voided ${title}.`)}
+                onResult={QUIET}
               />
             </>
           ) : null}
