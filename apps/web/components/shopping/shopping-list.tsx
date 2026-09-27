@@ -11,7 +11,6 @@ import {
   WidgetItem,
   WidgetList,
 } from "@baumy/ui";
-import { SHOPPING_ITEM_MAX } from "@baumy/types";
 import {
   useActionForm,
   useReporting,
@@ -124,7 +123,6 @@ function QuickAdd({
                 kiosk={kiosk}
                 placeholder="milk, eggs"
                 autoComplete="off"
-                maxLength={SHOPPING_ITEM_MAX * 4}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 required
