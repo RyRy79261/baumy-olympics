@@ -216,3 +216,56 @@ export function formatMonthKey(key: string): string {
   const [year, month] = key.split("-").map(Number);
   return `${MONTHS[(month as number) - 1]} ${year}`;
 }
+
+// --- Calendar days as "YYYY-MM-DD" (SPEC §6.4) ------------------------------
+// The house calendar talks in Berlin days and wall-clock times, the way people
+// type them. These helpers move between those strings and UTC instants.
+
+/** A Berlin calendar day, "YYYY-MM-DD". */
+export type DateKey = string;
+
+/** The Berlin calendar day of an instant, e.g. "2027-01-15". */
+export function berlinDateKey(instant: Date): DateKey {
+  const p = berlinParts(instant);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
+}
+
+/** The Berlin wall-clock time of an instant, "HH:MM". */
+export function berlinTimeKey(instant: Date): string {
+  const p = berlinParts(instant);
+  return `${pad2(p.hour)}:${pad2(p.minute)}`;
+}
+
+function dateKeyParts(key: DateKey): [number, number, number] {
+  const [y, m, d] = key.split("-").map(Number);
+  return [y as number, m as number, d as number];
+}
+
+/** `days` calendar days after a day (negative goes back). */
+export function addDaysToDateKey(key: DateKey, days: number): DateKey {
+  const [y, m, d] = dateKeyParts(key);
+  const t = new Date(Date.UTC(y, m - 1, d) + days * MS_PER_DAY);
+  return `${t.getUTCFullYear()}-${pad2(t.getUTCMonth() + 1)}-${pad2(t.getUTCDate())}`;
+}
+
+/** ISO weekday of a day: 1 = Monday … 7 = Sunday. */
+export function dateKeyWeekday(key: DateKey): number {
+  const [y, m, d] = dateKeyParts(key);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay() || 7;
+}
+
+/**
+ * The instant Berlin's clock reads `time` ("HH:MM", default midnight) on a
+ * day: 19:00 on 15 Jan is 18:00Z, on 15 Jul it is 17:00Z.
+ */
+export function berlinDateTimeToUtc(key: DateKey, time = "00:00"): Date {
+  const [y, m, d] = dateKeyParts(key);
+  const [hh, mm] = time.split(":").map(Number);
+  return berlinWallTimeToUtc(y, m, d, hh, mm);
+}
+
+/** "Fri 15 Jan" for a day, for people to read. */
+export function formatDateKey(key: DateKey): string {
+  const [, m, d] = dateKeyParts(key);
+  return `${WEEKDAYS[dateKeyWeekday(key) - 1]} ${d} ${MONTHS[m - 1]}`;
+}

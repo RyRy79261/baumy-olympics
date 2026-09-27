@@ -2,6 +2,12 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   addBerlinDays,
+  addDaysToDateKey,
+  berlinDateKey,
+  berlinDateTimeToUtc,
+  berlinTimeKey,
+  dateKeyWeekday,
+  formatDateKey,
   berlinMonthBounds,
   berlinMonthKey,
   berlinParts,
@@ -273,5 +279,56 @@ describe("addBerlinDays and startOfBerlinWeek", () => {
         },
       ),
     );
+  });
+});
+
+describe("calendar days", () => {
+  it("reads an instant's Berlin day and time, in winter and in summer", () => {
+    // 19:00 Berlin is 18:00Z in January (+01:00) and 17:00Z in July (+02:00).
+    expect(berlinDateKey(iso("2027-01-15T18:00:00Z"))).toBe("2027-01-15");
+    expect(berlinTimeKey(iso("2027-01-15T18:00:00Z"))).toBe("19:00");
+    expect(berlinTimeKey(iso("2027-07-15T17:00:00Z"))).toBe("19:00");
+    // 23:30Z on 31 Dec is already 1 Jan in Berlin.
+    expect(berlinDateKey(iso("2026-12-31T23:30:00Z"))).toBe("2027-01-01");
+  });
+
+  it("turns a Berlin day and time into the right instant either side of DST", () => {
+    expect(berlinDateTimeToUtc("2027-01-15", "19:00").toISOString()).toBe(
+      "2027-01-15T18:00:00.000Z",
+    );
+    expect(berlinDateTimeToUtc("2027-07-15", "19:00").toISOString()).toBe(
+      "2027-07-15T17:00:00.000Z",
+    );
+    expect(berlinDateTimeToUtc("2027-07-15").toISOString()).toBe(
+      "2027-07-14T22:00:00.000Z",
+    );
+  });
+
+  it("round-trips any instant's minute through its day and time", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1_700_000_000, max: 1_900_000_000 }),
+        (s) => {
+          // Whole minutes, away from the repeated hour when clocks go back.
+          const at = new Date(Math.floor(s / 60) * 60_000);
+          const back = berlinDateTimeToUtc(
+            berlinDateKey(at),
+            berlinTimeKey(at),
+          );
+          const p = berlinParts(at);
+          const ambiguous = p.month === 10 && p.hour === 2;
+          return ambiguous || back.getTime() === at.getTime();
+        },
+      ),
+    );
+  });
+
+  it("adds days and names weekdays on the calendar, not in hours", () => {
+    expect(addDaysToDateKey("2027-03-27", 1)).toBe("2027-03-28");
+    expect(addDaysToDateKey("2027-03-01", -1)).toBe("2027-02-28");
+    expect(addDaysToDateKey("2027-12-31", 1)).toBe("2028-01-01");
+    expect(dateKeyWeekday("2027-01-15")).toBe(5);
+    expect(dateKeyWeekday("2027-01-17")).toBe(7);
+    expect(formatDateKey("2027-01-15")).toBe("Fri 15 Jan");
   });
 });
