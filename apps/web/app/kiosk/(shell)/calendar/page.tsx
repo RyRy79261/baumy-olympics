@@ -57,7 +57,7 @@ export default async function KioskCalendarPage({
         }
         actions={
           <Link href="/kiosk" className={buttonClass("secondary", "kiosk")}>
-            Chores
+            Home
           </Link>
         }
       />
