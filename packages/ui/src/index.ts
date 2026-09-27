@@ -10,6 +10,12 @@ export {
   type ButtonSize,
   type ButtonVariant,
 } from "./button";
+export {
+  CalendarDayCell,
+  CalendarEventButton,
+  CalendarGrid,
+  type CalendarEventButtonProps,
+} from "./calendar";
 export { Card } from "./card";
 export {
   ChoiceGroup,
