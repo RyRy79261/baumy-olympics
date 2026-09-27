@@ -31,9 +31,11 @@ export {
   canDeliverAuthEmail,
   isAuthConfigured,
   isEmailProviderConfigured,
+  isFounderEmail,
   isGoogleConfigured,
   resolveAuthEmailCaptureFile,
   resolveBaseURL,
+  resolveFounderEmails,
   resolveTrustedOrigins,
   type AuthEnv,
 } from "./env";
