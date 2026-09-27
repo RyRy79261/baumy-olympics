@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  addBerlinDays,
   berlinMonthBounds,
   berlinMonthKey,
   berlinParts,
@@ -13,6 +14,7 @@ import {
   seasonBounds,
   seasonYear,
   startOfBerlinDay,
+  startOfBerlinWeek,
 } from "../time";
 
 const iso = (s: string) => new Date(s);
@@ -212,5 +214,64 @@ describe("Berlin months", () => {
   it("names a month for people", () => {
     expect(formatMonthKey("2026-09")).toBe("Sep 2026");
     expect(formatMonthKey("2027-01")).toBe("Jan 2027");
+  });
+});
+
+describe("addBerlinDays and startOfBerlinWeek", () => {
+  it("keeps Monday midnight across both daylight-saving changes", () => {
+    // 28 days from Mon 12 Oct (summer) is Mon 9 Nov (winter): 28×24h + 1h.
+    const oct = berlinWallTimeToUtc(2026, 10, 12);
+    expect(addBerlinDays(oct, 28)).toEqual(berlinWallTimeToUtc(2026, 11, 9));
+    expect(addBerlinDays(oct, 28).getTime() - oct.getTime()).toBe(
+      (28 * 24 + 1) * 3600_000,
+    );
+    // …and across the March change it is 1h short.
+    const mar = berlinWallTimeToUtc(2026, 3, 16);
+    expect(addBerlinDays(mar, 28).getTime() - mar.getTime()).toBe(
+      (28 * 24 - 1) * 3600_000,
+    );
+    expect(addBerlinDays(mar, -1)).toEqual(berlinWallTimeToUtc(2026, 3, 15));
+  });
+
+  it("keeps the wall time of day, to the minute", () => {
+    const at = berlinWallTimeToUtc(2026, 12, 31, 23, 45);
+    expect(addBerlinDays(at, 1)).toEqual(
+      berlinWallTimeToUtc(2027, 1, 1, 23, 45),
+    );
+  });
+
+  it("starts a week on Monday 00:00 Berlin", () => {
+    const monday = berlinWallTimeToUtc(2026, 9, 28);
+    // Sunday 23:30 Berlin is still the week before.
+    expect(startOfBerlinWeek(berlinWallTimeToUtc(2026, 9, 27, 23, 30))).toEqual(
+      berlinWallTimeToUtc(2026, 9, 21),
+    );
+    expect(startOfBerlinWeek(monday)).toEqual(monday);
+    expect(startOfBerlinWeek(berlinWallTimeToUtc(2026, 10, 4, 23, 59))).toEqual(
+      monday,
+    );
+  });
+
+  it("puts every instant in the week that starts at most 7 days before it", () => {
+    fc.assert(
+      fc.property(
+        fc.date({
+          min: new Date("2000-01-01T00:00:00Z"),
+          max: new Date("2100-01-01T00:00:00Z"),
+          noInvalidDate: true,
+        }),
+        (at) => {
+          const start = startOfBerlinWeek(at);
+          const p = berlinParts(start);
+          expect(p.weekday).toBe(1);
+          expect([p.hour, p.minute, p.second]).toEqual([0, 0, 0]);
+          expect(start.getTime()).toBeLessThanOrEqual(at.getTime());
+          expect(nextBerlinMonday(start)).toEqual(addBerlinDays(start, 7));
+          expect(addBerlinDays(start, 7).getTime()).toBeGreaterThan(
+            at.getTime(),
+          );
+        },
+      ),
+    );
   });
 });

@@ -8,11 +8,13 @@
 
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   bigserial,
   boolean,
   check,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -56,6 +58,15 @@ export const ruleSource = pgEnum("rule_source", [
   "seed",
   "manual",
   "suggestion",
+]);
+
+export const weightSuggestionStatus = pgEnum("weight_suggestion_status", [
+  "open",
+  "scheduled",
+  "dismissed",
+  "vetoed",
+  "applied",
+  "superseded",
 ]);
 
 /** v1 implements `points` only (SPEC §4.5); the others are kept for later. */
@@ -417,7 +428,7 @@ export const chores = pgTable(
  * effect when it happened (`ruleVersionAt` in packages/core).
  *
  * `suggestion_id` names the `weight_suggestions` row a `suggestion` version
- * came from. That table arrives with issue #17, which adds the foreign key.
+ * came from; each suggestion applies at most once (the unique index).
  * `created_by` is null for `seed` rows.
  */
 export const choreRuleVersions = pgTable(
@@ -433,7 +444,9 @@ export const choreRuleVersions = pgTable(
     basePoints: integer("base_points").notNull(),
     cooldownMinutes: integer("cooldown_minutes").notNull(),
     source: ruleSource("source").notNull(),
-    suggestionId: uuid("suggestion_id"),
+    suggestionId: uuid("suggestion_id").references(
+      (): AnyPgColumn => weightSuggestions.id,
+    ),
     createdBy: uuid("created_by").references(() => members.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -444,6 +457,8 @@ export const choreRuleVersions = pgTable(
       t.choreId,
       t.effectiveFrom,
     ),
+    // Many NULLs pass a unique index, which is what `seed`/`manual` rows need.
+    uniqueIndex("chore_rule_versions_suggestion_id_uq").on(t.suggestionId),
     check(
       "chore_rule_versions_base_points_range",
       sql`${t.basePoints} BETWEEN 1 AND 200`,
@@ -455,6 +470,96 @@ export const choreRuleVersions = pgTable(
     check(
       "chore_rule_versions_suggestion_source",
       sql`(${t.suggestionId} IS NULL) OR (${t.source} = 'suggestion')`,
+    ),
+  ],
+);
+
+/**
+ * A weekly measurement of how often a chore is done, and the weight change it
+ * suggests (SPEC §4.4). Only a measurement outside the dead-band is stored.
+ * `computeSuggestions` (weights.ts) writes at most one per chore and Berlin
+ * week (`week_start`); an admin schedules or dismisses it, another member may
+ * veto a scheduled one until `applies_at`, and `applyDueSuggestions` turns it
+ * into a `suggestion` rule version effective from the moment it runs.
+ *
+ * `sample_intervals` are the winsorised gaps in minutes, oldest first (the
+ * panel's sparkline). `scheduled_points`/`scheduled_cooldown_minutes` are what
+ * the admin scheduled ("Edit & schedule" may differ from the suggestion).
+ */
+export const weightSuggestions = pgTable(
+  "weight_suggestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    choreId: uuid("chore_id")
+      .notNull()
+      .references(() => chores.id),
+    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    sampleIntervals: integer("sample_intervals").array().notNull(),
+    medianIntervalMinutes: integer("median_interval_minutes").notNull(),
+    rawPoints: doublePrecision("raw_points").notNull(),
+    currentPoints: integer("current_points").notNull(),
+    currentCooldownMinutes: integer("current_cooldown_minutes").notNull(),
+    suggestedPoints: integer("suggested_points").notNull(),
+    suggestedCooldownMinutes: integer("suggested_cooldown_minutes").notNull(),
+    status: weightSuggestionStatus("status").notNull().default("open"),
+    scheduledPoints: integer("scheduled_points"),
+    scheduledCooldownMinutes: integer("scheduled_cooldown_minutes"),
+    appliesAt: timestamp("applies_at", { withTimezone: true }),
+    scheduledBy: uuid("scheduled_by").references(() => members.id),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    dismissedBy: uuid("dismissed_by").references(() => members.id),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    vetoedBy: uuid("vetoed_by").references(() => members.id),
+    vetoedAt: timestamp("vetoed_at", { withTimezone: true }),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("weight_suggestions_chore_week_uq").on(t.choreId, t.weekStart),
+    // One suggestion per chore is waiting on people at a time.
+    uniqueIndex("weight_suggestions_one_active_per_chore_uq")
+      .on(t.choreId)
+      .where(sql`${t.status} IN ('open', 'scheduled')`),
+    index("weight_suggestions_scheduled_idx")
+      .on(t.appliesAt)
+      .where(sql`${t.status} = 'scheduled'`),
+    check(
+      "weight_suggestions_suggested_points_range",
+      sql`${t.suggestedPoints} BETWEEN 5 AND 60`,
+    ),
+    check(
+      "weight_suggestions_scheduled_points_range",
+      sql`${t.scheduledPoints} BETWEEN 1 AND 200`,
+    ),
+    check(
+      "weight_suggestions_cooldowns_non_negative",
+      sql`${t.suggestedCooldownMinutes} >= 0 AND ${t.scheduledCooldownMinutes} >= 0`,
+    ),
+    // Scheduled, vetoed and applied ones were scheduled first; open ones not.
+    check(
+      "weight_suggestions_scheduled_has_schedule",
+      sql`${t.status} NOT IN ('scheduled', 'vetoed', 'applied') OR (${t.appliesAt} IS NOT NULL AND ${t.scheduledBy} IS NOT NULL AND ${t.scheduledAt} IS NOT NULL AND ${t.scheduledPoints} IS NOT NULL AND ${t.scheduledCooldownMinutes} IS NOT NULL)`,
+    ),
+    check(
+      "weight_suggestions_open_unscheduled",
+      sql`${t.status} <> 'open' OR ${t.appliesAt} IS NULL`,
+    ),
+    check(
+      "weight_suggestions_dismissed",
+      sql`(${t.status} = 'dismissed') = (${t.dismissedBy} IS NOT NULL AND ${t.dismissedAt} IS NOT NULL)`,
+    ),
+    check(
+      "weight_suggestions_vetoed",
+      sql`(${t.status} = 'vetoed') = (${t.vetoedBy} IS NOT NULL AND ${t.vetoedAt} IS NOT NULL)`,
+    ),
+    check(
+      "weight_suggestions_applied",
+      sql`(${t.status} = 'applied') = (${t.appliedAt} IS NOT NULL)`,
     ),
   ],
 );

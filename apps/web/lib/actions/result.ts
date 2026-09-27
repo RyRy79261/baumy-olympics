@@ -87,7 +87,9 @@ export type DomainErrorCode =
   /** A prize mode v1 does not play (`heaviest_streak`, `longest_streak`). */
   | "PRIZE_MODE_NOT_SUPPORTED"
   /** An admin tried to approve their own point adjustment. */
-  | "SELF_APPROVAL";
+  | "SELF_APPROVAL"
+  /** The member who scheduled a weight change tried to veto it. */
+  | "SELF_VETO";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 
