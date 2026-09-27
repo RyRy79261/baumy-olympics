@@ -6,7 +6,7 @@ import { openKioskChores, pairedKiosk } from "../lib/kiosk";
 // icons that make the home-screen app open full screen in landscape, the
 // screen wake lock and its notice, the 60-second idle reset (with its
 // countdown, from any kiosk page), and the offline page. Night mode moves
-// the server clock, so it is kiosk-night.spec.ts (desktop-chromium only).
+// the server clock, so it is kiosk-night.spec.ts (the server-clock project).
 
 const KIOSK_ONLY = "The kiosk is an iPad in landscape.";
 
@@ -113,7 +113,7 @@ test("wake lock, idle reset and the offline page", async ({
     kiosk.getByRole("heading", { name: "Kitchen", level: 1 }),
   ).toBeVisible();
 
-  // The wake lock: refused, so the header says the screen may sleep ...
+  // The wake lock: refused, so the corner tag says the screen may sleep ...
   const notice = kiosk.getByTestId("wake-lock-notice");
   await expect(notice).toHaveText("Screen may sleep");
   // ... held once the browser allows it (asked again on visibilitychange) ...
