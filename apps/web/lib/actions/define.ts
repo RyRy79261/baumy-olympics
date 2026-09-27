@@ -45,6 +45,10 @@ export const ACTION_NAMES = [
   "schedule_weight",
   "dismiss_weight",
   "veto_weight",
+  "list_events",
+  "create_event",
+  "update_event",
+  "delete_event",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 

@@ -5,6 +5,12 @@ import type { ActionDef, ActionName, AnyActionDef, RequestCtx } from "./define";
 import { addPotContribution } from "./add-pot-contribution";
 import { adjustPoints } from "./adjust-points";
 import { attachCompletionPhoto } from "./attach-completion-photo";
+import {
+  createEvent,
+  deleteEvent,
+  listEvents,
+  updateEvent,
+} from "./calendar";
 import { checkKioskPin } from "./check-kiosk-pin";
 import {
   concedeCompletion,
@@ -76,6 +82,10 @@ export const REGISTRY = {
   schedule_weight: scheduleWeight,
   dismiss_weight: dismissWeight,
   veto_weight: vetoWeight,
+  list_events: listEvents,
+  create_event: createEvent,
+  update_event: updateEvent,
+  delete_event: deleteEvent,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =
