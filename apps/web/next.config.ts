@@ -24,6 +24,18 @@ const config: NextConfig = {
         : "/api/mcp/well-known/oauth-protected-resource",
     }));
   },
+  // The consent screen hands out a code with one click, so no other site may
+  // frame it (clickjacking; intake-tracker sets frame-ancestors 'none').
+  async headers() {
+    const noFraming = [
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+    ];
+    return ["/oauth/consent", "/api/mcp/oauth/authorize"].map((source) => ({
+      source,
+      headers: noFraming,
+    }));
+  },
 };
 
 export default config;

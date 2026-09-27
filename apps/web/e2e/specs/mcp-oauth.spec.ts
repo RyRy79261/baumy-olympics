@@ -134,8 +134,13 @@ test("a scripted client completes the OAuth round trip and is disconnected", asy
   const { verifier, challenge } = pkce();
 
   const callback = catchCallback(page);
-  await page.goto(authorizeUrl(meta, clientId, challenge));
+  const landed = await page.goto(authorizeUrl(meta, clientId, challenge));
   await expect(page).toHaveURL(/\/oauth\/consent\?/);
+  // No other site may frame the consent screen (clickjacking).
+  expect(landed?.headers()["x-frame-options"]).toBe("DENY");
+  expect(landed?.headers()["content-security-policy"]).toBe(
+    "frame-ancestors 'none'",
+  );
   await expect(
     page.getByRole("heading", { name: `Connect ${name} to Baumy` }),
   ).toBeVisible();
