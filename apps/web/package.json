@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
-    "vercel-build": "pnpm --filter @baumy/db db:migrate && next build",
+    "vercel-build": "pnpm --filter @baumy/db db:migrate && pnpm --filter @baumy/db db:seed && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
