@@ -9,7 +9,7 @@ import { pairedKiosk } from "../lib/kiosk";
 // it back to sleep, and 06:30 wakes it for good.
 //
 // It moves the shared SERVER clock (the night is the server's), so it runs
-// serially in desktop-chromium only (playwright.config.ts
+// in the server-clock project, one test at a time (playwright.config.ts
 // SHARED_CLOCK_SPECS), on an iPad-sized context of its own, and puts the
 // clock back afterwards. Playwright's clock moves the iPad's timers.
 
