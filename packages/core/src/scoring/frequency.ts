@@ -56,6 +56,21 @@ export const FREQUENCY_V1 = {
 
 export type FrequencyRules = typeof FREQUENCY_V1;
 
+/**
+ * A stored suggestion's life (`weight_suggestions.status`):
+ * - `open`: waiting for an admin;
+ * - `scheduled`: applies at `applies_at` unless someone vetoes it first;
+ * - `dismissed` (by an admin), `vetoed` (by another member), `applied`;
+ * - `superseded`: a newer week's suggestion replaced it while still open.
+ */
+export type WeightSuggestionStatus =
+  | "open"
+  | "scheduled"
+  | "dismissed"
+  | "vetoed"
+  | "applied"
+  | "superseded";
+
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
 
