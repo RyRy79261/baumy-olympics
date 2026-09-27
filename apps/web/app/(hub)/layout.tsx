@@ -38,6 +38,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     { href: "/chores", label: "Chores" },
     { href: "/calendar", label: "Calendar" },
     { href: "/notes", label: "Notes" },
+    { href: "/shopping", label: "Shopping" },
     { href: "/scores", label: "Scores" },
     { href: "/pot", label: "Pot" },
     {

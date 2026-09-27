@@ -13,6 +13,10 @@ import type { CheckKioskPinData } from "@/lib/actions/check-kiosk-pin";
 import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
 import type { DeleteNoteData, NoteWriteData } from "@/lib/actions/notes";
+import type {
+  AddShoppingData,
+  CheckOffShoppingData,
+} from "@/lib/actions/shopping";
 import { getKioskActor } from "@/lib/auth";
 import { now } from "@/lib/clock";
 import {
@@ -25,6 +29,7 @@ import {
 import { pairKioskDevice } from "@/lib/kiosk/pairing";
 import { pickKioskMember } from "@/lib/kiosk/selection";
 import { getClientIp } from "@/lib/rate-limit";
+import { splitItemsForm } from "@/lib/shopping/view";
 
 // The kiosk's server actions (SPEC §8). Pairing and picking who is acting
 // are the kiosk's own sign-in state, kept in its cookies; everything the
@@ -221,5 +226,37 @@ export async function kioskDeleteNoteAction(
 ): Promise<ActionResult<DeleteNoteData>> {
   const result = await kioskActionForm("delete_note", form);
   if (result.ok) revalidateKioskNotes();
+  return result;
+}
+
+type AddShoppingResult = ActionResult<AddShoppingData>;
+type CheckOffShoppingResult = ActionResult<CheckOffShoppingData>;
+
+/** The shopping page, and the home whose widget shows the list. */
+function revalidateKioskShopping(): void {
+  revalidatePath("/kiosk/shopping");
+  revalidatePath("/kiosk");
+}
+
+/** The kiosk's quick-add, as the acting member: no PIN. */
+export async function kioskAddShoppingAction(
+  _prev: AddShoppingResult | null,
+  form: FormData,
+): Promise<AddShoppingResult> {
+  const result = await kioskActionForm(
+    "add_shopping_items",
+    splitItemsForm(form),
+  );
+  if (result.ok) revalidateKioskShopping();
+  return result;
+}
+
+/** One tap on a row checks it off, as the acting member. */
+export async function kioskCheckOffShoppingAction(
+  _prev: CheckOffShoppingResult | null,
+  form: FormData,
+): Promise<CheckOffShoppingResult> {
+  const result = await kioskActionForm("check_off_shopping_items", form);
+  if (result.ok) revalidateKioskShopping();
   return result;
 }
