@@ -11,6 +11,8 @@ export {
   MEMBER_COLORS,
   MemberColor,
   MemberRole,
+  TelegramLinkCode,
+  TelegramUserId,
 } from "./member";
 export {
   KIOSK_DEVICE_NAME_MAX,
