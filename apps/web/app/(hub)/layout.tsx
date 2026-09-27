@@ -22,9 +22,13 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
   );
   const items: NavItem[] = [
     { href: "/", label: "Hub" },
+    { href: "/chores", label: "Chores" },
     { href: "/settings", label: "Settings" },
     ...(me.role === "admin"
-      ? [{ href: "/admin/members", label: "Members" } as NavItem]
+      ? ([
+          { href: "/admin/members", label: "Members" },
+          { href: "/admin/chores", label: "Edit chores" },
+        ] as NavItem[])
       : []),
   ];
   return (

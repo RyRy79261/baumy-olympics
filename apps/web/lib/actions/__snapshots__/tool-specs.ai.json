@@ -9,5 +9,59 @@
       "additionalProperties": false
     },
     "risk": "safe"
+  },
+  {
+    "name": "list_chores",
+    "description": "Lists the household's chores with their ids, base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "includeArchived": {
+          "description": "Also list archived chores. Default false.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  },
+  {
+    "name": "log_completion",
+    "description": "Logs that a household member did a chore and scores it (streaks and break bonuses). doneBy defaults to you; logging for someone else vouches for them. Refused with COOLDOWN (and retryAt) if the chore was done too recently, and with other codes for times in the future, more than 24h ago, or before the chore's last completion. Get chore and member ids from list_chores and whoami.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "choreId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The chore's id, from list_chores."
+        },
+        "doneBy": {
+          "description": "The member id of whoever did the chore. Defaults to you. Logging for someone else vouches for them.",
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "occurredAt": {
+          "description": "When the chore was done, ISO 8601. Defaults to now; at most 24 hours ago, and not before the chore's last completion.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "note": {
+          "description": "An optional short note.",
+          "type": "string",
+          "maxLength": 280
+        }
+      },
+      "required": [
+        "choreId"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
   }
 ]

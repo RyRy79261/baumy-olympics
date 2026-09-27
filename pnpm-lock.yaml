@@ -32,6 +32,9 @@ importers:
       '@baumy/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@baumy/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@baumy/db':
         specifier: workspace:*
         version: link:../../packages/db

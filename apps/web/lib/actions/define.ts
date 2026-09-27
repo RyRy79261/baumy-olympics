@@ -24,6 +24,9 @@ export const ACTION_NAMES = [
   "pair_kiosk",
   "revoke_kiosk",
   "check_kiosk_pin",
+  "list_chores",
+  "log_completion",
+  "manage_chore",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 

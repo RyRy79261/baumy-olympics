@@ -5,6 +5,9 @@ import type { ActionDef, ActionName, AnyActionDef, RequestCtx } from "./define";
 import { checkKioskPin } from "./check-kiosk-pin";
 import { createTelegramLinkCode } from "./create-telegram-link-code";
 import { joinAsFounder } from "./join-as-founder";
+import { listChores } from "./list-chores";
+import { logCompletionAction } from "./log-completion";
+import { manageChore } from "./manage-chore";
 import { manageMembers } from "./manage-members";
 import { mintInvite } from "./mint-invite";
 import { pairKiosk } from "./pair-kiosk";
@@ -32,6 +35,9 @@ export const REGISTRY = {
   pair_kiosk: pairKiosk,
   revoke_kiosk: revokeKiosk,
   check_kiosk_pin: checkKioskPin,
+  list_chores: listChores,
+  log_completion: logCompletionAction,
+  manage_chore: manageChore,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =

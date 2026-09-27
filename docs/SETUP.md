@@ -208,3 +208,26 @@ Postgres (concurrent claims and guesses) and end to end in `ipad-landscape`.
       it locked to the app.
 - If the iPad is lost, revoke it on `/admin/members` ("Revoke"); it is sent
   back to `/kiosk/pair` on its next request.
+
+## Chores (issue #14)
+
+Nothing here needs an account, a secret or a new env var: the chore
+actions are tested on PGlite and Docker Postgres (two people tapping one
+chore at once, two seeds at once) and end to end on a phone, a desktop and
+the kiosk.
+
+- [ ] **Check the starter chores after the first deploy.** `vercel-build`
+      now runs `db:seed` after `db:migrate`; its build log should show
+      `[seed] ep-…: added 11 starter chores.` once, and `nothing to do` on
+      every later deploy. `/chores` should list the 11 chores of SPEC §4.7.
+      To seed by hand instead:
+      `DATABASE_URL_UNPOOLED='postgres://…' pnpm --filter @baumy/db db:seed`.
+- [ ] **Review the starter values** on `/admin/chores` (points, cooldown,
+      proof, confirmation, effort). Edits apply from now on; nothing already
+      scored changes. Archive a chore you do not want rather than renaming it.
+- [ ] **Look and feel is deferred to issue #7.** The chore tiles, the "+N"
+      pop, the "STREAK BROKEN" banner and the sheet are neutral placeholders
+      in `packages/ui/src/chores.tsx`; the pixel kit restyles them there.
+- Photo proof arrives with issue #15: until then a chore set to "Photo
+  proof: Required" cannot be logged (it answers `PHOTO_REQUIRED`), so keep
+  proof at None or Optional.

@@ -1,5 +1,6 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
+import { expectKioskTargets, pairCode, typePin } from "../lib/kiosk";
 
 // Issue #10 end to end, on the kitchen iPad (ipad-landscape), against Docker
 // Postgres: an admin pairs a kiosk, the code works once, a member taps their
@@ -8,43 +9,6 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 // revoked kiosk is sent back to /kiosk/pair.
 
 const PIN = "2580";
-
-/** Every visible button in `scope` is a 56px (or larger) square target. */
-async function expectKioskTargets(scope: Locator) {
-  const buttons = scope.getByRole("button");
-  const count = await buttons.count();
-  expect(count).toBeGreaterThan(0);
-  for (let i = 0; i < count; i++) {
-    const b = buttons.nth(i);
-    if (!(await b.isVisible())) continue;
-    const box = (await b.boundingBox())!;
-    const name = (await b.textContent())?.trim() ?? "";
-    expect(box.height, `height of "${name}"`).toBeGreaterThanOrEqual(56);
-    expect(box.width, `width of "${name}"`).toBeGreaterThanOrEqual(56);
-  }
-}
-
-async function pairCode(admin: Page, deviceName: string): Promise<string> {
-  await admin.goto("/admin/members");
-  const form = admin.locator("form").filter({
-    has: admin.getByRole("button", { name: "Create pairing code" }),
-  });
-  await form.getByLabel("Device name").fill(deviceName);
-  await form.getByRole("button", { name: "Create pairing code" }).click();
-  const code = (await admin.getByTestId("pairing-code").textContent())!.trim();
-  expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-  await expect(admin.getByTestId(`kiosk-${deviceName}`)).toContainText(
-    "Waiting for its code",
-  );
-  return code;
-}
-
-async function typePin(dialog: Locator, pin: string) {
-  for (const digit of pin) {
-    await dialog.getByRole("button", { name: digit, exact: true }).click();
-  }
-  await dialog.getByRole("button", { name: "OK" }).click();
-}
 
 test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   page,

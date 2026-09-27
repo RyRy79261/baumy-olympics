@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button, Dialog, FormMessage, PinPad } from "@baumy/ui";
 import { useActionForm, type FormAction } from "@/components/use-action-form";
 import type { ActionResult } from "@/lib/actions/result";
@@ -12,6 +12,11 @@ import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
 // form, and its OK sends the same request again with the PIN. The pad is
 // remounted for every attempt, so the digits last one request; after a
 // success it is gone, and the next request asks again.
+//
+// With `onResult`, the caller reports the outcome itself (a toast, a score
+// pop): the form shows nothing inline except inside the PIN pad. The same
+// form works off the kiosk, where a session attests itself and the pad never
+// opens.
 
 export function AttestedForm<T>({
   action,
@@ -19,6 +24,8 @@ export function AttestedForm<T>({
   pinLabel,
   fields,
   success,
+  onResult,
+  disabled = false,
 }: {
   action: FormAction<T>;
   /** The button that starts the request. */
@@ -28,7 +35,10 @@ export function AttestedForm<T>({
   /** Hidden inputs: the action's own input. */
   fields?: ReactNode;
   /** What to show after it worked. */
-  success: (data: T) => ReactNode;
+  success?: (data: T) => ReactNode;
+  /** Called once per answer that does not ask for a PIN. */
+  onResult?: (result: ActionResult<T>) => void;
+  disabled?: boolean;
 }) {
   const { state, formAction, pending, requestId } = useActionForm(action);
   const [attempt, setAttempt] = useState(0);
@@ -38,6 +48,14 @@ export function AttestedForm<T>({
   const needsPin =
     failed !== null && !failed.ok && PIN_PROMPT_CODES.has(failed.code);
   const pinOpen = needsPin && !dismissed;
+
+  useEffect(() => {
+    if (!state || !onResult) return;
+    if (!state.ok && PIN_PROMPT_CODES.has(state.code)) return;
+    onResult(state);
+    // Once per answer: `state` is a new object for every submission, while
+    // `onResult` may be a new function on every render.
+  }, [state]);
 
   return (
     <form
@@ -50,13 +68,13 @@ export function AttestedForm<T>({
     >
       <input type="hidden" name="requestId" value={requestId} />
       {fields}
-      <Button type="submit" size="kiosk" disabled={pending}>
+      <Button type="submit" size="kiosk" disabled={pending || disabled}>
         {label}
       </Button>
-      {state?.ok ? (
+      {state?.ok && success && !onResult ? (
         <FormMessage tone="success">{success(state.data)}</FormMessage>
       ) : null}
-      {failed && !failed.ok && !needsPin ? (
+      {failed && !failed.ok && !needsPin && !onResult ? (
         <FormMessage tone="error">{failed.message}</FormMessage>
       ) : null}
       <Dialog
