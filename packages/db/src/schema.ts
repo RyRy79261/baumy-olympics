@@ -958,3 +958,107 @@ export const aiUsage = pgTable(
     ),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// MCP OAuth (SPEC §6.3, issue #23)
+// ---------------------------------------------------------------------------
+//
+// The authorization server that lets a chatbot (claude.ai's custom connector,
+// Claude Desktop, Claude Code) act as ONE member. Ported from intake-tracker
+// `apps/web/src/db/schema.ts` (mcp_oauth_clients, mcp_auth_codes,
+// mcp_access_tokens), keyed on `members` instead of Neon Auth users.
+//
+// Nothing secret is stored: client secrets, codes, access and refresh tokens
+// are kept as sha256 hex only (mcp-oauth.ts). Rows are never deleted by the
+// app; a revoked or expired row simply stops working.
+
+/** A client registered through Dynamic Client Registration (RFC 7591). */
+export const mcpOauthClients = pgTable(
+  "mcp_oauth_clients",
+  {
+    clientId: text("client_id").primaryKey(),
+    /** sha256 hex; null for a public client (`none`). */
+    clientSecretHash: text("client_secret_hash"),
+    clientName: text("client_name").notNull(),
+    redirectUris: text("redirect_uris").array().notNull(),
+    tokenEndpointAuthMethod: text("token_endpoint_auth_method").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check(
+      "mcp_oauth_clients_auth_method",
+      sql`${t.tokenEndpointAuthMethod} IN ('none', 'client_secret_basic', 'client_secret_post')`,
+    ),
+    check(
+      "mcp_oauth_clients_secret_matches_method",
+      sql`(${t.clientSecretHash} IS NULL) = (${t.tokenEndpointAuthMethod} = 'none')`,
+    ),
+  ],
+);
+
+/**
+ * A single-use authorization code, minted when a member approves the consent
+ * screen. PKCE is S256 only. `scopes` are the ones the member ticked.
+ */
+export const mcpAuthCodes = pgTable(
+  "mcp_auth_codes",
+  {
+    codeHash: text("code_hash").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => mcpOauthClients.clientId, { onDelete: "cascade" }),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id),
+    redirectUri: text("redirect_uri").notNull(),
+    codeChallenge: text("code_challenge").notNull(),
+    scopes: text("scopes").array().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("mcp_auth_codes_member_id_idx").on(t.memberId)],
+);
+
+/**
+ * An access token and its refresh token. Refreshing revokes this row and
+ * inserts a new one with the same `grant_id` in one transaction, so a grant
+ * (one consent, one "connection" on /settings/connections) has at most one
+ * live row.
+ */
+export const mcpAccessTokens = pgTable(
+  "mcp_access_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** One approval of the consent screen, kept across refreshes. */
+    grantId: uuid("grant_id").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    refreshTokenHash: text("refresh_token_hash").notNull().unique(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => mcpOauthClients.clientId, { onDelete: "cascade" }),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id),
+    scopes: text("scopes").array().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    refreshExpiresAt: timestamp("refresh_expires_at", {
+      withTimezone: true,
+    }).notNull(),
+    /** When the member approved the grant; copied on every refresh. */
+    grantedAt: timestamp("granted_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("mcp_access_tokens_member_id_idx").on(t.memberId),
+    index("mcp_access_tokens_grant_id_idx").on(t.grantId),
+  ],
+);

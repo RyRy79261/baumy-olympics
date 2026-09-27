@@ -1,6 +1,7 @@
 import "server-only";
 
 import { notFound, redirect } from "next/navigation";
+import { signInUrl } from "./callback-url";
 import {
   getActor,
   type Actor,
@@ -53,17 +54,33 @@ export type PageMember = MemberActor & {
   displayName: string;
 };
 
-async function enforce(need: PageNeed): Promise<MemberActor> {
+async function enforce(
+  need: PageNeed,
+  returnTo?: string,
+): Promise<MemberActor> {
   const actor = await getActor();
   const verdict = pageGate(actor, need);
-  if (verdict.kind === "redirect") redirect(verdict.to);
+  if (verdict.kind === "redirect") {
+    // Only sign-in comes back: a page reached from outside (the MCP consent
+    // page) returns there once the person has signed in.
+    redirect(
+      (verdict.to === "/auth/sign-in"
+        ? signInUrl(returnTo)
+        : verdict.to) as "/auth/sign-in",
+    );
+  }
   if (verdict.kind === "not_found") notFound();
   return actor as MemberActor;
 }
 
-/** For hub pages: the member, or off to sign-in or /join. */
-export async function requireMemberPage(): Promise<PageMember> {
-  return (await enforce("member")) as PageMember;
+/**
+ * For hub pages: the member, or off to sign-in or /join. `returnTo` (a path
+ * on this site) is where sign-in sends the person back to.
+ */
+export async function requireMemberPage(
+  opts: { returnTo?: string } = {},
+): Promise<PageMember> {
+  return (await enforce("member", opts.returnTo)) as PageMember;
 }
 
 /** For /admin/*: an admin; anyone else gets a 404. */

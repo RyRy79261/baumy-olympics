@@ -117,3 +117,47 @@ export function FormMessage({
     </p>
   );
 }
+
+/**
+ * A checkbox with its label and an optional hint, the whole row a 44px touch
+ * target. `children` go under the hint (the MCP consent screen lists what a
+ * scope allows there).
+ */
+export function Checkbox({
+  id,
+  label,
+  hint,
+  children,
+  className,
+  ...props
+}: Omit<ComponentPropsWithRef<"input">, "type"> & {
+  id: string;
+  label: ReactNode;
+  hint?: ReactNode;
+  children?: ReactNode;
+}) {
+  const hintId = hint ? `${id}-hint` : undefined;
+  return (
+    <div className={cx("flex flex-col gap-1", className)}>
+      <label
+        htmlFor={id}
+        className="inline-flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-neutral-900"
+      >
+        <input
+          id={id}
+          type="checkbox"
+          aria-describedby={hintId}
+          className="size-5 shrink-0 accent-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+          {...props}
+        />
+        {label}
+      </label>
+      {hint ? (
+        <p id={hintId} className="ml-8 text-sm text-neutral-600">
+          {hint}
+        </p>
+      ) : null}
+      {children ? <div className="ml-8">{children}</div> : null}
+    </div>
+  );
+}

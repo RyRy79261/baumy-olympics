@@ -21,10 +21,10 @@ export interface GatedAction {
 const OK: GateResult = { ok: true };
 
 /** The MCP scope a token needs for each kind of action (SPEC §6.3). */
-export const MCP_SCOPE: Record<ActionKind, string> = {
+export const MCP_SCOPE = {
   read: "baumy:read",
   write: "baumy:write",
-};
+} as const satisfies Record<ActionKind, string>;
 
 const NOT_A_MEMBER = fail(
   "FORBIDDEN",

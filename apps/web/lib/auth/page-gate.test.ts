@@ -114,4 +114,18 @@ describe("the page wrappers", () => {
     await expect(requireAdminPage()).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(requireJoiningPage()).rejects.toThrow("NEXT_REDIRECT /");
   });
+
+  it("sends a visitor who is not signed in back to returnTo after sign-in", async () => {
+    getActor.mockResolvedValue(null);
+    await expect(
+      requireMemberPage({ returnTo: "/oauth/consent?client_id=a&state=b" }),
+    ).rejects.toThrow(
+      "NEXT_REDIRECT /auth/sign-in?callbackURL=%2Foauth%2Fconsent%3Fclient_id%3Da%26state%3Db",
+    );
+    // An account with no member row still goes to /join: no code for it.
+    getActor.mockResolvedValue(account);
+    await expect(
+      requireMemberPage({ returnTo: "/oauth/consent" }),
+    ).rejects.toThrow("NEXT_REDIRECT /join");
+  });
 });
