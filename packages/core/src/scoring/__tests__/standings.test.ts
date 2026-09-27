@@ -203,6 +203,18 @@ describe("seasonStandings", () => {
     expect(r.winnerMemberId).toBeNull();
   });
 
+  it("no winner when the sole leader's total is not positive", () => {
+    const r = standings({
+      memberIds: [RYAN, PARTNER],
+      adjustments: [adjustment(PARTNER, -5, jan(3))],
+    });
+    expect(r.standings.map((s) => [s.memberId, s.rank, s.points])).toEqual([
+      [RYAN, 1, 0],
+      [PARTNER, 2, -5],
+    ]);
+    expect(r.winnerMemberId).toBeNull();
+  });
+
   it("no winner when the top two tie on every tie-break", () => {
     const r = standings({
       completions: [
