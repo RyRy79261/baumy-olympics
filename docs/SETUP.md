@@ -262,9 +262,9 @@ without it.
       `/admin/chores`, log it with a photo on `/chores`, and open
       `/inbox`: the claim shows the photo. Opening that photo's
       `/api/blob?pathname=…` link in a private window must answer 401.
-- Photos are not pruned yet: the daily job deletes them 90 days after a
-  claim finalizes once issue #18 lands. A file whose action was refused is
-  deleted at once by the upload route.
+- The daily job (issue #18) deletes a photo 90 days after its claim
+  settled; without a Blob store it leaves them alone. A file whose action
+  was refused is deleted at once by the upload route.
 
 ## Scoreboard and pot (issue #16)
 
@@ -283,8 +283,8 @@ is being logged) and end to end on a phone and a desktop.
 - [ ] **Look and feel is deferred to issue #7.** The table, the dimmed
       points, the streak flame and the big numbers are neutral placeholders
       in `packages/ui/src/scores.tsx`.
-- Closing the season and writing the winner arrive with the daily job
-  (issue #18); the kiosk's leaderboard widget with the hub (issue #20).
+- The daily job (issue #18) closes the season and writes the winner; the
+  kiosk's leaderboard widget arrives with the hub (issue #20).
 
 ## Weights (issue #17)
 
@@ -293,14 +293,46 @@ unit and property tested, the weekly compute and the apply on PGlite and
 Docker Postgres (two computes at once, a veto racing the apply, two applies
 at once), and the schedule-then-veto flow end to end.
 
-- [ ] **Nothing is suggested until the daily job exists (issue #18).**
-      `computeSuggestions` and `applyDueSuggestions` (`packages/db/src/weights.ts`)
-      are written but nothing calls them on a deployment yet; `/admin/weights`
-      already shows each chore's live measurement. In e2e, the test-only
-      `POST /api/test/weights` runs them (404 outside `E2E_TEST_MODE=1`).
+- [ ] **Suggestions appear on Mondays (Berlin)**, once the daily job runs
+      (issue #18, below): it calls `computeSuggestions` and
+      `applyDueSuggestions`. In e2e, the test-only `POST /api/test/weights`
+      runs them on any day (404 outside `E2E_TEST_MODE=1`).
 - [ ] **Decide the weight changes together.** A change one admin schedules
       shows on `/inbox` ("Point changes coming") for everyone else to veto
       until it applies, at the first Monday 00:00 Berlin at least 48h away
       and at least 28 days after the chore's last change.
 - [ ] **Look and feel is deferred to issue #7.** The sparkline is a neutral
       placeholder in `packages/ui/src/sparkline.tsx`.
+
+## Daily job (issue #18)
+
+`GET /api/cron/daily` runs at 02:00 UTC (`apps/web/vercel.json`) and does
+what the reads already derive from the clock: it persists finalized, expired
+and timed-out claims, closes last season and writes its winner, computes and
+applies weight suggestions on Berlin Mondays, and deletes proof photos 90
+days after their claim settled. Nothing depends on it having run: hub and
+kiosk page loads run the same sweep at most every 15 minutes. It is tested
+on PGlite and Docker Postgres (overlapping runs), so CI needs no secret.
+
+- [ ] **Set `CRON_SECRET`** on the Vercel project (Production; Preview only
+      if you want previews to run it), a random string of at least 16
+      characters, e.g. `openssl rand -hex 32`. Vercel sends it as
+      `Authorization: Bearer …` to the cron. Without it the route answers 503
+      and does nothing (the page-load sweep still runs).
+- [ ] **Add `CRON_SECRET` to `.env.example`** (agents cannot edit `.env*`
+      files). It is already in turbo `globalEnv`:
+
+  ```sh
+  # Shared secret for GET /api/cron/daily (Vercel sends it as a Bearer token).
+  # Without it the daily cron answers 503; the page-load sweep still runs.
+  CRON_SECRET=
+  ```
+
+- [ ] **After the deploy, check it:** Vercel → Project → Settings → Cron Jobs
+      lists `/api/cron/daily`; "Run" it once and the log shows each step
+      (`settle`, `seasons`, `weights`, `photos`) with `ok: true`. Hobby runs
+      it once a day, sometime within the 02:00 UTC hour.
+- [ ] **Decide the December pot** ([UNRESOLVED] in SPEC §4.5): money for
+      last season can be recorded until the job closes it, about 2 January.
+- A season with a disputed claim that has a photo stays `closing` until an
+  admin rules on it on `/inbox`; then the next run writes the winner.

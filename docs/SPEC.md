@@ -217,6 +217,8 @@ cooldown = clamp(0.5·I, 60min, 7d)
   - Members tied on all three share a rank. There is no winner (`winnerMemberId = null`) when nobody has a positive total or the top two are tied on all three; the owner decides that case by hand.
   - Asking for `heaviest_streak` or `longest_streak` returns `PRIZE_MODE_NOT_SUPPORTED`.
 - At Dec 31 24:00 Berlin the season becomes `closing`. It becomes `closed` once every challenge window has passed (up to 72h). The winner is written at that point.
+  - Closing in detail (added 2026-09-27, issue #18; `seasonStatusAt` in `packages/core/src/scoring/lifecycle.ts`): a season is `closed` once `now ≥ ends_at + maxBackdateH` (nothing can be logged into it any more) **and** none of its completions is still `pending` or `disputed` by `effectiveStatus(now)`. A disputed claim with an in-time photo keeps the season `closing` until someone rules on it. The status is derived when read (`seasonStatusNow` in `packages/db/src/seasons.ts`): `get_standings` shows it and `adjust_points` approve refuses `SEASON_CLOSED` by it, whether or not the daily job has written it. An approval holds its season `FOR SHARE`, so the job never writes a winner that misses it. The job writes `closed`, `winner_member_id` (from `seasonStandings`, the same ranking as `get_standings`; null on a tie) and `finalized_at`; a stored prize mode v1 does not play stays `closing` for the owner.
+  - [UNRESOLVED 2026-09-27] `add_pot_contribution` still checks the stored status, so December's money can be recorded until the job closes last season (about 2 January). Say whether the pot should stay open longer than the standings.
 - Monthly pot contributions are logged in `pot_contributions`.
 
 ### 4.6 Worked examples (these become test fixtures)
@@ -533,7 +535,7 @@ export interface ActionDef<I extends z.ZodType, O> {
   - `/api/blob` answers 404 for an unsafe or off-list pathname before asking who is there, 401 for no member session and no paired kiosk (a kiosk with nobody picked may look), and 404 unless the pathname is exactly the one stored on that completion of the household. The stored name is `completions/{id}/{16 hex}.{webp|jpg|png}`.
   - Blob sits behind `lib/photos/blob-store.ts` (`ok`/`not_configured`/`unavailable`); under `E2E_TEST_MODE=1` an in-memory store stands in.
 - Pixel sprites are **static files** in `apps/web/public/sprites/`, not stored in Blob.
-- The daily cron deletes photos 90 days after a completion is finalized.
+- The daily cron deletes photos 90 days after a completion is finalized. [CORRECTION 2026-09-27] issue #18: 90 days after its verification ended (`photoPruneAt`: the latest of the challenge window's end, a confirmation, a partner-mode expiry and the last dispute ruling), so a claim still open keeps its photo. The file is deleted first, then `photo_pathname` is cleared; `photo_attached_at` stays.
 
 ### 6.6 baumy-brain integration (ADR 0003)
 
@@ -553,6 +555,12 @@ export interface ActionDef<I extends z.ZodType, O> {
   - prunes photos.
 - Every job is idempotent and safe against double claims (`FOR UPDATE SKIP LOCKED`).
 - Correctness never depends on the cron (statuses are derived when read, section 4.3). Hub page loads also run the same sweep lazily, behind a rate-limit row, using camp-404's `apps/web/lib/background-work.ts` pattern.
+- **Details** (added 2026-09-27, issue #18): the sweep is `runSweep(now)` in `apps/web/lib/background-work.ts`, with its steps in `packages/db/src/sweep.ts`, each in a transaction of its own so one failing does not stop the others:
+  1. `settleDueCompletions`: under the chore's lock (`FOR UPDATE SKIP LOCKED`), each due row is written with `settle` as a compare-and-set on its stored status; a timed-out dispute is closed as `expired` at the moment its window ended. Nothing is re-scored, since the counted set does not change.
+  2. `closeDueSeasons` (section 4.5), claiming seasons with `FOR UPDATE SKIP LOCKED`.
+  3. On Berlin Mondays (`isBerlinMonday(now)`, so a run at Sun 23:30 UTC is a Monday run): `computeSuggestions`, then `applyDueSuggestions`.
+  4. Photos (section 6.5): `listPhotosToPrune`, delete each file through the Blob adapter outside any transaction, then `clearPrunedPhoto` (`FOR UPDATE SKIP LOCKED`, compare-and-set on the pathname). With no Blob store the step leaves every row alone.
+- `GET /api/cron/daily` answers 503 and runs nothing while `CRON_SECRET` is unset, 401 unless `Authorization` is exactly `Bearer $CRON_SECRET` (compared in constant time), and otherwise the report of each step (500 if a step failed). The hub layout and the kiosk shell call `runSweepAfterResponse()`: in `after()`, at most once a minute per server and once per 15 minutes across servers (`action_rate_limit` key `background:daily-sweep`). The page-load trigger is off under `E2E_TEST_MODE=1`.
 
 ### 6.8 Env vars
 
