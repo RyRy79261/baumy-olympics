@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { createHttpDb, isLocalProxy } from "../index";
-import { consumeRateLimit } from "../rate-limit";
+import { RATE_LIMIT_ROW_HORIZON_MS, consumeRateLimit } from "../rate-limit";
 import * as schema from "../schema";
 
 // consumeRateLimit against real Postgres with real concurrency: under
@@ -67,5 +67,31 @@ describe("consumeRateLimit under concurrent calls", () => {
     );
     expect(verdicts.every((v) => v !== null)).toBe(true);
     expect(verdicts.filter((v) => v?.ok)).toHaveLength(3);
+  });
+
+  it("does not deadlock when racing calls each find the others' rows stale", async () => {
+    // Each call upserts its own week-old row (locking it) and sweeps the
+    // others' week-old rows. Without SKIP LOCKED in the sweep they wait on
+    // each other, Postgres fails one as a deadlock, and it returns null.
+    for (let round = 0; round < 5; round++) {
+      const stale = Array.from({ length: 10 }, freshKey);
+      await createHttpDb()
+        .insert(schema.actionRateLimit)
+        .values(
+          stale.map((key) => ({
+            key,
+            count: 1,
+            windowStart: Date.now() - RATE_LIMIT_ROW_HORIZON_MS - 60_000,
+          })),
+        );
+      const verdicts = await Promise.all(
+        stale.map((key) =>
+          consumeRateLimit({ key, limit: 5, windowMs: WINDOW }),
+        ),
+      );
+      expect(verdicts).toHaveLength(stale.length);
+      expect(verdicts.filter((v) => v === null)).toHaveLength(0);
+      expect(verdicts.every((v) => v?.ok)).toBe(true);
+    }
   });
 });
