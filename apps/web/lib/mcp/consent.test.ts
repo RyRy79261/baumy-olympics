@@ -28,7 +28,7 @@ describe("consentLines", () => {
       input: z.strictObject({}),
       execute: async () => ({ ok: true as const, data: null }),
     };
-    const registry: Record<string, AnyActionDef> = {
+    const registry = {
       a: defineAction({
         ...base,
         name: "a",
@@ -66,6 +66,9 @@ describe("consentLines", () => {
         surfaces: ["mcp"],
       }),
     };
-    expect(consentLines(registry)).toEqual({ read: ["Same"], write: ["Do"] });
+    expect(consentLines(registry as Record<string, AnyActionDef>)).toEqual({
+      read: ["Same"],
+      write: ["Do"],
+    });
   });
 });
