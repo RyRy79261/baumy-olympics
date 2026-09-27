@@ -326,7 +326,7 @@ packages/{eslint-config,typescript-config}
 - **Sign-in methods:** email and password, with Google as an optional social provider.
 - **Session:** `session.expiresIn = 30d`, `updateAge = 1d`, cookie cache 300s. The session is longer than camp-404's because this is a household app. Sessions run in the app's own process against our own Neon tables.
 - **Hardening:** fail closed when `BETTER_AUTH_SECRET` is missing (`authMayServe`); `changeEmail` is off; trusted origins are absolute.
-- **Mobile-friendly tokens:** the Better Auth `bearer()` plugin is on from day one, so a future Capacitor or native shell can send `Authorization: Bearer`. This avoids the Neon Auth problem on Android. `lib/auth.ts#getActor()` accepts a cookie session, a bearer token, or a kiosk-device cookie, and returns one `Actor`.
+- **Mobile-friendly tokens:** the Better Auth `bearer()` plugin is on from day one, so a future Capacitor or native shell can send `Authorization: Bearer`. This avoids the Neon Auth problem on Android. `lib/auth.ts#getActor()` accepts a cookie session, a bearer token, or a kiosk-device cookie, and returns one `Actor`. The bearer plugin runs with `requireSignature: true`: the token is the signed cookie value from the `set-auth-token` header, so a raw `session.token` read from the database is not a credential (added 2026-09-27, issue #6).
 - **Membership:** sign-up is open, but having no `members` row means `/join` (redeem an invite code). `FOUNDER_EMAILS` bootstraps the first admin.
 - **Kiosk:**
   1. An admin creates a pairing code on their phone. It has 8 characters, lasts 10 minutes and can be used once.

@@ -1,0 +1,15 @@
+{
+  "extends": "@baumy/typescript-config/base.json",
+  "include": ["src/**/*.ts", "vitest.config.ts"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"],
+    // Consumed as source (`main`/`types` point at ./src/index.ts), so no .d.ts
+    // is ever emitted. Declaration emit is off because Better Auth's inferred
+    // types name modules through pnpm's store path, which a .d.ts cannot
+    // (TS2883). Copied from camp-404 `packages/auth/tsconfig.json`.
+    "declaration": false,
+    "declarationMap": false
+  }
+}
