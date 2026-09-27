@@ -18,6 +18,7 @@ export {
   type CalendarEventButtonProps,
 } from "./calendar";
 export { Card } from "./card";
+export { CheckItemButton, CheckList } from "./check-list";
 export {
   ChoiceGroup,
   ChoreTile,
