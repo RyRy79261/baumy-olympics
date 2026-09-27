@@ -1,0 +1,74 @@
+"use server";
+
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { kioskActionForm } from "@/lib/actions/kiosk";
+import type { ActionResult } from "@/lib/actions/result";
+import type { CheckKioskPinData } from "@/lib/actions/check-kiosk-pin";
+import { getKioskActor } from "@/lib/auth";
+import { now } from "@/lib/clock";
+import {
+  KIOSK_COOKIE,
+  KIOSK_COOKIE_MAX_AGE_S,
+  KIOSK_MEMBER_COOKIE,
+  KIOSK_MEMBER_MAX_AGE_S,
+  kioskCookieOptions,
+} from "@/lib/kiosk/cookies";
+import { pairKioskDevice } from "@/lib/kiosk/pairing";
+import { pickKioskMember } from "@/lib/kiosk/selection";
+import { getClientIp } from "@/lib/rate-limit";
+
+// The kiosk's server actions (SPEC §8). Pairing and picking who is acting
+// are the kiosk's own sign-in state, kept in its cookies; everything the
+// household can DO from the kiosk goes through runAction (kioskActionForm).
+
+/** /kiosk/pair: trade the admin's code for the device cookie. */
+export async function pairKioskAction(
+  _prev: ActionResult<null> | null,
+  form: FormData,
+): Promise<ActionResult<null>> {
+  const result = await pairKioskDevice({
+    code: form.get("code"),
+    ip: getClientIp(await headers()),
+    now: now(),
+  });
+  if (!result.ok) return result;
+  const jar = await cookies();
+  jar.set(
+    KIOSK_COOKIE,
+    result.token,
+    kioskCookieOptions(KIOSK_COOKIE_MAX_AGE_S),
+  );
+  jar.delete(KIOSK_MEMBER_COOKIE);
+  redirect("/kiosk");
+}
+
+/** An avatar was tapped: that member is acting now. */
+export async function pickMemberAction(form: FormData): Promise<void> {
+  const picked = await pickKioskMember(
+    await getKioskActor(),
+    form.get("memberId"),
+  );
+  if (!picked.ok) {
+    if (picked.code === "UNAUTHENTICATED") redirect("/kiosk/pair");
+    return;
+  }
+  (await cookies()).set(
+    KIOSK_MEMBER_COOKIE,
+    picked.data.memberId,
+    kioskCookieOptions(KIOSK_MEMBER_MAX_AGE_S),
+  );
+}
+
+/** "Done", or 60 seconds idle: nobody is acting. */
+export async function clearPickAction(): Promise<void> {
+  (await cookies()).delete(KIOSK_MEMBER_COOKIE);
+}
+
+/** "Check my PIN": the attested request, with the PIN in the form. */
+export async function checkPinAction(
+  _prev: ActionResult<CheckKioskPinData> | null,
+  form: FormData,
+): Promise<ActionResult<CheckKioskPinData>> {
+  return kioskActionForm("check_kiosk_pin", form);
+}
