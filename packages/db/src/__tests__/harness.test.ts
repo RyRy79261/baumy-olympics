@@ -55,6 +55,7 @@ describe("useTestDb", () => {
       "invite_codes",
       "kiosk_devices",
       "members",
+      "notes",
       "point_adjustments",
       "pot_contributions",
       "rate_limit",
