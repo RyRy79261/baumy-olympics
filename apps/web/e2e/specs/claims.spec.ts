@@ -8,8 +8,9 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 // through /api/blob), the partner withdraws the dispute, and once the SERVER
 // clock is past the finalize time the claim shows as finalized.
 //
-// It moves the shared server clock, so it runs serially in desktop-chromium
-// only (playwright.config.ts), and puts the clock back afterwards.
+// It moves the shared server clock, so it runs in the server-clock project,
+// one test at a time (playwright.config.ts), and puts the clock back
+// afterwards.
 
 test.describe.configure({ mode: "serial" });
 

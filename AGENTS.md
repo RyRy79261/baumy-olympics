@@ -57,7 +57,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 - E2E runs against Docker Postgres, never against production. External services are faked when `E2E_TEST_MODE=1`, and the app refuses to boot with that flag set on Vercel.
   - Specs live in `apps/web/e2e/specs/`; the config (`apps/web/playwright.config.ts`) refuses any non-localhost `E2E_BASE_URL`.
   - First run: `pnpm --filter @baumy/web e2e:install` for Chromium.
-  - To move server time, use `advanceClock(page, ms)` from `apps/web/e2e/lib/clock.ts`; `page.clock` only moves the browser. The offset is shared by the whole server, so such specs run serially in `desktop-chromium` only (add them to `SHARED_CLOCK_SPECS` in `playwright.config.ts`).
+  - To move server time, use `advanceClock(page, ms)` from `apps/web/e2e/lib/clock.ts`; `page.clock` only moves the browser. The offset is shared by the whole server, so such specs run one at a time in their own `server-clock` project (add them to `SHARED_CLOCK_SPECS` in `playwright.config.ts`; its founder is `founder-server-clock@example.com` in `scripts/e2e-local.sh`).
 
 ## Database rules
 
