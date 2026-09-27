@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      // `next typegen` (typecheck) and `next build` both write .next/types.
+      // Run in parallel they race, and typegen fails with ENOENT on
+      // .next/types/link.d.ts. Build after typecheck instead.
+      "dependsOn": ["^build", "typecheck"]
+    }
+  }
+}
