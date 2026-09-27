@@ -69,12 +69,34 @@
       <button type="button" id="retry">Try again</button>
     </main>
     <script>
-      document
-        .getElementById("retry")
-        .addEventListener("click", () => location.reload());
-      window.addEventListener("online", () => location.reload());
+      // "online" means the iPad has a network, not that Baumy answers: the
+      // reload it triggers can still fail (the service worker sees the network
+      // a moment after the page does, or the router is up before the
+      // internet) and land back here, and "online" does not fire twice. So
+      // while the iPad says it is online, this page tries again by itself,
+      // waiting 1s, 2s, 4s ... up to a minute, counted across its own reloads.
+      const KEY = "baumy-offline-retries";
+      let saved = null;
+      try {
+        saved = JSON.parse(sessionStorage.getItem(KEY) || "null");
+      } catch {}
+      // A count older than two minutes belongs to an earlier outage.
+      const tries =
+        saved && Date.now() - saved.at < 120000 ? Number(saved.tries) || 0 : 0;
+      function retry() {
+        sessionStorage.setItem(
+          KEY,
+          JSON.stringify({ tries: tries + 1, at: Date.now() }),
+        );
+        location.reload();
+      }
+      document.getElementById("retry").addEventListener("click", retry);
+      window.addEventListener("online", retry);
+      if (navigator.onLine) {
+        setTimeout(retry, Math.min(60000, 1000 * 2 ** tries));
+      }
       setInterval(() => {
-        if (navigator.onLine) location.reload();
+        if (navigator.onLine) retry();
       }, 60000);
     </script>
   </body>
