@@ -12,3 +12,12 @@ export {
   type MemberRole,
   type ServiceActor,
 } from "./actor";
+export {
+  pageGate,
+  requireAdminPage,
+  requireJoiningPage,
+  requireMemberPage,
+  type PageMember,
+  type PageNeed,
+  type PageVerdict,
+} from "./page-gate";

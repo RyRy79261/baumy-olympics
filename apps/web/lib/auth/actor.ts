@@ -46,6 +46,8 @@ export interface MemberActor {
    */
   memberId?: string;
   role?: MemberRole;
+  /** The member's display name, with `memberId`. */
+  displayName?: string;
 }
 
 /** A paired kiosk device; `memberId` is the avatar tapped on it, if any. */
@@ -98,7 +100,13 @@ export const getActor = cache(async (): Promise<Actor | null> => {
     name: session.user.name,
     emailVerified: session.user.emailVerified,
     sessionCreatedAt: new Date(session.session.createdAt).toISOString(),
-    ...(member ? { memberId: member.id, role: member.role } : {}),
+    ...(member
+      ? {
+          memberId: member.id,
+          role: member.role,
+          displayName: member.displayName,
+        }
+      : {}),
   };
 });
 

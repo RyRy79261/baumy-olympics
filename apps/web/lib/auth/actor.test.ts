@@ -82,6 +82,7 @@ describe("getActor", () => {
       sessionCreatedAt: "2026-09-27T09:55:00.000Z",
       memberId: "m_1",
       role: "admin",
+      displayName: "Ryan",
     });
     expect(findMember).toHaveBeenCalledWith("u_1");
   });
