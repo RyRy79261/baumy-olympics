@@ -1,0 +1,89 @@
+# Kitchen iPad setup
+
+How to turn the iPad into the always-on kitchen screen (SPEC §8, issue #29).
+Pairing itself is in [SETUP.md](SETUP.md#kiosk-issue-10).
+
+## 1. Install it to the home screen
+
+1. Pair the iPad first: open `https://<production host>/kiosk/pair` in
+   Safari and type the code from `/admin/members`.
+2. On `/kiosk`, tap Share → **Add to Home Screen**. Keep the name "Baumy".
+3. Open Baumy from the home screen. It opens full screen, with no Safari
+   bars (`display: standalone` in `app/manifest.ts`, and `appleWebApp`
+   in the root layout).
+
+The manifest says `orientation: landscape`, but iPadOS ignores that for
+home-screen apps. Hold the iPad in landscape and lock the rotation
+(Control Centre → Rotation Lock), or let Guided Access hold it (below).
+
+## 2. Keep it awake
+
+The kiosk asks for the Screen Wake Lock every time it opens, every time it
+comes back into view and on any touch while it does not hold it. iPadOS
+supports it from 16.4 in Safari and in home-screen apps. While the lock is
+not held, a tag in the bottom-left corner says:
+
+- **Screen may sleep**: the browser refused or dropped the lock (Low Power
+  Mode, the page was hidden). Touch the screen and it asks again.
+- **Screen cannot stay on**: this browser has no wake lock at all (iPadOS
+  before 16.4). Update iPadOS, or rely on Auto-Lock below.
+
+The wake lock is best effort, so set the fallback as well:
+
+1. Settings → Display & Brightness → **Auto-Lock → Never**.
+2. Settings → Battery → Low Power Mode **off** (it overrides the wake lock
+   and Auto-Lock).
+3. Keep the iPad on its charger.
+
+## 3. Lock it to the app (Guided Access)
+
+Guided Access keeps the iPad in Baumy: no swiping home, no notifications.
+
+1. Settings → Accessibility → **Guided Access → On**.
+2. Passcode Settings → Set Guided Access Passcode (keep it somewhere the
+   household can find it). Turn Face ID/Touch ID on if you like.
+3. Settings → Accessibility → Guided Access → **Display Auto-Lock → Never**.
+   Guided Access has its own auto-lock, and it wins over the one in Display
+   & Brightness.
+4. Open Baumy from the home screen, triple-click the top (or home) button,
+   and tap **Start**. Under Options, turn **Motion** off to hold landscape.
+5. To leave it: triple-click, type the passcode, End.
+
+## 4. What the screen does on its own
+
+- **Idle reset.** After 60 seconds untouched it forgets who tapped their
+  avatar and goes back to the kitchen home, from any kiosk page, and closes
+  any open sheet or PIN pad. The last 10 seconds show a countdown; any
+  touch cancels it.
+- **Night mode.** From 23:00 to 06:30 Berlin time it dims to a sleeping
+  Baumy and a big clock. A touch wakes it; after a minute untouched it goes
+  back to sleep; 06:30 wakes it for good. The hours are
+  `KIOSK_NIGHT_HOURS` (`"23:00-06:30"` by default, `"off"` to turn it off;
+  see SETUP.md). The screen does not dim the backlight itself: a web page
+  cannot. Lower the brightness in Control Centre if the night screen is too
+  bright.
+- **Offline.** If the server cannot be reached when a page loads, it shows
+  "No connection" instead of Safari's error page, and reloads itself as
+  soon as the connection is back (and every minute). Nothing is stored for
+  offline use.
+- **Freshness.** The kitchen home re-reads itself every 60 seconds and
+  when it comes back into view (issue #20).
+
+## 5. Checks before calling it done
+
+- [ ] Launched from the home screen, it is full screen in landscape.
+- [ ] **2-hour soak test:** leave it on the kitchen home, untouched, for two
+      hours in the day. The screen stays on, the corner tag never appears,
+      and the clock is still ticking. Note the iPadOS version and the result
+      in the PR or issue #29.
+- [ ] Tap an avatar, open Chores, walk away: after 50 seconds the countdown
+      shows, after 60 the screen is home and says "Tap your avatar".
+- [ ] After 23:00 (or with `KIOSK_NIGHT_HOURS` set to the next few minutes
+      on a preview): the night screen shows, a tap wakes it, a minute
+      later it sleeps again, and in the morning it is awake.
+- [ ] Turn Wi-Fi off and reload: "No connection". Turn it on: the kiosk is
+      back by itself.
+- [ ] Lighthouse (Chrome DevTools → Lighthouse, device Desktop, on
+      `/kiosk` of a paired Chrome): no accessibility errors. Lighthouse 12
+      dropped its PWA category; check installability in DevTools →
+      Application → Manifest instead (no errors or warnings).

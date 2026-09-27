@@ -689,16 +689,20 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
 - **Route:** `/kiosk`, a landscape layout with no page scrolling on the hub.
 - **Touch targets:** at least **56px** (with 64px for primary actions), no interaction that depends on hover, and `touch-action: manipulation`.
 - **PWA:** a manifest with `display: standalone` and `orientation: landscape`, plus apple-touch icons. A service worker is **not** planned for v1 (it is an online-only kiosk), except for an offline fallback page.
+  - Built (added 2026-09-27, issue #29): `app/manifest.ts` (`start_url: /kiosk`), placeholder pixel icons from `components/app-icon.tsx` (`/icon/192`, `/icon/512`, `/icon/maskable`, `/apple-icon`), and `public/sw.js`, registered by the kiosk shell, whose only job is `public/offline.html` when a page load fails. iPadOS ignores `orientation`; Guided Access holds it (`docs/kiosk-setup.md`).
 - **Always on:**
   - The Screen Wake Lock API (`navigator.wakeLock`), re-acquired on `visibilitychange`, as a best effort.
   - The documented fallback is iPad Auto-Lock set to Never, plus Guided Access.
+  - Built (added 2026-09-27, issue #29): `lib/kiosk/wake-lock.ts`, asked for on open, on `visibilitychange` and on a touch while not held; a corner tag ("Screen may sleep", "Screen cannot stay on") shows whenever it is not held. The setup is `docs/kiosk-setup.md`.
 - **Night mode:** from 23:00 to 06:30, the screen dims to a sleeping Baumy and a clock, and wakes on touch.
+  - Built (added 2026-09-27, issue #29): `components/kiosk/night-mode.tsx`, with the schedule in `lib/kiosk/night.ts` (Berlin wall time, so the nights the clocks change are an hour longer or shorter). The window is `KIOSK_NIGHT_HOURS` (`"23:00-06:30"` by default, `"off"`); under `E2E_TEST_MODE=1` it is off unless the browser's `baumy_e2e_night` cookie sets one, so parallel kiosk specs never meet it. A tap wakes the screen (on click, so the tap never reaches the page); a minute untouched puts it back to sleep; the end of the window wakes it. It follows the server's clock, like the hub clock, and sends `sleep`/`wake` to Baumy's mood. The shell carries `data-skin="day"|"night"` for issue #7's skins.
 - **Freshness:**
   - The page calls `router.refresh()` every 60s and on focus (bypassing the 30s shopping cache).
   - Every mutation calls `revalidatePath`.
   - There are no websockets in v1.
   - Built (added 2026-09-27, issue #20): `components/hub/auto-refresh.tsx` on the kiosk home, which skips a refresh while a dialog is open or a field has focus.
 - **Idle:** after 60 seconds idle, the screen returns home and clears the selected actor. This stops the next person acting as the previous one.
+  - Made robust (added 2026-09-27, issue #29): `components/kiosk/use-idle.ts` measures from the last touch with a one-second tick and checks again when the page becomes visible (Safari pauses timers while the screen is off), so a late timer cannot let the next person act as the last. It also runs with nobody picked on any kiosk page but home, closes open dialogs, goes home even if clearing the pick failed, tries again a minute later, and shows a countdown for the last 10 seconds.
 
 ## 9. Security
 

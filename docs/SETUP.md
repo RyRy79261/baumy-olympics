@@ -206,6 +206,8 @@ Postgres (concurrent claims and guesses) and end to end in `ipad-landscape`.
 - [ ] **Keep the iPad awake** until issue #29 adds the wake lock: Settings →
       Display & Brightness → Auto-Lock → Never, and Guided Access if you want
       it locked to the app.
+      [CORRECTION 2026-09-27] issue #29 added the wake lock; the full setup
+      is [kiosk-setup.md](kiosk-setup.md) (see "Kitchen iPad" below).
 - If the iPad is lost, revoke it on `/admin/members` ("Revoke"); it is sent
   back to `/kiosk/pair` on its next request.
 
@@ -625,3 +627,33 @@ tokens against Docker Postgres.
 - To rotate the token, run `service-token rotate baumy-brain` (the old one
   stops at once), then update brain's env.
 - To cut brain off, run `service-token revoke baumy-brain`.
+
+## Kitchen iPad as an appliance (issue #29)
+
+The manifest, icons, wake lock, idle reset, night mode and offline page need
+no account and no secret. One optional env var; the rest is on the iPad
+itself, in [kiosk-setup.md](kiosk-setup.md).
+
+- [ ] **Add the night-mode line to `.env.example`** (agents cannot edit
+      `.env*` files; it is already in turbo `globalEnv`):
+
+      ```sh
+      # Kiosk night mode (issue #29): Berlin wall time "HH:MM-HH:MM", or "off".
+      # Unset = 23:00-06:30. A value that does not parse falls back to it.
+      KIOSK_NIGHT_HOURS=
+      ```
+
+- [ ] **Only if you want other hours**, set `KIOSK_NIGHT_HOURS` in Vercel
+      (Production), for example `22:30-07:00`, and redeploy. Under
+      `E2E_TEST_MODE=1` night mode is off unless a spec's browser carries the
+      `baumy_e2e_night` cookie.
+- [ ] **Set up the iPad** as [kiosk-setup.md](kiosk-setup.md) says: add
+      `/kiosk` to the home screen, Auto-Lock Never, Low Power Mode off,
+      Guided Access with its own Display Auto-Lock set to Never.
+- [ ] **Run the checks** at the end of kiosk-setup.md on the real iPad,
+      including the **2-hour soak test**, and note the result on issue #29
+      (the PR could not: no iPad in CI).
+- [ ] **Approve the pixel art.** The app icon (`components/app-icon.tsx`),
+      the night screen's sleeping Baumy and every sprite are placeholders:
+      the final sheets, AI-generated from `design/baumy-reference.png` and
+      cleaned up by hand, need your approval before they ship (issue #7).
