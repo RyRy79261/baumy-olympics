@@ -17,6 +17,7 @@
     "./kiosk-pin": "./src/kiosk-pin.ts",
     "./seasons": "./src/seasons.ts",
     "./completions": "./src/completions.ts",
+    "./chores": "./src/chores.ts",
     "./test-harness": "./src/__tests__/_harness.ts",
     "./game-fixtures": "./src/__tests__/_game-fixtures.ts"
   },
@@ -29,7 +30,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:local": "vitest run --config vitest.local.config.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@baumy/core": "workspace:*",

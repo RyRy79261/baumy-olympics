@@ -1,20 +1,28 @@
+import { starterChore } from "../chores";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import { choreRuleVersions, chores, members } from "../schema";
 
 // Arrangements for the game tests (PGlite and Docker Postgres, db and web).
 
-const HOUR_MIN = 60;
+/** Name, base and cooldown of a SPEC §4.7 starter chore, as seeded. */
+function starter(name: string) {
+  const c = starterChore(name);
+  return {
+    name: c.name,
+    basePoints: c.basePoints,
+    cooldownMinutes: c.cooldownMinutes,
+  };
+}
 
-/** SPEC §4.7 seed values, which the E-examples in §4.6 are written against. */
+/**
+ * SPEC §4.7 seed values, which the E-examples in §4.6 are written against,
+ * read from the seed itself (`STARTER_CHORES`), not copied.
+ */
 export const SEED_CHORES = {
-  trash: { name: "Trash", basePoints: 20, cooldownMinutes: 48 * HOUR_MIN },
-  dishes: { name: "Dishes", basePoints: 10, cooldownMinutes: 12 * HOUR_MIN },
-  bathroom: {
-    name: "Bathroom",
-    basePoints: 26,
-    cooldownMinutes: 84 * HOUR_MIN,
-  },
+  trash: starter("Trash"),
+  dishes: starter("Dishes"),
+  bathroom: starter("Bathroom"),
 } as const;
 
 /** Long before any test's clock, so the version is in effect throughout. */
