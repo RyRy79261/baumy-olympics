@@ -50,3 +50,21 @@ export {
   PrizeMode,
   potMonthDate,
 } from "./scores";
+export {
+  CalendarDate,
+  CalendarEventId,
+  CalendarEventUpdate,
+  CalendarTime,
+  EVENT_DESCRIPTION_MAX,
+  EVENT_LOCATION_MAX,
+  EVENT_MAX_DAYS,
+  EVENT_TITLE_MAX,
+  EventKind,
+  EventRange,
+  LIST_EVENTS_MAX_DAYS,
+  NewCalendarEvent,
+  checkEventFields,
+  daysBetween,
+  eventFieldsShape,
+  isCalendarDate,
+} from "./calendar";
