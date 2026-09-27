@@ -17,6 +17,8 @@
     "e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
+    "@baumy/auth": "workspace:*",
+    "better-auth": "1.6.25",
     "next": "^16.3.6",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
