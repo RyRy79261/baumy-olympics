@@ -35,6 +35,12 @@ export const ACTION_NAMES = [
   "concede_completion",
   "resolve_dispute",
   "attach_completion_photo",
+  "get_standings",
+  "get_streaks",
+  "get_pot",
+  "adjust_points",
+  "add_pot_contribution",
+  "set_prize_mode",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 

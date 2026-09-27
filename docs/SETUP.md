@@ -265,3 +265,23 @@ without it.
 - Photos are not pruned yet: the daily job deletes them 90 days after a
   claim finalizes once issue #18 lands. A file whose action was refused is
   deleted at once by the upload route.
+
+## Scoreboard and pot (issue #16)
+
+Nothing here needs an account, a secret or a new env var: the actions are
+tested on PGlite and Docker Postgres (setting the prize mode while a chore
+is being logged) and end to end on a phone and a desktop.
+
+- [ ] **Promote a second admin** on `/admin/members` if you want to use
+      point adjustments: an adjustment counts only once an admin other than
+      the one who proposed it approves it on `/scores`.
+- [ ] **Check the prize mode** on `/scores`: v1 plays only "Points: winner
+      takes the whole pot". This season's mode is fixed at its first
+      completion; next year's can be set any time.
+- [ ] **Record the pot** on `/pot` each month (admins only). It is a
+      ledger: the money moves at the bank.
+- [ ] **Look and feel is deferred to issue #7.** The table, the dimmed
+      points, the streak flame and the big numbers are neutral placeholders
+      in `packages/ui/src/scores.tsx`.
+- Closing the season and writing the winner arrive with the daily job
+  (issue #18); the kiosk's leaderboard widget with the hub (issue #20).

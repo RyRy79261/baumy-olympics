@@ -32,6 +32,8 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
   const items: NavItem[] = [
     { href: "/", label: "Hub" },
     { href: "/chores", label: "Chores" },
+    { href: "/scores", label: "Scores" },
+    { href: "/pot", label: "Pot" },
     {
       href: "/inbox",
       label: waiting > 0 ? `Needs your OK (${waiting})` : "Needs your OK",

@@ -7,3 +7,4 @@ export * from "./scoring/replay";
 export * from "./scoring/validate";
 export * from "./scoring/verification";
 export * from "./scoring/standings";
+export * from "./scoring/streaks";

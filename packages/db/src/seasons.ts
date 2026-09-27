@@ -4,8 +4,9 @@ import type { Queryable } from "./index";
 import { seasons } from "./schema";
 
 // Seasons (SPEC §4.1, §4.5): one per Berlin calendar year, created lazily the
-// first time something needs it (a completion, the scoreboard), never ahead of
-// time by a cron. Every function takes the caller's handle.
+// first time a write needs it (a completion, an adjustment, a pot contribution
+// or a prize mode), never ahead of time by a cron; the scoreboard reads a
+// missing season as empty. Every function takes the caller's handle.
 
 export type SeasonRow = typeof seasons.$inferSelect;
 
