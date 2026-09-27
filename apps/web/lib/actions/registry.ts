@@ -2,12 +2,15 @@ import "server-only";
 
 import type { ActionResult } from "./result";
 import type { ActionDef, ActionName, AnyActionDef, RequestCtx } from "./define";
+import { checkKioskPin } from "./check-kiosk-pin";
 import { createTelegramLinkCode } from "./create-telegram-link-code";
 import { joinAsFounder } from "./join-as-founder";
 import { manageMembers } from "./manage-members";
 import { mintInvite } from "./mint-invite";
+import { pairKiosk } from "./pair-kiosk";
 import { redeemInvite } from "./redeem-invite";
 import { revokeInvite } from "./revoke-invite";
+import { revokeKiosk } from "./revoke-kiosk";
 import { createRunner } from "./run";
 import { setKioskPin } from "./set-kiosk-pin";
 import { updateMyProfile } from "./update-my-profile";
@@ -26,6 +29,9 @@ export const REGISTRY = {
   manage_members: manageMembers,
   set_kiosk_pin: setKioskPin,
   create_telegram_link_code: createTelegramLinkCode,
+  pair_kiosk: pairKiosk,
+  revoke_kiosk: revokeKiosk,
+  check_kiosk_pin: checkKioskPin,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =
