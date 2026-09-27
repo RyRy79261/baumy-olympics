@@ -13,6 +13,8 @@
     "./members": "./src/members.ts",
     "./invite-codes": "./src/invite-codes.ts",
     "./telegram-link-codes": "./src/telegram-link-codes.ts",
+    "./kiosk-devices": "./src/kiosk-devices.ts",
+    "./kiosk-pin": "./src/kiosk-pin.ts",
     "./test-harness": "./src/__tests__/_harness.ts"
   },
   "scripts": {

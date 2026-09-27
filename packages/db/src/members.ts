@@ -227,3 +227,67 @@ export async function setKioskPinHash(
     .returning({ id: members.id });
   return rows.length > 0;
 }
+
+export interface KioskMember {
+  id: string;
+  displayName: string;
+  avatarSprite: string;
+  color: string;
+}
+
+/** The active members, in the order they joined: the kiosk's avatar bar. */
+export async function listActiveMembers(
+  db: Queryable,
+  householdId: string,
+): Promise<KioskMember[]> {
+  return db
+    .select({
+      id: members.id,
+      displayName: members.displayName,
+      avatarSprite: members.avatarSprite,
+      color: members.color,
+    })
+    .from(members)
+    .where(
+      and(eq(members.householdId, householdId), isNull(members.deactivatedAt)),
+    )
+    .orderBy(asc(members.createdAt), asc(members.id));
+}
+
+/** One active member of the household, or null. */
+export async function findActiveMember(
+  db: Queryable,
+  householdId: string,
+  memberId: string,
+): Promise<KioskMember | null> {
+  const [row] = await db
+    .select({
+      id: members.id,
+      displayName: members.displayName,
+      avatarSprite: members.avatarSprite,
+      color: members.color,
+    })
+    .from(members)
+    .where(
+      and(
+        eq(members.id, memberId),
+        eq(members.householdId, householdId),
+        isNull(members.deactivatedAt),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** When the member's kiosk PIN was locked by failed attempts, or null. */
+export async function findKioskPinLockedAt(
+  db: Queryable,
+  memberId: string,
+): Promise<Date | null> {
+  const [row] = await db
+    .select({ lockedAt: members.kioskPinLockedAt })
+    .from(members)
+    .where(eq(members.id, memberId))
+    .limit(1);
+  return row?.lockedAt ?? null;
+}
