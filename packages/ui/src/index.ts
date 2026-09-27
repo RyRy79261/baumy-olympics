@@ -55,4 +55,10 @@ export { ProofPhoto } from "./proof-photo";
 export { Points, Stat, StreakFlame, Table, Td, Th } from "./scores";
 export { PIN_MAX_LENGTH, PIN_MIN_LENGTH, PinPad } from "./pin-pad";
 export { Sparkline, type SparklineProps } from "./sparkline";
-export { Sprite, type SpriteState } from "./sprite";
+export {
+  BAUMY_STATES,
+  SPRITE_MOTION,
+  Sprite,
+  type SpriteState,
+} from "./sprite";
+export { LevelMeter, MicButton, type MicState } from "./voice";

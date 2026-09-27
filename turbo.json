@@ -29,6 +29,7 @@
     "CRON_SECRET",
     "ANTHROPIC_API_KEY",
     "AI_DAILY_COMMANDS_PER_MEMBER",
+    "GROQ_API_KEY",
     "E2E_*"
   ],
   "tasks": {

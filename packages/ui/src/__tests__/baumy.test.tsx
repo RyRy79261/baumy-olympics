@@ -6,11 +6,11 @@ const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 
 describe("SpeechBubble", () => {
   it("is a polite live region beside Baumy in the given state", () => {
-    const out = html(<SpeechBubble state="think">Hmm…</SpeechBubble>);
+    const out = html(<SpeechBubble state="thinking">Hmm…</SpeechBubble>);
     expect(out).toContain('role="status"');
     expect(out).toContain('aria-live="polite"');
-    expect(out).toContain('data-state="think"');
-    expect(out).toContain('aria-label="Baumy (think)"');
+    expect(out).toContain('data-state="thinking"');
+    expect(out).toContain('aria-label="Baumy (thinking)"');
     expect(out).toContain("Hmm…");
   });
 

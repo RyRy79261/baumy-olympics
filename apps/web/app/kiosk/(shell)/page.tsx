@@ -6,6 +6,7 @@ import { HubDashboard } from "@/components/hub/hub-dashboard";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { getKioskActor } from "@/lib/auth";
 import { loadHub } from "@/lib/hub/load";
+import { voiceConfigured } from "@/lib/integrations/groq";
 
 // The kitchen screen's home (SPEC §3.1, §8, issue #20): the hub's widgets on
 // one landscape screen that never scrolls at 1180×820, read as the paired
@@ -35,6 +36,7 @@ export default async function KioskHomePage() {
       />
       <HubDashboard
         hub={hub}
+        voice={voiceConfigured()}
         kiosk
         actingName={kiosk.displayName}
         links={{

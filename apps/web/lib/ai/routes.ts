@@ -107,7 +107,7 @@ const SurfaceField = z.enum(["ui", "kiosk"]).optional();
  * nobody signed in, 403 without a member (a kiosk where nobody has tapped
  * their avatar).
  */
-async function aiCtx(
+export async function aiCtx(
   deps: Pick<AiRouteDeps, "requestCtx">,
   surface: Surface,
   requestId?: string,

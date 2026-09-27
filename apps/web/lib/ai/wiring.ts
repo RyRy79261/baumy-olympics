@@ -3,6 +3,7 @@ import "server-only";
 import { CLAUDE_MODELS, COMMAND_TIER } from "@baumy/ai-prompts";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { listChoreNames } from "@baumy/db/chores";
+import { recordAiAudio } from "@baumy/db/ai-usage";
 import { listActiveMembers } from "@baumy/db/members";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { actionKind, proposeAction, runAction } from "@/lib/actions/registry";
@@ -10,12 +11,15 @@ import { toolSpecs } from "@/lib/actions/tool-specs";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { now } from "@/lib/clock";
 import { claudeClient } from "@/lib/integrations/claude";
+import { transcriber } from "@/lib/integrations/groq";
+import { rateLimiter } from "@/lib/rate-limit";
 import type {
   AiRouteDeps,
   CommandRouteDeps,
   ProposalRouteDeps,
   RunRouteDeps,
 } from "./routes";
+import type { TranscribeRouteDeps } from "./transcribe";
 import { claimCommand, dailyCommandLimit, recordCommandTokens } from "./usage";
 
 // The real dependencies of the AI routes (lib/ai/routes.ts), in one place so
@@ -68,5 +72,24 @@ export function runRouteDeps(): RunRouteDeps {
   return {
     requestCtx,
     runAction: (name, input, ctx) => runAction(name, input, ctx),
+  };
+}
+
+export function transcribeRouteDeps(): TranscribeRouteDeps {
+  return {
+    requestCtx,
+    loadHousehold,
+    logError,
+    transcriber: () => transcriber(),
+    rateLimiter,
+    recordAudio: async (ctx, model, audioSeconds) => {
+      await recordAiAudio(createHttpDb() as unknown as Queryable, {
+        householdId: ctx.householdId,
+        memberId: ctx.actor.memberId!,
+        model,
+        audioSeconds,
+        now: ctx.now,
+      });
+    },
   };
 }
