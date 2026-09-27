@@ -12,6 +12,7 @@ import {
   bigserial,
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -20,6 +21,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -40,6 +42,57 @@ export const actionRequestStatus = pgEnum("action_request_status", [
   "pending",
   "done",
   "failed",
+]);
+
+// The game enums mirror the unions in packages/core/src/scoring (ruleset.ts,
+// validate.ts, verification.ts, standings.ts); a test in packages/db compares
+// them.
+
+export const proofMode = pgEnum("proof_mode", ["none", "optional", "required"]);
+
+export const confirmMode = pgEnum("confirm_mode", ["optimistic", "partner"]);
+
+export const ruleSource = pgEnum("rule_source", [
+  "seed",
+  "manual",
+  "suggestion",
+]);
+
+/** v1 implements `points` only (SPEC §4.5); the others are kept for later. */
+export const prizeMode = pgEnum("prize_mode", [
+  "points",
+  "heaviest_streak",
+  "longest_streak",
+]);
+
+export const seasonStatus = pgEnum("season_status", [
+  "active",
+  "closing",
+  "closed",
+]);
+
+export const completionStatus = pgEnum("completion_status", [
+  "pending",
+  "confirmed",
+  "finalized",
+  "disputed",
+  "voided",
+]);
+
+export const voidReason = pgEnum("void_reason", [
+  "unconfirmed",
+  "conceded",
+  "disputed",
+  "undone",
+]);
+
+export const disputeResolution = pgEnum("dispute_resolution", [
+  "withdrawn",
+  "conceded",
+  "undone",
+  "upheld",
+  "overruled",
+  "expired",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -319,6 +372,332 @@ export const kioskDevices = pgTable(
     check(
       "kiosk_devices_paired_has_token",
       sql`(${t.pairedAt} IS NULL) = (${t.tokenHash} IS NULL)`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Game (SPEC §4, §5)
+// ---------------------------------------------------------------------------
+//
+// `completion_scores` is output, never input: `rescoreChore` (completions.ts)
+// rebuilds a (chore, season) from the completions and rule versions on every
+// write to that chore, so the table can be dropped and rebuilt identically.
+
+/** A household chore. Its weight lives in `chore_rule_versions`. */
+export const chores = pgTable(
+  "chores",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    name: text("name").notNull(),
+    sprite: text("sprite").notNull(),
+    proofMode: proofMode("proof_mode").notNull().default("none"),
+    confirmMode: confirmMode("confirm_mode").notNull().default("optimistic"),
+    effortFactorPct: integer("effort_factor_pct").notNull().default(100),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("chores_household_id_idx").on(t.householdId),
+    check(
+      "chores_effort_factor_pct_range",
+      sql`${t.effortFactorPct} BETWEEN 50 AND 300`,
+    ),
+  ],
+);
+
+/**
+ * A chore's weight from `effective_from` on. Changes insert a new row and are
+ * never retroactive (SPEC §4.4): a completion is scored by the version in
+ * effect when it happened (`ruleVersionAt` in packages/core).
+ *
+ * `suggestion_id` names the `weight_suggestions` row a `suggestion` version
+ * came from. That table arrives with issue #17, which adds the foreign key.
+ * `created_by` is null for `seed` rows.
+ */
+export const choreRuleVersions = pgTable(
+  "chore_rule_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    choreId: uuid("chore_id")
+      .notNull()
+      .references(() => chores.id),
+    effectiveFrom: timestamp("effective_from", {
+      withTimezone: true,
+    }).notNull(),
+    basePoints: integer("base_points").notNull(),
+    cooldownMinutes: integer("cooldown_minutes").notNull(),
+    source: ruleSource("source").notNull(),
+    suggestionId: uuid("suggestion_id"),
+    createdBy: uuid("created_by").references(() => members.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("chore_rule_versions_chore_effective_from_uq").on(
+      t.choreId,
+      t.effectiveFrom,
+    ),
+    check(
+      "chore_rule_versions_base_points_range",
+      sql`${t.basePoints} BETWEEN 1 AND 200`,
+    ),
+    check(
+      "chore_rule_versions_cooldown_non_negative",
+      sql`${t.cooldownMinutes} >= 0`,
+    ),
+    check(
+      "chore_rule_versions_suggestion_source",
+      sql`(${t.suggestionId} IS NULL) OR (${t.source} = 'suggestion')`,
+    ),
+  ],
+);
+
+/**
+ * A calendar year in Berlin (SPEC §4.1), stored as UTC instants:
+ * `[starts_at, ends_at)`. Created lazily by `ensureSeason` (seasons.ts).
+ */
+export const seasons = pgTable(
+  "seasons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    year: integer("year").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    prizeMode: prizeMode("prize_mode").notNull().default("points"),
+    status: seasonStatus("status").notNull().default("active"),
+    winnerMemberId: uuid("winner_member_id").references(() => members.id),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("seasons_household_year_uq").on(t.householdId, t.year),
+    check("seasons_ends_after_start", sql`${t.endsAt} > ${t.startsAt}`),
+    // Only a closed season has a winner (and there may be none: a tie).
+    check(
+      "seasons_winner_only_when_closed",
+      sql`${t.winnerMemberId} IS NULL OR ${t.status} = 'closed'`,
+    ),
+  ],
+);
+
+/**
+ * One claim that a member did a chore (SPEC §4.3). Written only by
+ * `logCompletion`, and its status only by `setCompletionStatus`, both of
+ * which lock the chore row first.
+ *
+ * `client_request_id` is NOT NULL on purpose: a nullable column in a unique
+ * index lets any number of NULLs through (AGENTS.md "Postgres traps").
+ */
+export const completions = pgTable(
+  "completions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    choreId: uuid("chore_id")
+      .notNull()
+      .references(() => chores.id),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    doneBy: uuid("done_by")
+      .notNull()
+      .references(() => members.id),
+    loggedBy: uuid("logged_by")
+      .notNull()
+      .references(() => members.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    loggedAt: timestamp("logged_at", { withTimezone: true }).notNull(),
+    source: surface("source").notNull(),
+    status: completionStatus("status").notNull(),
+    verifiedBy: uuid("verified_by").references(() => members.id),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    finalizesAt: timestamp("finalizes_at", { withTimezone: true }),
+    photoPathname: text("photo_pathname"),
+    photoAttachedAt: timestamp("photo_attached_at", { withTimezone: true }),
+    note: text("note"),
+    voidReason: voidReason("void_reason"),
+    clientRequestId: text("client_request_id").notNull(),
+  },
+  (t) => [
+    uniqueIndex("completions_household_client_request_uq").on(
+      t.householdId,
+      t.clientRequestId,
+    ),
+    index("completions_chore_season_occurred_idx").on(
+      t.choreId,
+      t.seasonId,
+      t.occurredAt,
+    ),
+    index("completions_season_idx").on(t.seasonId),
+    // A voided row says why, and only a voided row has a reason.
+    check(
+      "completions_void_reason_iff_voided",
+      sql`(${t.status} = 'voided') = (${t.voidReason} IS NOT NULL)`,
+    ),
+    check(
+      "completions_verified_pair",
+      sql`(${t.verifiedBy} IS NULL) = (${t.verifiedAt} IS NULL)`,
+    ),
+    check(
+      "completions_confirmed_is_verified",
+      sql`${t.status} <> 'confirmed' OR ${t.verifiedBy} IS NOT NULL`,
+    ),
+    // A photo keeps its attach time; the time outlives a pruned photo.
+    check(
+      "completions_photo_has_time",
+      sql`${t.photoPathname} IS NULL OR ${t.photoAttachedAt} IS NOT NULL`,
+    ),
+  ],
+);
+
+/**
+ * The replay's output for each counted completion (SPEC §4.2). Always
+ * rebuildable; never edit a row by hand, re-score the chore instead.
+ */
+export const completionScores = pgTable(
+  "completion_scores",
+  {
+    completionId: uuid("completion_id")
+      .primaryKey()
+      .references(() => completions.id, { onDelete: "cascade" }),
+    ruleVersionId: uuid("rule_version_id")
+      .notNull()
+      .references(() => choreRuleVersions.id),
+    rulesetVersion: integer("ruleset_version").notNull(),
+    streakLen: integer("streak_len").notNull(),
+    multiplierPct: integer("multiplier_pct").notNull(),
+    basePts: integer("base_pts").notNull(),
+    streakPts: integer("streak_pts").notNull(),
+    brokenMemberId: uuid("broken_member_id").references(() => members.id),
+    brokenLen: integer("broken_len"),
+    breakPts: integer("break_pts").notNull(),
+    totalPts: integer("total_pts").notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    check("completion_scores_streak_len_positive", sql`${t.streakLen} >= 1`),
+    check(
+      "completion_scores_total",
+      sql`${t.totalPts} = ${t.streakPts} + ${t.breakPts}`,
+    ),
+    check(
+      "completion_scores_broken_pair",
+      sql`(${t.brokenMemberId} IS NULL) = (${t.brokenLen} IS NULL)`,
+    ),
+  ],
+);
+
+/**
+ * A challenge to a completion (SPEC §4.3). At most one is open per
+ * completion (the partial unique index); an open one has no resolution.
+ */
+export const disputes = pgTable(
+  "disputes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    completionId: uuid("completion_id")
+      .notNull()
+      .references(() => completions.id),
+    raisedBy: uuid("raised_by")
+      .notNull()
+      .references(() => members.id),
+    reason: text("reason").notNull(),
+    resolution: disputeResolution("resolution"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("disputes_one_open_per_completion_uq")
+      .on(t.completionId)
+      .where(sql`${t.resolvedAt} IS NULL`),
+    index("disputes_completion_id_idx").on(t.completionId),
+    check("disputes_reason_not_blank", sql`btrim(${t.reason}) <> ''`),
+    check(
+      "disputes_resolution_pair",
+      sql`(${t.resolution} IS NULL) = (${t.resolvedAt} IS NULL)`,
+    ),
+  ],
+);
+
+/**
+ * A manual change to a member's season total (SPEC §4.5). It counts once
+ * approved, by someone other than its creator. May be negative, never zero.
+ */
+export const pointAdjustments = pgTable(
+  "point_adjustments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id),
+    points: integer("points").notNull(),
+    reason: text("reason").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => members.id),
+    approvedBy: uuid("approved_by").references(() => members.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("point_adjustments_season_id_idx").on(t.seasonId),
+    check("point_adjustments_points_nonzero", sql`${t.points} <> 0`),
+    check(
+      "point_adjustments_approver_not_creator",
+      sql`${t.approvedBy} <> ${t.createdBy}`,
+    ),
+    check(
+      "point_adjustments_approved_pair",
+      sql`(${t.approvedBy} IS NULL) = (${t.approvedAt} IS NULL)`,
+    ),
+  ],
+);
+
+/** Money into the year-end pot (SPEC §4.5). `month` is the 1st of a month. */
+export const potContributions = pgTable(
+  "pot_contributions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    month: date("month", { mode: "string" }).notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    contributedBy: uuid("contributed_by")
+      .notNull()
+      .references(() => members.id),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("pot_contributions_season_id_idx").on(t.seasonId),
+    check("pot_contributions_amount_positive", sql`${t.amountCents} > 0`),
+    check(
+      "pot_contributions_month_first_day",
+      sql`extract(day from ${t.month}) = 1`,
     ),
   ],
 );
