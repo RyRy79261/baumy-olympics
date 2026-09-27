@@ -51,6 +51,7 @@ export const households = pgTable("households", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   tz: text("tz").notNull().default("Europe/Berlin"),
+  motto: text("motto"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
