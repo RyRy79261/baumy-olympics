@@ -26,11 +26,15 @@ describe("MicButton", () => {
     );
   });
 
-  it("cannot be pressed while the microphone opens or the clip is sent", () => {
-    for (const state of ["starting", "sending"] as const) {
-      expect(html(<MicButton state={state} />)).toContain('disabled=""');
-    }
+  it("cannot be pressed while the clip is sent", () => {
+    expect(html(<MicButton state="sending" />)).toContain('disabled=""');
     expect(html(<MicButton state="idle" disabled />)).toContain('disabled=""');
+  });
+
+  it("stays pressable while the microphone opens, so a release is heard", () => {
+    const out = html(<MicButton state="starting" />);
+    expect(out).not.toContain('disabled=""');
+    expect(out).toContain('aria-busy="true"');
   });
 });
 

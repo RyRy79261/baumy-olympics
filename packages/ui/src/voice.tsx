@@ -38,8 +38,12 @@ export function MicButton({
     <button
       type={type}
       aria-pressed={recording}
+      aria-busy={state === "starting" || undefined}
       data-state={state}
-      disabled={state === "starting" || state === "sending" || disabled}
+      // Not disabled while the microphone opens: the finger lifting during
+      // the permission prompt must still reach the button (a disabled
+      // control gets no pointer events in some browsers).
+      disabled={state === "sending" || disabled}
       className={cx(
         "inline-flex shrink-0 touch-none items-center justify-center gap-2 rounded border px-4 font-medium select-none [-webkit-touch-callout:none]",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900",
