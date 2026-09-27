@@ -12,6 +12,7 @@ import type {
 import type { CheckKioskPinData } from "@/lib/actions/check-kiosk-pin";
 import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
+import type { DeleteNoteData, NoteWriteData } from "@/lib/actions/notes";
 import { getKioskActor } from "@/lib/auth";
 import { now } from "@/lib/clock";
 import {
@@ -80,13 +81,19 @@ export async function checkPinAction(
   return kioskActionForm("check_kiosk_pin", form);
 }
 
+/** The chores page, and the home whose widgets show the due chores. */
+function revalidateKioskChores(): void {
+  revalidatePath("/kiosk/chores");
+  revalidatePath("/kiosk");
+}
+
 /** Log a chore as the acting member; for someone else, with the PIN. */
 export async function kioskLogCompletionAction(
   _prev: ActionResult<LogCompletionData> | null,
   form: FormData,
 ): Promise<ActionResult<LogCompletionData>> {
   const result = await kioskActionForm("log_completion", form);
-  if (result.ok) revalidatePath("/kiosk");
+  if (result.ok) revalidateKioskChores();
   return result;
 }
 
@@ -102,7 +109,7 @@ async function claimEvent(
   form: FormData,
 ): Promise<ClaimResult> {
   const result = await kioskActionForm(name, form);
-  if (result.ok) revalidatePath("/kiosk");
+  if (result.ok) revalidateKioskChores();
   return result;
 }
 
@@ -169,5 +176,50 @@ export async function kioskDeleteEventAction(
 ): Promise<ActionResult<DeleteEventData>> {
   const result = await kioskActionForm("delete_event", form);
   if (result.ok) revalidatePath("/kiosk/calendar");
+  return result;
+}
+
+type NoteWriteResult = ActionResult<NoteWriteData>;
+
+/** The notes page, and the home whose widget shows the pinned ones. */
+function revalidateKioskNotes(): void {
+  revalidatePath("/kiosk/notes");
+  revalidatePath("/kiosk");
+}
+
+/** The kiosk's notes: each change needs the acting member's PIN. */
+export async function kioskCreateNoteAction(
+  _prev: NoteWriteResult | null,
+  form: FormData,
+): Promise<NoteWriteResult> {
+  const result = await kioskActionForm("create_note", form);
+  if (result.ok) revalidateKioskNotes();
+  return result;
+}
+
+export async function kioskUpdateNoteAction(
+  _prev: NoteWriteResult | null,
+  form: FormData,
+): Promise<NoteWriteResult> {
+  const result = await kioskActionForm("update_note", form);
+  if (result.ok) revalidateKioskNotes();
+  return result;
+}
+
+export async function kioskPinNoteAction(
+  _prev: NoteWriteResult | null,
+  form: FormData,
+): Promise<NoteWriteResult> {
+  const result = await kioskActionForm("pin_note", form);
+  if (result.ok) revalidateKioskNotes();
+  return result;
+}
+
+export async function kioskDeleteNoteAction(
+  _prev: ActionResult<DeleteNoteData> | null,
+  form: FormData,
+): Promise<ActionResult<DeleteNoteData>> {
+  const result = await kioskActionForm("delete_note", form);
+  if (result.ok) revalidateKioskNotes();
   return result;
 }
