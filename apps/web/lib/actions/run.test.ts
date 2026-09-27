@@ -471,6 +471,17 @@ describe("step 4: rate limits", () => {
     expect(actorKey({ kind: "service", tokenName: "baumy-brain" })).toBe(
       "service:baumy-brain",
     );
+    // A service acting for a Telegram user keys on that user, linked or not.
+    for (const memberId of [undefined, "m1"]) {
+      expect(
+        actorKey({
+          kind: "service",
+          tokenName: "baumy-brain",
+          telegramUserId: 42,
+          ...(memberId ? { memberId } : {}),
+        }),
+      ).toBe("service:baumy-brain:tg:42");
+    }
     expect(actorKey(sessionActor(undefined))).toBe("user:u_none");
     expect(actorKey({ kind: "mcp", memberId: "m1", scopes: [] })).toBe(
       "member:m1",
@@ -604,6 +615,37 @@ describe("steps 5 and 6: idempotency and audit", () => {
 
   it("a write needs a member behind the actor, whatever its gate", async () => {
     const svc = defineAction({
+      name: "test_member_write",
+      title: "Member write",
+      description: "Test.",
+      consent: "Test consent",
+      kind: "write",
+      risk: "safe",
+      surfaces: ["brain"],
+      requires: "member",
+      input: z.strictObject({}),
+      async execute() {
+        executed();
+        return { ok: true, data: null };
+      },
+    });
+    run = createRunner({ test_member_write: svc }, deps);
+    const res = await run(
+      "test_member_write",
+      {},
+      ctxFor(
+        { kind: "service", tokenName: "baumy-brain" },
+        { source: "brain" },
+      ),
+    );
+    expect(res).toMatchObject({ ok: false, code: "FORBIDDEN" });
+    expect(executed).not.toHaveBeenCalled();
+  });
+
+  it("a service write without a member keys on the member execute names, or fails", async () => {
+    const me = await seedMember(db());
+    let names: string | undefined = me;
+    const svc = defineAction({
       name: "test_service_write",
       title: "Service write",
       description: "Test.",
@@ -615,20 +657,33 @@ describe("steps 5 and 6: idempotency and audit", () => {
       input: z.strictObject({}),
       async execute() {
         executed();
-        return { ok: true, data: null };
+        return {
+          ok: true,
+          data: { linked: true },
+          ...(names ? { joinedAs: names } : {}),
+        };
       },
     });
     run = createRunner({ test_service_write: svc }, deps);
-    const res = await run(
-      "test_service_write",
-      {},
-      ctxFor(
-        { kind: "service", tokenName: "baumy-brain" },
-        { source: "brain" },
-      ),
+    const ctx = ctxFor(
+      { kind: "service", tokenName: "baumy-brain", telegramUserId: 7 },
+      { source: "brain" },
     );
-    expect(res).toMatchObject({ ok: false, code: "FORBIDDEN" });
-    expect(executed).not.toHaveBeenCalled();
+    await expect(run("test_service_write", {}, ctx)).resolves.toEqual({
+      ok: true,
+      data: { linked: true },
+    });
+    expect(await auditRows()).toMatchObject([
+      { actorMemberId: me, source: "brain" },
+    ]);
+
+    // One that names nobody is a bug: INTERNAL, and nothing is kept.
+    names = undefined;
+    await expect(
+      run("test_service_write", {}, ctxFor(ctx.actor, { source: "brain" })),
+    ).resolves.toMatchObject({ ok: false, code: "INTERNAL" });
+    expect(await auditRows()).toHaveLength(1);
+    expect(await requestRows()).toHaveLength(1);
   });
 });
 

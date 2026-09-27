@@ -21,6 +21,7 @@ export const ACTION_NAMES = [
   "manage_members",
   "set_kiosk_pin",
   "create_telegram_link_code",
+  "link_telegram",
   "authorize_mcp_client",
   "list_mcp_connections",
   "revoke_mcp_connection",
@@ -143,9 +144,10 @@ export type ExecuteResult<O> =
        */
       undo?: () => Promise<void>;
       /**
-       * `account` actions only: the member this request just created. An
-       * account has no member to key the ledger and the audit row on until
-       * the action makes one, so `runAction` keys both on this.
+       * `account` and `service` actions only: the member this request is
+       * for, when the actor had none (an account that just joined, or a
+       * Telegram user `link_telegram` just linked). `runAction` keys the
+       * ledger and the audit row on it.
        */
       joinedAs?: string;
       /**
