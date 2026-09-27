@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { listActiveMembers } from "@baumy/db/members";
-import { Card, FormMessage, PageHeading } from "@baumy/ui";
+import { Card, FormMessage, PageHeading, buttonClass } from "@baumy/ui";
 import { ClaimList } from "@/components/claims/claim-list";
 import { ChoreGrid } from "@/components/chores/chore-grid";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
@@ -60,6 +61,14 @@ export default async function KioskHomePage() {
           acting
             ? `Hi ${kiosk.displayName}. Tap a chore you just did. Anything that needs your PIN will ask for it.`
             : "Tap your avatar at the top to start."
+        }
+        actions={
+          <Link
+            href="/kiosk/calendar"
+            className={buttonClass("secondary", "kiosk")}
+          >
+            Calendar
+          </Link>
         }
       />
       {acting && listed ? (

@@ -12,6 +12,7 @@ import {
 } from "@baumy/db/sweep";
 import { applyDueSuggestions, computeSuggestions } from "@baumy/db/weights";
 import { now as clockNow } from "./clock";
+import { redactSecrets } from "./redact";
 import { blobStore, type BlobStore } from "./photos/blob-store";
 import { isTestMode } from "./test-mode";
 
@@ -75,25 +76,7 @@ export interface SweepReport {
 type Env = Record<string, string | undefined>;
 type Detail = Record<string, number | string>;
 
-/** The value of every env var that looks like a secret, longest first. */
-function secretValues(env: Env): string[] {
-  return Object.entries(env)
-    .filter(
-      ([k, v]) =>
-        v !== undefined &&
-        v.length >= 8 &&
-        /SECRET|TOKEN|KEY|PASSWORD|DATABASE_URL/.test(k),
-    )
-    .map(([, v]) => v as string)
-    .sort((a, b) => b.length - a.length);
-}
-
-/** `text` with every secret-looking env value replaced. */
-export function redactSecrets(text: string, env: Env = process.env): string {
-  let out = text;
-  for (const v of secretValues(env)) out = out.split(v).join("[redacted]");
-  return out;
-}
+export { redactSecrets };
 
 async function runStep(
   step: StepName,

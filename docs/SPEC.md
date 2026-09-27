@@ -497,6 +497,13 @@ export interface ActionDef<I extends z.ZodType, O> {
 - `veto_weight` `{suggestionId}` (`member`, UI only) vetoes a scheduled change before `applies_at` (`WINDOW_CLOSED`); the member who scheduled it gets `SELF_VETO`. A vetoed suggestion is never applied.
 - The pages are `/admin/weights` (current, raw and suggested points, the sample size and a sparkline of the gaps, and the week's suggestion to schedule or dismiss) and a "Point changes coming" list with Veto on `/inbox` for every member.
 
+**Calendar actions** (added 2026-09-27, issue #19):
+
+- `list_events` `{from?, to?}` (Berlin days, inclusive, both default to today, at most 62 days apart) returns each event with its id, title, notes, place, `allDay`, `start`/`end` (a day for all-day events, else an ISO instant), its first and last Berlin day and Berlin start and end time, a `when` line and `addedBy` (the member id in `baumyMember`). Private and confidential events are left out.
+- `create_event` `{title, description?, location?, kind: timed|all_day, date, endDate?, startTime?, endTime?}`: Berlin days and wall-clock times; a timed event needs both times and must end after it starts, `endDate` is the last day (inclusive, default `date`). The Google id is `sha256(member:source:requestId)` cut to 32 hex characters, so a retry of the same request names the same event and Google's 409 counts as done.
+- `update_event` `{eventId, …all the fields}` reads the event first (`NOT_FOUND` for a missing or private one), then PATCHes it; its `undo` writes the old fields back. `delete_event` `{eventId}` reads it too; its `undo` restores the event (a deleted Google event stays `cancelled` and can be confirmed again).
+- Codes: `NOT_CONFIGURED` (no credentials: the page says "Not connected yet"), `UNAVAILABLE` (Google failed or timed out), `NOT_FOUND`. The pages are `/calendar` and `/kiosk/calendar` (Day, Week and Month views, `?view=&date=`), with a create and edit sheet and a separate confirm dialog for delete.
+
 **Scoreboard actions** (added 2026-09-27, issue #16):
 
 - `get_standings` `{year?, recent?}` (read, every surface) ranks the season with `seasonStandings`: each active member (and anyone else who scored) with `points` (the season's `completion_scores` plus approved adjustments), `provisionalPts` (the part from claims still `pending` at `now` by `effectiveStatus`, shown dimmed), `gapToLeader`, verified and total completions. It also returns `leaderId` (the would-be winner, null on a tie or with no positive total), the season's prize mode, `prizeLocked` (the season has any completion) and next year's mode, dispute counts for the current Berlin month (raised by and against each member), the latest scored completions with base, streak bonus (`streak_pts − base_pts`) and break points, and the adjustments. A season with no row reads as active, `points` and empty; reads never create one. A stored mode other than `points` returns `PRIZE_MODE_NOT_SUPPORTED`.
@@ -518,7 +525,7 @@ export interface ActionDef<I extends z.ZodType, O> {
   - Timed events are sent as a local `dateTime` (`YYYY-MM-DDTHH:MM:00`) **without an offset**, plus `timeZone: "Europe/Berlin"`. Camp-404 hard-codes `+02:00`, which is wrong for half the year in Berlin because of daylight saving.
   - The actor is recorded in `extendedProperties.private.baumyMember`.
   - Writes use `PATCH` for updates.
-  - Private and confidential events are hidden on the kiosk.
+  - Private and confidential events are hidden on the kiosk. [CORRECTION 2026-09-27] issue #19: hidden everywhere (every surface and page), and they cannot be changed or deleted from the app, as in camp-404: the calendar and the kitchen screen are shared.
 - **Consistency:** calendar writes are `transactional: false` actions. As in camp-404 `packages/db/src/calendar-events.ts`, call Google with no transaction open, then write the audit row. If the audit write fails, the `undo` callback deletes the event again.
 - **Service account:** a new one for this house only, not camp-404's. Share the chosen calendar with it.
 - **Env:** `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_CLIENT_EMAIL`, `GOOGLE_CALENDAR_PRIVATE_KEY`.

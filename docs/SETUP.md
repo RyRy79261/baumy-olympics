@@ -336,3 +336,56 @@ on PGlite and Docker Postgres (overlapping runs), so CI needs no secret.
       last season can be recorded until the job closes it, about 2 January.
 - A season with a disputed claim that has a photo stays `closing` until an
   admin rules on it on `/inbox`; then the next run writes the winner.
+
+## Calendar (issue #19)
+
+`/calendar` (and `/kiosk/calendar`) shows the house's Google Calendar in
+Day, Week and Month views, and adds, edits and deletes events through the
+`list_events`, `create_event`, `update_event` and `delete_event` actions. The
+client is `apps/web/lib/integrations/google-calendar.ts` (no SDK: a
+hand-signed service-account JWT). Without the three settings below the page
+says "Not connected yet" instead of failing, and the actions answer
+`NOT_CONFIGURED`. CI and e2e need no account: they use the in-memory fake
+(`lib/integrations/calendar-memory.ts`) under `E2E_TEST_MODE=1`.
+
+- [ ] **Decide which Google Calendar is the house calendar** (still open,
+      SPEC §12, #30). A new calendar made for the house is simplest.
+- [ ] **Make a new service account for this house** (SPEC §12 decision 9:
+      not camp-404's). Google Cloud Console → a project for Baumy → APIs &
+      Services → enable the **Google Calendar API** → IAM & Admin → Service
+      accounts → Create (no roles needed) → Keys → Add key → JSON. Keep the
+      JSON file out of the repo.
+- [ ] **Share the calendar with the service account:** Google Calendar →
+      the calendar's Settings and sharing → Share with specific people → the
+      service account's `client_email` → **Make changes to events**. Copy the
+      calendar's ID from "Integrate calendar" on the same page.
+- [ ] **Set the three variables** on the Vercel project (Production and
+      Preview): `GOOGLE_CALENDAR_ID` (the calendar ID),
+      `GOOGLE_CALENDAR_CLIENT_EMAIL` (`client_email` from the JSON) and
+      `GOOGLE_CALENDAR_PRIVATE_KEY` (`private_key` from the JSON, pasted as
+      is: the `\n` escapes are turned back into newlines). They are already
+      in turbo `globalEnv`.
+- [ ] **Add them to `.env.example`** (agents cannot edit `.env*` files):
+
+  ```sh
+  # The house's Google Calendar (SPEC §6.4), shared with a service account
+  # made for this house ("Make changes to events"). Without all three the
+  # calendar page says "Not connected yet".
+  GOOGLE_CALENDAR_ID=
+  GOOGLE_CALENDAR_CLIENT_EMAIL=
+  # The JSON key's private_key, with its \n escapes, in double quotes.
+  GOOGLE_CALENDAR_PRIVATE_KEY=
+  ```
+
+- [ ] **After the deploy, check it:** add an event at 19:00 on `/calendar`
+      for a day in winter and one in summer; both must show at 19:00 in
+      Google Calendar (the app sends Berlin wall time with
+      `timeZone: Europe/Berlin`, never a fixed offset). A failure is logged
+      as `[calendar] <op> failed: HTTP <status>`; 403 or 404 means the
+      calendar is not shared with the service account, or the ID is wrong.
+- Private and confidential events are hidden everywhere and cannot be
+  changed from the app. Olympics keeps no copy of the events, only the
+  audit rows of its own changes.
+- [ ] **Look and feel is deferred to issue #7.** The grid, the day cells and
+      the event buttons are neutral placeholders in
+      `packages/ui/src/calendar.tsx`.

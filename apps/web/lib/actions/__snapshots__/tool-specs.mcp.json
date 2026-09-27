@@ -252,5 +252,147 @@
       "additionalProperties": false
     },
     "risk": "safe"
+  },
+  {
+    "name": "list_events",
+    "description": "Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM) and who added it (a member id). Private events are left out.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "The first day, YYYY-MM-DD in Europe/Berlin. Defaults to today.",
+          "type": "string"
+        },
+        "to": {
+          "description": "The last day (inclusive). Defaults to `from`. At most 62 days after it.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  },
+  {
+    "name": "create_event",
+    "description": "Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "description": "Notes for the event. Optional.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "location": {
+          "description": "Where. Optional.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "timed",
+            "all_day"
+          ],
+          "description": "`timed` needs startTime and endTime; `all_day` fills whole days."
+        },
+        "date": {
+          "type": "string",
+          "description": "The first day, YYYY-MM-DD, in Europe/Berlin."
+        },
+        "endDate": {
+          "description": "The last day (inclusive), YYYY-MM-DD. Defaults to `date`.",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "Timed events: the Berlin wall-clock start, HH:MM (24h).",
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "endTime": {
+          "description": "Timed events: the Berlin wall-clock end, HH:MM (24h), on endDate.",
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        }
+      },
+      "required": [
+        "title",
+        "kind",
+        "date"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
+  },
+  {
+    "name": "update_event",
+    "description": "Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{5,1024}$",
+          "description": "The event's id, from list_events."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "description": "Notes for the event. Optional.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "location": {
+          "description": "Where. Optional.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "timed",
+            "all_day"
+          ],
+          "description": "`timed` needs startTime and endTime; `all_day` fills whole days."
+        },
+        "date": {
+          "type": "string",
+          "description": "The first day, YYYY-MM-DD, in Europe/Berlin."
+        },
+        "endDate": {
+          "description": "The last day (inclusive), YYYY-MM-DD. Defaults to `date`.",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "Timed events: the Berlin wall-clock start, HH:MM (24h).",
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "endTime": {
+          "description": "Timed events: the Berlin wall-clock end, HH:MM (24h), on endDate.",
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        }
+      },
+      "required": [
+        "eventId",
+        "title",
+        "kind",
+        "date"
+      ],
+      "additionalProperties": false
+    },
+    "risk": "confirm"
   }
 ]
