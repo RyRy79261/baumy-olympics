@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { createHttpDb } from "@baumy/db";
 import { members } from "@baumy/db/schema";
-import { FormMessage, PageHeading } from "@baumy/ui";
+import { Card, FormMessage, PageHeading } from "@baumy/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
 
@@ -28,7 +29,7 @@ export default async function SettingsPage() {
     <>
       <PageHeading
         title="Settings"
-        description="Your kiosk PIN and your Telegram link."
+        description="Your kiosk PIN, your Telegram link and your connected apps."
       />
       <div className="flex max-w-xl flex-col gap-6">
         {row?.kioskPinLockedAt ? (
@@ -39,6 +40,14 @@ export default async function SettingsPage() {
         ) : null}
         <KioskPinForm hasPin={Boolean(row?.kioskPinHash)} />
         <TelegramLinkForm linked={row?.telegramUserId != null} />
+        <Card
+          title="Connected apps"
+          description="Apps such as Claude that can reach Baumy as you over MCP."
+        >
+          <Link href="/settings/connections" className="text-sm underline">
+            Manage connected apps
+          </Link>
+        </Card>
       </div>
     </>
   );
