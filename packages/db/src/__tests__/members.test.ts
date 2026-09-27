@@ -9,7 +9,7 @@ import {
   insertMember,
   listMembers,
   lockMember,
-  lockOtherActiveAdmins,
+  lockActiveAdmins,
   setKioskPinHash,
   updateMember,
 } from "../members";
@@ -103,7 +103,7 @@ describe("member writes and listings", () => {
     expect(list[0]).not.toHaveProperty("kioskPinHash");
   });
 
-  it("lockOtherActiveAdmins lists the other active admins only", async () => {
+  it("lockActiveAdmins lists the active admins only, in id order", async () => {
     const me = await seed("u_me");
     const other = await seed("u_other");
     await seed("u_old_admin", new Date("2026-01-01T00:00:00Z"));
@@ -112,9 +112,9 @@ describe("member writes and listings", () => {
     const ids = await t
       .db()
       .transaction((tx) =>
-        lockOtherActiveAdmins(tx as unknown as Queryable, HOUSEHOLD_ID, me.id),
+        lockActiveAdmins(tx as unknown as Queryable, HOUSEHOLD_ID),
       );
-    expect(ids).toEqual([other.id]);
+    expect(ids).toEqual([me.id, other.id].sort());
   });
 
   it("lockMember finds a household member, or null", async () => {

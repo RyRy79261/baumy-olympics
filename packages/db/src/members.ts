@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { createHttpDb, type Queryable } from "./index";
 import { members } from "./schema";
 
@@ -127,15 +127,15 @@ export async function listMembers(
 }
 
 /**
- * The OTHER active admins, row-locked (`FOR UPDATE`) until the transaction
- * ends. Demoting or deactivating an admin checks this first, so two admins
- * demoting each other at once cannot leave the household with none: the
- * second waits for the first's lock and then sees one admin fewer.
+ * Every active admin's id, row-locked (`FOR UPDATE`) in id order until the
+ * transaction ends. Demoting or deactivating a member takes these locks
+ * first, so two admins demoting each other at once cannot leave the
+ * household with none: the second waits for the first, then counts one admin
+ * fewer. Locking in one fixed order means the two cannot deadlock either.
  */
-export async function lockOtherActiveAdmins(
+export async function lockActiveAdmins(
   db: Queryable,
   householdId: string,
-  exceptMemberId: string,
 ): Promise<string[]> {
   const rows = await db
     .select({ id: members.id })
@@ -145,9 +145,9 @@ export async function lockOtherActiveAdmins(
         eq(members.householdId, householdId),
         eq(members.role, "admin"),
         isNull(members.deactivatedAt),
-        ne(members.id, exceptMemberId),
       ),
     )
+    .orderBy(asc(members.id))
     .for("update");
   return rows.map((r) => r.id);
 }
