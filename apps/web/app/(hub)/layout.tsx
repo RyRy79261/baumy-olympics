@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AppShell, buttonClass } from "@baumy/ui";
+import { createHttpDb, type Queryable } from "@baumy/db";
+import { findKioskPinLockedAt } from "@baumy/db/members";
+import { AppShell, FormMessage, buttonClass } from "@baumy/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { NavLinks, type NavItem } from "./nav-links";
 
@@ -12,6 +14,12 @@ export const dynamic = "force-dynamic";
 
 export default async function HubLayout({ children }: { children: ReactNode }) {
   const me = await requireMemberPage();
+  // SPEC §6.2: after 10 wrong PINs at the kiosk, the member hears about it
+  // on their own device, on every page, until they set a new PIN.
+  const pinLockedAt = await findKioskPinLockedAt(
+    createHttpDb() as unknown as Queryable,
+    me.memberId,
+  );
   const items: NavItem[] = [
     { href: "/", label: "Hub" },
     { href: "/settings", label: "Settings" },
@@ -34,6 +42,18 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
         </>
       }
     >
+      {pinLockedAt ? (
+        <div className="mb-6" data-testid="kiosk-pin-locked">
+          <FormMessage tone="error">
+            Your kiosk PIN was locked after 10 wrong tries at the kiosk. If that
+            was not you, tell your household.{" "}
+            <Link href="/settings" className="underline">
+              Set a new PIN
+            </Link>{" "}
+            to unlock it.
+          </FormMessage>
+        </div>
+      ) : null}
       {children}
     </AppShell>
   );
