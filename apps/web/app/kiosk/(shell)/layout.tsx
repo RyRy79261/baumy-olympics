@@ -7,6 +7,7 @@ import { listActiveMembers } from "@baumy/db/members";
 import { AvatarButton, Button, KioskShell } from "@baumy/ui";
 import { IdleReset } from "@/components/kiosk/idle-reset";
 import { getKioskActor } from "@/lib/auth";
+import { runSweepAfterResponse } from "@/lib/background-work";
 import { clearPickAction, pickMemberAction } from "../actions";
 
 // The kitchen kiosk's shell (SPEC §8): a landscape screen, signed in as a
@@ -25,6 +26,9 @@ export default async function KioskLayout({
 }) {
   const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
+  // The kitchen screen is the page loaded most: it runs the daily job's
+  // sweep too, at most every 15 minutes (lib/background-work.ts).
+  runSweepAfterResponse();
   const people = await listActiveMembers(
     createHttpDb() as unknown as Queryable,
     HOUSEHOLD_ID,

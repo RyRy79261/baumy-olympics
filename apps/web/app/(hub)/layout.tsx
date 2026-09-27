@@ -6,6 +6,7 @@ import { AppShell, FormMessage, buttonClass } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
+import { runSweepAfterResponse } from "@/lib/background-work";
 import { NavLinks, type NavItem } from "./nav-links";
 
 // The hub's shell (SPEC §7) around every page for household members. The
@@ -16,6 +17,9 @@ export const dynamic = "force-dynamic";
 
 export default async function HubLayout({ children }: { children: ReactNode }) {
   const me = await requireMemberPage();
+  // SPEC §6.7: the daily job's sweep, at most every 15 minutes, after this
+  // response (lib/background-work.ts). Nothing on the page waits on it.
+  runSweepAfterResponse();
   // SPEC §6.2: after 10 wrong PINs at the kiosk, the member hears about it
   // on their own device, on every page, until they set a new PIN.
   const pinLockedAt = await findKioskPinLockedAt(
