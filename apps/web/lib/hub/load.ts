@@ -4,6 +4,7 @@ import type { RequestCtx } from "@/lib/actions/define";
 import type { NoteView } from "@/lib/actions/notes";
 import { runAction } from "@/lib/actions/registry";
 import type { ActionResult } from "@/lib/actions/result";
+import type { ShoppingEntry } from "@/lib/integrations/brain";
 import { formatEuros, gapLabel } from "@/lib/scores/view";
 import {
   dueChores,
@@ -18,7 +19,7 @@ import {
 // Every widget is one or two actions through runAction, the same reads the
 // AI, MCP and brain get, run side by side. A read that fails, or throws,
 // becomes that widget's `unavailable` state and nothing else: the calendar
-// being down never takes the page with it.
+// or brain being down never takes the page with it.
 
 /** How many members the leaderboard lists. */
 export const HUB_STANDINGS = 5;
@@ -43,6 +44,11 @@ export interface HubData {
   /** The pot's total, "€80.50", or why it cannot be shown. */
   pot: { ok: true; total: string } | { ok: false; message: string };
   notes: WidgetState<NoteView[]>;
+  /**
+   * brain's shopping list. Ready even when empty: the widget's quick-add
+   * field is there either way.
+   */
+  shopping: WidgetState<ShoppingEntry[]>;
 }
 
 const DOWN = "This could not be loaded just now. It will try again.";
@@ -60,7 +66,7 @@ async function read<T>(
 }
 
 export async function loadHub(ctx: RequestCtx): Promise<HubData> {
-  const [events, chores, standings, pot, notes] = await Promise.all([
+  const [events, chores, standings, pot, notes, shopping] = await Promise.all([
     read(() => runAction("list_events", {}, ctx)),
     read(() => runAction("list_chores", {}, ctx)),
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
@@ -68,6 +74,7 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
     read(() =>
       runAction("list_notes", { pinnedOnly: true, limit: HUB_NOTES }, ctx),
     ),
+    read(() => runAction("list_shopping", {}, ctx)),
   ]);
   return {
     now: ctx.now.toISOString(),
@@ -101,5 +108,8 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
       (d) => d.notes,
       "Nothing is pinned. Pin a note on the Notes page.",
     ),
+    shopping: shopping.ok
+      ? { status: "ready", data: shopping.data.items }
+      : { status: "unavailable", message: shopping.message },
   };
 }

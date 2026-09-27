@@ -16,6 +16,15 @@ import {
   unconfiguredCalendar,
 } from "@/lib/integrations/calendar";
 import type { CalendarClient } from "@/lib/integrations/google-calendar";
+import {
+  setBrainClientForTests,
+  unconfiguredBrain,
+} from "@/lib/integrations/brain";
+import {
+  clearMemoryShopping,
+  memoryAdd,
+  memoryBrain,
+} from "@/lib/integrations/brain-memory";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import { HUB_NOTES, loadHub } from "./load";
 
@@ -61,6 +70,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   setCalendarClientForTests(null);
+  setBrainClientForTests(null);
+  clearMemoryShopping();
   vi.restoreAllMocks();
 });
 
@@ -105,6 +116,42 @@ describe("loadHub", () => {
     expect(hub.notes).toMatchObject({
       status: "ready",
       data: [{ id: pinned.ok && pinned.data.note.id, title: "Wifi" }],
+    });
+  });
+
+  it("shows brain's shopping list, empty or not", async () => {
+    setBrainClientForTests(memoryBrain());
+    expect((await loadHub(ctxFor(sessionActor(ryan)))).shopping).toEqual({
+      status: "ready",
+      data: [],
+    });
+    memoryAdd(["milk", "eggs"]);
+    const hub = await loadHub(ctxFor(kioskActor(), { source: "kiosk" }));
+    expect(
+      hub.shopping.status === "ready" && hub.shopping.data.map((i) => i.item),
+    ).toEqual(["milk", "eggs"]);
+  });
+
+  it("says the shopping list is unavailable when brain is down, and shows everything else", async () => {
+    await seedChore(db(), SEED_CHORES.trash);
+    setBrainClientForTests({
+      ...unconfiguredBrain,
+      listShopping: async () => ({ ok: false, reason: "unavailable" }),
+    });
+    const hub = await loadHub(ctxFor(kioskActor(), { source: "kiosk" }));
+    expect(hub.shopping).toEqual({
+      status: "unavailable",
+      message: expect.stringContaining("The shopping list is unavailable"),
+    });
+    expect(hub.events.status).toBe("ready");
+    expect(hub.chores.status).toBe("ready");
+    expect(hub.standings.status).toBe("ready");
+    expect(hub.pot.ok).toBe(true);
+    // Not set up at all: it says so instead.
+    setBrainClientForTests(null);
+    expect((await loadHub(ctxFor(sessionActor(ryan)))).shopping).toMatchObject({
+      status: "unavailable",
+      message: expect.stringContaining("not connected yet"),
     });
   });
 
