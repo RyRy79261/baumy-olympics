@@ -1,0 +1,154 @@
+import { expect, test, type Page } from "@playwright/test";
+import { addChore, openChore } from "../lib/chores";
+import { advanceClock, resetClock } from "../lib/clock";
+import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
+
+// Issue #15, SPEC §4.6 E9 on the phone: the founder self-claims a chore, the
+// partner disputes it with a reason, the founder attaches a photo (shown only
+// through /api/blob), the partner withdraws the dispute, and once the SERVER
+// clock is past the finalize time the claim shows as finalized.
+//
+// It moves the shared server clock, so it runs serially in desktop-chromium
+// only (playwright.config.ts), and puts the clock back afterwards.
+
+test.describe.configure({ mode: "serial" });
+
+const HOUR = 60 * 60 * 1000;
+// A 1×1 PNG: the browser decodes it and re-encodes it before the upload.
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+test.afterEach(async ({ page }) => {
+  await resetClock(page);
+});
+
+function claim(page: Page, chore: string) {
+  return page.getByTestId(`claim-${chore}`);
+}
+
+function toast(page: Page, text: string) {
+  return page.getByRole("status").filter({ hasText: text });
+}
+
+test("E9: dispute, photo, withdraw, then finalize", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const chore = `Tub ${suffix}`;
+  const founder = `Founder ${project}`;
+  const partnerName = `Partner ${suffix}`;
+
+  await founderAdmin(page, project);
+  const invite = await mintCode(page, 1);
+  const partner = await newAccount(browser, `claims-${project}`);
+  await redeem(partner.page, invite, partnerName);
+  await expect(partner.page).toHaveURL(/\/$/);
+  await addChore(page, { name: chore, basePoints: 26, cooldownHours: 84 });
+
+  // The founder self-claims it.
+  await page.goto("/chores");
+  const sheet = await openChore(page, chore);
+  await sheet.getByRole("button", { name: "Log it" }).click();
+  await expect(page.getByTestId("score-pop")).toHaveText("+26");
+
+  // It waits on the partner, who disputes it with a reason.
+  const p = partner.page;
+  await p.goto("/inbox");
+  await expect(
+    p.getByRole("link", { name: /^Needs your OK \(\d+\)$/ }),
+  ).toBeVisible();
+  let card = p.getByTestId("needs-you").getByTestId(`claim-${chore}`);
+  await expect(card).toContainText(`${founder} did ${chore}`);
+  await expect(card).toContainText("+26, final at");
+  await expect(card.getByRole("button", { name: "Confirm" })).toBeVisible();
+  await card.getByRole("button", { name: "Dispute" }).click();
+  const send = card.getByRole("button", { name: "Send dispute" });
+  await expect(send).toBeDisabled();
+  await card.getByLabel("Why was it not done?").fill("The tub is still grey");
+  await send.click();
+  await expect(toast(p, `Disputed ${chore}.`)).toBeVisible();
+  await expect(claim(p, chore)).toHaveAttribute("data-status", "disputed");
+
+  // The founder sees the dispute and attaches a photo.
+  await page.goto("/inbox");
+  card = page.getByTestId("needs-you").getByTestId(`claim-${chore}`);
+  await expect(card).toContainText(
+    `Disputed by ${partnerName}: "The tub is still grey".`,
+  );
+  await expect(card).toContainText("Without a photo it is voided at");
+  await expect(card.getByRole("button", { name: "Concede" })).toBeVisible();
+  await card.getByLabel("Add a photo").setInputFiles({
+    name: "tub.png",
+    mimeType: "image/png",
+    buffer: PNG,
+  });
+  await card.getByRole("button", { name: "Upload photo" }).click();
+  await expect(toast(page, `Photo added to ${chore}.`)).toBeVisible();
+  const photo = claim(page, chore).getByRole("img", {
+    name: `Proof photo for ${chore}`,
+  });
+  await expect(photo).toBeVisible();
+  // Only ever the proxy, never a raw Blob URL, and it really loads.
+  await expect(photo).toHaveAttribute(
+    "src",
+    /^\/api\/blob\?pathname=completions%2F[0-9a-f-]{36}%2F[0-9a-f]{16}\.webp$/,
+  );
+  // Lazy-loaded: it loads once it is on screen.
+  await photo.scrollIntoViewIfNeeded();
+  await expect
+    .poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(claim(page, chore)).toContainText("It has a photo");
+
+  // The partner withdraws the dispute: pending again.
+  await p.goto("/inbox");
+  card = p.getByTestId("needs-you").getByTestId(`claim-${chore}`);
+  await expect(
+    card.getByRole("img", { name: `Proof photo for ${chore}` }),
+  ).toBeVisible();
+  await card.getByRole("button", { name: "Withdraw dispute" }).click();
+  await expect(toast(p, `Dispute on ${chore} withdrawn.`)).toBeVisible();
+  await expect(claim(p, chore)).toHaveAttribute("data-status", "pending");
+
+  // Past the finalize time (logged + 24h), it has settled as finalized.
+  await page.goto("/inbox");
+  await expect(
+    page.getByTestId("your-claims").getByTestId(`claim-${chore}`),
+  ).toBeVisible();
+  await advanceClock(page, 25 * HOUR);
+  await page.goto("/inbox");
+  await expect(claim(page, chore)).toHaveCount(0);
+  await expect(page.getByTestId(`settled-${chore}`)).toHaveText(
+    `${chore}: finalized, +26`,
+  );
+  await resetClock(page);
+
+  await partner.context.close();
+});
+
+test("the photo proxy refuses strangers and unsafe paths", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+  const get = (pathname: string) =>
+    context.request.get(`/api/blob?pathname=${encodeURIComponent(pathname)}`);
+  const stranger = await get(`completions/${id}/a1b2c3d4e5f60718.webp`);
+  expect(stranger.status()).toBe(401);
+  for (const bad of [
+    `completions/${id}/../x.webp`,
+    `completions/${id}/a1b2c3d4e5f60718%2ewebp`,
+  ]) {
+    expect((await get(bad)).status(), bad).toBe(404);
+  }
+  const upload = await context.request.post("/api/uploads/completion-photo", {
+    headers: { "sec-fetch-site": "same-origin" },
+    multipart: { choreId: id },
+  });
+  expect(upload.status()).toBe(401);
+  await context.close();
+});
