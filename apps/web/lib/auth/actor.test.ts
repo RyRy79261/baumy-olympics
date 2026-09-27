@@ -30,8 +30,13 @@ const { getActor, getActorOrRedirect, redirectIfSignedIn } =
   await import("./actor");
 
 const session = {
-  user: { id: "u_1", email: "ryan@example.com", name: "Ryan" },
-  session: { id: "s_1" },
+  user: {
+    id: "u_1",
+    email: "ryan@example.com",
+    name: "Ryan",
+    emailVerified: true,
+  },
+  session: { id: "s_1", createdAt: new Date("2026-09-27T09:55:00Z") },
 };
 
 beforeEach(() => {
@@ -53,6 +58,8 @@ describe("getActor", () => {
       userId: "u_1",
       email: "ryan@example.com",
       name: "Ryan",
+      emailVerified: true,
+      sessionCreatedAt: "2026-09-27T09:55:00.000Z",
     });
     const passed = getSession.mock.calls[0]?.[0] as { headers: Headers };
     expect(passed.headers.get("cookie")).toBe("x=y");
@@ -71,6 +78,8 @@ describe("getActor", () => {
       userId: "u_1",
       email: "ryan@example.com",
       name: "Ryan",
+      emailVerified: true,
+      sessionCreatedAt: "2026-09-27T09:55:00.000Z",
       memberId: "m_1",
       role: "admin",
     });

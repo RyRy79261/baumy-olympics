@@ -23,6 +23,8 @@ const admin: Actor = {
   userId: "u1",
   email: "a@b.c",
   name: "A",
+  emailVerified: true,
+  sessionCreatedAt: "2026-09-27T09:00:00.000Z",
   memberId: "m1",
   role: "admin",
 };
@@ -32,6 +34,8 @@ const account: Actor = {
   userId: "u3",
   email: "x@y.z",
   name: "X",
+  emailVerified: false,
+  sessionCreatedAt: "2026-09-27T09:00:00.000Z",
 };
 const kiosk: Actor = { kind: "kiosk", deviceId: "d1", memberId: "m1" };
 const kioskNobody: Actor = { kind: "kiosk", deviceId: "d1" };
