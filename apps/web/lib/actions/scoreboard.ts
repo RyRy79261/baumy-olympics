@@ -23,11 +23,7 @@ import {
   type AdjustmentListing,
   type ScoredCompletion,
 } from "@baumy/db/scores";
-import {
-  findSeason,
-  seasonStatusNow,
-  type SeasonRow,
-} from "@baumy/db/seasons";
+import { findSeason, seasonStatusNow, type SeasonRow } from "@baumy/db/seasons";
 import { defineAction, type ActionCtx } from "./define";
 import { fail } from "./result";
 
