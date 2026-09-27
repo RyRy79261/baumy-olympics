@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { formatDateKey } from "@baumy/core";
 import {
   Button,
@@ -23,7 +23,11 @@ import {
   EVENT_LOCATION_MAX,
   EVENT_TITLE_MAX,
 } from "@baumy/types";
-import { useActionForm, type FormAction } from "@/components/use-action-form";
+import {
+  useActionForm,
+  useReporting,
+  type FormAction,
+} from "@/components/use-action-form";
 import type {
   CalendarWriteData,
   DeleteEventData,
@@ -268,24 +272,6 @@ function EventDetails({
       ) : null}
     </dl>
   );
-}
-
-/**
- * The action, then `onDone` on success. Read through a ref, so the form's
- * action never goes stale and the sheet can close before it re-renders.
- */
-function useReporting<T>(action: FormAction<T>, onDone: (data: T) => void) {
-  const done = useRef(onDone);
-  done.current = onDone;
-  const [wrapped] = useState<FormAction<T>>(() => {
-    const send: FormAction<T> = async (prev, form) => {
-      const result = await action(prev, form);
-      if (result.ok) done.current(result.data);
-      return result;
-    };
-    return send;
-  });
-  return wrapped;
 }
 
 function EventForm({
