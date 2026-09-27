@@ -50,20 +50,29 @@ export function PhotoPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <label
-        htmlFor={id}
-        className={buttonClass("secondary", kiosk ? "kiosk" : "default")}
-      >
-        {busy ? "Preparing the photo…" : preview ? "Change photo" : label}
-      </label>
-      <input
-        id={id}
-        type="file"
-        accept="image/*"
-        aria-label={label}
-        className="sr-only"
-        onChange={(e) => void pick(e.currentTarget.files?.[0])}
-      />
+      {/* The native input lies, invisible, over the button-looking label, so
+          it keeps keyboard focus and a touch target as big as the label
+          (56px on the kiosk). */}
+      <div className="relative focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-neutral-900">
+        <label
+          htmlFor={id}
+          className={buttonClass(
+            "secondary",
+            kiosk ? "kiosk" : "default",
+            "w-full",
+          )}
+        >
+          {busy ? "Preparing the photo…" : preview ? "Change photo" : label}
+        </label>
+        <input
+          id={id}
+          type="file"
+          accept="image/*"
+          aria-label={label}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          onChange={(e) => void pick(e.currentTarget.files?.[0])}
+        />
+      </div>
       {preview ? <ProofPhoto src={preview} alt="The photo you chose" /> : null}
       {error ? <FormMessage tone="error">{error}</FormMessage> : null}
     </div>
