@@ -8,11 +8,19 @@ import { SignInForm } from "./sign-in-form";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Sign in - Baumy Olympics" };
 
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   await redirectIfSignedIn();
+  const { error } = await searchParams;
   return (
     <main>
-      <SignInForm googleEnabled={isGoogleConfigured(process.env)} />
+      <SignInForm
+        googleEnabled={isGoogleConfigured(process.env)}
+        oauthFailed={Boolean(error)}
+      />
     </main>
   );
 }

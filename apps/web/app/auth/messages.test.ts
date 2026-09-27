@@ -27,6 +27,12 @@ describe("signInErrorSentence", () => {
   it("says when it is rate limited", () => {
     expect(signInErrorSentence({ status: 429 })).toBe(TOO_MANY_ATTEMPTS);
   });
+
+  it("does not blame the password when the server failed", () => {
+    expect(signInErrorSentence({ status: 503 })).toBe(SOMETHING_WENT_WRONG);
+    expect(signInErrorSentence({ status: 500 })).toBe(SOMETHING_WENT_WRONG);
+    expect(signInErrorSentence({})).toBe(SIGN_IN_REFUSED);
+  });
 });
 
 describe("signUpErrorSentence", () => {

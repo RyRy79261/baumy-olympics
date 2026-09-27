@@ -3,13 +3,26 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
-import { signInErrorSentence, SOMETHING_WENT_WRONG } from "../messages";
+import {
+  OAUTH_FAILED,
+  signInErrorSentence,
+  SOMETHING_WENT_WRONG,
+} from "../messages";
 
 /** Email and password sign-in, plus Google when this deployment has its keys. */
-export function SignInForm({ googleEnabled }: { googleEnabled: boolean }) {
+export function SignInForm({
+  googleEnabled,
+  oauthFailed = false,
+}: {
+  googleEnabled: boolean;
+  /** Landed here from a failed Google round trip (`?error=`). */
+  oauthFailed?: boolean;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    oauthFailed ? OAUTH_FAILED : null,
+  );
   const [pending, setPending] = useState(false);
 
   async function submit(e: FormEvent<HTMLFormElement>) {

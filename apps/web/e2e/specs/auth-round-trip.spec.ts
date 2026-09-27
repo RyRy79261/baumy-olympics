@@ -118,6 +118,22 @@ test("forgot password says the same for an address with no account", async ({
   expect((await readMail()).filter((m) => m.to === nobody)).toEqual([]);
 });
 
+test("a failed Google round trip lands on sign-in with a sentence", async ({
+  page,
+}) => {
+  await page.goto("/auth/sign-in");
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Google" }),
+  ).toHaveCount(0);
+  // Where Better Auth's onAPIError.errorURL sends an OAuth failure.
+  await page.goto("/auth/sign-in?error=please_restart_the_process");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Google didn't finish" }),
+  ).toBeVisible();
+  await expect(page.getByText("please_restart_the_process")).toHaveCount(0);
+});
+
 test("a bearer token from sign-in authenticates GET /api/me without cookies", async ({
   playwright,
   baseURL,
