@@ -43,6 +43,13 @@ import {
 export const UPLOAD_LIMITS = { perMember: 20, perIp: 40 } as const;
 export const UPLOAD_WINDOW_MS = 60 * 60 * 1000;
 
+/**
+ * The most a whole request may declare: the photo plus the form's other
+ * fields and multipart framing. Checked on `Content-Length` before the body
+ * is parsed, so nobody can make the server read a huge body first.
+ */
+export const UPLOAD_MAX_REQUEST_BYTES = PHOTO_MAX_BYTES + 64 * 1024;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Form fields that belong to the route, not to the action's input. */
@@ -88,6 +95,14 @@ export async function handleCompletionPhotoUpload(
 ): Promise<Response> {
   const crossSite = rejectCrossSite(req);
   if (crossSite) return crossSite;
+
+  const declared = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > UPLOAD_MAX_REQUEST_BYTES) {
+    return refuse(
+      413,
+      fail("INVALID_INPUT", "That photo is too large (5 MB at most)."),
+    );
+  }
 
   let form: FormData;
   try {

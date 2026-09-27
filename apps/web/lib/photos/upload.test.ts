@@ -6,7 +6,11 @@ import type { RateLimiter } from "@/lib/rate-limit";
 import { ctxFor, kioskActor, sessionActor } from "@/test-utils/actions";
 import { memoryBlobStore, type BlobStore } from "./blob-store";
 import { PHOTO_MAX_BYTES, photoProxyUrl } from "./paths";
-import { handleCompletionPhotoUpload, type UploadDeps } from "./upload";
+import {
+  UPLOAD_MAX_REQUEST_BYTES,
+  handleCompletionPhotoUpload,
+  type UploadDeps,
+} from "./upload";
 
 // POST /api/uploads/completion-photo (SPEC §6.5): who may upload, what, how
 // often, and that the file is kept only when the action took it. The action
@@ -281,6 +285,27 @@ describe("refusals", () => {
     );
     expect(big.status).toBe(413);
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it("answers 413 to a body declared too large, before reading it or asking who is there", async () => {
+    const requestCtx = vi.fn(deps().requestCtx);
+    const res = await handleCompletionPhotoUpload(
+      new Request("http://localhost/api/uploads/completion-photo", {
+        method: "POST",
+        body: "x",
+        headers: {
+          "sec-fetch-site": "same-origin",
+          "content-length": String(UPLOAD_MAX_REQUEST_BYTES + 1),
+        },
+      }),
+      deps({ requestCtx }),
+    );
+    expect(res.status).toBe(413);
+    expect(requestCtx).not.toHaveBeenCalled();
+    // A photo at the limit, with its fields, still fits.
+    const atLimit = upload({ image: image("image/webp", PHOTO_MAX_BYTES) });
+    const body = await atLimit.clone().arrayBuffer();
+    expect(body.byteLength).toBeLessThanOrEqual(UPLOAD_MAX_REQUEST_BYTES);
   });
 
   it("rate-limits per member and per address, with Retry-After", async () => {
