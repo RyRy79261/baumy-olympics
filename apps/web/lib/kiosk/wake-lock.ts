@@ -7,7 +7,7 @@
 // to guess.
 //
 // Framework-free so it can be tested with a fake navigator and document; the
-// React side is components/kiosk/wake-lock.tsx.
+// React side is components/kiosk/keep-screen-on.tsx.
 
 /** Where the lock stands. */
 export type WakeLockStatus =
