@@ -54,6 +54,13 @@ export function VoiceRecorder({
   const startedAt = useRef(0);
   const releasedEarly = useRef(false);
   const tap = useRef(false);
+  const mounted = useRef(true);
+  // The sheet's latest callbacks: the recorder's onstop fires long after the
+  // render that started it, and must not send with that render's history.
+  const latest = useRef({ onStart, onClip, onCancel, onUnavailable });
+  useEffect(() => {
+    latest.current = { onStart, onClip, onCancel, onUnavailable };
+  });
 
   /** Stop the microphone, the meter and the timers; keep the recorder. */
   const release = useCallback(() => {
@@ -71,8 +78,10 @@ export function VoiceRecorder({
   }, []);
 
   // Unmounting (the sheet closed) drops a recording without sending it.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       const rec = recorder.current;
       if (rec) {
         rec.ondataavailable = null;
@@ -81,9 +90,8 @@ export function VoiceRecorder({
       }
       recorder.current = null;
       release();
-    },
-    [release],
-  );
+    };
+  }, [release]);
 
   const finish = useCallback(() => {
     const rec = recorder.current;
@@ -100,7 +108,7 @@ export function VoiceRecorder({
         : (t) => MediaRecorder.isTypeSupported(t),
     );
     if (!mime || !navigator.mediaDevices?.getUserMedia) {
-      onUnavailable(
+      latest.current.onUnavailable(
         "This browser can't record here, so type to Baumy instead.",
       );
       return;
@@ -117,10 +125,17 @@ export function VoiceRecorder({
         },
       });
     } catch (err) {
+      if (!mounted.current) return;
       setState("idle");
       const f = micFailure(err);
-      if (f.kind === "unavailable") onUnavailable(f.message);
-      else onCancel(f.message);
+      if (f.kind === "unavailable") latest.current.onUnavailable(f.message);
+      else latest.current.onCancel(f.message);
+      return;
+    }
+    // The sheet closed while the permission prompt was up: turn the
+    // microphone straight back off, and record nothing.
+    if (!mounted.current) {
+      media.getTracks().forEach((t) => t.stop());
       return;
     }
     stream.current = media;
@@ -155,7 +170,7 @@ export function VoiceRecorder({
     } catch (err) {
       release();
       setState("idle");
-      onCancel(micFailure(err).message);
+      latest.current.onCancel(micFailure(err).message);
       return;
     }
     recorder.current = rec;
@@ -168,10 +183,10 @@ export function VoiceRecorder({
       setTapMode(false);
       const clip = new Blob(chunks, { type: mime });
       if (Date.now() - startedAt.current < MIN_CLIP_MS || clip.size === 0) {
-        onCancel("Hold the button while you speak.");
+        latest.current.onCancel("Hold the button while you speak.");
         return;
       }
-      onClip(clip, mime);
+      latest.current.onClip(clip, mime);
     };
     rec.start();
     startedAt.current = Date.now();
@@ -180,8 +195,8 @@ export function VoiceRecorder({
     tap.current = tap.current || releasedEarly.current;
     setTapMode(tap.current);
     setState("recording");
-    onStart();
-  }, [state, onStart, onClip, onCancel, onUnavailable, finish, release]);
+    latest.current.onStart();
+  }, [state, finish, release]);
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
     if (e.button !== 0 || disabled) return;
