@@ -1062,3 +1062,33 @@ export const mcpAccessTokens = pgTable(
     index("mcp_access_tokens_grant_id_idx").on(t.grantId),
   ],
 );
+
+/**
+ * Tokens a trusted service (baumy-brain) sends as `Authorization: Bearer`
+ * to `/api/v1/actions` (SPEC §6.3, §6.6, issue #27). Minted by
+ * `packages/db/scripts/service-token.ts`, which prints the token once; only
+ * its sha256 is stored, so the plaintext lives in brain's env and never in
+ * ours. `scopes` names what the token may do (`brain`: the brain surface).
+ * Revoking sets `revoked_at`; a revoked token is never found again. One
+ * live token per name, so rotating is: revoke, then mint the name again.
+ */
+export const serviceTokens = pgTable(
+  "service_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** For example `baumy-brain`; the script revokes by name. */
+    name: text("name").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    scopes: text("scopes").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [
+    // One live token per name; a revoked name may be minted again (rotation).
+    uniqueIndex("service_tokens_live_name_uq")
+      .on(t.name)
+      .where(sql`${t.revokedAt} IS NULL`),
+  ],
+);

@@ -26,7 +26,8 @@
     "./game-fixtures": "./src/__tests__/_game-fixtures.ts",
     "./notes": "./src/notes.ts",
     "./ai-usage": "./src/ai-usage.ts",
-    "./mcp-oauth": "./src/mcp-oauth.ts"
+    "./mcp-oauth": "./src/mcp-oauth.ts",
+    "./service-tokens": "./src/service-tokens.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
@@ -38,7 +39,8 @@
     "test:coverage": "vitest run --coverage",
     "test:local": "vitest run --config vitest.local.config.ts",
     "test:watch": "vitest",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "service-token": "tsx scripts/service-token.ts"
   },
   "dependencies": {
     "@baumy/core": "workspace:*",

@@ -4,6 +4,7 @@ import type { Queryable } from "../index";
 import { members, telegramLinkCodes } from "../schema";
 import {
   TELEGRAM_LINK_CODE_TTL_MS,
+  claimTelegramLinkCode,
   hashTelegramLinkCode,
   insertTelegramLinkCode,
 } from "../telegram-link-codes";
@@ -50,5 +51,76 @@ describe("insertTelegramLinkCode", () => {
       },
     ]);
     expect(JSON.stringify(rows)).not.toContain("AB12CD34");
+  });
+});
+
+describe("claimTelegramLinkCode", () => {
+  const db = () => t.db() as unknown as Queryable;
+  const TG = 5_000_000_002;
+
+  async function member() {
+    const [m] = await t
+      .db()
+      .insert(members)
+      .values({
+        householdId: HOUSEHOLD_ID,
+        displayName: "Ryan",
+        avatarSprite: "cat",
+        color: "#112233",
+      })
+      .returning({ id: members.id });
+    return m!.id;
+  }
+
+  it("claims a live code once, whatever its case, and records the tg id", async () => {
+    const memberId = await member();
+    await insertTelegramLinkCode(db(), {
+      code: "AB12CD34",
+      memberId,
+      now: NOW,
+    });
+    const at = new Date(NOW.getTime() + 60_000);
+    await expect(
+      claimTelegramLinkCode(db(), {
+        code: " ab12cd34 ",
+        telegramUserId: TG,
+        now: at,
+      }),
+    ).resolves.toEqual({ memberId });
+    const [row] = await t.db().select().from(telegramLinkCodes);
+    expect(row).toMatchObject({ usedAt: at, usedByTg: TG });
+    // Used: a second claim finds nothing.
+    await expect(
+      claimTelegramLinkCode(db(), {
+        code: "AB12CD34",
+        telegramUserId: TG,
+        now: at,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it("refuses an expired code and a wrong one", async () => {
+    const memberId = await member();
+    const { expiresAt } = await insertTelegramLinkCode(db(), {
+      code: "EF56GH78",
+      memberId,
+      now: NOW,
+    });
+    await expect(
+      claimTelegramLinkCode(db(), {
+        code: "EF56GH79",
+        telegramUserId: TG,
+        now: NOW,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      claimTelegramLinkCode(db(), {
+        code: "EF56GH78",
+        telegramUserId: TG,
+        now: expiresAt,
+      }),
+    ).resolves.toBeNull();
+    const [row] = await t.db().select().from(telegramLinkCodes);
+    expect(row).toMatchObject({ usedAt: null, usedByTg: null });
   });
 });

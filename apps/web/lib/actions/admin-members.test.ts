@@ -300,6 +300,72 @@ describe("manage_members", () => {
     });
   });
 
+  it("sets, moves and clears a Telegram id, refusing one another member holds", async () => {
+    const { id, ctx } = await adminCtx();
+    const other = await seedMember(db(), { displayName: "Other" });
+    const TG = 5_000_000_101;
+    // A form sends the digits as a string.
+    await expect(
+      runAction(
+        "manage_members",
+        { op: "set_telegram", memberId: other, telegramUserId: String(TG) },
+        ctx,
+      ),
+    ).resolves.toMatchObject({ ok: true, data: { telegramUserId: TG } });
+    expect((await row(other)).telegramUserId).toBe(TG);
+    const [audit] = await t.db().select().from(auditEvents);
+    expect(audit).toMatchObject({
+      actorMemberId: id,
+      entity: "member",
+      entityId: other,
+      payload: { op: "set_telegram", telegramUserId: TG },
+    });
+
+    // Saving the same id on the same member again is fine.
+    await expect(
+      runAction(
+        "manage_members",
+        { op: "set_telegram", memberId: other, telegramUserId: TG },
+        ctxFor(ctx.actor),
+      ),
+    ).resolves.toMatchObject({ ok: true });
+
+    // Another member cannot take it while Other holds it.
+    await expect(
+      runAction(
+        "manage_members",
+        { op: "set_telegram", memberId: id, telegramUserId: TG },
+        ctxFor(ctx.actor),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "TELEGRAM_ALREADY_LINKED" });
+    expect((await row(id)).telegramUserId).toBeNull();
+
+    // An empty field (no id) unlinks; then the id is free.
+    await expect(
+      runAction(
+        "manage_members",
+        { op: "set_telegram", memberId: other },
+        ctxFor(ctx.actor),
+      ),
+    ).resolves.toMatchObject({ ok: true, data: { telegramUserId: null } });
+    expect((await row(other)).telegramUserId).toBeNull();
+    await expect(
+      runAction(
+        "manage_members",
+        { op: "set_telegram", memberId: id, telegramUserId: TG },
+        ctxFor(ctx.actor),
+      ),
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(
+      runAction(
+        "manage_members",
+        { op: "set_telegram", memberId: other, telegramUserId: "12ab" },
+        ctxFor(ctx.actor),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
+  });
+
   it("returns INVALID_INPUT for an empty edit or an unknown op, NOT_FOUND for a stranger", async () => {
     const { ctx } = await adminCtx();
     const other = await seedMember(db());

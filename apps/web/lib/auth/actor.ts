@@ -32,9 +32,9 @@ import {
 // - `kiosk`: a paired kiosk device, from the `baumy_kiosk` cookie, with the
 //   member whose avatar was tapped, if any (getKioskActor).
 // A person's own session wins when a browser carries both. The service and
-// MCP kinds are declared here so the gates (lib/auth/gates.ts) already handle
-// them; their credentials arrive with their own issues (MCP OAuth #23, brain
-// tokens #27).
+// MCP kinds are built by their own adapters from their own credentials: MCP
+// tokens in lib/mcp (issues #23, #24), brain's service token in lib/brain
+// (issue #27).
 // Deciding what an actor may DO is not this file's job: that is `runAction`
 // and its gates.
 
@@ -87,10 +87,17 @@ export interface KioskActor {
   displayName?: string;
 }
 
-/** A service token (baumy-brain); `memberId` is the Telegram-linked member. */
+/**
+ * A service token (baumy-brain) acting for a Telegram user (issue #27, the
+ * `/api/v1/actions` adapter in lib/brain). `memberId` is the member that
+ * Telegram user is linked to, if any; an unlinked one may only call
+ * `link_telegram`.
+ */
 export interface ServiceActor {
   kind: "service";
   tokenName: string;
+  /** From `X-Baumy-Actor: tg:<id>`. */
+  telegramUserId?: number;
   memberId?: string;
 }
 

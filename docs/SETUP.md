@@ -587,7 +587,41 @@ Telegram group. No migration.
       `[brain] <op> failed: HTTP <status>`; 401 means the two
       `KITCHEN_API_TOKEN`s differ.
 - Kitchen writes reach brain with no author for now (brain records
-  `added_by` as null); sending the member's Telegram id waits for Telegram
-  linking (issue #27).
+  `added_by` as null). Members can link Telegram since issue #27; sending
+  their Telegram id with kitchen writes is a follow-up.
 - [ ] **Look and feel is deferred to issue #7.** The tap-to-check rows are
       neutral placeholders in `packages/ui/src/check-list.tsx`.
+
+## Brain actions endpoint and Telegram linking (issue #27)
+
+`/api/v1/actions` lets baumy-brain run Olympics actions for a linked
+Telegram user; the contract is [brain-integration.md](brain-integration.md).
+Migration `0010_service_tokens` runs on deploy. No new env var in this app:
+it keeps only the token's hash, in the database. Until a token is minted
+every call answers 401, so nothing is exposed. CI and e2e mint their own
+tokens against Docker Postgres.
+
+- [ ] **Mint brain's token against production**, from a checkout of `main`
+      after this PR deploys, with the direct (unpooled) Neon string:
+
+      ```sh
+      DATABASE_URL_UNPOOLED='<direct production string>' \
+        pnpm --filter @baumy/db --silent service-token mint baumy-brain
+      ```
+
+      It prints the token once (stderr names the host). Nothing else keeps
+      it.
+
+- [ ] **In baumy-brain's Vercel project** (Production) set
+      `BRAIN_SERVICE_TOKEN` to that token and `OLYMPICS_BASE_URL` to this
+      app's production URL (the names issue #28 gives brain's client), then
+      redeploy brain once that client exists.
+- [ ] **Link your own Telegram account** once brain is deployed: Settings →
+      Create a link code, then send `/link <code>` to `@baumy_bot`. Or, as an
+      admin, type a member's Telegram user id on `/admin/members`.
+- [ ] **Check it** with a curl from your machine (the example at the end of
+      brain-integration.md): with `X-Baumy-Confirmed: 1` the event appears on
+      `/calendar`; without it the answer is 428 `CONFIRMATION_REQUIRED`.
+- To rotate the token, run `service-token rotate baumy-brain` (the old one
+  stops at once), then update brain's env.
+- To cut brain off, run `service-token revoke baumy-brain`.
