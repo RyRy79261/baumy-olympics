@@ -45,6 +45,7 @@ describe("useTestDb", () => {
       "account",
       "action_rate_limit",
       "action_requests",
+      "ai_usage",
       "audit_events",
       "chore_rule_versions",
       "chores",
