@@ -21,8 +21,8 @@ export default async function HubPage() {
       />
       <Card title="Coming soon">
         <p className="text-sm text-neutral-700">
-          The scoreboard, the calendar and the shopping list will live here.
-          Log what you did under{" "}
+          The scoreboard, the calendar and the shopping list will live here. Log
+          what you did under{" "}
           <Link href="/chores" className="underline">
             Chores
           </Link>
