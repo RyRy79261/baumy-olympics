@@ -86,20 +86,20 @@ describe("the fake calendar", () => {
     });
   });
 
-  it("answers the same id again with the event, like Google's 409", async () => {
+  it("answers the same id again like the client's 409: confirmed, as asked", async () => {
     const c = memoryCalendar();
     await c.create("evt00001", at19("2027-01-15"), "m-1");
-    const again = await c.create(
-      "evt00001",
-      { ...at19("2027-01-15"), title: "Other" },
-      "m-2",
-    );
-    expect(again).toMatchObject({ ok: true, data: { title: "Dinner" } });
-    await c.delete("evt00001");
-    expect(await c.create("evt00001", at19("2027-01-15"), "m-1")).toEqual({
-      ok: false,
-      reason: "unavailable",
+    const again = await c.create("evt00001", at19("2027-01-15"), "m-1");
+    expect(again).toMatchObject({
+      ok: true,
+      data: { title: "Dinner", member: "m-1" },
     });
+    // Deleted (an undo), then the same create again: it comes back.
+    await c.delete("evt00001");
+    expect(await c.create("evt00001", at19("2027-01-15"), "m-1")).toMatchObject(
+      { ok: true, data: { id: "evt00001", title: "Dinner" } },
+    );
+    expect(await c.get("evt00001")).toMatchObject({ ok: true });
   });
 
   it("lists what overlaps the range, soonest first, all-day by Berlin days", async () => {
