@@ -15,6 +15,13 @@
       "when": 1790468503473,
       "tag": "0001_seed_household",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790471398167,
+      "tag": "0002_auth_tables",
+      "breakpoints": true
     }
   ]
 }
