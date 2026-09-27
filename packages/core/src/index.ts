@@ -9,3 +9,4 @@ export * from "./scoring/verification";
 export * from "./scoring/standings";
 export * from "./scoring/streaks";
 export * from "./scoring/frequency";
+export * from "./scoring/lifecycle";
