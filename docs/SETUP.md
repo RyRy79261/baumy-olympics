@@ -284,7 +284,7 @@ is being logged) and end to end on a phone and a desktop.
       points, the streak flame and the big numbers are neutral placeholders
       in `packages/ui/src/scores.tsx`.
 - The daily job (issue #18) closes the season and writes the winner; the
-  kiosk's leaderboard widget arrives with the hub (issue #20).
+  kiosk's leaderboard widget is on the kiosk home (issue #20).
 
 ## Weights (issue #17)
 
@@ -389,3 +389,19 @@ says "Not connected yet" instead of failing, and the actions answer
 - [ ] **Look and feel is deferred to issue #7.** The grid, the day cells and
       the event buttons are neutral placeholders in
       `packages/ui/src/calendar.tsx`.
+
+## Hub and notes (issue #20)
+
+Nothing here needs an account, a secret or a new env var. The notes table
+comes with migration `0007_notes.sql`, applied by `db:migrate` on deploy.
+
+- [ ] **Look and feel is deferred to issue #7.** The widgets, the sticky
+      notes, the clock and the Baumy button are neutral placeholders in
+      `packages/ui/src/hub.tsx` and `packages/ui/src/note.tsx`; the note
+      colours are names (`NOTE_COLORS`) for the palette to map.
+- The "Today" widget says the calendar is not connected until the Google
+  Calendar settings above are set; the rest of the hub works without them.
+- The shopping widget is an empty slot until issue #26, and the Baumy
+  button opens a placeholder until the AI command (issues #21, #22).
+- On the kiosk, adding or changing a note asks for the member's kiosk PIN:
+  each member sets theirs in `/settings` on their own phone.

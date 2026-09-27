@@ -1,7 +1,7 @@
 "use client";
 
 import { AttestedForm } from "@/components/kiosk/attested-form";
-import { checkPinAction } from "../actions";
+import { checkPinAction } from "../../actions";
 
 export function CheckPinForm({ displayName }: { displayName: string }) {
   return (

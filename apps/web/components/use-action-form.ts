@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { fieldErrors, type ActionResult } from "@/lib/actions/result";
 
 // The client half of the UI adapter (lib/actions/ui.ts): a form bound to a
@@ -39,4 +39,25 @@ export function useActionForm<T>(action: FormAction<T>) {
     requestId,
     errors: fieldErrors(state),
   };
+}
+
+/**
+ * The action, then `onDone` on success. Read through a ref, so the form's
+ * action never goes stale and a sheet can close before it re-renders.
+ */
+export function useReporting<T>(
+  action: FormAction<T>,
+  onDone: (data: T) => void,
+): FormAction<T> {
+  const done = useRef(onDone);
+  done.current = onDone;
+  const [wrapped] = useState<FormAction<T>>(() => {
+    const send: FormAction<T> = async (prev, form) => {
+      const result = await action(prev, form);
+      if (result.ok) done.current(result.data);
+      return result;
+    };
+    return send;
+  });
+  return wrapped;
 }

@@ -50,6 +50,13 @@
       "when": 1790488655783,
       "tag": "0006_weight_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790494386990,
+      "tag": "0007_notes",
+      "breakpoints": true
     }
   ]
 }

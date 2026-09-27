@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { addChore, openChore } from "../lib/chores";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import { expectKioskTargets, pairedKiosk, typePin } from "../lib/kiosk";
+import {
+  expectKioskTargets,
+  openKioskChores,
+  pairedKiosk,
+  typePin,
+} from "../lib/kiosk";
 
 // Issue #15 on the kitchen iPad: the founder self-claims a chore on the
 // kiosk; when the partner taps their avatar, the "Needs your OK" banner shows
@@ -40,6 +45,8 @@ test("on the kiosk, confirm a housemate's claim with a PIN; undo asks for one to
 
   // The founder logs it twice; the banner offers to undo them.
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
+  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+  await openKioskChores(kiosk);
   for (let i = 0; i < 2; i++) {
     const sheet = await openChore(kiosk, chore);
     await sheet.getByRole("button", { name: "Log it" }).click();

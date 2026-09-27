@@ -40,6 +40,13 @@ This is a single screen with no scrolling at 1180×820 (iPad Air, landscape):
 - **pinned notes**;
 - **the Baumy button**, bottom right, which opens the command sheet.
 
+Details settled while building it (added 2026-09-27, issue #20):
+
+- `/` and `/kiosk` show the same widgets (`components/hub/hub-dashboard.tsx`), read through `loadHub` (`lib/hub/load.ts`): `list_events` (today; events that have not ended, at most 5), `list_chores` (the chores in state `due`, never-done first then the longest due, "overdue" after a day; then those falling due before Berlin midnight; each with its streak holder), `get_standings` (the top 5 with the gap to the leader), `get_pot` (the total) and `list_notes` (`pinnedOnly`, at most 4). Each read that fails or throws becomes that widget's own "unavailable" line, and each widget has its own empty sentence, so the calendar being down never breaks the page.
+- The shopping list is an empty slot until issue #26. The Baumy button opens a placeholder dialog until the AI command (issues #21, #22).
+- The kiosk home reads as the paired device whether or not anyone has tapped their avatar: a new gate, `display` (`requireDisplay`), lets a kiosk actor with no member picked run **reads offered on the kiosk**; everyone else is held to `requireMember`, and writes always need a member. `list_events`, `list_chores` (its `next` preview is null then), `get_standings`, `get_pot` and `list_notes` use it.
+- The chore grid, "Needs your OK" and "Check my PIN" moved from `/kiosk` to `/kiosk/chores`; notes are at `/notes` and `/kiosk/notes`.
+
 ### 3.2 Chores game
 
 This covers:
@@ -62,6 +69,13 @@ baumy-brain owns the list (`baumy_list_items`). Olympics reads it and writes to 
 ### 3.5 Notes
 
 Short household notes, such as "plumber comes Tue" or the wifi guest code (not secrets). Each note has a title, a markdown body, an optional colour and pinned flag, and an author. Olympics owns them, because brain has no notes store. We never store secrets in notes; brain already handles encrypted secrets.
+
+Details settled while building it (added 2026-09-27, issue #20):
+
+- Any member may add, change, pin or delete any note; it is the household's board. On the kiosk every change needs the acting member's PIN in that request (`requires: "attested"`).
+- The body is markdown and is only ever rendered by `MarkdownBody` (`packages/ui/src/markdown.tsx`, ported from camp-404): raw HTML is shown as the text it was typed as, the rehype-sanitize schema is an allow-list of the tags markdown makes, links keep only http, https, mailto and in-app paths, images are never loaded (their alt text shows), and headings become bold lines. A single newline is a line break.
+- `color` is a name from `NOTE_COLORS` (`packages/types`) or null; issue #7 decides the palette.
+- Delete is a soft delete (`deleted_at`); nothing in the app brings a note back.
 
 ### 3.6 Baumy the cat and the AI command
 
@@ -389,7 +403,7 @@ packages/{eslint-config,typescript-config}
     - A kiosk visiting a hub page is sent to `/kiosk`; admin pages never render for it.
     - Every PIN attempt is counted before the PIN is checked, and a correct PIN gives its attempt back, so only failures use the limits up. The 6th attempt in 15 minutes is refused without being checked, even if it is right. If an attempt cannot be counted, no PIN is accepted (fail closed). A locked PIN answers `PIN_LOCKED`.
     - The lock's audit row (`kiosk_pin_locked`) is written by runAction's attestation step in its own transaction, since the request it belongs to is refused. `set_kiosk_pin` clears the lock and both counters. The notice shows on every hub page (and `/settings`) until then.
-- **Gates:** `requireMember` (member session, MCP or brain actor; kiosk actors only for actions with `surfaces ∋ "kiosk"`), `requireAdmin` (admin with a real session), `requireAttested` (see §6.3) and `requireSession` (`actor.kind === "member"` from a real cookie or bearer session, never the kiosk). `requireAccount` is a real session with or without a member row, used only by the joining actions (`redeem_invite`, `join_as_founder`); `runAction` keys their ledger and audit rows on the member they create (added 2026-09-27, issue #9). `requireSession` guards setting or changing the kiosk PIN (changing needs the current password or a session under 10 minutes old), creating Telegram link codes, `update_my_profile`, MCP consent and connections, and everything under `/settings`.
+- **Gates:** `requireMember` (member session, MCP or brain actor; kiosk actors only for actions with `surfaces ∋ "kiosk"`), `requireDisplay` (`requireMember`, or a paired kiosk with nobody picked for a read offered on the kiosk; added 2026-09-27, issue #20), `requireAdmin` (admin with a real session), `requireAttested` (see §6.3) and `requireSession` (`actor.kind === "member"` from a real cookie or bearer session, never the kiosk). `requireAccount` is a real session with or without a member row, used only by the joining actions (`redeem_invite`, `join_as_founder`); `runAction` keys their ledger and audit rows on the member they create (added 2026-09-27, issue #9). `requireSession` guards setting or changing the kiosk PIN (changing needs the current password or a session under 10 minutes old), creating Telegram link codes, `update_my_profile`, MCP consent and connections, and everything under `/settings`.
 - **Rate limits:** two buckets per action (per user and per IP), copied from camp-404 `apps/web/lib/rate-limit.ts`.
 
 ### 6.3 Action registry (ADR 0002)
@@ -514,6 +528,13 @@ export interface ActionDef<I extends z.ZodType, O> {
 - `set_prize_mode` (admin, UI only) `{season: current|next, mode}`: anything but `points` is `PRIZE_MODE_NOT_SUPPORTED`. For the current season it locks the season row `FOR UPDATE` and refuses with `PRIZE_MODE_LOCKED` if any completion exists (a completion insert's foreign-key `KEY SHARE` lock waits on that row lock, so one in flight is either seen or waits). Next year's season is created if needed and always accepts.
 - The pages are `/scores` (standings, streaks, recent completions, prize mode, adjustments) and `/pot`; the kiosk shows the leaderboard with the hub widgets (issue #20).
 
+**Note actions** (added 2026-09-27, issue #20):
+
+- `list_notes` `{pinnedOnly?, limit?}` (read, every surface, `display`) returns the live notes, pinned first, then the most recently changed, each with its id, title, `bodyMd`, colour, `pinned`, author (id and name) and ISO times.
+- `create_note` `{title, bodyMd?, color?, pinned?}` (risk `safe`), `update_note` `{noteId, title, bodyMd?, color?}` (risk `confirm`; it replaces the title, body and colour, a field left out is emptied; the pin is untouched) and `pin_note` `{noteId, pinned}` (risk `safe`; pinning counts as a change, so a note pinned just now comes first). All three are on every surface and `requires: "attested"`.
+- `delete_note` `{noteId}` (risk `destructive`, `ui`, `kiosk`, `ai`) soft-deletes. `update_note`, `pin_note` and `delete_note` answer `NOT_FOUND` for a note that is deleted or not there.
+- The pages are `/notes` and `/kiosk/notes`; pinned notes show on `/` and `/kiosk`.
+
 ### 6.4 Google Calendar
 
 - Port camp-404 `apps/web/lib/google-calendar.ts` and `lib/integration-config.ts`:
@@ -627,6 +648,7 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
   - The page calls `router.refresh()` every 60s and on focus (bypassing the 30s shopping cache).
   - Every mutation calls `revalidatePath`.
   - There are no websockets in v1.
+  - Built (added 2026-09-27, issue #20): `components/hub/auto-refresh.tsx` on the kiosk home, which skips a refresh while a dialog is open or a field has focus.
 - **Idle:** after 60 seconds idle, the screen returns home and clears the selected actor. This stops the next person acting as the previous one.
 
 ## 9. Security

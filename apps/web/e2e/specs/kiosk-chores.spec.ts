@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { addChore, openChore, tile } from "../lib/chores";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import { expectKioskTargets, pairedKiosk, typePin } from "../lib/kiosk";
+import {
+  expectKioskTargets,
+  openKioskChores,
+  pairedKiosk,
+  typePin,
+} from "../lib/kiosk";
 
 // Issue #14 on the kitchen iPad: the chore grid acts as the member whose
 // avatar was tapped. The founder builds a streak of 2; the partner breaks it
@@ -44,6 +49,7 @@ test("on the kiosk, break the partner's streak and log for someone else", async 
   // The founder does it twice: a streak of 2.
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+  await openKioskChores(kiosk);
   for (const [points, streak] of [
     [20, 1],
     [25, 2],

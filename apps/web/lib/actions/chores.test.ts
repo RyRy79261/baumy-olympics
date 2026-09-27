@@ -211,12 +211,8 @@ describe("list_chores", () => {
     }
   });
 
-  it("refuses anyone who is not a member, and a kiosk nobody picked an avatar on", async () => {
-    for (const actor of [
-      accountActor("stranger"),
-      { kind: "kiosk", deviceId: "dev-1" } as Actor,
-      mcp(ryan, []),
-    ]) {
+  it("refuses anyone who is not a member", async () => {
+    for (const actor of [accountActor("stranger"), mcp(ryan, [])]) {
       await expect(
         runAction(
           "list_chores",
@@ -225,6 +221,15 @@ describe("list_chores", () => {
         ),
       ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
     }
+  });
+
+  it("shows the kitchen screen the chores before anyone taps in, with no preview", async () => {
+    const idle: Actor = { kind: "kiosk", deviceId: "dev-1" };
+    const data = ok(
+      await runAction("list_chores", {}, ctxFor(idle, { source: "kiosk" })),
+    );
+    expect(data.chores.length).toBeGreaterThan(0);
+    for (const c of data.chores) expect(c.next).toBeNull();
   });
 
   it("refuses unknown input", async () => {

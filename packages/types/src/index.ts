@@ -68,3 +68,20 @@ export {
   eventFieldsShape,
   isCalendarDate,
 } from "./calendar";
+export {
+  ListNotesInput,
+  NOTE_BODY_MAX,
+  NOTE_COLORS,
+  NOTE_LIST_MAX,
+  NOTE_TITLE_MAX,
+  NewNote,
+  NoteBody,
+  NoteColor,
+  NoteColorChoice,
+  NoteFlag,
+  NoteId,
+  NotePin,
+  NoteRef,
+  NoteTitle,
+  NoteUpdate,
+} from "./notes";

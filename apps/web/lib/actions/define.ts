@@ -49,6 +49,11 @@ export const ACTION_NAMES = [
   "create_event",
   "update_event",
   "delete_event",
+  "list_notes",
+  "create_note",
+  "update_note",
+  "pin_note",
+  "delete_note",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 
@@ -59,6 +64,8 @@ export const ACTION_NAME_PATTERN = /^[a-z0-9_]{1,64}$/;
  * Who may run an action, one gate function per concern (lib/auth/gates.ts):
  * - `member`: any household member; kiosk actors only where
  *   `surfaces` includes "kiosk";
+ * - `display`: `member`, or, for a read offered on the kiosk, the paired
+ *   kiosk with nobody picked (the kitchen screen's hub widgets);
  * - `admin`: an admin with a real session;
  * - `attested`: the member themself (a session, MCP or brain is its own
  *   member; the kiosk must send that member's PIN with the request);
@@ -68,7 +75,13 @@ export const ACTION_NAME_PATTERN = /^[a-z0-9_]{1,64}$/;
  * - `service`: a service token (baumy-brain).
  */
 export type Gate =
-  "member" | "admin" | "attested" | "session" | "account" | "service";
+  | "member"
+  | "display"
+  | "admin"
+  | "attested"
+  | "session"
+  | "account"
+  | "service";
 
 export type ActionKind = "read" | "write";
 export type ActionRisk = "safe" | "confirm" | "destructive";

@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import { expectKioskTargets, pairCode, typePin } from "../lib/kiosk";
+import {
+  expectKioskTargets,
+  openKioskChores,
+  pairCode,
+  typePin,
+} from "../lib/kiosk";
 
 // Issue #10 end to end, on the kitchen iPad (ipad-landscape), against Docker
 // Postgres: an admin pairs a kiosk, the code works once, a member taps their
@@ -89,6 +94,8 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   await expect(kiosk.getByTestId("acting-as")).toHaveText(name);
   await expect(avatar).toHaveAttribute("aria-pressed", "true");
   await expectKioskTargets(kiosk.locator("header"));
+  await expectKioskTargets(kiosk.locator("main"));
+  await openKioskChores(kiosk);
   await expectKioskTargets(kiosk.locator("main"));
 
   // Check my PIN: the first request has no PIN, so the pad opens.
