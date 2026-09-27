@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { RequestCtx } from "@/lib/actions/define";
 import type { Actor } from "./actor";
 import {
+  requireAccount,
   requireAdmin,
   requireAttested,
   requireMember,
@@ -127,6 +128,23 @@ describe("requireSession", () => {
   });
 });
 
+describe("requireAccount", () => {
+  it("accepts any real session, member row or not", () => {
+    for (const a of [account, member, admin]) {
+      expect(requireAccount(ctx(a))).toEqual({ ok: true });
+    }
+  });
+
+  it("refuses the kiosk, MCP and brain", () => {
+    for (const a of [kiosk, brain, mcpWrite]) {
+      expect(requireAccount(ctx(a))).toMatchObject({
+        ok: false,
+        code: "FORBIDDEN",
+      });
+    }
+  });
+});
+
 describe("requireAdmin", () => {
   it("accepts an admin session only", () => {
     expect(requireAdmin(ctx(admin))).toEqual({ ok: true });
@@ -213,11 +231,19 @@ describe("runGate", () => {
       "admin",
       "attested",
       "service",
+      "account",
     ] as const;
     const verdicts = await Promise.all(
       gates.map((g) => runGate(g, ctx(member), everywhere, verify)),
     );
-    expect(verdicts.map((v) => v.ok)).toEqual([true, true, false, true, false]);
+    expect(verdicts.map((v) => v.ok)).toEqual([
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+    ]);
     await expect(
       runGate("attested", ctx(kiosk, "1"), everywhere, verify),
     ).resolves.toEqual({ ok: true });
