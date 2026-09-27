@@ -55,6 +55,29 @@ export function requireMember(
 }
 
 /**
+ * What the kitchen screen may show while nobody has tapped their avatar
+ * (SPEC §3.1, §8): a READ offered on the kiosk, from a paired kiosk with no
+ * member picked. Everyone else is held to `requireMember`. It never lets a
+ * write through: those need a member to be done by, and runAction keys the
+ * ledger and the audit row on one.
+ */
+export function requireDisplay(
+  ctx: RequestCtx,
+  action: GatedAction,
+): GateResult {
+  const { actor } = ctx;
+  if (
+    actor.kind === "kiosk" &&
+    !actor.memberId &&
+    action.kind === "read" &&
+    action.surfaces.includes("kiosk")
+  ) {
+    return OK;
+  }
+  return requireMember(ctx, action);
+}
+
+/**
  * A real cookie or bearer session of a household member: never the kiosk, an
  * MCP token or brain.
  */
@@ -173,6 +196,8 @@ export async function runGate(
   switch (gate) {
     case "member":
       return requireMember(ctx, action);
+    case "display":
+      return requireDisplay(ctx, action);
     case "session":
       return requireSession(ctx);
     case "account":

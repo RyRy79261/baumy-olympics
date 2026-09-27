@@ -5,6 +5,7 @@ import {
   requireAccount,
   requireAdmin,
   requireAttested,
+  requireDisplay,
   requireMember,
   requireService,
   requireSession,
@@ -112,6 +113,45 @@ describe("requireMember", () => {
     expect(
       requireMember(ctx({ ...mcpRead, scopes: [] }), readAction),
     ).toMatchObject({ ok: false });
+  });
+});
+
+describe("requireDisplay", () => {
+  const kioskRead: GatedAction = { kind: "read", surfaces: ["ui", "kiosk"] };
+  const kioskWrite: GatedAction = { kind: "write", surfaces: ["ui", "kiosk"] };
+
+  it("lets the kiosk with nobody picked read what the kiosk offers", () => {
+    expect(requireDisplay(ctx(kioskNobody), kioskRead)).toEqual({ ok: true });
+    expect(requireDisplay(ctx(kiosk), kioskRead)).toEqual({ ok: true });
+  });
+
+  it("never lets the kiosk with nobody picked write", () => {
+    expect(requireDisplay(ctx(kioskNobody), kioskWrite)).toMatchObject({
+      ok: false,
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("keeps the kiosk off reads it is not offered", () => {
+    expect(requireDisplay(ctx(kioskNobody), readAction)).toMatchObject({
+      ok: false,
+      code: "FORBIDDEN",
+    });
+    expect(requireDisplay(ctx(kiosk), readAction)).toMatchObject({
+      ok: false,
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("holds everyone else to requireMember", () => {
+    expect(requireDisplay(ctx(member), kioskRead)).toEqual({ ok: true });
+    for (const a of [account, brainUnlinked]) {
+      expect(requireDisplay(ctx(a), kioskRead)).toMatchObject({
+        ok: false,
+        code: "FORBIDDEN",
+      });
+    }
+    expect(requireDisplay(ctx(mcpWrite), kioskRead)).toEqual({ ok: true });
   });
 });
 
@@ -279,6 +319,7 @@ describe("runGate", () => {
     const verify = vi.fn(async (): Promise<PinVerdict> => PASS);
     const gates = [
       "member",
+      "display",
       "session",
       "admin",
       "attested",
@@ -291,6 +332,7 @@ describe("runGate", () => {
     expect(verdicts.map((v) => v.ok)).toEqual([
       true,
       true,
+      true,
       false,
       true,
       false,
@@ -300,5 +342,8 @@ describe("runGate", () => {
       runGate("attested", ctx(kiosk, "1"), everywhere, verify),
     ).resolves.toEqual({ ok: true });
     expect(verify).toHaveBeenCalledTimes(1);
+    await expect(
+      runGate("display", ctx(kioskNobody), { kind: "read", surfaces: ["kiosk"] }, verify),
+    ).resolves.toEqual({ ok: true });
   });
 });

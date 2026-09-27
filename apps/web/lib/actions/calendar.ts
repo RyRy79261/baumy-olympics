@@ -125,7 +125,7 @@ export const listEvents = defineAction({
   kind: "read",
   risk: "safe",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: "member",
+  requires: "display",
   input: EventRange,
   async execute(ctx, input) {
     const from = input.from ?? berlinDateKey(ctx.now);
