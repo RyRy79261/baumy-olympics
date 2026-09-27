@@ -77,3 +77,96 @@ export const METRICS = {
   houseStreakDays: 11,
   overdue: BOUNTIES.filter((b) => b.dueInHours < 0).length,
 };
+
+// ---------------------------------------------------------------- month events
+/** A calendar event on an absolute date (ISO yyyy-mm-dd, Europe/Berlin day). */
+export type CalEvent = { date: string; start: string; end: string; title: string; who: string };
+
+export const TODAY_ISO = "2026-09-28";
+
+const ev = (date: string, start: string, end: string, title: string, who: string): CalEvent => ({ date, start, end, title, who });
+
+/** ~8 weeks around today (Sep 1 to Oct 31 2026): some busy days, some empty. */
+export const MONTH_EVENTS: CalEvent[] = [
+  // September, mostly past
+  ev("2026-09-01", "19:00", "20:00", "Yoga", "mika"),
+  ev("2026-09-02", "07:30", "08:00", "Recycling pickup", "house"),
+  ev("2026-09-02", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-09-04", "20:00", "23:00", "Movie night", "house"),
+  ev("2026-09-05", "11:00", "13:00", "Brunch", "house"),
+  ev("2026-09-05", "15:00", "16:00", "Bike repair", "sam"),
+  ev("2026-09-07", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-09-08", "19:00", "20:00", "Yoga", "mika"),
+  ev("2026-09-10", "12:00", "13:00", "Dentist", "jo"),
+  ev("2026-09-12", "10:00", "11:00", "Flat meeting", "house"),
+  ev("2026-09-12", "14:00", "17:00", "IKEA run", "sam"),
+  ev("2026-09-12", "19:00", "23:00", "Birthday: Lena", "jo"),
+  ev("2026-09-12", "21:00", "23:00", "Pub quiz", "ryan"),
+  ev("2026-09-14", "07:30", "08:00", "Recycling pickup", "house"),
+  ev("2026-09-14", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-09-15", "19:00", "20:00", "Yoga", "mika"),
+  ev("2026-09-17", "18:30", "20:00", "Choir", "sam"),
+  ev("2026-09-19", "13:00", "17:00", "Flohmarkt", "jo"),
+  ev("2026-09-20", "11:00", "13:00", "Brunch", "house"),
+  ev("2026-09-21", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-09-22", "19:00", "20:00", "Yoga", "mika"),
+  ev("2026-09-24", "20:00", "23:00", "Board games", "house"),
+  ev("2026-09-26", "10:00", "13:00", "Deep clean", "house"),
+  ev("2026-09-26", "15:00", "17:00", "Football", "sam"),
+  ev("2026-09-26", "20:00", "23:59", "Party at Kai's", "jo"),
+  // This week (matches WEEK)
+  ev("2026-09-28", "07:30", "08:00", "Recycling pickup", "house"),
+  ev("2026-09-28", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-09-28", "19:30", "22:00", "Dinner: Jo's friends", "jo"),
+  ev("2026-09-29", "09:00", "10:00", "Vet: Baumy jabs", "house"),
+  ev("2026-09-29", "12:30", "13:30", "Dentist", "ryan"),
+  ev("2026-09-29", "18:30", "20:00", "Choir", "sam"),
+  ev("2026-09-29", "20:00", "23:00", "Board games", "house"),
+  ev("2026-09-30", "10:00", "16:00", "Handyman (boiler)", "house"),
+  ev("2026-09-30", "18:30", "19:30", "Yoga", "mika"),
+  ev("2026-10-01", "12:00", "13:00", "Lunch w/ mum", "sam"),
+  ev("2026-10-02", "07:30", "08:00", "Recycling pickup", "house"),
+  ev("2026-10-02", "17:00", "19:00", "Train to Hamburg", "ryan"),
+  ev("2026-10-02", "18:00", "20:00", "Work drinks", "mika"),
+  ev("2026-10-02", "19:00", "23:59", "Kiez party", "house"),
+  ev("2026-10-02", "22:00", "23:59", "DJ set at Loophole", "jo"),
+  ev("2026-10-03", "10:00", "12:00", "Flea market", "jo"),
+  ev("2026-10-03", "14:00", "18:00", "Keller clear-out", "house"),
+  ev("2026-10-04", "11:00", "14:00", "Brunch", "house"),
+  // Next weeks
+  ev("2026-10-05", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-10-07", "19:00", "20:00", "Yoga", "mika"),
+  ev("2026-10-07", "20:00", "22:00", "Pub quiz", "ryan"),
+  ev("2026-10-09", "10:00", "11:00", "Chimney sweep", "house"),
+  ev("2026-10-09", "12:00", "13:00", "Lunch w/ mum", "sam"),
+  ev("2026-10-09", "18:30", "20:00", "Choir", "sam"),
+  ev("2026-10-09", "19:30", "23:00", "Jo's birthday drinks", "jo"),
+  ev("2026-10-10", "09:00", "10:30", "Farmers market", "mika"),
+  ev("2026-10-10", "11:00", "13:00", "Brunch", "house"),
+  ev("2026-10-10", "14:00", "16:00", "Football", "sam"),
+  ev("2026-10-10", "16:00", "17:00", "Baumy grooming", "house"),
+  ev("2026-10-10", "20:00", "23:00", "Movie night", "house"),
+  ev("2026-10-12", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-10-13", "07:30", "08:00", "Recycling pickup", "house"),
+  ev("2026-10-14", "19:00", "20:00", "Yoga", "mika"),
+  ev("2026-10-15", "16:00", "17:00", "Landlord inspection", "house"),
+  ev("2026-10-15", "18:00", "21:00", "Sam's parents visit", "sam"),
+  ev("2026-10-16", "20:00", "23:00", "Concert", "jo"),
+  ev("2026-10-17", "10:00", "13:00", "Half marathon", "ryan"),
+  ev("2026-10-17", "12:00", "15:00", "Bake sale", "mika"),
+  ev("2026-10-17", "19:00", "23:00", "Dinner party", "house"),
+  ev("2026-10-18", "11:00", "13:00", "Brunch", "house"),
+  ev("2026-10-19", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-10-21", "19:00", "20:00", "Yoga", "mika"),
+  ev("2026-10-22", "12:00", "13:00", "Dentist", "sam"),
+  ev("2026-10-23", "19:00", "22:00", "Pumpkin carving", "house"),
+  ev("2026-10-24", "10:00", "12:00", "Keller party setup", "house"),
+  ev("2026-10-24", "21:00", "23:59", "Housewarming: Ana", "jo"),
+  ev("2026-10-25", "11:00", "13:00", "Brunch", "house"),
+  ev("2026-10-27", "18:00", "20:00", "Climbing", "ryan"),
+  ev("2026-10-31", "20:00", "23:59", "Halloween party", "house"),
+];
+
+/** Events on one ISO date, in start order. */
+export const eventsOn = (date: string) =>
+  MONTH_EVENTS.filter((e) => e.date === date).sort((a, b) => a.start.localeCompare(b.start));

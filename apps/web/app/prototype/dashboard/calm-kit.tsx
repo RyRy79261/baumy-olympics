@@ -6,7 +6,7 @@
 // messages module, and the reminder + screensaver wiring.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { BlinkingBaumy } from "./baumy-sprite";
+import { BaumyCat } from "./baumy-cat";
 import { HOUSEMATES, MESSAGES, type Bounty } from "./data";
 import type { PixelIcon } from "./calm-icons";
 import { VC_CSS } from "./overlay-chrome";
@@ -133,9 +133,9 @@ const NAV: { l: string; g: GlyphName }[] = [
 export const FOOTER_H = 84;
 export const HEADER_H = 156;
 /** The calendar slot: below the header, above the footer and the raised voice button. */
-export const BODY_STYLE: CSSProperties = { top: HEADER_H, bottom: FOOTER_H + 22, left: 24, right: 24 };
+export const BODY_STYLE: CSSProperties = { top: HEADER_H, bottom: FOOTER_H + 40, left: 24, right: 24 };
 
-function Footer({ listening, onVoice }: { listening: boolean; onVoice: () => void }) {
+function Footer() {
   return (
     <>
       <nav
@@ -154,49 +154,8 @@ function Footer({ listening, onVoice }: { listening: boolean; onVoice: () => voi
           );
         })}
       </nav>
-      <button
-        type="button"
-        data-voice
-        onClick={onVoice}
-        aria-label="Talk to Baumy"
-        className="absolute right-[24px] grid h-[100px] w-[112px] place-items-center"
-        style={{ bottom: 12, ...framed(listening ? K.pink : K.violet, listening ? "#3a1740" : "#231640", 4) }}
-      >
-        <BlinkingBaumy scale={3} />
-      </button>
+      <BaumyCat scale={5} />
     </>
-  );
-}
-
-function Listening({ onStop }: { onStop: () => void }) {
-  return (
-    <div
-      className="cm-in absolute right-[24px] z-30 flex w-[440px] flex-col gap-4 p-6"
-      style={{ bottom: FOOTER_H + 40, ...framed(K.pink, "#1f1230", 4) }}
-      data-listening
-    >
-      <div className="flex items-center gap-4">
-        <div className="flex h-[48px] items-end gap-[6px]">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <span key={i} className="cm-eq block h-full w-[10px]" style={{ background: K.pink, animationDelay: `${i * 0.15}s` }} />
-          ))}
-        </div>
-        <span className={`${F.press} text-[20px]`} style={{ color: K.pink }}>
-          Listening…
-        </span>
-      </div>
-      <p className={`${F.pix} text-[24px] leading-snug`} style={{ color: K.muted }}>
-        Try &ldquo;I bought cat food&rdquo; or &ldquo;what&apos;s on tomorrow?&rdquo;
-      </p>
-      <button
-        type="button"
-        onClick={onStop}
-        className={`${F.silk} h-[60px] text-[16px] font-bold uppercase`}
-        style={{ ...framed(K.pink, K.pink, 3), color: K.ink }}
-      >
-        Done
-      </button>
-    </div>
   );
 }
 
@@ -204,7 +163,6 @@ function Listening({ onStop }: { onStop: () => void }) {
 export function CalmShell({ icons, calendar }: { icons: IconSpec[]; calendar: (now: Date) => ReactNode }) {
   const [now, setNow] = useState(() => new Date(START));
   const [open, setOpen] = useState<string | null>(null);
-  const [listening, setListening] = useState(false);
   const [reminder, setReminder] = useState(false);
   const [saver, setSaver] = useState(false);
   const idle = useRef<number | undefined>(undefined);
@@ -264,8 +222,7 @@ export function CalmShell({ icons, calendar }: { icons: IconSpec[]; calendar: (n
       <main className="absolute" style={BODY_STYLE}>
         {calendar(now)}
       </main>
-      <Footer listening={listening} onVoice={() => setListening((l) => !l)} />
-      {listening && <Listening onStop={() => setListening(false)} />}
+      <Footer />
       {spec && (
         <div
           className="cm-fade absolute inset-0 z-40 flex items-start justify-center px-6 pt-[120px]"
