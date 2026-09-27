@@ -12,11 +12,15 @@ import {
 } from "@baumy/ui";
 import type { HubData } from "@/lib/hub/load";
 import { BaumySheet } from "@/components/baumy/baumy-sheet";
+import {
+  ShoppingList,
+  type ShoppingActions,
+} from "@/components/shopping/shopping-list";
 import { LiveClock } from "./live-clock";
 
 // The hub (SPEC §3.1, issue #20): one screen with the clock, today's events,
 // the chores that are due with their streak holders, the leaderboard and the
-// pot, the pinned notes, the shopping list's slot and the Baumy button. The
+// pot, the pinned notes, brain's shopping list and the Baumy button. The
 // same widgets on a phone (`/`, stacked) and on the kitchen screen (`/kiosk`,
 // three columns by two rows that never scroll: each widget clips what does
 // not fit). Each widget shows its own empty or unavailable state.
@@ -27,6 +31,7 @@ export interface HubLinks {
   calendar: Route;
   chores: Route;
   notes: Route;
+  shopping: Route;
   /** The scoreboard; the kiosk has none. */
   scores?: Route;
 }
@@ -56,9 +61,15 @@ export function HubDashboard({
   kiosk = false,
   actingName,
   voice = false,
+  shopping,
 }: {
   hub: HubData;
   links: HubLinks;
+  /**
+   * The shopping widget's writes, and whether they are offered (on the
+   * kiosk only once someone has tapped their avatar).
+   */
+  shopping: { actions: ShoppingActions; canEdit: boolean };
   kiosk?: boolean;
   /** The kiosk's acting member, for the PIN pad of Baumy's proposals. */
   actingName?: string;
@@ -66,6 +77,7 @@ export function HubDashboard({
   voice?: boolean;
 }) {
   const { events, chores, standings, pot, notes } = hub;
+  const list = hub.shopping;
   return (
     <>
       <HubGrid kiosk={kiosk} data-testid="hub">
@@ -198,9 +210,20 @@ export function HubDashboard({
           id="widget-shopping"
           data-testid="widget-shopping"
           title="Shopping list"
-          status="empty"
-          message="The shopping list moves in here soon."
-        />
+          status={list.status === "unavailable" ? "unavailable" : "ready"}
+          message={list.status === "unavailable" ? list.message : undefined}
+          action={<More href={links.shopping} label="List" kiosk={kiosk} />}
+        >
+          {list.status === "unavailable" ? null : (
+            <ShoppingList
+              items={list.status === "ready" ? list.data : []}
+              kiosk={kiosk}
+              canEdit={shopping.canEdit}
+              actions={shopping.actions}
+              idPrefix="hub-shopping"
+            />
+          )}
+        </Widget>
       </HubGrid>
       <BaumySheet kiosk={kiosk} actingName={actingName} voice={voice} />
     </>
