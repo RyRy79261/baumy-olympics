@@ -22,6 +22,11 @@ import { listChores } from "./list-chores";
 import { logCompletionAction } from "./log-completion";
 import { manageChore } from "./manage-chore";
 import { manageMembers } from "./manage-members";
+import {
+  authorizeMcpClient,
+  listMcpConnectionsAction,
+  revokeMcpConnection,
+} from "./mcp-connections";
 import { mintInvite } from "./mint-invite";
 import {
   createNote,
@@ -61,6 +66,9 @@ export const REGISTRY = {
   manage_members: manageMembers,
   set_kiosk_pin: setKioskPin,
   create_telegram_link_code: createTelegramLinkCode,
+  authorize_mcp_client: authorizeMcpClient,
+  list_mcp_connections: listMcpConnectionsAction,
+  revoke_mcp_connection: revokeMcpConnection,
   pair_kiosk: pairKiosk,
   revoke_kiosk: revokeKiosk,
   check_kiosk_pin: checkKioskPin,
