@@ -22,8 +22,9 @@ name: Delete Neon branch for closed PR
 # the reason it works.
 #
 # Copied into baumy-olympics from afrikaburn-contributors-app
-# (origin/main:.github/workflows/neon-pr-cleanup.yml) per ADR 0004. Only change:
-# the Vercel step also deletes the branch-scoped NEON_PREVIEW_READY row that
+# (origin/main:.github/workflows/neon-pr-cleanup.yml) per ADR 0004. Changes: the
+# Neon branch is matched by exact name (see Naming), and the Vercel step also
+# deletes the branch-scoped NEON_PREVIEW_READY row that
 # scripts/neon-preview-env.sh writes. It still runs for Dependabot PRs, as a
 # safety net, even though none should have a branch.
 #
@@ -34,11 +35,11 @@ name: Delete Neon branch for closed PR
 #
 #     preview/<head-branch-name>
 #
-# We look these up by PREFIX rather than reconstructing the full name from event
-# data — head-ref slugging can differ between Vercel, the Neon integration and
-# the action that reports branch names, so a prefix match is more robust while
-# staying narrowly scoped to this PR. (It does mean a branch named `feat-a` would
-# also match `preview/feat-a-b`; keep branch names distinct, which they are.)
+# We match that name EXACTLY. afrikaburn matched by prefix because the Vercel
+# integration's slugging could differ from the head ref; our own script writes
+# `preview/<head ref>` verbatim, so there is nothing to tolerate, and a prefix
+# match would let closing `feat/12-chores` delete `preview/feat/12-chores-ui`,
+# another open PR's database.
 
 # `pull_request_target` (not `pull_request`) so the base repository's Actions
 # secret store is available even when the PR was opened or closed by Dependabot
@@ -84,8 +85,8 @@ jobs:
             exit 0
           fi
 
-          prefix="preview/${HEAD_REF}"
-          echo "Looking up Neon branches with prefix: $prefix"
+          target_name="preview/${HEAD_REF}"
+          echo "Looking up Neon branch: $target_name"
 
           api="https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}"
           auth="Authorization: Bearer ${NEON_API_KEY}"
@@ -122,19 +123,19 @@ jobs:
             fi
           done
 
-          # Non-primary branches matching this PR's prefix. `primary != true` is
+          # The non-primary branch named exactly after this PR's head ref. `primary != true` is
           # the guard that matters most in this repository: the primary branch is
           # PRODUCTION, holding real burners' registrations, and it must never be
           # a candidate for deletion under any circumstance.
-          targets=$(printf '%s' "$all_branches" | jq -r --arg prefix "$prefix" '
+          targets=$(printf '%s' "$all_branches" | jq -r --arg name "$target_name" '
             .[]
             | select(.primary != true)
-            | select(.name | startswith($prefix))
+            | select(.name == $name)
             | [.id, .name] | @tsv
           ')
 
           if [ -z "$targets" ]; then
-            echo "No Neon branch found for PR #${PR_NUMBER} (prefix: $prefix). Nothing to delete."
+            echo "No Neon branch found for PR #${PR_NUMBER} ($target_name). Nothing to delete."
             exit 0
           fi
 
