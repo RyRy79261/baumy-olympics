@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { count, eq } from "drizzle-orm";
+import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { Queryable, Tx } from "@baumy/db";
@@ -7,6 +8,7 @@ import { actionRequests, auditEvents, members } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
 import {
   FIXED_NOW,
+  accountActor,
   allowAll,
   ctxFor,
   kioskActor,
@@ -806,5 +808,201 @@ describe("transactional: false", () => {
       });
     const stale = await run("test_external", { title: "Dinner" }, ctx);
     expect(stale).toEqual({ ok: true, data: { eventId: "evt_1" } });
+  });
+});
+
+describe("account actions (joining the household)", () => {
+  let joinMode: "ok" | "no_member" | "refuse" = "ok";
+
+  const join = defineAction({
+    name: "test_join",
+    title: "Join",
+    description: "Test join.",
+    consent: "Test consent",
+    kind: "write",
+    risk: "safe",
+    surfaces: ["ui"],
+    requires: "account",
+    input: z.strictObject({ name: z.string() }),
+    async execute(ctx, input) {
+      executed(input);
+      if (ctx.actor.memberId) {
+        return {
+          ok: false,
+          code: "ALREADY_MEMBER",
+          message: "Joined.",
+        } as const;
+      }
+      const [row] = await ctx.db
+        .insert(members)
+        .values({
+          householdId: HOUSEHOLD_ID,
+          authUserId: ctx.actor.kind === "member" ? ctx.actor.userId : null,
+          displayName: input.name,
+          avatarSprite: "cat",
+          color: "#123456",
+        })
+        .returning({ id: members.id });
+      if (joinMode === "refuse") {
+        return {
+          ok: false,
+          code: "INVITE_USED_UP",
+          message: "Used up.",
+        } as const;
+      }
+      return {
+        ok: true,
+        data: { memberId: row!.id },
+        audit: { entity: "member", entityId: row!.id },
+        ...(joinMode === "ok" ? { joinedAs: row!.id } : {}),
+      };
+    },
+  });
+
+  const detachedJoin = defineAction({
+    ...join,
+    name: "test_detached_join",
+    transactional: false,
+  });
+
+  beforeEach(() => {
+    joinMode = "ok";
+    run = createRunner(
+      { test_join: join, test_detached_join: detachedJoin },
+      deps,
+    );
+  });
+
+  it("runs for an account with no member, keying the ledger and audit on the new member", async () => {
+    const ctx = ctxFor(accountActor("u_new"));
+    const res = await run("test_join", { name: "Newbie" }, ctx);
+    expect(res).toMatchObject({ ok: true });
+    const memberId = (res as { data: { memberId: string } }).data.memberId;
+    expect(await requestRows()).toEqual([
+      expect.objectContaining({
+        actorMemberId: memberId,
+        requestId: ctx.requestId,
+        action: "test_join",
+        status: "done",
+        result: res,
+      }),
+    ]);
+    expect(await auditRows()).toEqual([
+      expect.objectContaining({
+        actorMemberId: memberId,
+        action: "test_join",
+        entity: "member",
+        entityId: memberId,
+        payload: { name: "Newbie" },
+      }),
+    ]);
+
+    // The retry comes back as the member it made, and replays.
+    const again = await run(
+      "test_join",
+      { name: "Newbie" },
+      { ...ctx, actor: { ...accountActor("u_new"), memberId, role: "member" } },
+    );
+    expect(again).toEqual(res);
+    expect(executed).toHaveBeenCalledTimes(1);
+  });
+
+  it("is INTERNAL, writing nothing, when the action creates no member", async () => {
+    joinMode = "no_member";
+    const res = await run(
+      "test_join",
+      { name: "Ghost" },
+      ctxFor(accountActor("u_ghost")),
+    );
+    expect(res).toMatchObject({ ok: false, code: "INTERNAL" });
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(await t.db().select().from(members)).toHaveLength(0);
+    expect(await requestRows()).toHaveLength(0);
+  });
+
+  it("rolls the new member back when the action refuses", async () => {
+    joinMode = "refuse";
+    const res = await run(
+      "test_join",
+      { name: "Late" },
+      ctxFor(accountActor("u_late")),
+    );
+    expect(res).toEqual({
+      ok: false,
+      code: "INVITE_USED_UP",
+      message: "Used up.",
+    });
+    expect(await t.db().select().from(members)).toHaveLength(0);
+    expect(await auditRows()).toHaveLength(0);
+  });
+
+  it("refuses the kiosk and non-transactional joins", async () => {
+    await expect(
+      run("test_join", { name: "K" }, ctxFor(kioskActor(), { source: "ui" })),
+    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    await expect(
+      run(
+        "test_detached_join",
+        { name: "D" },
+        ctxFor(accountActor("u_detached")),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    expect(executed).not.toHaveBeenCalled();
+  });
+});
+
+describe("secrets in the input or the result", () => {
+  const secretive = defineAction({
+    name: "test_secretive",
+    title: "Secretive",
+    description: "Test write with a secret in and out.",
+    consent: "Test consent",
+    kind: "write",
+    risk: "safe",
+    surfaces: ["ui"],
+    requires: "member",
+    input: z.strictObject({ pin: z.string(), label: z.string() }),
+    fingerprint: (input) => ({ label: input.label }),
+    async execute(_ctx, input) {
+      executed(input);
+      const data: { code: string | null; label: string } = {
+        code: "SECRET-CODE",
+        label: input.label,
+      };
+      return { ok: true, data, storedData: { ...data, code: null } };
+    },
+  });
+
+  beforeEach(() => {
+    run = createRunner({ test_secretive: secretive }, deps);
+  });
+
+  it("keeps the secret out of the ledger and the audit row, and hands it over once", async () => {
+    const me = await seedMember(db());
+    const ctx = ctxFor(sessionActor(me));
+    const res = await run("test_secretive", { pin: "4321", label: "x" }, ctx);
+    expect(res).toEqual({
+      ok: true,
+      data: { code: "SECRET-CODE", label: "x" },
+    });
+    const [ledger] = await requestRows();
+    expect(ledger?.result).toEqual({
+      ok: true,
+      data: { code: null, label: "x" },
+    });
+    const [audit] = await auditRows();
+    expect(audit?.payload).toEqual({ label: "x" });
+    const everything = JSON.stringify([ledger, audit]);
+    expect(everything).not.toContain("4321");
+    expect(everything).not.toContain("SECRET-CODE");
+
+    // A replay gets the stored form, without the code.
+    const replay = await run(
+      "test_secretive",
+      { pin: "9999", label: "x" },
+      ctx,
+    );
+    expect(replay).toEqual({ ok: true, data: { code: null, label: "x" } });
+    expect(executed).toHaveBeenCalledTimes(1);
   });
 });

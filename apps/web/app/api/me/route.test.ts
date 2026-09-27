@@ -15,6 +15,8 @@ describe("GET /api/me", () => {
       userId: "u_1",
       email: "ryan@example.com",
       name: "Ryan",
+      emailVerified: true,
+      sessionCreatedAt: "2026-09-27T09:00:00.000Z",
     };
     getActor.mockResolvedValue(actor);
     const res = await GET();

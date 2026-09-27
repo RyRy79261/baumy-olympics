@@ -39,6 +39,10 @@ import { fail, type ActionFailure, type ActionResult } from "./result";
 // requests with one key meet at the INSERT: the second waits for the first
 // transaction, then finds its row.
 //
+// An `account` action from an account with no member yet (joining the
+// household) has nothing to key the claim on, so it executes first and keys
+// the ledger and the audit row on the member it created (`runJoining`).
+//
 // `transactional: false` actions (Google, brain) commit the claim as
 // `pending`, run `execute` with NO transaction open, then write the audit row
 // and the result in a short second transaction.
@@ -218,29 +222,39 @@ function claimOutcome(c: Exclude<Claim, { kind: "claimed" }>) {
   }
 }
 
+/**
+ * Write the audit row and store the result. `auditInput` is the input as the
+ * action's `fingerprint` shows it. The ledger keeps `storedData` when the
+ * action set it (the caller still gets `data`, once).
+ */
 async function finish(
   tx: Queryable,
   key: ClaimKey,
   action: string,
-  input: unknown,
+  auditInput: unknown,
   out: Extract<ExecuteResult<unknown>, { ok: true }>,
   now: Date,
 ): Promise<ActionResult<unknown>> {
-  const result = asStored<unknown>({ ok: true, data: out.data });
+  const stored = asStored<unknown>({
+    ok: true,
+    data: out.storedData !== undefined ? out.storedData : out.data,
+  });
   await tx.insert(auditEvents).values({
     actorMemberId: key.actorMemberId,
     source: key.source,
     action,
     entity: out.audit?.entity ?? action,
     entityId: out.audit?.entityId ?? null,
-    payload: out.audit?.payload ?? input ?? null,
+    payload: out.audit?.payload ?? auditInput ?? null,
     at: now,
   });
   await tx
     .update(actionRequests)
-    .set({ status: "done", result })
+    .set({ status: "done", result: stored })
     .where(keyWhere(key));
-  return result;
+  return out.storedData !== undefined
+    ? asStored<unknown>({ ok: true, data: out.data })
+    : stored;
 }
 
 /** Build a runner over a registry. `runAction` (registry.ts) is the real one. */
@@ -320,8 +334,13 @@ export function createRunner(
       }
 
       // Writes: the ledger and the audit trail both key on a member.
+      const seen = def.fingerprint ? def.fingerprint(input) : input;
+      const hash = inputHash(def.name, seen);
       const actorMemberId = ctx.actor.memberId;
       if (!actorMemberId) {
+        if (gate === "account" && def.transactional !== false) {
+          return await runJoining(def, ctx, input, seen, hash, deps);
+        }
         return fail("FORBIDDEN", "Only household members can do this.");
       }
       const key: ClaimKey = {
@@ -329,10 +348,9 @@ export function createRunner(
         source: ctx.source,
         requestId: ctx.requestId!,
       };
-      const hash = inputHash(def.name, input);
 
       if (def.transactional === false) {
-        return await runDetached(def, ctx, input, key, hash, deps);
+        return await runDetached(def, ctx, input, seen, key, hash, deps);
       }
 
       // 5 and 6 in one transaction: claim, execute, audit, store.
@@ -344,7 +362,7 @@ export function createRunner(
         // The action said no: roll back everything, claim included, so a
         // retry is judged afresh.
         if (!out.ok) throw new ActionAbort(out);
-        return finish(db, key, def.name, input, out, ctx.now);
+        return finish(db, key, def.name, seen, out, ctx.now);
       });
     } catch (err) {
       if (err instanceof ActionAbort) return err.result;
@@ -352,6 +370,49 @@ export function createRunner(
       return fail("INTERNAL", GENERIC_ERROR);
     }
   };
+}
+
+/**
+ * An `account` action from an account with no member yet (joining the
+ * household). There is no member to key the claim on before `execute`, so it
+ * runs first, in the transaction, and must create the member and name it in
+ * `joinedAs`; the ledger row and the audit row are then keyed on that member,
+ * in the same transaction. A retry with the same request id comes back as
+ * that member and replays the stored result through the normal claim.
+ *
+ * Two joins by the same account at once meet at the unique
+ * `members.auth_user_id`: the second waits for the first, then creates
+ * nothing and fails, rolling back whatever it had claimed (an invite use).
+ */
+async function runJoining(
+  def: AnyActionDef,
+  ctx: RequestCtx,
+  input: unknown,
+  seen: unknown,
+  hash: string,
+  deps: RunnerDeps,
+): Promise<ActionResult<unknown>> {
+  return deps.withTransaction(async (tx) => {
+    const db = tx as unknown as Queryable;
+    const out = await def.execute({ ...ctx, db }, input);
+    if (!out.ok) throw new ActionAbort(out);
+    if (!out.joinedAs) {
+      throw new Error(`${def.name} ran for an account but created no member`);
+    }
+    const key: ClaimKey = {
+      actorMemberId: out.joinedAs,
+      source: ctx.source,
+      requestId: ctx.requestId!,
+    };
+    await db.insert(actionRequests).values({
+      ...key,
+      action: def.name,
+      inputHash: hash,
+      status: "pending",
+      createdAt: ctx.now,
+    });
+    return finish(db, key, def.name, seen, out, ctx.now);
+  });
 }
 
 /**
@@ -363,6 +424,7 @@ async function runDetached(
   def: AnyActionDef,
   ctx: RequestCtx,
   input: unknown,
+  seen: unknown,
   key: ClaimKey,
   hash: string,
   deps: RunnerDeps,
@@ -404,7 +466,7 @@ async function runDetached(
 
   try {
     return await deps.withTransaction((tx) =>
-      finish(tx as unknown as Queryable, key, def.name, input, out, ctx.now),
+      finish(tx as unknown as Queryable, key, def.name, seen, out, ctx.now),
     );
   } catch (err) {
     deps.logError(`[action:${def.name}] could not be audited`, err);

@@ -32,6 +32,13 @@ export interface MemberActor {
   userId: string;
   email: string;
   name: string;
+  /** Whether Better Auth has seen this address confirmed (link or Google). */
+  emailVerified: boolean;
+  /**
+   * When this session signed in, ISO 8601. Changing an existing kiosk PIN
+   * without the password needs a session under 10 minutes old (SPEC §6.2).
+   */
+  sessionCreatedAt: string;
   /**
    * The active `members` row linked to this account, if there is one. A
    * session without one is only proof of an account, not of a housemate, and
@@ -89,6 +96,8 @@ export const getActor = cache(async (): Promise<Actor | null> => {
     userId: session.user.id,
     email: session.user.email,
     name: session.user.name,
+    emailVerified: session.user.emailVerified,
+    sessionCreatedAt: new Date(session.session.createdAt).toISOString(),
     ...(member ? { memberId: member.id, role: member.role } : {}),
   };
 });
