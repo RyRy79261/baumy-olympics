@@ -101,6 +101,7 @@ export const RULESET_V1 = {
   breakPctPerLen: 20, breakLenCap: 10,         // 20% of base per broken length, cap 200%
   minBrokenStreak: 1,
   undoWindowMin: 10, challengeWindowH: 24, partnerConfirmExpiryH: 72, maxBackdateH: 24,
+  maxFutureMin: 2,                             // the FUTURE check's clock-skew allowance (added 2026-09-27, issue #11)
 } as const;
 
 multiplierPct(n) = 100 + 25·(n−1)                           // uncapped
@@ -128,9 +129,13 @@ The results are written to `completion_scores`, and the whole (chore, season) is
 - `FUTURE` (more than 2 minutes after now)
 - `BACKDATE_TOO_FAR` (more than 24h ago)
 - `OUT_OF_ORDER` (before the last live completion; history is append-only)
-- `SEASON_CLOSED`
+- `SEASON_CLOSED` (only a `closed` season; a `closing` one still takes the up-to-24h backdated completions that fall in it)
 - `PHOTO_REQUIRED`
 - `ARCHIVED_CHORE`
+
+The checks run in the order `ARCHIVED_CHORE`, `SEASON_CLOSED`, `FUTURE`, `BACKDATE_TOO_FAR`, `PHOTO_REQUIRED`, `OUT_OF_ORDER`, `COOLDOWN`, and the first failure is returned. Until `effectiveStatus` lands (issue #12), `isLive` in `validate.ts` derives only the partner-mode 72h expiry from `now`; a disputed row stays live until its timeout to `voided` is persisted (added 2026-09-27, issue #11).
+
+Replay resets the streak whenever the Berlin season year of `occurred_at` changes, so it is correct even when handed rows from more than one season (added 2026-09-27, issue #11).
 
 ### 4.3 Confirmation
 
