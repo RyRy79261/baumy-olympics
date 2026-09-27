@@ -17,7 +17,9 @@ import type { MessageParams } from "./claude";
 //     text names (else the first one);
 //   - "I did/took/cleaned … the <chore>": reads list_chores, then proposes
 //     log_completion for every chore named in the text (the longest names
-//     first), or asks which chore when none is.
+//     first), or asks which chore when none is;
+//   - "add milk and eggs (to the list)": proposes ONE add_shopping_items
+//     with every item named (issue #26).
 //
 // Anything else gets a short help line and no tool. It never touches the
 // database itself: everything it knows comes from the tool results.
@@ -26,6 +28,20 @@ type Block = Anthropic.ContentBlock;
 
 const LOG_VERBS =
   /\b(did|done|took|take|cleaned|clean|emptied|empty|log|logged|finished|vacuumed|washed|mopped|watered|unloaded|made)\b/;
+
+/** "add milk, eggs and bread to the shopping list" → the part to add. */
+const ADD_SHOPPING =
+  /\badd\s+(.+?)(?:\s+(?:on)?to\s+(?:the\s+|our\s+)?(?:shopping\s+)?list)?[\s.!?]*$/;
+
+/** The items named in "milk, eggs and bread". */
+export function shoppingItemsNamed(said: string): string[] {
+  const m = ADD_SHOPPING.exec(said);
+  if (!m) return [];
+  return m[1]!
+    .split(/,|\band\b/)
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+}
 
 let seq = 0;
 const id = (prefix: string) => `${prefix}_fake_${++seq}`;
@@ -193,6 +209,20 @@ export async function fakeClaude(
           `I've lined up confirming ${claim.doneByName}'s ${claim.choreName}.`,
         ),
         toolUse("confirm_completion", { completionId: claim.completionId }),
+      ],
+      "tool_use",
+    );
+  }
+
+  const shopping = offered.has("add_shopping_items")
+    ? shoppingItemsNamed(said)
+    : [];
+  if (shopping.length > 0) {
+    return message(
+      model,
+      [
+        text("I've lined up the shopping list for you. Tap approve."),
+        toolUse("add_shopping_items", { items: shopping }),
       ],
       "tool_use",
     );

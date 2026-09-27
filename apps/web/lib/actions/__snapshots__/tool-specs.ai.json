@@ -664,5 +664,80 @@
     },
     "kind": "write",
     "risk": "destructive"
+  },
+  {
+    "name": "list_shopping",
+    "title": "Shopping list",
+    "description": "Lists what is on the house shopping list (the same list the house Telegram group keeps with Baumy), oldest first: each item's id, its name and when it was added (ISO 8601, UTC).",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "kind": "read",
+    "risk": "safe"
+  },
+  {
+    "name": "add_shopping_items",
+    "title": "Add to the shopping list",
+    "description": "Adds one or more items to the house shopping list, which the house Telegram group shares. Send every item of one request in ONE call, one entry each: \"add milk and eggs\" is items [\"milk\", \"eggs\"]. Something already on the list is left as it is.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "items": {
+          "description": "The items, one entry each, as people would write them: [\"milk\", \"eggs\"]. Put every item of one request in this one list.",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "safe"
+  },
+  {
+    "name": "check_off_shopping_items",
+    "title": "Check off the shopping list",
+    "description": "Checks items off the house shopping list (they were bought, or are not needed), by name as list_shopping gives them. Send every item in one call.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "items": {
+          "description": "The items, one entry each, as people would write them: [\"milk\", \"eggs\"]. Put every item of one request in this one list.",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "safe"
   }
 ]

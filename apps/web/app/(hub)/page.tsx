@@ -5,10 +5,11 @@ import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { loadHub } from "@/lib/hub/load";
 import { voiceConfigured } from "@/lib/integrations/groq";
+import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
 
 // The hub home (SPEC §3.1, issue #20): the clock, today's events, the chores
-// that are due, the leaderboard and the pot, the pinned notes, the shopping
-// list's slot and the Baumy button. The kitchen screen shows the same
+// that are due, the leaderboard and the pot, the pinned notes, brain's
+// shopping list and the Baumy button. The kitchen screen shows the same
 // widgets at /kiosk.
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,12 @@ export default async function HubPage() {
           calendar: "/calendar",
           chores: "/chores",
           notes: "/notes",
+          shopping: "/shopping",
           scores: "/scores",
+        }}
+        shopping={{
+          canEdit: true,
+          actions: { add: addShoppingAction, checkOff: checkOffShoppingAction },
         }}
       />
     </>

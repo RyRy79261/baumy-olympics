@@ -2,11 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { refreshCookieLine } from "@/lib/hub/refresh";
 
 // The kitchen screen stays fresh without websockets (SPEC §8): it re-reads
 // the page every 60 seconds and whenever it comes back into view. It waits
 // while someone is in the middle of something (a dialog open, a field
 // focused), so a refresh never pulls the page out from under them.
+//
+// Each of these re-reads sets a short-lived cookie first, so the server
+// skips its 30-second cache of brain's shopping list (lib/hub/refresh.ts).
 
 export const HUB_REFRESH_MS = 60_000;
 
@@ -29,7 +33,9 @@ export function AutoRefresh({
   const router = useRouter();
   useEffect(() => {
     const refresh = () => {
-      if (!isBusy(document)) router.refresh();
+      if (isBusy(document)) return;
+      document.cookie = refreshCookieLine();
+      router.refresh();
     };
     const onVisible = () => {
       if (document.visibilityState === "visible") refresh();
