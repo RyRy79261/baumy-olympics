@@ -96,6 +96,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 - **Validate with Zod at every boundary.** Shared schemas live in `packages/types`.
 - A `"use server"` file exports only async functions.
 - **Integrations** (Google Calendar, brain, Groq, Claude) return result unions (`ok`, `not_configured`, `unavailable`) and never throw into the UI. Errors carry the HTTP status only, and secrets are passed through `redactSecrets`.
+  - The shopping list is brain's (issue #26): read and write it only through `brainClient()` (`lib/integrations/brain.ts`) inside the shopping actions. Its 30s read cache is cleared by our writes and by the kiosk home's re-read (`skipShoppingCacheOnRefresh`). In e2e, `/api/test/brain` plays the Telegram group and the `baumy_e2e_brain=down` cookie takes brain down for one browser.
 - **Time:** read the current time from `lib/clock.ts` (never `new Date()` in server code). All times are stored as UTC timestamptz. Anything about days or seasons uses Europe/Berlin through `packages/core/src/time.ts`. Never hard-code `+01:00` or `+02:00`.
 - **No cron beyond the single daily job.** Other work runs in `after()` or lazily on page load behind a rate-limit row, and must be idempotent and safe against double claims (`FOR UPDATE SKIP LOCKED`).
 - **Env vars:** every new variable goes into both `.env.example` and turbo `globalEnv` in the same PR.
