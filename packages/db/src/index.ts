@@ -3,6 +3,7 @@ import { drizzle as drizzleHttp } from "drizzle-orm/neon-http";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { drizzle as drizzleServerless } from "drizzle-orm/neon-serverless";
 import type { NeonDatabase } from "drizzle-orm/neon-serverless";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "./schema";
 
 // Ported from camp-404 `packages/db/src/index.ts`, with afrikaburn's
@@ -13,6 +14,13 @@ export * as schema from "./schema";
 
 export type Database = NeonHttpDatabase<typeof schema>;
 export type PooledDatabase = { db: NeonDatabase<typeof schema>; pool: Pool };
+
+/**
+ * Anything that runs queries against our schema: the HTTP driver, the pooled
+ * driver or a transaction handle. For code that takes the caller's handle
+ * (AGENTS.md "Domain functions take the caller's tx") and must not care which.
+ */
+export type Queryable = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 /**
  * Used when DATABASE_URL is unset, for example during `next build`'s

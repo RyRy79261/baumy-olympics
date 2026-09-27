@@ -14,6 +14,10 @@ vi.mock("next/headers", () => ({ headers: () => headersMock() }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => redirectMock(to),
 }));
+const findMember = vi.fn();
+vi.mock("@baumy/db/members", () => ({
+  findActiveMemberByAuthUserId: (id: string) => findMember(id),
+}));
 vi.mock("@baumy/auth", async (importOriginal) => {
   const real = await importOriginal<typeof AuthModule>();
   return {
@@ -23,7 +27,7 @@ vi.mock("@baumy/auth", async (importOriginal) => {
 });
 
 const { getActor, getActorOrRedirect, redirectIfSignedIn } =
-  await import("./auth");
+  await import("./actor");
 
 const session = {
   user: { id: "u_1", email: "ryan@example.com", name: "Ryan" },
@@ -35,6 +39,8 @@ beforeEach(() => {
   vi.stubEnv("VERCEL_ENV", "");
   vi.stubEnv("BETTER_AUTH_SECRET", "");
   getSession.mockReset();
+  findMember.mockReset();
+  findMember.mockResolvedValue(null);
   headersMock.mockClear();
   redirectMock.mockClear();
 });
@@ -52,6 +58,25 @@ describe("getActor", () => {
     expect(passed.headers.get("cookie")).toBe("x=y");
   });
 
+  it("attaches the active member and role linked to the account", async () => {
+    getSession.mockResolvedValue(session);
+    findMember.mockResolvedValue({
+      id: "m_1",
+      householdId: "h_1",
+      role: "admin",
+      displayName: "Ryan",
+    });
+    await expect(getActor()).resolves.toEqual({
+      kind: "member",
+      userId: "u_1",
+      email: "ryan@example.com",
+      name: "Ryan",
+      memberId: "m_1",
+      role: "admin",
+    });
+    expect(findMember).toHaveBeenCalledWith("u_1");
+  });
+
   it("returns null when there is no session", async () => {
     getSession.mockResolvedValue(null);
     await expect(getActor()).resolves.toBeNull();
@@ -63,6 +88,7 @@ describe("getActor", () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     await expect(getActor()).resolves.toBeNull();
     expect(getSession).not.toHaveBeenCalled();
+    expect(findMember).not.toHaveBeenCalled();
   });
 
   it("reads the session on Vercel once the secret is set", async () => {

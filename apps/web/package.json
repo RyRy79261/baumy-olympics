@@ -14,11 +14,15 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "e2e:install": "playwright install --with-deps chromium"
+    "e2e:install": "playwright install --with-deps chromium",
+    "test:local": "vitest run --config vitest.local.config.ts"
   },
   "dependencies": {
     "@baumy/auth": "workspace:*",
+    "@baumy/db": "workspace:*",
+    "@baumy/types": "workspace:*",
     "better-auth": "1.6.25",
+    "drizzle-orm": "^0.45.3",
     "next": "^16.3.6",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -28,6 +32,7 @@
   "devDependencies": {
     "@baumy/eslint-config": "workspace:*",
     "@baumy/typescript-config": "workspace:*",
+    "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.4",
