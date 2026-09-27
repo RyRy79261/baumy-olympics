@@ -133,9 +133,7 @@ describe("verificationEndedAt and photoPruneAt", () => {
     expect(verificationEndedAt(row, at(EXPIRY - 1), null)).toBeNull();
     expect(verificationEndedAt(row, at(EXPIRY), null)).toEqual(at(EXPIRY));
     const confirmed = after(row, { type: "confirm", actor: PARTNER });
-    expect(verificationEndedAt(confirmed, at(HOUR), null)).toEqual(
-      at(EXPIRY),
-    );
+    expect(verificationEndedAt(confirmed, at(HOUR), null)).toEqual(at(EXPIRY));
   });
 
   it("ends a ruled dispute at the ruling, and a late confirmation then", () => {
@@ -158,8 +156,8 @@ describe("verificationEndedAt and photoPruneAt", () => {
     expect(verificationEndedAt(ruled.row, at(10 * DAY), at(10 * DAY))).toEqual(
       at(10 * DAY),
     );
-    expect(
-      photoPruneAt(ruled.row, at(10 * DAY), at(9 * DAY)),
-    ).toEqual(at(10 * DAY + RETAIN));
+    expect(photoPruneAt(ruled.row, at(10 * DAY), at(9 * DAY))).toEqual(
+      at(10 * DAY + RETAIN),
+    );
   });
 });
