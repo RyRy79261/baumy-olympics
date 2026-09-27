@@ -7,10 +7,10 @@
 The owner remembered AfrikaBurn having "a trick to stop Dependabot creating Neon previews", and he was right. afrikaburn origin/main (added in ef65a4e, #65; still there at 46f0ed2) has:
 
 - `.github/workflows/neon-pr-preview.yml`, whose job is guarded by `github.event.pull_request.user.login != 'dependabot[bot]'`, keyed on the PR author rather than `github.actor`.
-- `neon-pr-cleanup.yml`, which uses `pull_request_target` so that it can still *delete* a branch when a Dependabot PR closes.
+- `neon-pr-cleanup.yml`, which uses `pull_request_target` so that it can still _delete_ a branch when a Dependabot PR closes.
 - `.github/dependabot.yml` with a 2-day `cooldown`, a lockstep `vitest` group and `better-auth` / `@better-auth/*` ignores, and a commitlint ignore for `chore(deps): bump …`.
 
-afrikaburn does not skip the Vercel build for Dependabot, so such a PR builds against the Preview env's default `DATABASE_URL*` ("in practice production, or nothing", its `docs/deploy.md`). The same happens on the *first* build of every PR, because `neon-preview-env.sh` sets branch-scoped env vars and redeploys only after the git-triggered build has started. With migrate-on-build, that build would migrate the wrong database.
+afrikaburn does not skip the Vercel build for Dependabot, so such a PR builds against the Preview env's default `DATABASE_URL*` ("in practice production, or nothing", its `docs/deploy.md`). The same happens on the _first_ build of every PR, because `neon-preview-env.sh` sets branch-scoped env vars and redeploys only after the git-triggered build has started. With migrate-on-build, that build would migrate the wrong database.
 
 When the Neon branch quota fills up, every Vercel preview fails within about one second.
 

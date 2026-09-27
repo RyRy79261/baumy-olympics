@@ -1,0 +1,4 @@
+# Conventional Commits with a workspace scope (AGENTS.md). CI will check the PR
+# title and every commit too, because a hook only binds machines that have run
+# `pnpm install`.
+pnpm exec commitlint --edit "$1"
