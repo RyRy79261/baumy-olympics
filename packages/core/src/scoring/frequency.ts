@@ -64,12 +64,7 @@ export type FrequencyRules = typeof FREQUENCY_V1;
  * - `superseded`: a newer week's suggestion replaced it while still open.
  */
 export type WeightSuggestionStatus =
-  | "open"
-  | "scheduled"
-  | "dismissed"
-  | "vetoed"
-  | "applied"
-  | "superseded";
+  "open" | "scheduled" | "dismissed" | "vetoed" | "applied" | "superseded";
 
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
