@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { createHttpDb, type Queryable } from "@baumy/db";
@@ -6,15 +7,26 @@ import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { listActiveMembers } from "@baumy/db/members";
 import { AvatarButton, Button, KioskShell } from "@baumy/ui";
 import { IdleReset } from "@/components/kiosk/idle-reset";
+import { KeepScreenOn } from "@/components/kiosk/keep-screen-on";
+import { NightMode } from "@/components/kiosk/night-mode";
+import { RegisterServiceWorker } from "@/components/kiosk/service-worker";
 import { getKioskActor } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
+import { now } from "@/lib/clock";
+import {
+  NIGHT_TEST_COOKIE,
+  isNightAt,
+  kioskNightWindow,
+} from "@/lib/kiosk/night";
 import { clearPickAction, pickMemberAction } from "../actions";
 
 // The kitchen kiosk's shell (SPEC §8): a landscape screen, signed in as a
 // paired DEVICE, with the household's avatars along the top. Tapping one
-// makes that member the one acting; 60 seconds idle forgets them. An
-// unpaired or revoked device is sent to /kiosk/pair. Nothing here links to
-// the hub or to admin pages, and admin actions refuse the kiosk anyway.
+// makes that member the one acting; 60 seconds idle forgets them and goes
+// home. It holds the screen wake lock, sleeps at night (issue #29) and
+// registers the offline page's service worker. An unpaired or revoked device
+// is sent to /kiosk/pair. Nothing here links to the hub or to admin pages,
+// and admin actions refuse the kiosk anyway.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Kiosk - Baumy" };
@@ -29,6 +41,10 @@ export default async function KioskLayout({
   // The kitchen screen is the page loaded most: it runs the daily job's
   // sweep too, at most every 15 minutes (lib/background-work.ts).
   runSweepAfterResponse();
+  const at = now();
+  const night = kioskNightWindow(
+    (await cookies()).get(NIGHT_TEST_COOKIE)?.value,
+  );
   const people = await listActiveMembers(
     createHttpDb() as unknown as Queryable,
     HOUSEHOLD_ID,
@@ -37,6 +53,7 @@ export default async function KioskLayout({
   return (
     <KioskShell
       brand="Baumy"
+      skin={isNightAt(at, night) ? "night" : "day"}
       avatars={people.map((p) => (
         <form key={p.id} action={pickMemberAction}>
           <input type="hidden" name="memberId" value={p.id} />
@@ -64,7 +81,10 @@ export default async function KioskLayout({
         )
       }
     >
-      <IdleReset active={Boolean(kiosk.memberId)} />
+      <KeepScreenOn />
+      <IdleReset memberPicked={Boolean(kiosk.memberId)} />
+      <NightMode serverNow={at.toISOString()} window={night} />
+      <RegisterServiceWorker />
       {children}
     </KioskShell>
   );
