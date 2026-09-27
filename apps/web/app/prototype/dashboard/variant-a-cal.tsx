@@ -202,7 +202,7 @@ function WeekDivider({ monday }: { monday: string }) {
 }
 
 /** A native-scrolling list with the scrollbar hidden and a chunky pixel one drawn beside it. */
-function PixelScroll({ children, endLabel }: { children: ReactNode; endLabel: string }) {
+function PixelScroll({ children, endLabel, tone = K.bg }: { children: ReactNode; endLabel?: string; tone?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const [m, setM] = useState({ top: 0, view: 0, full: 0, trackH: 0 });
@@ -244,24 +244,26 @@ function PixelScroll({ children, endLabel }: { children: ReactNode; endLabel: st
 
   // Stepped (dithered-looking) fade in the page colour.
   const fade: CSSProperties = {
-    background: `linear-gradient(to bottom, transparent 0 20%, ${K.bg}55 20% 40%, ${K.bg}99 40% 60%, ${K.bg}dd 60% 80%, ${K.bg} 80%)`,
+    background: `linear-gradient(to bottom, transparent 0 20%, ${tone}55 20% 40%, ${tone}99 40% 60%, ${tone}dd 60% 80%, ${tone} 80%)`,
   };
 
   return (
     <div className="flex min-h-0 flex-1 gap-3">
       <div className="relative min-h-0 flex-1">
         <div ref={ref} data-agenda onScroll={measure} className="a2-noscroll h-full overflow-y-auto">
-          <div className="pb-[88px]">
+          <div className={endLabel ? "pb-[88px]" : "pb-[72px]"}>
             {children}
-            <div className={`${F.silk} py-6 text-center text-[14px] uppercase`} style={{ color: K.dim }}>
-              ── {endLabel} ──
-            </div>
+            {endLabel && (
+              <div className={`${F.silk} py-6 text-center text-[14px] uppercase`} style={{ color: K.dim }}>
+                ── {endLabel} ──
+              </div>
+            )}
           </div>
         </div>
         {!atTop && (
           <div
             className="pointer-events-none absolute left-0 right-0 top-0 h-[28px]"
-            style={{ background: `linear-gradient(to top, transparent 0 33%, ${K.bg}88 33% 66%, ${K.bg} 66%)` }}
+            style={{ background: `linear-gradient(to top, transparent 0 33%, ${tone}88 33% 66%, ${tone} 66%)` }}
           />
         )}
         {!atEnd && (
@@ -340,8 +342,8 @@ function Chip({ e, dim }: { e: CalEvent; dim: boolean }) {
   const c = whoColor(e.who);
   return (
     <div
-      className={`${F.pix} flex h-[26px] items-center gap-[6px] overflow-hidden pr-1 text-[16px] leading-none`}
-      style={{ background: `${c}24`, opacity: dim ? 0.5 : 1 }}
+      className={`${F.pix} flex h-[27px] shrink-0 items-center gap-[6px] overflow-hidden pr-1 text-[17px] leading-none`}
+      style={{ background: `${c}2e`, color: K.text, opacity: dim ? 0.45 : 1 }}
     >
       <span className="block h-full w-[5px] shrink-0" style={{ background: c }} />
       <span className="truncate">{e.title}</span>
@@ -358,18 +360,18 @@ function DaySheet({ iso, top, onClose }: { iso: string; top: boolean; onClose: (
       {!top && <div className="flex-1" />}
       <section
         data-sheet={iso}
-        className="cm-in flex max-h-[62%] min-h-[300px] flex-col"
+        className="cm-in flex h-[72%] flex-col"
         style={framed(K.violet, "#1e1432", 4)}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center gap-4 px-7 pb-3 pt-6">
           <div className="flex-1">
             <div className={`${F.press} text-[22px]`} style={{ color: isToday ? K.violet : K.text }}>
-              {isToday ? "TODAY" : `${WD_LONG[dow(iso)]!.toUpperCase()} ${dom(iso)}`}
+              {isToday ? "TODAY" : `${WD_LONG[dow(iso)]} ${dom(iso)} ${monName(iso)}`.toUpperCase()}
             </div>
             <div className={`${F.silk} mt-2 text-[14px] uppercase`} style={{ color: K.muted }}>
-              {isToday ? `${WD_LONG[dow(iso)]} ${dom(iso)} ${monName(iso)}` : monName(iso)} ·{" "}
-              {evs.length === 0 ? "nothing planned" : `${evs.length} ${evs.length === 1 ? "thing" : "things"}${past ? " · past" : ""}`}
+              {isToday ? `${WD_LONG[dow(iso)]} ${dom(iso)} ${monName(iso)} · ` : ""}
+              {evs.length === 0 ? "nothing planned" : `${evs.length} ${evs.length === 1 ? "thing" : "things"} planned${past ? " · past" : ""}`}
             </div>
           </div>
           <button
@@ -383,7 +385,8 @@ function DaySheet({ iso, top, onClose }: { iso: string; top: boolean; onClose: (
             ×
           </button>
         </header>
-        <div className="a2-noscroll min-h-0 flex-1 overflow-y-auto px-7 pb-6">
+        <div className="flex min-h-0 flex-1 flex-col pb-5 pl-7 pr-4">
+          <PixelScroll tone="#1e1432">
           {evs.length === 0 ? (
             <div className={`${F.pix} py-10 text-center text-[28px]`} style={{ color: K.muted }}>
               A free day. Baumy suggests a nap.
@@ -415,6 +418,7 @@ function DaySheet({ iso, top, onClose }: { iso: string; top: boolean; onClose: (
               );
             })
           )}
+          </PixelScroll>
         </div>
       </section>
       {top && <div className="flex-1" />}
@@ -457,11 +461,11 @@ function Month({ ym, picked, onPick }: { ym: string; picked: string | null; onPi
               data-date={iso}
               onClick={() => onPick(iso)}
               className="flex min-h-0 flex-col gap-[4px] overflow-hidden p-[7px] text-left"
-              style={{ ...frame, opacity: inMonth ? 1 : 0.4 }}
+              style={{ ...frame, opacity: inMonth || isToday ? 1 : 0.55 }}
             >
-              <div className="flex h-[24px] items-center justify-between">
+              <div className="flex h-[26px] shrink-0 items-center justify-between">
                 <span
-                  className={`${F.press} px-[4px] text-[15px] leading-[22px]`}
+                  className={`${F.press} px-[4px] text-[17px] leading-[24px]`}
                   style={
                     isToday
                       ? { background: K.violet, color: K.ink }
@@ -480,8 +484,8 @@ function Month({ ym, picked, onPick }: { ym: string; picked: string | null; onPi
                 <Chip key={e.start + e.title} e={e} dim={past} />
               ))}
               {extra > 0 && (
-                <div className={`${F.press} pl-[2px] text-[13px] leading-[20px]`} style={{ color: K.muted }}>
-                  +{extra} more
+                <div className={`${F.press} pl-[2px] text-[14px] leading-[22px]`} style={{ color: past ? K.dim : K.muted }}>
+                  +{extra}
                 </div>
               )}
             </button>

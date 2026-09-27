@@ -1,17 +1,15 @@
 "use client";
 
 // PROTOTYPE (issue #7), throwaway. Variant A: notification icons by STATUS
-// (Urgent, New, Messages) over a full-width week agenda: today big, then
-// the next six days as rows.
+// (Urgent, New, Messages) over a Week | Month calendar (variant-a-cal.tsx).
 
 import { useState } from "react";
-import { BOUNTIES, isUrgent, WEEK } from "./data";
+import { BOUNTIES, eventsOn, isUrgent, TODAY_ISO } from "./data";
+import { CalendarArea } from "./variant-a-cal";
 import { ENVELOPE, SIREN, STAR } from "./calm-icons";
 import {
   BountyRows,
   CalmShell,
-  DATES,
-  DAYS,
   F,
   framed,
   HM,
@@ -106,12 +104,12 @@ function Who({ who, scale = 2 }: { who: string; scale?: number }) {
 
 function Today({ now }: { now: Date }) {
   const m = nowMin(now);
-  const today = WEEK.filter((e) => e.day === 0);
+  const today = eventsOn(TODAY_ISO);
   const past = today.filter((e) => toMin(e.end) <= m);
   const coming = today.filter((e) => toMin(e.end) > m);
   const next = coming[0];
   return (
-    <section className="flex flex-col px-7 pb-5 pt-6" style={framed(K.violet, "#1e1432", 4)}>
+    <section className="flex shrink-0 flex-col px-7 pb-5 pt-5" style={framed(K.violet, "#1e1432", 4)}>
       <div className="flex items-baseline justify-between">
         <span className={`${F.press} text-[22px]`} style={{ color: K.violet }}>
           TODAY
@@ -121,7 +119,7 @@ function Today({ now }: { now: Date }) {
         </span>
       </div>
       {past.map((e) => (
-        <div key={e.title} className={`${F.pix} mt-4 flex items-center gap-4 text-[22px]`} style={{ color: K.dim }}>
+        <div key={e.title} className={`${F.pix} mt-3 flex items-center gap-4 text-[22px]`} style={{ color: K.dim }}>
           <span className={`${F.press} w-[150px] text-[16px]`}>{e.start}</span>
           <span className="ml-6 line-through">{e.title}</span>
           <span className={`${F.silk} text-[13px] uppercase`}>done</span>
@@ -131,17 +129,17 @@ function Today({ now }: { now: Date }) {
         const c = whoColor(e.who);
         const mins = toMin(e.start) - m;
         return (
-          <div key={e.title} className="mt-5 flex items-center gap-4">
+          <div key={e.title} className="mt-4 flex items-center gap-4">
             <div className="w-[150px] shrink-0">
               <div className={`${F.press} text-[28px] leading-none`}>{e.start}</div>
               <div className={`${F.silk} mt-2 text-[14px] uppercase`} style={{ color: K.muted }}>
                 to {e.end}
               </div>
             </div>
-            <span className="block h-[84px] w-[8px] shrink-0" style={{ background: c }} />
+            <span className="block h-[76px] w-[8px] shrink-0" style={{ background: c }} />
             <div className="min-w-0 flex-1">
-              <div className={`${F.pix} truncate text-[42px] font-semibold leading-none`}>{e.title}</div>
-              <div className="mt-3">
+              <div className={`${F.pix} truncate text-[40px] font-semibold leading-none`}>{e.title}</div>
+              <div className="mt-2">
                 <Who who={e.who} />
               </div>
             </div>
@@ -157,51 +155,11 @@ function Today({ now }: { now: Date }) {
   );
 }
 
-function Days() {
-  return (
-    <section className="flex flex-1 flex-col">
-      {[1, 2, 3, 4, 5, 6].map((d) => {
-        const evs = WEEK.filter((e) => e.day === d);
-        return (
-          <div key={d} className="flex flex-1 items-center gap-5 px-2" style={{ borderTop: `2px solid ${K.line}` }}>
-            <div className="w-[118px] shrink-0">
-              <div className={`${F.silk} text-[15px] font-bold uppercase`} style={{ color: d === 1 ? K.text : K.muted }}>
-                {d === 1 ? "Tomorrow" : DAYS[d]}
-              </div>
-              <div className={`${F.press} mt-2 text-[22px]`} style={{ color: d >= 5 ? K.muted : K.text }}>
-                {DATES[d]}
-              </div>
-            </div>
-            <div className="flex min-w-0 flex-1 gap-6">
-              {evs.map((e) => (
-                <div key={e.title} className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="block h-[46px] w-[6px] shrink-0" style={{ background: whoColor(e.who) }} />
-                  <div className="min-w-0">
-                    <div className={`${F.pix} truncate text-[27px] leading-none`}>{e.title}</div>
-                    <div className={`${F.silk} mt-[6px] text-[13px] uppercase`} style={{ color: K.muted }}>
-                      {e.start} · <span style={{ color: whoColor(e.who) }}>{whoName(e.who)}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
 export function VariantA() {
   return (
     <CalmShell
       icons={ICONS}
-      calendar={(now) => (
-        <div className="flex h-full flex-col gap-4">
-          <Today now={now} />
-          <Days />
-        </div>
-      )}
+      calendar={(now) => <CalendarArea today={<Today now={now} />} />}
     />
   );
 }

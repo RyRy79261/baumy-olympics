@@ -145,7 +145,7 @@ export function BaumyCat({ scale = 5 }: { scale?: number }) {
     mode === "listening" ? (tick % 2 ? TALK : BASE) : tick % 20 === 0 ? BLINK : BASE;
 
   return (
-    <div className="absolute bottom-[80px] right-[22px] z-30" data-voice-cat>
+    <div className="absolute bottom-[4px] right-[18px] z-30" data-voice-cat>
       {mode === "listening" && (
         <Bubble>
           <div className="flex items-center gap-4">
