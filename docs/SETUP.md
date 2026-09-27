@@ -159,3 +159,32 @@ Postgres in the CI `db · docker postgres` job (`pnpm db:local:test`).
       passing.
 - Kiosk PIN attestation fails closed (every PIN is refused) until issue #10
   wires the real check; that is code, not an owner step.
+
+## Membership (issue #9)
+
+Nothing here blocks CI: the e2e harness sets its own `FOUNDER_EMAILS` (one
+per Playwright project) and reads confirmation links from the capture file.
+Until `FOUNDER_EMAILS` is set on a deployment, nobody there can become the
+first admin, so everyone who signs up waits on `/join`.
+
+- [ ] **Add `FOUNDER_EMAILS` to `.env.example`** (agents cannot edit
+      `.env*` files). It is already in turbo `globalEnv`:
+
+  ```sh
+  # Comma-separated. Each may join as an admin without an invite code, once
+  # the address is verified (the confirmation email, or Google sign-in).
+  FOUNDER_EMAILS=
+  ```
+
+- [ ] **Set `FOUNDER_EMAILS`** in Vercel (Production scope, and Preview if
+      you test previews) to your address and your partner's, comma-separated.
+- [ ] **Make verification possible.** A founder must confirm their address
+      before `/join` lets them in as admin. That needs Resend
+      (`RESEND_API_KEY` and `RESEND_FROM_EMAIL`, see "Auth" above) or
+      Google sign-in (Google addresses count as verified).
+- [ ] **After the first production deploy**: sign up with a founder address,
+      open the confirmation email, go to `/join` and press "Join as admin".
+      Then open `/admin/members`, create an invite code and check that a
+      second account can redeem it.
+- `INVITE_CODES` in SPEC §6.8 is not read by anything yet (marked
+  UNRESOLVED there): say whether it should go, or what it should seed.

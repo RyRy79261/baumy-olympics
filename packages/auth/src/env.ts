@@ -31,6 +31,11 @@ export interface AuthEnv {
   GOOGLE_CLIENT_ID?: string | undefined;
   GOOGLE_CLIENT_SECRET?: string | undefined;
   NODE_ENV?: string | undefined;
+  /**
+   * Comma-separated emails that may join as an admin without an invite code,
+   * once the address is verified (SPEC §6.2). How the first admin exists.
+   */
+  FOUNDER_EMAILS?: string | undefined;
   /** The e2e harness switch. The app refuses to boot with it on Vercel. */
   E2E_TEST_MODE?: string | undefined;
   /**
@@ -257,4 +262,22 @@ export function authConfigWarnings(env: AuthEnv): string[] {
     );
   }
   return warnings;
+}
+
+/**
+ * The founder emails, trimmed and lowercased; empty when unset. Better Auth
+ * stores emails lowercased, so a session's email compares directly.
+ */
+export function resolveFounderEmails(env: AuthEnv): ReadonlySet<string> {
+  return new Set(
+    (env.FOUNDER_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.includes("@")),
+  );
+}
+
+/** Whether `email` is on the founder list. */
+export function isFounderEmail(env: AuthEnv, email: string): boolean {
+  return resolveFounderEmails(env).has(email.trim().toLowerCase());
 }

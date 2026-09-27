@@ -59,15 +59,24 @@ export function requireMember(
  * MCP token or brain.
  */
 export function requireSession(ctx: RequestCtx): GateResult {
-  const { actor } = ctx;
-  if (actor.kind !== "member") {
-    return fail(
-      "FORBIDDEN",
-      "This can only be done signed in on your own phone or computer.",
-    );
-  }
-  if (!actor.memberId) return NOT_A_MEMBER;
+  const account = requireAccount(ctx);
+  if (!account.ok) return account;
+  if (!ctx.actor.memberId) return NOT_A_MEMBER;
   return OK;
+}
+
+/**
+ * A real cookie or bearer session, member row or not: someone who has an
+ * account and may be about to join. Only the joining actions use it; they
+ * check membership themselves.
+ */
+export function requireAccount(ctx: RequestCtx): GateResult {
+  return ctx.actor.kind === "member"
+    ? OK
+    : fail(
+        "FORBIDDEN",
+        "This can only be done signed in on your own phone or computer.",
+      );
 }
 
 /** An admin, signed in with a real session. */
@@ -126,6 +135,8 @@ export async function runGate(
       return requireMember(ctx, action);
     case "session":
       return requireSession(ctx);
+    case "account":
+      return requireAccount(ctx);
     case "admin":
       return requireAdmin(ctx);
     case "attested":

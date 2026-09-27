@@ -36,13 +36,34 @@ export async function seedMember(
 export function sessionActor(
   memberId: string | undefined,
   role: MemberRole = "member",
+  overrides: Partial<MemberActor> = {},
 ): MemberActor {
   return {
     kind: "member",
     userId: `u_${memberId ?? "none"}`,
     email: "someone@example.com",
     name: "Someone",
+    emailVerified: true,
+    // An hour before FIXED_NOW: an established session, not a fresh one.
+    sessionCreatedAt: "2026-09-27T09:00:00.000Z",
     ...(memberId ? { memberId, role } : {}),
+    ...overrides,
+  };
+}
+
+/** A signed-in account with no member row: someone about to join. */
+export function accountActor(
+  userId: string,
+  overrides: Partial<MemberActor> = {},
+): MemberActor {
+  return {
+    kind: "member",
+    userId,
+    email: `${userId}@example.com`,
+    name: userId,
+    emailVerified: true,
+    sessionCreatedAt: "2026-09-27T09:00:00.000Z",
+    ...overrides,
   };
 }
 
