@@ -1,10 +1,13 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  berlinMonthBounds,
+  berlinMonthKey,
   berlinParts,
   berlinWallTimeToUtc,
   berlinWeekday,
   formatBerlinDateTime,
+  formatMonthKey,
   isBerlinMonday,
   nextBerlinMonday,
   seasonBounds,
@@ -182,5 +185,32 @@ describe("formatBerlinDateTime", () => {
     expect(formatBerlinDateTime(iso("2026-12-31T23:30:00Z"))).toBe(
       "Fri 1 Jan, 00:30",
     );
+  });
+});
+
+describe("Berlin months", () => {
+  it("keys an instant by the Berlin month, not the UTC one", () => {
+    // 23:30Z on 31 Aug is 01:30 on 1 Sep in Berlin (summer time).
+    expect(berlinMonthKey(iso("2026-08-31T23:30:00Z"))).toBe("2026-09");
+    expect(berlinMonthKey(iso("2026-08-31T21:59:59Z"))).toBe("2026-08");
+    // Winter time: 23:30Z on 31 Dec is already January in Berlin.
+    expect(berlinMonthKey(iso("2026-12-31T23:30:00Z"))).toBe("2027-01");
+  });
+
+  it("bounds a month at Berlin midnight on each side, across DST and years", () => {
+    // March holds the spring change: it starts at +01:00 and ends at +02:00.
+    expect(berlinMonthBounds(2026, 3)).toEqual({
+      startsAt: iso("2026-02-28T23:00:00Z"),
+      endsAt: iso("2026-03-31T22:00:00Z"),
+    });
+    expect(berlinMonthBounds(2026, 12)).toEqual({
+      startsAt: iso("2026-11-30T23:00:00Z"),
+      endsAt: iso("2026-12-31T23:00:00Z"),
+    });
+  });
+
+  it("names a month for people", () => {
+    expect(formatMonthKey("2026-09")).toBe("Sep 2026");
+    expect(formatMonthKey("2027-01")).toBe("Jan 2027");
   });
 });

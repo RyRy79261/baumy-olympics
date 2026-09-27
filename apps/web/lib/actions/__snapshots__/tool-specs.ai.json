@@ -186,5 +186,71 @@
       "additionalProperties": false
     },
     "risk": "confirm"
+  },
+  {
+    "name": "get_standings",
+    "description": "Returns the season scoreboard: each member's rank and points (scored completions plus approved adjustments), the part of those points that is still provisional (claims that can still be disputed), how far each member is behind the leader, the leader (who would take the pot now, or null on a tie), the prize mode, dispute counts this month, the latest scored completions with their breakdown (base, streak bonus, break bonus) and the point adjustments. Times are ISO 8601 in UTC; the household lives in Europe/Berlin.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "year": {
+          "description": "The season (Berlin calendar year). Defaults to the current season.",
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2100
+        },
+        "recent": {
+          "description": "How many recent completions to include. Default 10.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  },
+  {
+    "name": "get_streaks",
+    "description": "Returns the season's streak board: who holds each chore's streak now and how long it is, and the season's best runs (current or already broken), longest first, each with its chore, member, length, weight (base points added up) and dates. Times are ISO 8601 in UTC.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "year": {
+          "description": "The season (Berlin calendar year). Defaults to the current season.",
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2100
+        },
+        "best": {
+          "description": "How many best runs to return. Default 5.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": "safe"
+  },
+  {
+    "name": "get_pot",
+    "description": "Returns the season's savings pot: each month's contributions (amounts in euro cents, who paid, notes), the running total after each month, the total, and the current leader who would take the whole pot at the end of the season (null when nobody leads outright). The pot is a ledger only; money moves at the bank.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "year": {
+          "description": "The season (Berlin calendar year). Defaults to the current season.",
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2100
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": "safe"
   }
 ]

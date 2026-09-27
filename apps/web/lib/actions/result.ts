@@ -81,7 +81,13 @@ export type DomainErrorCode =
   /** The claim already has its proof photo. */
   | "PHOTO_ALREADY_ATTACHED"
   /** `attach_completion_photo` without a photo from the upload route. */
-  | "PHOTO_MISSING";
+  | "PHOTO_MISSING"
+  /** The season already has a completion, so its prize mode is fixed. */
+  | "PRIZE_MODE_LOCKED"
+  /** A prize mode v1 does not play (`heaviest_streak`, `longest_streak`). */
+  | "PRIZE_MODE_NOT_SUPPORTED"
+  /** An admin tried to approve their own point adjustment. */
+  | "SELF_APPROVAL";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 
