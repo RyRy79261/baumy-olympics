@@ -304,6 +304,15 @@ The schema is one hand-written file and is the only source of truth. Migrations 
   - `runAction` writes `audit_events` and `action_requests` in the same transaction; `logCompletion` writes neither.
 - Reads use the HTTP driver.
 
+**Details of the write path** (added 2026-09-27, issue #13; `packages/db/src/completions.ts`, `seasons.ts`):
+
+- `logCompletion` checks `client_request_id` **under the chore lock**: a repeat for the same chore and doer returns the stored completion (`duplicate: true`) and writes nothing; a repeat naming another chore or doer is `REQUEST_ID_REUSED`. Besides the validator codes it can return `CHORE_NOT_FOUND` and `NO_RULE_VERSION` (no rule version in effect at `occurred_at`).
+- The previous live completion before the season start is found among the latest 20 rows not stored as `voided`, judged with `isLive(now)`.
+- A season nobody has created yet validates as `active`, and `ensureSeason` creates it (`active`, `prize_mode=points`, `[1 Jan 00:00 Berlin, next 1 Jan)`) only once the completion passes. `ensureSeason` is `INSERT … ON CONFLICT DO NOTHING` on `(household_id, year)`, then a read.
+- `rescoreChore` replays the whole (chore, season), upserts every counted row's score and deletes the scores of rows no longer counted. `setCompletionStatus` compare-and-sets the verification columns on the expected status (`STALE` otherwise), then re-scores; it locks the chore too, so it never interleaves with a `logCompletion`. `rebuildAllScores` rebuilds every (chore, season) in chore order.
+- Constraints beyond the table above: `completions.client_request_id` is NOT NULL (it is in a unique index); `void_reason` is set exactly when `voided`; `verified_by`/`verified_at` are set together, and `confirmed` needs them; a `photo_pathname` needs a `photo_attached_at`; `completion_scores.total_pts = streak_pts + break_pts`; at most one open dispute per completion (partial unique index on `resolved_at IS NULL`), with a non-blank reason; `point_adjustments.points <> 0`; `pot_contributions.month` is the 1st of a month; a season has a winner only when `closed`; `chore_rule_versions.cooldown_minutes >= 0`.
+- `chore_rule_versions.suggestion_id` has no foreign key yet: `weight_suggestions` arrives with issue #17, which adds it.
+
 ---
 
 ## 6. Architecture
@@ -574,12 +583,13 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
 
 ## 10. Testing strategy
 
-| Layer                     | Tool                                                                                                                                                                                                              | Floor                                       |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `packages/core` (scoring) | Vitest + **fast-check** property tests + the E1–E10 fixtures                                                                                                                                                      | 95% lines and branches, 100% on `scoring/*` |
-| `packages/db`             | Vitest + in-process **PGlite** that replays the real migrations (port camp-404 `packages/db/src/__tests__/_harness.ts`)                                                                                           | 75%                                         |
-| `apps/web/lib/**`         | Vitest in jsdom, with an alias from `server-only` to an empty module (camp-404 `apps/web/vitest.config.ts`). Covers every action's `execute`, surface and permission rules, and each adapter.                     | 90%                                         |
-| E2E                       | Playwright against `next start` on a **real Docker Postgres** (afrikaburn `scripts/e2e-local.sh`, `docker-compose.local.yml`). Projects: `desktop-chromium`, `ipad-landscape` (1180×820, touch) and `mobile-360`. | Critical flows                              |
+| Layer                     | Tool                                                                                                                                                                                                                                                   | Floor                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| `packages/core` (scoring) | Vitest + **fast-check** property tests + the E1–E10 fixtures                                                                                                                                                                                           | 95% lines and branches, 100% on `scoring/*` |
+| `packages/db`             | Vitest + in-process **PGlite** that replays the real migrations (port camp-404 `packages/db/src/__tests__/_harness.ts`)                                                                                                                                | 75%                                         |
+| `*.local.test.ts`         | Vitest against **Docker Postgres** (`pnpm db:local:test`, the `db-local` CI job). PGlite is a single connection and serialises every transaction, so races (the idempotency claim, the chore lock) are tested here only (added 2026-09-27, issue #13). | none                                        |
+| `apps/web/lib/**`         | Vitest in jsdom, with an alias from `server-only` to an empty module (camp-404 `apps/web/vitest.config.ts`). Covers every action's `execute`, surface and permission rules, and each adapter.                                                          | 90%                                         |
+| E2E                       | Playwright against `next start` on a **real Docker Postgres** (afrikaburn `scripts/e2e-local.sh`, `docker-compose.local.yml`). Projects: `desktop-chromium`, `ipad-landscape` (1180×820, touch) and `mobile-360`.                                      | Critical flows                              |
 
 - In E2E, external services (Google Calendar, Claude, Groq, brain, Blob) sit behind adapter interfaces with in-memory fakes, which are chosen when `E2E_TEST_MODE=1`. Users are created through the real UI, and there is no DB back door except the seed script.
 - Server time comes from `apps/web/lib/clock.ts`. With `E2E_TEST_MODE=1` it adds an offset set through a test-only route, so specs can advance past the 24h window; Playwright's clock alone only moves the browser.
