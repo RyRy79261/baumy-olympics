@@ -173,9 +173,11 @@ export const SENSITIVE_AUTH_PATHS = [
 /**
  * Optional rate-limit tuning, so the e2e harness can raise the ceiling without
  * anyone reaching for `enabled: false`. `{}` when unset keeps Better Auth's
- * own defaults. Production must leave these unset.
+ * own defaults. Ignored on any Vercel deployment, like the email capture file:
+ * a stray value there would switch off brute-force protection on sign-in.
  */
 export function resolveRateLimit(env: AuthEnv): RateLimitTuning {
+  if (trimmed(env.VERCEL_ENV)) return {};
   const window = Number(env.AUTH_RATE_LIMIT_WINDOW_SECONDS);
   const max = Number(env.AUTH_RATE_LIMIT_MAX);
   const hasWindow = Number.isFinite(window) && window > 0;
