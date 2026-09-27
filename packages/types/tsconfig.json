@@ -1,0 +1,7 @@
+{
+  "extends": "@baumy/typescript-config/base.json",
+  "include": ["src/**/*.ts", "vitest.config.ts"],
+  "compilerOptions": {
+    "outDir": "dist"
+  }
+}
