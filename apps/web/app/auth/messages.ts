@@ -23,11 +23,26 @@ interface AuthError {
   code?: string;
 }
 
-/** What a refused sign-in says: rate limited, or the one neutral sentence. */
+/**
+ * What a refused sign-in says: rate limited, a server failure (auth switched
+ * off, database down), or the one neutral sentence. A server failure is not an
+ * answer about the account, so saying so reveals nothing.
+ */
 export function signInErrorSentence(error: AuthError): string {
   if (error.status === 429) return TOO_MANY_ATTEMPTS;
+  if (error.status !== undefined && error.status >= 500) {
+    return SOMETHING_WENT_WRONG;
+  }
   return SIGN_IN_REFUSED;
 }
+
+/**
+ * Better Auth sends a failed OAuth round trip (Google) back to sign-in with
+ * `?error=<code>` (`onAPIError.errorURL`). The code is not shown: it is
+ * attacker-controllable text in a URL.
+ */
+export const OAUTH_FAILED =
+  "Signing in with Google didn't finish. Try again, or use your email and password.";
 
 /**
  * What a refused sign-up says. An address that already has an account says so,
