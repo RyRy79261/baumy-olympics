@@ -48,6 +48,7 @@ describe("useTestDb", () => {
       "audit_events",
       "households",
       "invite_codes",
+      "kiosk_devices",
       "members",
       "rate_limit",
       "session",

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { inviteCodeState, listInviteCodes } from "@baumy/db/invite-codes";
+import { kioskDeviceState, listKioskDevices } from "@baumy/db/kiosk-devices";
 import { listMembers } from "@baumy/db/members";
 import { Card, PageHeading } from "@baumy/ui";
 import { requireAdminPage } from "@/lib/auth";
@@ -11,12 +12,22 @@ import {
   MintInviteForm,
   RevokeInviteButton,
 } from "./admin-forms";
+import { PairKioskForm, RevokeKioskButton } from "./kiosk-forms";
 
 // /admin/members (SPEC §6.2): admins only; anyone else gets a 404 from the
 // page gate, and every write here is an admin-only registry action.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Members - Baumy Olympics" };
+
+const DEVICE_STATE_LABEL = {
+  waiting: "Waiting for its code",
+  expired: "Code expired",
+  paired: "Paired",
+  revoked: "Revoked",
+} as const;
+
+const day = (d: Date) => d.toISOString().slice(0, 10);
 
 const STATE_LABEL = {
   active: "Active",
@@ -28,9 +39,10 @@ const STATE_LABEL = {
 export default async function AdminMembersPage() {
   const me = await requireAdminPage();
   const db = createHttpDb() as unknown as Queryable;
-  const [people, codes] = await Promise.all([
+  const [people, codes, devices] = await Promise.all([
     listMembers(db, HOUSEHOLD_ID),
     listInviteCodes(db, HOUSEHOLD_ID),
+    listKioskDevices(db, HOUSEHOLD_ID),
   ]);
   const at = now();
 
@@ -39,7 +51,7 @@ export default async function AdminMembersPage() {
       <PageHeading
         eyebrow="Admin"
         title="Members"
-        description="Who is in the household, and the codes that let people in."
+        description="Who is in the household, the codes that let people in, and the kitchen kiosks."
       />
       <div className="flex flex-col gap-6">
         <Card title="Household">
@@ -91,6 +103,45 @@ export default async function AdminMembersPage() {
                     ) : null}
                     {state === "active" ? (
                       <RevokeInviteButton code={c.code} />
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+
+        <PairKioskForm />
+
+        <Card title="Kiosks">
+          {devices.length === 0 ? (
+            <p className="text-sm text-neutral-600">No kiosks yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {devices.map((d) => {
+                const state = kioskDeviceState(d, at);
+                return (
+                  <li
+                    key={d.id}
+                    className="flex flex-wrap items-center gap-3 text-sm"
+                    data-testid={`kiosk-${d.name}`}
+                  >
+                    <span className="font-semibold">{d.name}</span>
+                    <span>{DEVICE_STATE_LABEL[state]}</span>
+                    {state === "paired" && d.pairedAt ? (
+                      <span className="text-neutral-600">
+                        since {day(d.pairedAt)}
+                        {d.lastSeenAt
+                          ? `, last seen ${d.lastSeenAt.toISOString().slice(0, 16).replace("T", " ")} UTC`
+                          : ""}
+                      </span>
+                    ) : null}
+                    {state === "paired" || state === "waiting" ? (
+                      <RevokeKioskButton
+                        deviceId={d.id}
+                        name={d.name}
+                        paired={state === "paired"}
+                      />
                     ) : null}
                   </li>
                 );

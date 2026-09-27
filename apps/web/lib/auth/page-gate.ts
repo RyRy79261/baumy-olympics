@@ -12,8 +12,10 @@ import {
 // (gates.ts, run by runAction); a page only decides what the visitor may SEE:
 //
 //   nobody signed in           → /auth/sign-in
-//   not a person's own session → 404 (the kiosk, MCP and brain never get the
-//                                hub's pages)
+//   a paired kiosk             → /kiosk (its own shell), or 404 on admin
+//                                pages
+//   not a person's own session → 404 (MCP and brain never get the hub's
+//                                pages)
 //   an account, no member row  → /join (redeem an invite code)
 //   a member, on an admin page → 404
 //   otherwise                  → the page
@@ -24,12 +26,17 @@ export type PageNeed = "member" | "admin" | "joining";
 
 export type PageVerdict =
   | { kind: "ok" }
-  | { kind: "redirect"; to: "/auth/sign-in" | "/join" | "/" }
+  | { kind: "redirect"; to: "/auth/sign-in" | "/join" | "/" | "/kiosk" }
   | { kind: "not_found" };
 
 /** Pure: what a page that needs `need` does with this actor. */
 export function pageGate(actor: Actor | null, need: PageNeed): PageVerdict {
   if (!actor) return { kind: "redirect", to: "/auth/sign-in" };
+  if (actor.kind === "kiosk") {
+    return need === "admin"
+      ? { kind: "not_found" }
+      : { kind: "redirect", to: "/kiosk" };
+  }
   if (actor.kind !== "member") return { kind: "not_found" };
   if (need === "joining") {
     return actor.memberId ? { kind: "redirect", to: "/" } : { kind: "ok" };

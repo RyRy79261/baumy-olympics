@@ -21,6 +21,9 @@ export const ACTION_NAMES = [
   "manage_members",
   "set_kiosk_pin",
   "create_telegram_link_code",
+  "pair_kiosk",
+  "revoke_kiosk",
+  "check_kiosk_pin",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 

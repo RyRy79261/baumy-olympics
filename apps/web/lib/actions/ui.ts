@@ -48,12 +48,16 @@ export function formDataToInput(form: FormData): Record<string, unknown> {
   return out;
 }
 
-/** The request context for a server action, or null when nobody signed in. */
+/**
+ * The request context for a server action, or null when nobody signed in. A
+ * paired kiosk without a person's session is not signed in here: the kiosk
+ * has its own adapter (kiosk.ts) and its own surface.
+ */
 export async function uiRequestCtx(
   requestId: string | undefined,
 ): Promise<RequestCtx | null> {
   const actor = await getActor();
-  if (!actor) return null;
+  if (!actor || actor.kind === "kiosk") return null;
   return {
     actor,
     source: "ui",
