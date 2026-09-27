@@ -1,9 +1,9 @@
-// PROTOTYPE (issue #7), throwaway. Variant C ("Busy"): window chrome,
+// PROTOTYPE (issue #7), throwaway. Shared by the overlays: window chrome,
 // colours, helpers and keyframes for the retro-OS lounge.
 
 import type { CSSProperties, ReactNode } from "react";
 import { HOUSEMATES, type Bounty } from "./data";
-import { Glyph, type GlyphName } from "./variant-c-pixels";
+import { Glyph, type GlyphName } from "./pixels";
 
 export const C = {
   bg: "#140c1f",

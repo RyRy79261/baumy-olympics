@@ -1,6 +1,7 @@
-// PROTOTYPE (issue #7), throwaway: three looks for the portrait kitchen
-// dashboard (iPad portrait, 820×820×1180), switchable with ?variant=A|B|C.
-// They differ in icon style, layout and busyness (A calm → C Camp-404 busy).
+// PROTOTYPE (issue #7), throwaway: three calm looks for the portrait kitchen
+// dashboard (iPad portrait, 820×1180), switchable with ?variant=A|B|C.
+// One skeleton (clock, ≤3 notification icons, full-width calendar); they
+// differ in the icon scheme and the calendar view.
 // Sample data, no auth, no writes. Lives on branch proto/kiosk-home-pixel only.
 
 import { Suspense } from "react";
@@ -10,9 +11,9 @@ import { VariantB } from "./variant-b";
 import { VariantC } from "./variant-c";
 
 const VARIANTS = [
-  { key: "A", name: "Calm" },
-  { key: "B", name: "Lounge" },
-  { key: "C", name: "Busy" },
+  { key: "A", name: "Status icons · agenda" },
+  { key: "B", name: "Taxonomy icons · week grid" },
+  { key: "C", name: "One icon · today timeline" },
 ];
 
 export default async function Page({

@@ -1,4 +1,4 @@
-// PROTOTYPE (issue #7), throwaway. Variant C ("Busy"): pixel art drawn from
+// PROTOTYPE (issue #7), throwaway. Pixel art drawn from
 // string grids, the Camp 404 "#"-grid technique (one character per pixel),
 // in warm lounge colours instead of the glitch copies.
 
