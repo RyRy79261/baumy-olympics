@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { seasonYear } from "@baumy/core";
+import { RULESET_V1, seasonBounds, seasonYear } from "@baumy/core";
 import type { Queryable } from "@baumy/db";
 import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
@@ -625,6 +625,43 @@ describe("adjust_points", () => {
         asAdmin(adminB),
       ),
     ).resolves.toMatchObject({ ok: false, code: "SEASON_CLOSED" });
+  });
+
+  it("judges a closed season at now, whether or not the daily job has run", async () => {
+    await selfLog(ryan, trash, FIXED_NOW);
+    const pending = ok(
+      await runAction(
+        "adjust_points",
+        { op: "create", memberId: ryan, points: 5, reason: "Late" },
+        asAdmin(adminA),
+      ),
+    );
+    const { endsAt } = seasonBounds(YEAR);
+    const closing = new Date(endsAt.getTime() + HOUR);
+    const closed = new Date(endsAt.getTime() + RULESET_V1.maxBackdateH * HOUR);
+    // Stored as active throughout: nothing has run the job.
+    const read = async (now: Date) =>
+      (await standings({ now }, { year: YEAR })).season.status;
+    expect(await read(FIXED_NOW)).toBe("active");
+    expect(await read(closing)).toBe("closing");
+    expect(await read(closed)).toBe("closed");
+    await expect(
+      runAction(
+        "adjust_points",
+        { op: "approve", adjustmentId: pending.adjustmentId },
+        asAdmin(adminB, { now: closed }),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "SEASON_CLOSED" });
+    const [season] = await t.db().select().from(seasons);
+    expect(season!.status).toBe("active");
+    // While it is only closing, an approval still counts.
+    ok(
+      await runAction(
+        "adjust_points",
+        { op: "approve", adjustmentId: pending.adjustmentId },
+        asAdmin(adminB, { now: closing }),
+      ),
+    );
   });
 
   it("validates the points and the reason", async () => {
