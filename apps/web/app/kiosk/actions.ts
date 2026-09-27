@@ -1,10 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { kioskActionForm } from "@/lib/actions/kiosk";
 import type { ActionResult } from "@/lib/actions/result";
 import type { CheckKioskPinData } from "@/lib/actions/check-kiosk-pin";
+import type { LogCompletionData } from "@/lib/actions/log-completion";
 import { getKioskActor } from "@/lib/auth";
 import { now } from "@/lib/clock";
 import {
@@ -71,4 +73,14 @@ export async function checkPinAction(
   form: FormData,
 ): Promise<ActionResult<CheckKioskPinData>> {
   return kioskActionForm("check_kiosk_pin", form);
+}
+
+/** Log a chore as the acting member; for someone else, with the PIN. */
+export async function kioskLogCompletionAction(
+  _prev: ActionResult<LogCompletionData> | null,
+  form: FormData,
+): Promise<ActionResult<LogCompletionData>> {
+  const result = await kioskActionForm("log_completion", form);
+  if (result.ok) revalidatePath("/kiosk");
+  return result;
 }
