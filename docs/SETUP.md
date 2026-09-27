@@ -4,6 +4,203 @@ Steps that need an account, a secret or admin rights on GitHub. Code that
 depends on them is written to skip or fail closed until they are done, so CI
 stays green in the meantime. Tick an item off here in the PR that finishes it.
 
+## Owner setup checklist
+
+Everything the owner has to do, in order, in one list. Each step links to the
+section below that has the details (exact clicks, values and checks). The
+sections below are the reference; this list is the order to do them in.
+Do the steps top to bottom: later steps need the domain, database and
+secrets from earlier ones.
+
+### 1. Vercel: keep one project
+
+- [ ] **Delete the duplicate Vercel project.** Two Vercel projects are
+      linked to this repository and both build every push: `baumy-olympics-web`
+      and `web` (see the two `Vercel – …` checks on any PR). Together they
+      spend the Hobby build quota twice, which is why every overnight PR's
+      Vercel checks failed with "Deployment rate limited". **Keep
+      `baumy-olympics-web`** (the descriptive name); in `web` go to Settings →
+      General → Delete Project (or at least Settings → Git → Disconnect).
+      Then check `baumy-olympics-web` uses Root Directory `apps/web`, framework
+      Next.js, no build command override, and that the Vercel–Neon
+      integration's preview branching is off.
+      Details: [Vercel and Neon previews](#vercel-and-neon-previews-issue-5).
+- [ ] **Add the custom domain** to `baumy-olympics-web` (Settings → Domains).
+      Several settings below need it (`BETTER_AUTH_URL`, `MCP_PUBLIC_URL`,
+      the Google OAuth redirect, brain's `OLYMPICS_BASE_URL`), and the kiosk
+      needs HTTPS.
+
+### 2. Neon database
+
+- [ ] **Create the Neon project** in `aws-eu-central-1` (Frankfurt); note the
+      pooled and the direct connection strings.
+- [ ] **On Vercel, Production:** `DATABASE_URL` = pooled,
+      `DATABASE_URL_UNPOOLED` = direct.
+- [ ] **On Vercel, Preview:** `PROD_DB_HOST` = the production direct host;
+      leave the preview `DATABASE_URL*` unset.
+      Details: [Database](#database-issue-3).
+
+### 3. GitHub repository secrets
+
+- [ ] **Settings → Secrets and variables → Actions:** `NEON_API_KEY`,
+      `NEON_PROJECT_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` (`team_…`) and
+      `VERCEL_PROJECT_IDS` = the `prj_…` id of **`baumy-olympics-web` only**
+      (not the deleted `web`).
+- [ ] **Dependabot:** check its config parsed (Insights → Dependency graph →
+      Dependabot) and that alerts and security updates are on; subscribe to
+      better-auth's releases by hand.
+      Details: [GitHub repository](#github-repository-issue-2).
+
+### 4. Auth, founders and email (Resend, optional Google sign-in)
+
+- [ ] **`BETTER_AUTH_SECRET`** (Production and Preview,
+      `openssl rand -base64 32`) and **`BETTER_AUTH_URL`** (Production = the
+      custom domain).
+- [ ] **Resend account:** verify the sending domain, then set
+      `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Without it nobody can reset a
+      password, and founders can verify only through Google.
+- [ ] **Google sign-in (optional):** OAuth client with redirect
+      `<BETTER_AUTH_URL>/api/auth/callback/google`; set `GOOGLE_CLIENT_ID`
+      and `GOOGLE_CLIENT_SECRET`. You need Resend **or** this so founders can
+      verify their address.
+- [ ] **`FOUNDER_EMAILS`** (Production): your address and your partner's,
+      comma-separated.
+      Details: [Auth](#auth-issue-6), [Membership](#membership-issue-9).
+
+### 5. Vercel Blob (photo proof)
+
+- [ ] **Create a PRIVATE Blob store** and connect it to `baumy-olympics-web`
+      (Production); Vercel sets `BLOB_READ_WRITE_TOKEN`.
+      Details: [Confirmations and photo proof](#confirmations-and-photo-proof-issue-15).
+
+### 6. Daily job
+
+- [ ] **`CRON_SECRET`** (Production, `openssl rand -hex 32`).
+      Details: [Daily job](#daily-job-issue-18).
+
+### 7. Google Calendar (house service account)
+
+- [ ] **Pick the house calendar** (issue #30; a new calendar is simplest).
+- [ ] **Create a service account for Baumy** (not camp-404's) in a Google
+      Cloud project with the Calendar API on; download its JSON key.
+- [ ] **Share the calendar** with the service account's `client_email`
+      ("Make changes to events") and copy the calendar ID.
+- [ ] **Set** `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_CLIENT_EMAIL`,
+      `GOOGLE_CALENDAR_PRIVATE_KEY` (Production and Preview).
+      Details: [Calendar](#calendar-issue-19).
+
+### 8. Anthropic (Baumy command)
+
+- [ ] **Create an API key** in a Baumy workspace on console.anthropic.com
+      (consider a monthly spend limit); set `ANTHROPIC_API_KEY` (Production).
+      Optionally `AI_DAILY_COMMANDS_PER_MEMBER` (default 50).
+      Details: [Baumy command](#baumy-command-issue-21).
+
+### 9. Groq (speaking to Baumy)
+
+- [ ] **Create a Groq API key** on console.groq.com; set `GROQ_API_KEY`
+      (Production).
+      Details: [Speaking to Baumy](#speaking-to-baumy-issue-22).
+
+### 10. MCP (claude.ai connector)
+
+- [ ] **`MCP_PUBLIC_URL`** (Production) = the custom domain, never a
+      `*.vercel.app` address. Without it MCP answers 503.
+      Details: [MCP OAuth](#mcp-oauth-issue-23).
+
+### 11. Optional: kiosk night hours
+
+- [ ] **`KIOSK_NIGHT_HOURS`** only if you want other hours than
+      23:00-06:30 Berlin, e.g. `22:30-07:00`.
+      Details: [Kitchen iPad](#kitchen-ipad-as-an-appliance-issue-29).
+
+### 12. `.env.example` lines agents could not write
+
+Agents are blocked from editing `.env*` files. Add each of these lines that
+is not already in `.env.example` (all are in turbo `globalEnv`; the comments
+for each are in the sections below):
+
+```sh
+FOUNDER_EMAILS=
+BLOB_READ_WRITE_TOKEN=
+CRON_SECRET=
+GOOGLE_CALENDAR_ID=
+GOOGLE_CALENDAR_CLIENT_EMAIL=
+GOOGLE_CALENDAR_PRIVATE_KEY=
+ANTHROPIC_API_KEY=
+AI_DAILY_COMMANDS_PER_MEMBER=
+GROQ_API_KEY=
+MCP_PUBLIC_URL=
+BRAIN_BASE_URL=
+KITCHEN_API_TOKEN=
+KIOSK_NIGHT_HOURS=
+```
+
+In baumy-brain's `.env.example`, add `KITCHEN_API_TOKEN=`,
+`BRAIN_SERVICE_TOKEN=` and `OLYMPICS_BASE_URL=` (its agents were blocked
+too; the lines are in brain's SETUP.md and the PR bodies).
+
+### 13. Deploy, then check production
+
+- [ ] **Deploy `main`** on `baumy-olympics-web` (redeploy after setting the
+      variables above). The build log shows `[migrate] VERCEL_ENV=production`,
+      then `[seed] …: added 11 starter chores.` once.
+- [ ] **Sign up with a founder address**, confirm the email, "Join as admin"
+      on `/join`, then invite your partner from `/admin/members`. Promote a
+      second admin (needed to approve point adjustments).
+- [ ] **Review the starter chores** on `/admin/chores`; keep photo proof off
+      "Required" until the Blob check below passes.
+- [ ] **Run the per-feature checks** in the sections below: password reset
+      email, photo proof, cron "Run" in Vercel, 19:00 calendar events in
+      winter and summer, Baumy "who's winning?", MCP `curl` and claude.ai
+      connector (`<domain>/api/mcp/mcp`, ask for `get_standings`).
+
+### 14. baumy-brain PRs to review, merge and wire up
+
+- [ ] **Review and merge baumy-brain PR #7** (kitchen shopping API, issue
+      #25). Reviewed overnight; one test added, no bugs.
+- [ ] **Shared kitchen token:** `openssl rand -hex 32`; set it as
+      `KITCHEN_API_TOKEN` in brain's Vercel project (Production) **and** in
+      `baumy-olympics-web` (Production and Preview), plus `BRAIN_BASE_URL` =
+      brain's https production URL here. Redeploy both.
+- [ ] **Mint brain's service token** from `main` against production:
+      `DATABASE_URL_UNPOOLED='<direct string>' pnpm --filter @baumy/db --silent service-token mint baumy-brain`.
+- [ ] **Review and merge baumy-brain PR #8** (Olympics client, `/link`,
+      calendar/chore intents, issue #28). Reviewed overnight; two fixes
+      pushed. Then in brain's Vercel project set `BRAIN_SERVICE_TOKEN` (the
+      minted token) and `OLYMPICS_BASE_URL` (the custom domain, one that does
+      not redirect), redeploy, run `scripts/set-commands.ts` and
+      `pnpm test:scenarios:live`.
+- [ ] **Link Telegram:** Settings → Create a link code → `/link <code>` to
+      `@baumy_bot`. Then add "milk" in the Telegram group and see it on the
+      kiosk within a minute.
+      Details: [Shopping list](#shopping-list-issue-26),
+      [Brain actions endpoint](#brain-actions-endpoint-and-telegram-linking-issue-27).
+
+### 15. Kitchen iPad
+
+- [ ] **Pair the iPad** (`/admin/members` → "Pair a kiosk", then
+      `/kiosk/pair` on the iPad over HTTPS); each housemate sets a kiosk PIN
+      in `/settings`.
+- [ ] **Set it up** per [kiosk-setup.md](kiosk-setup.md) (home screen,
+      Auto-Lock Never, Guided Access), run the **2-hour soak** and Lighthouse,
+      note the result on issue #29, and try hold-to-speak in Safari.
+
+### 16. Decisions only the owner can make
+
+- [ ] Which Google Calendar is the house calendar (issue #30).
+- [ ] `INVITE_CODES` (SPEC §6.8): drop it, or say what it should seed.
+- [ ] Whether the December pot stays open until the season closes
+      (about 2 January; SPEC §4.5).
+- [ ] Whether a chore's "due" follows the measured interval (SPEC,
+      UNRESOLVED, issue #17).
+- [ ] Confirm: admins cannot rule on their own claims; a completion logged
+      for someone else (confirmed on creation) cannot be undone (issue #12).
+- [ ] Review the `display` gate that lets an idle paired kiosk read five hub
+      widgets (issue #20).
+- [ ] Approve the pixel art and UI kit (issue #7): every screen is a neutral
+      placeholder until then.
+
 ## GitHub repository (issue #2)
 
 - [x] **Apply the `main` ruleset.** Applied 2026-09-27 (ruleset #24056225)
