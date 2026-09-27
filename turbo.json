@@ -6,6 +6,8 @@
     "DATABASE_URL",
     "DATABASE_URL_UNPOOLED",
     "NEON_LOCAL_PROXY",
+    "NEON_PREVIEW_READY",
+    "PROD_DB_HOST",
     "VERCEL_ENV",
     "E2E_*"
   ],

@@ -25,6 +25,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 | `pnpm --filter @baumy/db db:generate`                   | Generate a migration after editing `schema.ts`.                             |
 | `pnpm turbo run format:check lint typecheck test build` | **The gate.** Run it before every push.                                     |
 | `E2E_SERVE=build ./scripts/e2e-local.sh [specs/<area>]` | Run Playwright against Docker Postgres.                                     |
+| `for t in scripts/tests/*.test.sh; do bash "$t"; done`  | Test the deploy scripts (docs/deploy.md).                                   |
 
 ## Git and PRs
 
