@@ -12,6 +12,7 @@ export function KioskShell({
   brand,
   avatars,
   status,
+  skin = "day",
   children,
 }: {
   brand: ReactNode;
@@ -19,11 +20,18 @@ export function KioskShell({
   avatars: ReactNode;
   /** Who is acting, and the way to stop. */
   status?: ReactNode;
+  /**
+   * The time-of-day skin (SPEC §7, §8): the light "day" look from 06:30 to
+   * 23:00, "night" otherwise. Only a hook for now: issue #7 themes
+   * `[data-skin]`; night itself is the NightScreen over everything.
+   */
+  skin?: "day" | "night";
   children: ReactNode;
 }) {
   return (
     <div
       data-kiosk
+      data-skin={skin}
       className="flex h-dvh touch-manipulation flex-col overflow-hidden bg-neutral-100 text-neutral-900 select-none"
     >
       <header className="flex items-center gap-4 border-b border-neutral-300 bg-white px-4 py-2">

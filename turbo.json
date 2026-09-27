@@ -33,6 +33,7 @@
     "MCP_PUBLIC_URL",
     "BRAIN_BASE_URL",
     "KITCHEN_API_TOKEN",
+    "KIOSK_NIGHT_HOURS",
     "E2E_*"
   ],
   "tasks": {

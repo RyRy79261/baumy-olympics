@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Offline - Baumy</title>
+    <!--
+      The offline fallback (SPEC §8, issue #29): public/sw.js shows this page
+      when a page load cannot reach the server. It must stand alone (no app
+      CSS or JS is cached), so its few styles are inline. NEUTRAL
+      PLACEHOLDER: issue #7 restyles it with the rest of the kiosk. It tries
+      the page again when the device comes back online, and every minute.
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #f5f5f5;
+        color: #171717;
+        font-family: system-ui, sans-serif;
+      }
+      main {
+        display: flex;
+        height: 100%;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 16px;
+        text-align: center;
+      }
+      h1 {
+        margin: 0;
+        font-size: 2rem;
+      }
+      p {
+        margin: 0;
+        max-width: 32rem;
+        font-size: 1.125rem;
+        color: #404040;
+      }
+      button {
+        min-height: 56px;
+        min-width: 56px;
+        padding: 0 24px;
+        border: 0;
+        border-radius: 4px;
+        background: #171717;
+        color: #fff;
+        font: inherit;
+        font-size: 1rem;
+        touch-action: manipulation;
+      }
+      button:focus-visible {
+        outline: 2px solid #171717;
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>No connection</h1>
+      <p>
+        The kitchen screen cannot reach Baumy right now. It will try again by
+        itself as soon as the connection is back.
+      </p>
+      <button type="button" id="retry">Try again</button>
+    </main>
+    <script>
+      document
+        .getElementById("retry")
+        .addEventListener("click", () => location.reload());
+      window.addEventListener("online", () => location.reload());
+      setInterval(() => {
+        if (navigator.onLine) location.reload();
+      }, 60000);
+    </script>
+  </body>
+</html>

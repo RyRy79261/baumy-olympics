@@ -4,6 +4,17 @@
    package, so its classes are added here (camp-404's pattern). */
 @source "../../../packages/ui/src";
 
+/* Focus rings everywhere (issue #29's accessibility pass): anything a
+   keyboard or switch control can reach shows a ring when focused that way,
+   including plain links and elements without a focus-visible utility. In the
+   base layer, so a component's own focus-visible: classes still win. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
 /* Reduced motion, app-wide (SPEC §7), camp-404's kill switch
    (packages/ui/src/styles/globals.css). Someone who asks their device for
    less motion gets it everywhere, including motion added later without a
