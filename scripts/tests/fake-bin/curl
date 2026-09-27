@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# A fake curl for scripts/tests/neon-preview-env.test.sh. It answers the Neon
+# and Vercel calls neon-preview-env.sh makes from canned JSON, and appends
+# "METHOD URL BODY" to $FAKE_LOG so a test can assert what was called.
+set -euo pipefail
+
+method=GET
+body=""
+url=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -X) method="$2"; shift 2 ;;
+    -d) body="$2"; [ "$method" = GET ] && method=POST; shift 2 ;;
+    -H|--connect-timeout|--max-time|--retry|--retry-delay|-o|-w) shift 2 ;;
+    http*) url="$1"; shift ;;
+    *) shift ;;
+  esac
+done
+# One line per call: compact a JSON body.
+if [ -n "$body" ]; then
+  body="$(printf '%s' "$body" | jq -c . 2>/dev/null || printf '%s' "$body")"
+fi
+printf '%s %s %s\n' "$method" "$url" "$body" >> "$FAKE_LOG"
+
+state="$FAKE_STATE"
+branch_id="br-existing"
+[ -f "$state/created" ] && branch_id="br-new"
+
+case "$method $url" in
+  "GET https://console.neon.tech/"*"/branches?limit="*)
+    if [ "${FAKE_BRANCH_EXISTS:-0}" = 1 ] || [ -f "$state/created" ]; then
+      printf '{"branches":[{"id":"br-main","name":"main","primary":true},{"id":"%s","name":"preview/%s"}]}' "$branch_id" "$HEAD_REF"
+    else
+      printf '{"branches":[{"id":"br-main","name":"main","primary":true}]}'
+    fi ;;
+  "POST https://console.neon.tech/"*"/branches")
+    touch "$state/created"
+    printf '{"branch":{"id":"br-new"}}' ;;
+  "GET https://console.neon.tech/"*"/endpoints")
+    printf '{"endpoints":[{"id":"ep-1","branch_id":"%s","current_state":"idle"}]}' "$branch_id" ;;
+  "GET https://console.neon.tech/"*"/databases")
+    printf '{"databases":[{"name":"baumy"}]}' ;;
+  "GET https://console.neon.tech/"*"/roles")
+    printf '{"roles":[{"name":"owner"}]}' ;;
+  "GET https://console.neon.tech/"*"pooled=true")
+    printf '{"uri":"postgresql://owner:TOPSECRET@ep-preview-1-pooler.eu-central-1.aws.neon.tech/baumy?sslmode=require"}' ;;
+  "GET https://console.neon.tech/"*"pooled=false")
+    printf '{"uri":"postgresql://owner:TOPSECRET@ep-preview-1.eu-central-1.aws.neon.tech/baumy?sslmode=require"}' ;;
+  "GET https://api.vercel.com/v9/projects/"*"/env?"*)
+    printf '%s' "$FAKE_ENVS" ;;
+  "DELETE https://api.vercel.com/"*)
+    printf '{}' ;;
+  "POST https://api.vercel.com/v10/projects/"*"/env?"*)
+    printf '{"created":{"id":"env_x"}}' ;;
+  "GET https://api.vercel.com/v9/projects/"*)
+    printf '{"name":"baumy-olympics"}' ;;
+  "POST https://api.vercel.com/v13/deployments?"*)
+    printf '{"id":"dpl_new"}' ;;
+  *)
+    printf '{"error":{"message":"fake curl: unexpected %s %s"}}' "$method" "$url"
+    exit 22 ;;
+esac
