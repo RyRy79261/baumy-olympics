@@ -9,6 +9,7 @@ import {
   dismissSuggestion,
   findSuggestion,
   lastAppliedAt,
+  listScheduledChanges,
   listWeightPanel,
   lockSuggestion,
   scheduleSuggestion,
@@ -116,8 +117,27 @@ export const getWeights = defineAction({
   risk: "safe",
   surfaces: ["ui"],
   requires: "member",
-  input: z.strictObject({}),
-  async execute(ctx) {
+  input: z.strictObject({
+    scheduledOnly: z
+      .boolean()
+      .optional()
+      .describe("Only the scheduled changes, without measuring every chore."),
+  }),
+  async execute(ctx, input) {
+    const me = ctx.actor.memberId!;
+    const vetoable = (s: WeightSuggestionRow, choreName: string) => ({
+      ...suggestionView(s),
+      choreName,
+      canVeto: s.scheduledBy !== me,
+    });
+    if (input.scheduledOnly) {
+      const rows = await listScheduledChanges(ctx.db, ctx.householdId);
+      const data: GetWeightsData = {
+        chores: [],
+        scheduled: rows.map((r) => vetoable(r, r.choreName)),
+      };
+      return { ok: true, data };
+    }
     const rows = await listWeightPanel(ctx.db, {
       householdId: ctx.householdId,
       now: ctx.now,
@@ -146,14 +166,9 @@ export const getWeights = defineAction({
         lastAppliedAt: r.lastAppliedAt?.toISOString() ?? null,
       };
     });
-    const me = ctx.actor.memberId!;
     const scheduled = rows
       .filter((r) => r.active?.status === "scheduled")
-      .map((r) => ({
-        ...suggestionView(r.active!),
-        choreName: r.choreName,
-        canVeto: r.active!.scheduledBy !== me,
-      }))
+      .map((r) => vetoable(r.active!, r.choreName))
       .sort((a, b) => a.appliesAt!.localeCompare(b.appliesAt!));
     const data: GetWeightsData = { chores, scheduled };
     return { ok: true, data };
