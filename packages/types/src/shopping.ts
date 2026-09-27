@@ -2,9 +2,8 @@ import { z } from "zod";
 
 // The house shopping list at its boundaries (SPEC §3.4, §6.6, issue #26).
 // baumy-brain owns the list (ADR 0003); Olympics only reads it and sends it
-// items to add or check off, by name, through brain's kitchen API. The quick
-// add field on /shopping and the hub, `add_shopping_items` and
-// `check_off_shopping_items` all parse with these.
+// items to add or check off, by name, through brain's kitchen API.
+// `add_shopping_items` and `check_off_shopping_items` parse with these.
 
 /** Brain clamps an item to 80 characters; longer is refused here instead. */
 export const SHOPPING_ITEM_MAX = 80;
@@ -18,9 +17,10 @@ export const ShoppingItem = z
   .max(SHOPPING_ITEM_MAX, `Keep each item to ${SHOPPING_ITEM_MAX} characters.`);
 
 /**
- * Split what someone typed into items: commas and new lines separate them,
- * and blanks are dropped. "and" does not, so "salt and vinegar crisps" stays
- * one item; the AI sends an array for "milk and eggs".
+ * Split what someone typed in the quick-add field into items: commas and new
+ * lines separate them, and blanks are dropped. "and" does not, so "salt and
+ * vinegar crisps" stays one item. The UI splits before it sends; the actions
+ * never split, so an item whose name has a comma can still be checked off.
  */
 export function splitShoppingText(text: string): string[] {
   return text
@@ -30,15 +30,14 @@ export function splitShoppingText(text: string): string[] {
 }
 
 /**
- * One or more items: an array (JSON: the AI, MCP) or the text of one form
- * field ("milk, eggs"). Each entry is split the same way, so a form that
- * repeats the field works too.
+ * One or more items, each as it is: an array (JSON, a repeated form field)
+ * or one string (a form with a single item).
  */
 export const ShoppingItems = z
   .union([z.array(z.string()), z.string()], {
     error: "Name at least one item.",
   })
-  .transform((v) => (Array.isArray(v) ? v : [v]).flatMap(splitShoppingText))
+  .transform((v) => (Array.isArray(v) ? v : [v]))
   .pipe(
     z
       .array(ShoppingItem)

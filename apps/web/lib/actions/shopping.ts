@@ -6,6 +6,7 @@ import {
 } from "@/lib/integrations/brain";
 import { defineAction } from "./define";
 import { fail, type ActionFailure } from "./result";
+import { listPhrase } from "./shopping-text";
 
 // The house shopping list (SPEC §3.4, §6.6, issue #26). baumy-brain owns it
 // (ADR 0003): these actions read and write brain's list over its kitchen API
@@ -32,12 +33,6 @@ export function shoppingFailure(r: BrainFailure): ActionFailure {
         "UNAVAILABLE",
         "The shopping list is unavailable right now. Baumy's brain did not answer; try again in a minute.",
       );
-}
-
-/** "milk", "milk and eggs", "milk, eggs and bread". */
-export function listPhrase(items: readonly string[]): string {
-  if (items.length <= 1) return items[0] ?? "";
-  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 }
 
 export interface ListShoppingData {

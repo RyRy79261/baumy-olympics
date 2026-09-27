@@ -27,7 +27,8 @@ import {
 import type { RequestCtx } from "./define";
 import { REGISTRY } from "./registry";
 import { createRunner, defaultDeps, type RunnerDeps } from "./run";
-import { listPhrase, shoppingFailure } from "./shopping";
+import { shoppingFailure } from "./shopping";
+import { listPhrase } from "./shopping-text";
 
 // The shopping actions through the real runner on PGlite (issue #26):
 // success, each error code, the surfaces and the permissions, the audit row,
@@ -135,16 +136,16 @@ describe("add_shopping_items", () => {
     expect((await requests())[0]).toMatchObject({ status: "done" });
   });
 
-  it("takes the quick-add field's text, split at commas", async () => {
+  it("takes one form field's item as it is, commas and all", async () => {
     const me = await seedMember(db());
     ok(
       await run(
         "add_shopping_items",
-        { items: "bread, oat milk" },
+        { items: "Bread, wholemeal" },
         ctxFor(kiosk(me), { source: "kiosk" }),
       ),
     );
-    expect(names()).toEqual(["bread", "oat milk"]);
+    expect(names()).toEqual(["Bread, wholemeal"]);
   });
 
   it("says what was on the list already", async () => {
