@@ -132,3 +132,31 @@ export function nextBerlinMonday(after: Date): Date {
     target.getUTCDate(),
   );
 }
+
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * An instant as Berlin wall time for people to read, e.g. "Wed 30 Sep,
+ * 08:00". Built from `berlinParts`, not from a locale's formatter, so it reads
+ * the same on every server and browser.
+ */
+export function formatBerlinDateTime(instant: Date): string {
+  const p = berlinParts(instant);
+  return `${WEEKDAYS[p.weekday - 1]} ${p.day} ${MONTHS[p.month - 1]}, ${pad2(p.hour)}:${pad2(p.minute)}`;
+}
