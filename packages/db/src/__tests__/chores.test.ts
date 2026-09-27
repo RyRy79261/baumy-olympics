@@ -504,6 +504,36 @@ describe("chore admin writes", () => {
     expect(after).toEqual([{ basePoints: 35 }]);
   });
 
+  it("a new confirm mode re-scores every season: unconfirmed self-claims stop counting under partner mode", async () => {
+    const admin = await seedPlayer(db(), "Admin");
+    const ryan = await seedPlayer(db());
+    const { choreId } = await seedChore(db(), SEED_CHORES.dishes);
+    // One in 2025 and one now, both self-claims still stored as pending.
+    await selfClaim(choreId, ryan, new Date("2025-06-01T10:00:00Z"));
+    await selfClaim(choreId, ryan, NOW);
+    const scored = async () =>
+      (await t.db().select().from(completionScores)).length;
+    expect(await scored()).toBe(2);
+
+    const switchTo = (confirmMode: "partner" | "optimistic", hours: number) =>
+      inTx(async (tx) =>
+        updateChore(tx, {
+          householdId: HOUSEHOLD_ID,
+          chore: (await lockChoreRow(tx, HOUSEHOLD_ID, choreId))!,
+          settings: { confirmMode },
+          createdBy: admin,
+          now: at(hours),
+        }),
+      );
+    await expect(switchTo("partner", 1)).resolves.toMatchObject({
+      weightChanged: false,
+      chore: { confirmMode: "partner" },
+    });
+    expect(await scored()).toBe(0);
+    await switchTo("optimistic", 2);
+    expect(await scored()).toBe(2);
+  });
+
   it("gives a chore whose only weight is in the future one from now", async () => {
     const admin = await seedPlayer(db(), "Admin");
     const { choreId } = await seedChore(db(), {
