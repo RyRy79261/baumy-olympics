@@ -60,3 +60,41 @@ export const MEMBER_COLORS = [
 
 /** A kiosk PIN (SPEC §6.2): 4 to 6 digits. */
 export const KioskPin = z.string().regex(/^\d{4,6}$/, "Use 4 to 6 digits.");
+
+const TELEGRAM_ID_MESSAGE = "Use the Telegram user id: digits only.";
+
+/**
+ * A Telegram user id (`members.telegram_user_id`): a positive integer of at
+ * most 52 bits, so a JS number holds it exactly. Takes the digits as a
+ * string too, as a form field or the `X-Baumy-Actor` header sends them.
+ */
+export const TelegramUserId = z
+  .union(
+    [
+      z.int(),
+      z
+        .string()
+        .trim()
+        .regex(/^[1-9]\d{0,15}$/, TELEGRAM_ID_MESSAGE)
+        .transform(Number),
+    ],
+    { error: TELEGRAM_ID_MESSAGE },
+  )
+  .pipe(
+    z
+      .int()
+      .positive(TELEGRAM_ID_MESSAGE)
+      .max(Number.MAX_SAFE_INTEGER, TELEGRAM_ID_MESSAGE),
+  );
+
+/**
+ * A Telegram link code as someone types it after `/link` (SPEC §6.6): the
+ * 10 characters /settings shows, in any case. Anything that could not be a
+ * code is refused before it is hashed.
+ */
+export const TelegramLinkCode = z
+  .string()
+  .trim()
+  .min(8, "That code is too short. Copy it from Settings.")
+  .max(32, "That code is too long. Copy it from Settings.")
+  .regex(/^[A-Za-z0-9]+$/, "A link code is letters and digits only.");

@@ -18,6 +18,7 @@ import {
 import { createTelegramLinkCode } from "./create-telegram-link-code";
 import { getPendingConfirmations } from "./get-pending-confirmations";
 import { joinAsFounder } from "./join-as-founder";
+import { linkTelegram } from "./link-telegram";
 import { listChores } from "./list-chores";
 import { logCompletionAction } from "./log-completion";
 import { manageChore } from "./manage-chore";
@@ -71,6 +72,7 @@ export const REGISTRY = {
   manage_members: manageMembers,
   set_kiosk_pin: setKioskPin,
   create_telegram_link_code: createTelegramLinkCode,
+  link_telegram: linkTelegram,
   authorize_mcp_client: authorizeMcpClient,
   list_mcp_connections: listMcpConnectionsAction,
   revoke_mcp_connection: revokeMcpConnection,

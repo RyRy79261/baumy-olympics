@@ -64,6 +64,7 @@ describe("useTestDb", () => {
       "pot_contributions",
       "rate_limit",
       "seasons",
+      "service_tokens",
       "session",
       "telegram_link_codes",
       "user",

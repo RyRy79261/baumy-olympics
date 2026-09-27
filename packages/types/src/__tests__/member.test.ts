@@ -8,6 +8,8 @@ import {
   MEMBER_COLORS,
   MemberColor,
   MemberRole,
+  TelegramLinkCode,
+  TelegramUserId,
 } from "../member";
 
 describe("DisplayName", () => {
@@ -60,6 +62,47 @@ describe("KioskPin", () => {
   it("refuses short, long and non-digit PINs", () => {
     for (const pin of ["123", "1234567", "12a4", " 1234", ""]) {
       expect(KioskPin.safeParse(pin).success).toBe(false);
+    }
+  });
+});
+
+describe("TelegramUserId", () => {
+  it("takes a positive integer, as a number or as digits", () => {
+    expect(TelegramUserId.parse(123456789)).toBe(123456789);
+    expect(TelegramUserId.parse(" 5000000001 ")).toBe(5000000001);
+    expect(TelegramUserId.parse(String(Number.MAX_SAFE_INTEGER))).toBe(
+      Number.MAX_SAFE_INTEGER,
+    );
+  });
+
+  it("refuses anything else", () => {
+    for (const bad of [
+      0,
+      -5,
+      1.5,
+      "",
+      "0",
+      "012",
+      "12a",
+      "1e5",
+      "-1",
+      "99999999999999999",
+      Number.MAX_SAFE_INTEGER + 1,
+      null,
+    ]) {
+      expect(TelegramUserId.safeParse(bad).success).toBe(false);
+    }
+  });
+});
+
+describe("TelegramLinkCode", () => {
+  it("trims a code of letters and digits", () => {
+    expect(TelegramLinkCode.parse(" AB12cd34EF ")).toBe("AB12cd34EF");
+  });
+
+  it("refuses short, long and odd codes", () => {
+    for (const bad of ["ABC1234", "A".repeat(33), "AB12-CD34", "AB12 CD34"]) {
+      expect(TelegramLinkCode.safeParse(bad).success).toBe(false);
     }
   });
 });
