@@ -1,0 +1,65 @@
+import { describe, expect, it } from "vitest";
+import {
+  AVATAR_SPRITES,
+  AvatarSprite,
+  DISPLAY_NAME_MAX,
+  DisplayName,
+  KioskPin,
+  MEMBER_COLORS,
+  MemberColor,
+  MemberRole,
+} from "../member";
+
+describe("DisplayName", () => {
+  it("trims, and accepts 1 to 40 characters", () => {
+    expect(DisplayName.parse("  Ryan ")).toBe("Ryan");
+    expect(DisplayName.parse("x".repeat(DISPLAY_NAME_MAX))).toHaveLength(40);
+  });
+
+  it("refuses blank and overlong names", () => {
+    expect(DisplayName.safeParse("   ").success).toBe(false);
+    expect(
+      DisplayName.safeParse("x".repeat(DISPLAY_NAME_MAX + 1)).success,
+    ).toBe(false);
+  });
+});
+
+describe("MemberColor", () => {
+  it("lowercases a #rrggbb colour", () => {
+    expect(MemberColor.parse("#AABBCC")).toBe("#aabbcc");
+  });
+
+  it("refuses anything else", () => {
+    for (const bad of ["red", "#abc", "aabbcc", "#gggggg"]) {
+      expect(MemberColor.safeParse(bad).success).toBe(false);
+    }
+  });
+
+  it("offers only valid colours", () => {
+    expect(MEMBER_COLORS.length).toBeGreaterThan(0);
+    for (const c of MEMBER_COLORS) expect(MemberColor.parse(c)).toBe(c);
+  });
+});
+
+describe("AvatarSprite and MemberRole", () => {
+  it("accept the listed values only", () => {
+    for (const s of AVATAR_SPRITES) expect(AvatarSprite.parse(s)).toBe(s);
+    expect(AvatarSprite.safeParse("dragon").success).toBe(false);
+    expect(MemberRole.parse("admin")).toBe("admin");
+    expect(MemberRole.safeParse("owner").success).toBe(false);
+  });
+});
+
+describe("KioskPin", () => {
+  it("accepts 4 to 6 digits", () => {
+    for (const pin of ["1234", "12345", "123456"]) {
+      expect(KioskPin.parse(pin)).toBe(pin);
+    }
+  });
+
+  it("refuses short, long and non-digit PINs", () => {
+    for (const pin of ["123", "1234567", "12a4", " 1234", ""]) {
+      expect(KioskPin.safeParse(pin).success).toBe(false);
+    }
+  });
+});
