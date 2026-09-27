@@ -21,6 +21,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 | `pnpm i`                                                | Install dependencies. Uses pnpm 10 (`packageManager`) and Node 22 or later. |
 | `pnpm dev`                                              | Start the web app on :3000.                                                 |
 | `pnpm db:local:up`, then `pnpm db:local:migrate`        | Start Docker Postgres and the Neon proxies, then migrate.                   |
+| `pnpm db:local:test`                                    | Run the `packages/db` tests that need Docker Postgres (concurrency).        |
 | `pnpm --filter @baumy/db db:generate`                   | Generate a migration after editing `schema.ts`.                             |
 | `pnpm turbo run format:check lint typecheck test build` | **The gate.** Run it before every push.                                     |
 | `E2E_SERVE=build ./scripts/e2e-local.sh [specs/<area>]` | Run Playwright against Docker Postgres.                                     |
