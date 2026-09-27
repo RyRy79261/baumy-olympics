@@ -374,6 +374,16 @@ export interface ActionDef<I extends z.ZodType, O> {
   6. calls `execute` in the same transaction as the claim, then writes `audit_events` and the result. It is the only writer of those two tables.
   - For `transactional: false` actions, the claim is committed first as `pending`, `execute` runs with no transaction open, and audit and result are written in a short second transaction.
   - It returns `{ok: true, data} | {ok: false, code, message}`. The `message` is a sentence a user can act on, for example "Trash was done 12h ago; you can log it again from Wed 08:00."
+  - Details settled while building it (added 2026-09-27, issue #8):
+    - **Reads** are neither claimed nor audited. Every write needs a `requestId` (`^[A-Za-z0-9._:-]{8,128}$`), or it gets `INVALID_INPUT`.
+    - The input hash is sha256 of the action name plus the _parsed_ input with sorted keys, so reusing a `requestId` for another action is also `IDEMPOTENCY_CONFLICT`.
+    - An `execute` that returns `{ok: false}` rolls back the whole transaction, claim included, so nothing is stored and a retry is judged afresh. A throw does the same and returns a generic `INTERNAL`.
+    - `transactional: false`: a failure is stored as `failed`, and a retry with the same key runs again. A `pending` claim older than 5 minutes is taken over by a retry; a younger one answers `IN_PROGRESS`. If the audit transaction fails, `execute`'s optional `undo` runs.
+    - The first caller gets the result exactly as a replay does, after a JSON round trip (a `Date` becomes its ISO string).
+    - Writes need an actor linked to a member, since both tables key on `actor_member_id`. `getActor()` now resolves `memberId` and `role` from `members.auth_user_id` (active members only).
+    - Rate limits default to 30 writes or 120 reads per minute per actor, and 120 or 300 per IP, per action. `ActionDef.rateLimit` overrides them.
+    - `toolSpecs(surface)` returns `{name, description, input_schema, risk}` with the Zod _input_ side as JSON Schema, and never includes `destructive` actions for `mcp` or `brain`.
+    - An MCP actor also needs `baumy:read` or `baumy:write` for the action's kind, checked in `requireMember`.
 - **Attestation per actor kind:** a cookie or bearer session is attested for its own member. MCP and brain tokens count as the linked member's own session. The kiosk always needs `ctx.pin`, verified in the same request. Kiosk AI proposals that need attestation show a PinPad in the review sheet.
 - **UI:** each server action file (`"use server"`, async exports only) calls `runAction(name, formData, ctxFromSession)`.
 - **AI command:** `POST /api/ai/command` takes `{text, history?}`.
