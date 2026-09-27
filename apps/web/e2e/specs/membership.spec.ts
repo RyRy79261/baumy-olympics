@@ -1,0 +1,203 @@
+import { expect, test, type Browser, type Page } from "@playwright/test";
+import { founderEmail, freshEmail, signUp, signUpOrIn } from "../lib/accounts";
+import { waitForAuthMail } from "../lib/mail";
+
+// Issue #9 end to end, against Docker Postgres: only household members see
+// the hub. A founder (FOUNDER_EMAILS, set per project by e2e-local.sh)
+// verifies their email and joins as admin, mints an invite code on
+// /admin/members, and a brand-new account redeems it and reaches the hub.
+
+// One worker runs this file's tests in order: they share this project's
+// founder account, and two tests bootstrapping it at once would race.
+test.describe.configure({ mode: "default" });
+
+/** The founder for this project, signed in as the household admin. */
+async function founderAdmin(page: Page, project: string) {
+  const email = founderEmail(project);
+  await signUpOrIn(page, email);
+  await page.goto("/");
+  if (new URL(page.url()).pathname === "/join") {
+    await expect(
+      page.getByRole("heading", { name: "You're on the founders list" }),
+    ).toBeVisible();
+    if (await page.getByText("Confirm your email").isVisible()) {
+      // The link sent on sign-up, read from the e2e capture file.
+      await page.goto(await waitForAuthMail(email, "verify"));
+      await page.goto("/join");
+    }
+    const founder = page.locator("form").filter({
+      has: page.getByRole("button", { name: "Join as admin" }),
+    });
+    await founder.getByLabel("Your name").fill(`Founder ${project}`);
+    await founder.getByRole("button", { name: "Join as admin" }).click();
+  }
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    page.getByRole("heading", { name: "Hub", level: 1 }),
+  ).toBeVisible();
+}
+
+async function mintCode(page: Page, uses = 1): Promise<string> {
+  await page.goto("/admin/members");
+  await expect(
+    page.getByRole("heading", { name: "Members", level: 1 }),
+  ).toBeVisible();
+  const form = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Create invite code" }),
+  });
+  await form.getByLabel("Uses").fill(String(uses));
+  await form.getByRole("button", { name: "Create invite code" }).click();
+  const code = (await page.getByTestId("minted-code").textContent())!.trim();
+  expect(code).toMatch(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
+  await expect(page.getByTestId(`invite-${code}`)).toContainText("0 of");
+  return code;
+}
+
+async function newAccount(browser: Browser, label: string) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await signUp(page, freshEmail(label));
+  return { context, page };
+}
+
+async function redeem(page: Page, code: string, name: string) {
+  await page.getByLabel("Invite code").fill(code);
+  const form = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Join the household" }),
+  });
+  await form.getByLabel("Your name").fill(name);
+  await form.getByRole("button", { name: "Join the household" }).click();
+}
+
+test("a founder mints a code and a new account redeems it to reach the hub", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  // The database outlives a run, so the new member's name is unique.
+  const name = `Newbie ${Math.random().toString(36).slice(2, 8)}`;
+  await founderAdmin(page, project);
+  const code = await mintCode(page, 1);
+
+  // A new sign-up without a code cannot reach the hub.
+  const newbie = await newAccount(browser, `newbie-${project}`);
+  await expect(newbie.page).toHaveURL(/\/join$/);
+  await newbie.page.goto("/");
+  await expect(newbie.page).toHaveURL(/\/join$/);
+  await expect(
+    newbie.page.getByRole("heading", { name: "Join the household" }),
+  ).toBeVisible();
+  expect((await newbie.page.goto("/settings"))?.url()).toMatch(/\/join$/);
+
+  // A wrong code says what to do.
+  await redeem(newbie.page, "nope-nope-nope", "Newbie");
+  await expect(
+    newbie.page
+      .getByRole("alert")
+      .filter({ hasText: "That invite code doesn't exist" }),
+  ).toBeVisible();
+
+  // The real code, typed with a capital as a phone keyboard would.
+  await redeem(newbie.page, code.toUpperCase(), name);
+  await expect(newbie.page).toHaveURL(/\/$/);
+  await expect(
+    newbie.page.getByRole("heading", { name: "Hub", level: 1 }),
+  ).toBeVisible();
+  await expect(newbie.page.getByTestId("signed-in-as")).toHaveText(name);
+
+  // A member is not an admin: /admin/* is a 404, and the nav has no link.
+  await expect(
+    newbie.page.getByRole("link", { name: "Settings" }),
+  ).toBeVisible();
+  await expect(newbie.page.getByRole("link", { name: "Members" })).toHaveCount(
+    0,
+  );
+  const admin = await newbie.page.goto("/admin/members");
+  expect(admin?.status()).toBe(404);
+
+  // The code had one use, so the next person is told it is used up.
+  const late = await newAccount(browser, `late-${project}`);
+  await redeem(late.page, code, "Late");
+  await expect(
+    late.page
+      .getByRole("alert")
+      .filter({ hasText: "That invite code has already been used" }),
+  ).toBeVisible();
+  await expect(late.page).toHaveURL(/\/join$/);
+
+  // The admin sees the new member and the spent code.
+  await page.goto("/admin/members");
+  await expect(page.getByTestId(`member-${name}`)).toBeVisible();
+  await expect(page.getByTestId(`invite-${code}`)).toContainText("Used up");
+
+  await newbie.context.close();
+  await late.context.close();
+});
+
+test("an admin cancels a code, and redeeming it then says so", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  await founderAdmin(page, project);
+  const code = await mintCode(page, 2);
+  await page.getByRole("button", { name: `Cancel code ${code}` }).click();
+  await expect(page.getByTestId(`invite-${code}`)).toContainText("Cancelled");
+
+  const someone = await newAccount(browser, `cancelled-${project}`);
+  await redeem(someone.page, code, "Someone");
+  await expect(
+    someone.page
+      .getByRole("alert")
+      .filter({ hasText: "That invite code was cancelled" }),
+  ).toBeVisible();
+  await someone.context.close();
+});
+
+test("a member sets a kiosk PIN and creates a Telegram link code", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  await founderAdmin(page, project);
+  const code = await mintCode(page, 1);
+  const member = await newAccount(browser, `settings-${project}`);
+  await redeem(member.page, code, `Settings ${project}`);
+  await expect(member.page).toHaveURL(/\/$/);
+
+  const p = member.page;
+  await p.getByRole("link", { name: "Settings" }).click();
+  await expect(
+    p.getByRole("heading", { name: "Settings", level: 1 }),
+  ).toBeVisible();
+
+  // Mismatched PINs never reach the server.
+  await p.getByLabel("PIN", { exact: true }).fill("4321");
+  await p.getByLabel("Type it again").fill("4322");
+  await p.getByRole("button", { name: "Set PIN" }).click();
+  await expect(p.getByText("The PINs do not match.")).toBeVisible();
+
+  await p.getByLabel("PIN", { exact: true }).fill("4321");
+  await p.getByLabel("Type it again").fill("4321");
+  await p.getByRole("button", { name: "Set PIN" }).click();
+  await expect(
+    p.getByRole("status").filter({ hasText: "PIN saved." }),
+  ).toBeVisible();
+
+  // Changing it now asks for the current password field, but a session this
+  // fresh (under 10 minutes) does not need it.
+  await p.reload();
+  await expect(p.getByLabel("Your account password")).toBeVisible();
+  await p.getByLabel("New PIN").fill("135790");
+  await p.getByLabel("Type it again").fill("135790");
+  await p.getByRole("button", { name: "Change PIN" }).click();
+  await expect(
+    p.getByRole("status").filter({ hasText: "PIN changed." }),
+  ).toBeVisible();
+
+  await p.getByRole("button", { name: "Create a link code" }).click();
+  await expect(p.getByTestId("telegram-link-code")).toHaveText(
+    /^\/link [A-Z2-9]{10}$/,
+  );
+  await member.context.close();
+});

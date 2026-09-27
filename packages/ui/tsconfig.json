@@ -1,0 +1,7 @@
+{
+  "extends": "@baumy/typescript-config/react-library.json",
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts"],
+  "compilerOptions": {
+    "noEmit": true
+  }
+}

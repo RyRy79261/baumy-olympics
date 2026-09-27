@@ -11,7 +11,17 @@ import type { ActionFailure } from "./result";
  * Every registered action. registry.ts is typed against this list, so an
  * entry cannot be missing from either side.
  */
-export const ACTION_NAMES = ["whoami", "update_my_profile"] as const;
+export const ACTION_NAMES = [
+  "whoami",
+  "update_my_profile",
+  "redeem_invite",
+  "join_as_founder",
+  "mint_invite",
+  "revoke_invite",
+  "manage_members",
+  "set_kiosk_pin",
+  "create_telegram_link_code",
+] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 
 /** A valid Claude and MCP tool name. */
@@ -25,9 +35,12 @@ export const ACTION_NAME_PATTERN = /^[a-z0-9_]{1,64}$/;
  * - `attested`: the member themself (a session, MCP or brain is its own
  *   member; the kiosk must send that member's PIN with the request);
  * - `session`: a real cookie or bearer session, never the kiosk, MCP or brain;
+ * - `account`: a real session whether or not it has a member row yet. Only
+ *   for joining the household (`redeem_invite`, `join_as_founder`);
  * - `service`: a service token (baumy-brain).
  */
-export type Gate = "member" | "admin" | "attested" | "session" | "service";
+export type Gate =
+  "member" | "admin" | "attested" | "session" | "account" | "service";
 
 export type ActionKind = "read" | "write";
 export type ActionRisk = "safe" | "confirm" | "destructive";
@@ -75,6 +88,17 @@ export type ExecuteResult<O> =
        * row cannot be written afterwards (SPEC §6.4).
        */
       undo?: () => Promise<void>;
+      /**
+       * `account` actions only: the member this request just created. An
+       * account has no member to key the ledger and the audit row on until
+       * the action makes one, so `runAction` keys both on this.
+       */
+      joinedAs?: string;
+      /**
+       * What the idempotency ledger keeps for a replay, when `data` holds a
+       * secret that must not be stored (a one-time code). Defaults to `data`.
+       */
+      storedData?: O;
     }
   | ActionFailure;
 
@@ -109,6 +133,12 @@ export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
   rateLimit?: RateLimitSpec;
   /** Zod v4; `z.toJSONSchema` of it is the Claude and MCP tool schema. */
   input: I;
+  /**
+   * The part of the parsed input that the ledger's `input_hash` and the
+   * default audit payload see. Set it when the input holds a secret (a PIN, a
+   * password): an unsalted sha256 of a 4-digit PIN is no secret at all.
+   */
+  fingerprint?: (input: z.output<I>) => unknown;
   /** One line a human approves, e.g. "Log Trash for Ryan: +25 (streak 2)". */
   preview?(ctx: ActionCtx, input: z.output<I>): Promise<string>;
   execute(ctx: ActionCtx, input: z.output<I>): Promise<ExecuteResult<O>>;

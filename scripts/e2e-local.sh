@@ -45,6 +45,9 @@ export AUTH_EMAIL_CAPTURE_FILE="$LOG_DIR/auth-mail.jsonl"
 : >"$AUTH_EMAIL_CAPTURE_FILE"
 export AUTH_RATE_LIMIT_WINDOW_SECONDS=60
 export AUTH_RATE_LIMIT_MAX=10000
+# One founder per Playwright project (apps/web/e2e/lib/accounts.ts), so the
+# projects running in parallel each bootstrap their own admin (issue #9).
+export FOUNDER_EMAILS="founder-desktop-chromium@example.com,founder-ipad-landscape@example.com,founder-mobile-360@example.com"
 
 # 1. Database up, and wait until Postgres itself answers.
 echo "==> database stack"

@@ -29,7 +29,27 @@ export type PlatformErrorCode =
   /** Something threw. The message is generic; the log has the detail. */
   | "INTERNAL";
 
-export type ActionErrorCode = PlatformErrorCode;
+/** Codes the actions themselves return, each with a sentence to act on. */
+export type DomainErrorCode =
+  /** No invite code by that spelling. */
+  | "INVITE_NOT_FOUND"
+  | "INVITE_EXPIRED"
+  | "INVITE_REVOKED"
+  /** Every use of the code is taken. */
+  | "INVITE_USED_UP"
+  /** The account already belongs to an active member. */
+  | "ALREADY_MEMBER"
+  /** The account's member was deactivated; only an admin can bring it back. */
+  | "MEMBERSHIP_ENDED"
+  /** `join_as_founder` from an email that is not on FOUNDER_EMAILS. */
+  | "NOT_A_FOUNDER"
+  | "EMAIL_NOT_VERIFIED"
+  /** The change would leave the household without an active admin. */
+  | "LAST_ADMIN"
+  /** Needs the current password or a session under 10 minutes old. */
+  | "REAUTH_REQUIRED";
+
+export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 
 /** One validation problem, reduced to what serialises and a form can show. */
 export interface InputIssue {

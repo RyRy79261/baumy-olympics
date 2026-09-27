@@ -9,7 +9,7 @@ apps/web            Next.js 16 app (hub, kiosk, API, MCP, AI command)
 packages/core       pure domain logic (scoring). No I/O, no Date.now(), no randomness.
 packages/db         Drizzle schema + migrations + per-domain queries + PGlite test harness
 packages/auth       Better Auth config (pinned 1.6.25)
-packages/ui         pixel UI kit + sprites
+packages/ui         UI kit + sprites (neutral placeholders until issue #7 restyles them)
 packages/types      Zod schemas shared across boundaries
 packages/ai-prompts system prompts + model tiers (no SDK imports)
 ```
@@ -77,10 +77,12 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
   - UI server actions, the AI command, MCP and the brain endpoint all call `runAction`. Never call domain writes directly from a route or component.
   - `runAction` alone writes `audit_events` and `action_requests`. Domain functions take the caller's `tx` and write neither.
   - Declare an action with `defineAction` (`lib/actions/define.ts`), add its name to `ACTION_NAMES` and its entry to `lib/actions/registry.ts`. A write's `execute` returns `audit: {entity, entityId}`; returning `{ok: false}` rolls the whole transaction back.
-  - Server actions call `actionForm(name, formData)` (`lib/actions/ui.ts`); the form carries a hidden `requestId`.
+  - Server actions call `actionForm(name, formData)` (`lib/actions/ui.ts`); the form carries a hidden `requestId`. Client forms get it from `useActionForm` (`components/use-action-form.ts`).
+  - An input holding a secret (a PIN, a password) sets `fingerprint` so neither `input_hash` nor the audit payload sees it; a result holding a one-time code sets `storedData` so the ledger never stores it.
   - Actions that call Google or brain set `transactional: false`; never hold a transaction across a network call.
   - Admin-only actions have `surfaces: ["ui"]`.
-- **Authorization:** one gate function per concern (`requireMember`, `requireAdmin`, `requireAttested`, `requireSession`). Never hand-roll a check at a call site. Kiosk actors never pass `requireSession` or `requireAdmin`.
+- **Authorization:** one gate function per concern (`requireMember`, `requireAdmin`, `requireAttested`, `requireSession`, and `requireAccount` for the joining actions only). Never hand-roll a check at a call site. Kiosk actors never pass `requireSession`, `requireAccount` or `requireAdmin`.
+  - Pages use the page gate ladder (`lib/auth/page-gate.ts`): `requireMemberPage()` (no session → sign-in, no member row → `/join`), `requireAdminPage()` (non-admins get a 404) and `requireJoiningPage()`.
 - **Writes:**
   - Privileged writes add an `audit_events` row in the **same transaction** as the change.
   - Decision writes are compare-and-set (`WHERE status = $expected … RETURNING`). A lost race returns a sentence the user can act on.
