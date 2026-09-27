@@ -2,6 +2,8 @@ import "server-only";
 
 import type { ActionResult } from "./result";
 import type { ActionDef, ActionName, AnyActionDef, RequestCtx } from "./define";
+import { addPotContribution } from "./add-pot-contribution";
+import { adjustPoints } from "./adjust-points";
 import { attachCompletionPhoto } from "./attach-completion-photo";
 import { checkKioskPin } from "./check-kiosk-pin";
 import {
@@ -25,7 +27,9 @@ import { redeemInvite } from "./redeem-invite";
 import { revokeInvite } from "./revoke-invite";
 import { revokeKiosk } from "./revoke-kiosk";
 import { createRunner } from "./run";
+import { getPot, getStandings, getStreaks } from "./scoreboard";
 import { setKioskPin } from "./set-kiosk-pin";
+import { setPrizeMode } from "./set-prize-mode";
 import { updateMyProfile } from "./update-my-profile";
 import { whoami } from "./whoami";
 
@@ -56,6 +60,12 @@ export const REGISTRY = {
   concede_completion: concedeCompletion,
   resolve_dispute: resolveDispute,
   attach_completion_photo: attachCompletionPhoto,
+  get_standings: getStandings,
+  get_streaks: getStreaks,
+  get_pot: getPot,
+  adjust_points: adjustPoints,
+  add_pot_contribution: addPotContribution,
+  set_prize_mode: setPrizeMode,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =
