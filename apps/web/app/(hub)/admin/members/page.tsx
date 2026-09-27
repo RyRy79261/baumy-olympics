@@ -66,6 +66,7 @@ export default async function AdminMembersPage() {
                 role={m.role}
                 active={m.deactivatedAt === null}
                 isMe={m.id === me.memberId}
+                telegramUserId={m.telegramUserId}
               />
             ))}
           </ul>

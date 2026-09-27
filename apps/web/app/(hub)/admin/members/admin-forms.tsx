@@ -120,6 +120,7 @@ export interface MemberRowProps {
   role: "admin" | "member";
   active: boolean;
   isMe: boolean;
+  telegramUserId: number | null;
 }
 
 /** One member: role, active or not, and how they look (manage_members). */
@@ -127,6 +128,7 @@ export function MemberControls(props: MemberRowProps) {
   const role = useActionForm(manageMembersAction);
   const status = useActionForm(manageMembersAction);
   const edit = useActionForm(manageMembersAction);
+  const telegram = useActionForm(manageMembersAction);
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
@@ -289,6 +291,48 @@ export function MemberControls(props: MemberRowProps) {
             <FormMessage tone="success">Saved.</FormMessage>
           ) : edit.state && edit.state.code !== "INVALID_INPUT" ? (
             <FormMessage tone="error">{edit.state.message}</FormMessage>
+          ) : null}
+        </form>
+      </details>
+
+      <details>
+        <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm underline">
+          Telegram {props.telegramUserId === null ? "(not linked)" : "(linked)"}
+        </summary>
+        <form
+          action={telegram.formAction}
+          className="mt-3 flex flex-wrap items-end gap-3"
+        >
+          <input type="hidden" name="requestId" value={telegram.requestId} />
+          <input type="hidden" name="op" value="set_telegram" />
+          <input type="hidden" name="memberId" value={props.id} />
+          <Field
+            id={`telegram-${props.id}`}
+            label="Telegram user id"
+            hint="Leave it empty to unlink. Members can also link themselves with /link in Telegram."
+            errors={telegram.errors.telegramUserId}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                name="telegramUserId"
+                inputMode="numeric"
+                autoComplete="off"
+                defaultValue={props.telegramUserId ?? ""}
+              />
+            )}
+          </Field>
+          <Button type="submit" disabled={telegram.pending}>
+            Save Telegram id
+          </Button>
+          {telegram.state?.ok ? (
+            <FormMessage tone="success">
+              {telegram.state.data.telegramUserId === null
+                ? "Telegram unlinked."
+                : "Telegram id saved."}
+            </FormMessage>
+          ) : telegram.state && telegram.state.code !== "INVALID_INPUT" ? (
+            <FormMessage tone="error">{telegram.state.message}</FormMessage>
           ) : null}
         </form>
       </details>

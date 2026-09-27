@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  findMemberIdByTelegramUserId,
   lockActiveAdmins,
   lockMember,
   updateMember,
@@ -10,13 +11,15 @@ import {
   DisplayName,
   MemberColor,
   MemberRole,
+  TelegramUserId,
 } from "@baumy/types";
 import { defineAction } from "./define";
 import { fail } from "./result";
 
 // The admin members page (/admin/members): change a member's role, switch
-// them off or back on, or edit how they look. Admin only, UI only (SPEC §12
-// decision 10).
+// them off or back on, edit how they look, or set or clear their Telegram
+// user id by hand (issue #27; members normally link themselves with
+// `/link <code>`). Admin only, UI only (SPEC §12 decision 10).
 //
 // The household never loses its last admin: demoting or deactivating locks
 // every active admin row first (in id order, so two admins demoting each
@@ -34,6 +37,12 @@ const input = z.discriminatedUnion(
     }),
     z.strictObject({ op: z.literal("deactivate"), memberId }),
     z.strictObject({ op: z.literal("reactivate"), memberId }),
+    // No id (an empty field) unlinks.
+    z.strictObject({
+      op: z.literal("set_telegram"),
+      memberId,
+      telegramUserId: TelegramUserId.nullish(),
+    }),
     z
       .strictObject({
         op: z.literal("edit"),
@@ -60,6 +69,7 @@ export interface ManageMembersData {
   color: string;
   avatarSprite: string;
   active: boolean;
+  telegramUserId: number | null;
 }
 
 const LAST_ADMIN = fail(
@@ -71,7 +81,7 @@ export const manageMembers = defineAction({
   name: "manage_members",
   title: "Manage members",
   description:
-    "Changes a household member's role, deactivates or reactivates them, or edits their display name, colour and avatar.",
+    "Changes a household member's role, deactivates or reactivates them, edits their display name, colour and avatar, or sets or clears their Telegram user id.",
   consent: "Manage household members",
   kind: "write",
   risk: "confirm",
@@ -105,6 +115,23 @@ export const manageMembers = defineAction({
       case "reactivate":
         patch = { deactivatedAt: null };
         break;
+      case "set_telegram": {
+        const telegramUserId = change.telegramUserId ?? null;
+        if (telegramUserId !== null) {
+          const holder = await findMemberIdByTelegramUserId(
+            ctx.db,
+            telegramUserId,
+          );
+          if (holder && holder !== target.id) {
+            return fail(
+              "TELEGRAM_ALREADY_LINKED",
+              "That Telegram account is linked to another member. Clear it there first.",
+            );
+          }
+        }
+        patch = { telegramUserId };
+        break;
+      }
       case "edit": {
         const { op: _op, memberId: _id, ...fields } = change;
         patch = fields;
@@ -120,6 +147,7 @@ export const manageMembers = defineAction({
       color: row.color,
       avatarSprite: row.avatarSprite,
       active: row.deactivatedAt === null,
+      telegramUserId: row.telegramUserId,
     };
     return {
       ok: true,
