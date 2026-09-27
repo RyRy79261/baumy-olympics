@@ -4,11 +4,10 @@
 import {
   RULESET_V1,
   ruleVersionAt,
-  type CompletionStatus,
-  type ConfirmMode,
   type RuleVersion,
   type Ruleset,
 } from "./ruleset";
+import { effectiveStatus, type TimedRow } from "./verification";
 
 export type ProofMode = "none" | "optional" | "required";
 export type SeasonStatus = "active" | "closing" | "closed";
@@ -27,12 +26,9 @@ export type ValidationResult =
   | { ok: false; code: "COOLDOWN"; retryAt: Date }
   | { ok: false; code: Exclude<ValidationErrorCode, "COOLDOWN"> };
 
-export interface ValidatorCompletion {
+export interface ValidatorCompletion extends TimedRow {
   id: string;
   occurredAt: Date;
-  loggedAt: Date;
-  status: CompletionStatus;
-  confirmMode: ConfirmMode;
 }
 
 export interface NewCompletion {
@@ -58,23 +54,17 @@ const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 
 /**
- * Live (SPEC §4.1): not voided at `now`. That includes disputed rows and
- * partner-mode pending rows that have not yet expired unconfirmed. A disputed
- * row whose challenge window has run out without a photo is voided only once
- * `verification.ts` (issue #12) or the daily job has persisted it.
+ * Live (SPEC §4.1): not voided at `now`, using `effectiveStatus`. That
+ * includes disputed rows until their challenge window times out (or for good,
+ * if a photo was attached in time) and partner-mode pending rows until they
+ * expire unconfirmed.
  */
 export function isLive(
   c: ValidatorCompletion,
   now: Date,
   ruleset: Ruleset = RULESET_V1,
 ): boolean {
-  if (c.status === "voided") return false;
-  if (c.status === "pending" && c.confirmMode === "partner") {
-    const expiresAt =
-      c.loggedAt.getTime() + ruleset.partnerConfirmExpiryH * HOUR;
-    return now.getTime() < expiresAt;
-  }
-  return true;
+  return effectiveStatus(c, now, ruleset) !== "voided";
 }
 
 export function validateNewCompletion(

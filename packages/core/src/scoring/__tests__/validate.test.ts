@@ -15,7 +15,16 @@ function row(
   overrides: Partial<ValidatorCompletion> = {},
 ): ValidatorCompletion {
   const { id, loggedAt, status, confirmMode } = completion("x", occurredAt);
-  return { id, occurredAt, loggedAt, status, confirmMode, ...overrides };
+  return {
+    id,
+    occurredAt,
+    loggedAt,
+    status,
+    confirmMode,
+    finalizesAt: null,
+    photoAttachedAt: null,
+    ...overrides,
+  };
 }
 
 function attempt(overrides: Partial<NewCompletion>): NewCompletion {
@@ -286,6 +295,18 @@ describe("isLive", () => {
     expect(isLive(c, expiry)).toBe(false);
   });
 
+  it("keeps a disputed row live until its challenge window times out", () => {
+    const windowEnd = new Date(
+      loggedAt.getTime() + RULESET_V1.challengeWindowH * HOUR,
+    );
+    const disputed = row(loggedAt, { status: "disputed" });
+    expect(isLive(disputed, new Date(windowEnd.getTime() - 1))).toBe(true);
+    expect(isLive(disputed, windowEnd)).toBe(false);
+    // A photo attached in time keeps it live until someone rules on it.
+    const withPhoto = { ...disputed, photoAttachedAt: loggedAt };
+    expect(isLive(withPhoto, new Date(windowEnd.getTime() + DAY))).toBe(true);
+  });
+
   it("treats every non-voided status otherwise as live", () => {
     for (const status of [
       "pending",
@@ -293,7 +314,7 @@ describe("isLive", () => {
       "finalized",
       "disputed",
     ] as const) {
-      expect(isLive(row(loggedAt, { status }), expiry)).toBe(true);
+      expect(isLive(row(loggedAt, { status }), loggedAt)).toBe(true);
     }
     expect(isLive(row(loggedAt, { status: "voided" }), loggedAt)).toBe(false);
   });
