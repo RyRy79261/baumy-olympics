@@ -6,10 +6,12 @@
 // SPEC §5 is the design. All ids are uuid with defaultRandom() unless noted,
 // and every time is a timestamptz.
 
+import { sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -210,6 +212,68 @@ export const members = pgTable(
       .defaultNow(),
   },
   (t) => [index("members_household_id_idx").on(t.householdId)],
+);
+
+/**
+ * The front door (SPEC §6.2): a signed-in account with no `members` row
+ * redeems one of these at `/join`. `code` is stored lowercased, and every
+ * lookup lowercases what was typed (invite-codes.ts). A redeem claims a use
+ * with ONE `UPDATE … WHERE use_count < max_uses … RETURNING`, ported from
+ * camp-404 `packages/db/src/invite-codes.ts`, so two people racing for the
+ * last use cannot both get it; the check constraint is the backstop.
+ */
+export const inviteCodes = pgTable(
+  "invite_codes",
+  {
+    code: text("code").primaryKey(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    /** The role the new member gets. */
+    role: memberRole("role").notNull().default("member"),
+    maxUses: integer("max_uses").notNull().default(1),
+    useCount: integer("use_count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => members.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check("invite_codes_max_uses_positive", sql`${t.maxUses} >= 1`),
+    check(
+      "invite_codes_use_count_in_range",
+      sql`${t.useCount} >= 0 AND ${t.useCount} <= ${t.maxUses}`,
+    ),
+  ],
+);
+
+/**
+ * One-time codes a member creates in `/settings` and sends to baumy-brain as
+ * `/link <code>` (SPEC §6.6). Only the sha256 of the code is stored, so a
+ * database read does not yield a working code. Single use, 10 minutes; the
+ * redeem (`link_telegram`, issue #27) claims it with `UPDATE … WHERE used_at
+ * IS NULL AND expires_at > now … RETURNING`.
+ */
+export const telegramLinkCodes = pgTable(
+  "telegram_link_codes",
+  {
+    codeHash: text("code_hash").primaryKey(),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    /** The Telegram user id that redeemed it. */
+    usedByTg: bigint("used_by_tg", { mode: "number" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("telegram_link_codes_member_id_idx").on(t.memberId)],
 );
 
 // ---------------------------------------------------------------------------
