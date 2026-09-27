@@ -73,11 +73,21 @@ export async function consumeRateLimit(input: {
     // before either writes. The sweep is a CTE in the same statement. It skips
     // this call's own key: a CTE delete and the INSERT see one snapshot, and
     // touching the same row in both is an error.
+    //
+    // The sweep also skips rows another statement has locked (SKIP LOCKED).
+    // Without that, two calls whose own keys are both week-old each lock their
+    // own row in the upsert and then wait to delete the other's: a deadlock,
+    // which Postgres breaks by failing one of them. A skipped row is swept by
+    // a later call.
     const result = (await createHttpDb().execute(sql`
       WITH swept AS (
         DELETE FROM action_rate_limit
-         WHERE window_start < ${nowMs} - ${RATE_LIMIT_ROW_HORIZON_MS}::bigint
-           AND key <> ${key}
+         WHERE key IN (
+           SELECT key FROM action_rate_limit
+            WHERE window_start < ${nowMs} - ${RATE_LIMIT_ROW_HORIZON_MS}::bigint
+              AND key <> ${key}
+            FOR UPDATE SKIP LOCKED
+         )
       )
       INSERT INTO action_rate_limit (key, count, window_start)
       VALUES (${key}, 1, ${nowMs})
