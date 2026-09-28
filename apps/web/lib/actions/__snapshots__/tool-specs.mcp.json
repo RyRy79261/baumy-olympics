@@ -68,7 +68,8 @@
       "additionalProperties": false
     },
     "kind": "write",
-    "risk": "confirm"
+    "risk": "confirm",
+    "member_field": "doneBy"
   },
   {
     "name": "get_pending_confirmations",

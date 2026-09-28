@@ -203,7 +203,8 @@ export const deleteNote = defineAction({
   consent: "Delete the household's notes",
   kind: "write",
   risk: "destructive",
-  surfaces: ["ui", "kiosk", "ai"],
+  // Brain behind its confirm button (issue #70); never MCP.
+  surfaces: ["ui", "kiosk", "ai", "brain"],
   requires: "attested",
   input: NoteRef,
   async preview(ctx, i) {

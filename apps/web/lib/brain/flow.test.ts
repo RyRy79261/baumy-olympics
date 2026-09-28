@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Queryable } from "@baumy/db";
-import { actionRequests, auditEvents, members } from "@baumy/db/schema";
+import {
+  actionRequests,
+  auditEvents,
+  households,
+  members,
+} from "@baumy/db/schema";
 import {
   BRAIN_SCOPE,
   generateServiceToken,
@@ -194,13 +199,57 @@ describe("the brain endpoint on PGlite", () => {
     expect(await reused.json()).toMatchObject({ code: "LINK_CODE_INVALID" });
   });
 
-  it("refuses destructive and admin actions with SURFACE_FORBIDDEN", async () => {
+  it("deletes a note and an event only once the person confirmed it", async () => {
+    const ryan = await seedMember(db(), { telegramUserId: TG });
+    const actor = { "x-baumy-actor": `tg:${TG}` };
+    const note = await call(
+      "create_note",
+      { title: "Wifi" },
+      { ...actor, "idempotency-key": "brain-note-0001" },
+    );
+    const noteId = ((await note.json()) as { data: { note: { id: string } } })
+      .data.note.id;
+    const event = await call("create_event", dinner(), {
+      ...actor,
+      "x-baumy-confirmed": "1",
+      "idempotency-key": "brain-event-0002",
+    });
+    const eventId = (
+      (await event.json()) as { data: { event: { id: string } } }
+    ).data.event.id;
+
+    for (const [name, input] of [
+      ["delete_note", { noteId }],
+      ["delete_event", { eventId }],
+    ] as const) {
+      const headers = { ...actor, "idempotency-key": `brain-${name}-0001` };
+      const unconfirmed = await call(name, input, headers);
+      expect(unconfirmed.status).toBe(428);
+      const res = await call(name, input, {
+        ...headers,
+        "x-baumy-confirmed": "1",
+      });
+      expect(res.status).toBe(200);
+    }
+    const notes = await call("list_notes", {}, actor);
+    expect(
+      ((await notes.json()) as { data: { notes: unknown[] } }).data.notes,
+    ).toEqual([]);
+    const audits = await t.db().select().from(auditEvents);
+    expect(audits.map((a) => [a.action, a.actorMemberId, a.source])).toEqual(
+      expect.arrayContaining([
+        ["delete_note", ryan, "brain"],
+        ["delete_event", ryan, "brain"],
+      ]),
+    );
+  });
+
+  it("refuses admin actions with SURFACE_FORBIDDEN", async () => {
     await seedMember(db(), { telegramUserId: TG, role: "admin" });
     for (const [name, input] of [
-      ["delete_event", { eventId: "x" }],
-      ["delete_note", { noteId: "00000000-0000-4000-8000-000000000000" }],
       ["manage_members", { op: "deactivate", memberId: "x" }],
       ["mint_invite", {}],
+      ["schedule_weight", { suggestionId: "x" }],
     ] as const) {
       const res = await call(name, input, {
         "x-baumy-actor": `tg:${TG}`,
@@ -232,6 +281,134 @@ describe("the brain endpoint on PGlite", () => {
     const res = await call("whoami", {}, { "x-baumy-actor": `tg:${TG}` });
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ code: "UNAUTHENTICATED" });
+  });
+
+  it("acts for a housemate on the asker's behalf, audited with both", async () => {
+    const ryan = await seedMember(db(), {
+      telegramUserId: TG,
+      displayName: "Ryan",
+    });
+    const jo = await seedMember(db(), { displayName: "Jo" });
+    const actor = { "x-baumy-actor": `tg:${TG}` };
+    const posted = await call(
+      "create_reminder",
+      { title: "Plumber Wednesday" },
+      { ...actor, "idempotency-key": "brain-rem-0001" },
+    );
+    const { reminderId } = (
+      (await posted.json()) as { data: { reminderId: string } }
+    ).data;
+    const forJo = {
+      ...actor,
+      "x-baumy-on-behalf-of": jo,
+      "idempotency-key": "brain-ack-0001",
+    };
+
+    // Safe for Jo herself, but done for her it needs the asker's tap.
+    const unconfirmed = await call(
+      "acknowledge_reminder",
+      { reminderId },
+      forJo,
+    );
+    expect(unconfirmed.status).toBe(428);
+    const res = await call(
+      "acknowledge_reminder",
+      { reminderId },
+      { ...forJo, "x-baumy-confirmed": "1" },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: { reminderId, memberId: jo },
+    });
+
+    const listed = await call("list_reminders", {}, actor);
+    const { data } = (await listed.json()) as {
+      data: { reminders: { seenBy: string[] }[] };
+    };
+    expect(data.reminders[0]!.seenBy).toEqual([jo]);
+
+    const audits = await t.db().select().from(auditEvents);
+    expect(
+      audits.map((a) => ({
+        action: a.action,
+        actor: a.actorMemberId,
+        initiator: a.initiatedByMemberId,
+        source: a.source,
+      })),
+    ).toEqual([
+      {
+        action: "create_reminder",
+        actor: ryan,
+        initiator: null,
+        source: "brain",
+      },
+      {
+        action: "acknowledge_reminder",
+        actor: jo,
+        initiator: ryan,
+        source: "brain",
+      },
+    ]);
+
+    // A read on her behalf needs no tap: whoami answers as Jo.
+    const who = await call(
+      "whoami",
+      {},
+      { ...actor, "x-baumy-on-behalf-of": jo },
+    );
+    expect(await who.json()).toMatchObject({ data: { memberId: jo } });
+  });
+
+  it("refuses a target who is unknown, deactivated or in another household", async () => {
+    await seedMember(db(), { telegramUserId: TG });
+    const gone = await seedMember(db(), { deactivatedAt: now() });
+    const [other] = await t
+      .db()
+      .insert(households)
+      .values({ name: "Next door" })
+      .returning({ id: households.id });
+    const neighbour = await seedMember(db(), { householdId: other!.id });
+    for (const target of [
+      "00000000-0000-4000-8000-000000000000",
+      gone,
+      neighbour,
+    ]) {
+      const res = await call(
+        "create_note",
+        { title: "Hi" },
+        {
+          "x-baumy-actor": `tg:${TG}`,
+          "x-baumy-on-behalf-of": target,
+          "x-baumy-confirmed": "1",
+          "idempotency-key": `brain-behalf-${target.slice(0, 8)}`,
+        },
+      );
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({ code: "NOT_FOUND" });
+    }
+    expect(await t.db().select().from(auditEvents)).toHaveLength(0);
+  });
+
+  it("offers a member's weight reads and veto to brain", async () => {
+    await seedMember(db(), { telegramUserId: TG });
+    const res = await call(
+      "get_weights",
+      { scheduledOnly: true },
+      { "x-baumy-actor": `tg:${TG}` },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { scheduled: [] } });
+    const veto = await call(
+      "veto_weight",
+      { suggestionId: "00000000-0000-4000-8000-000000000000" },
+      {
+        "x-baumy-actor": `tg:${TG}`,
+        "x-baumy-confirmed": "1",
+        "idempotency-key": "brain-veto-0001",
+      },
+    );
+    expect(veto.status).toBe(404);
+    expect(await veto.json()).toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("stops mapping a member once they are deactivated", async () => {

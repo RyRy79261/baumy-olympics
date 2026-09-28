@@ -120,6 +120,17 @@ export function actorKey(actor: Actor): string {
 }
 
 /**
+ * Who asked for a change done on the actor's behalf (brain's
+ * `X-Baumy-On-Behalf-Of`), for the audit row; null when the actor asked
+ * themself.
+ */
+export function initiatorOf(actor: Actor): string | null {
+  return actor.kind === "service" && actor.initiatorMemberId
+    ? actor.initiatorMemberId
+    : null;
+}
+
+/**
  * What the caller gets back is exactly what a replay gets back: the result
  * as it round-trips through jsonb (a Date becomes its ISO string).
  */
@@ -240,7 +251,7 @@ async function finish(
   action: string,
   auditInput: unknown,
   out: Extract<ExecuteResult<unknown>, { ok: true }>,
-  now: Date,
+  ctx: RequestCtx,
 ): Promise<ActionResult<unknown>> {
   const stored = asStored<unknown>({
     ok: true,
@@ -248,12 +259,13 @@ async function finish(
   });
   await tx.insert(auditEvents).values({
     actorMemberId: key.actorMemberId,
+    initiatedByMemberId: initiatorOf(ctx.actor),
     source: key.source,
     action,
     entity: out.audit?.entity ?? action,
     entityId: out.audit?.entityId ?? null,
     payload: out.audit?.payload ?? auditInput ?? null,
-    at: now,
+    at: ctx.now,
   });
   await tx
     .update(actionRequests)
@@ -372,7 +384,7 @@ export function createRunner(
         // The action said no: roll back everything, claim included, so a
         // retry is judged afresh.
         if (!out.ok) throw new ActionAbort(out);
-        return finish(db, key, def.name, seen, out, ctx.now);
+        return finish(db, key, def.name, seen, out, ctx);
       });
     } catch (err) {
       if (err instanceof ActionAbort) return err.result;
@@ -423,7 +435,7 @@ async function runJoining(
       status: "pending",
       createdAt: ctx.now,
     });
-    return finish(db, key, def.name, seen, out, ctx.now);
+    return finish(db, key, def.name, seen, out, ctx);
   });
 }
 
@@ -478,7 +490,7 @@ async function runDetached(
 
   try {
     return await deps.withTransaction((tx) =>
-      finish(tx as unknown as Queryable, key, def.name, seen, out, ctx.now),
+      finish(tx as unknown as Queryable, key, def.name, seen, out, ctx),
     );
   } catch (err) {
     deps.logError(`[action:${def.name}] could not be audited`, err);

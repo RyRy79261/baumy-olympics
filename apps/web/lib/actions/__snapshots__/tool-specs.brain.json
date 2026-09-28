@@ -91,7 +91,8 @@
       "additionalProperties": false
     },
     "kind": "write",
-    "risk": "confirm"
+    "risk": "confirm",
+    "member_field": "doneBy"
   },
   {
     "name": "get_pending_confirmations",
@@ -301,6 +302,46 @@
     "risk": "safe"
   },
   {
+    "name": "get_weights",
+    "title": "Weights",
+    "description": "Lists each chore's points and cooldown, how often it is really done (the median gap and the sample), the weight change the frequency formula suggests, and the changes scheduled to apply next Monday.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "scheduledOnly": {
+          "description": "Only the scheduled changes, without measuring every chore.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "kind": "read",
+    "risk": "safe"
+  },
+  {
+    "name": "veto_weight",
+    "title": "Veto a weight change",
+    "description": "Vetoes a scheduled weight change before it applies. Only a member other than the one who scheduled it can veto it; a vetoed change never applies.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "suggestionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "suggestionId"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "confirm"
+  },
+  {
     "name": "list_events",
     "title": "Calendar",
     "description": "Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM) and who added it (a member id). Private events are left out.",
@@ -447,6 +488,28 @@
     },
     "kind": "write",
     "risk": "confirm"
+  },
+  {
+    "name": "delete_event",
+    "title": "Delete a calendar event",
+    "description": "Deletes an event from the house calendar, by its id from list_events. Always confirm with the person first.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{5,1024}$",
+          "description": "The event's id, from list_events."
+        }
+      },
+      "required": [
+        "eventId"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "destructive"
   },
   {
     "name": "list_notes",
@@ -642,6 +705,29 @@
     },
     "kind": "write",
     "risk": "safe"
+  },
+  {
+    "name": "delete_note",
+    "title": "Delete a note",
+    "description": "Deletes a note for everyone in the household. Always ask before doing this.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The note's id, from list_notes."
+        }
+      },
+      "required": [
+        "noteId"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "destructive"
   },
   {
     "name": "list_shopping",

@@ -442,16 +442,20 @@ describe("delete_note", () => {
     ).toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
 
-  it("is never offered over MCP or to brain", async () => {
+  it("is never offered over MCP; brain may delete (issue #70)", async () => {
     const note = await add("Wifi");
-    for (const ctx of [mcp(ryan, ["baumy:read", "baumy:write"]), brain(ryan)]) {
-      expect(
-        await runAction("delete_note", { noteId: note.id }, ctx),
-      ).toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
-    }
+    expect(
+      await runAction(
+        "delete_note",
+        { noteId: note.id },
+        mcp(ryan, ["baumy:read", "baumy:write"]),
+      ),
+    ).toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
     expect(ok(await runAction("list_notes", {}, as(ryan))).notes).toHaveLength(
       1,
     );
+    ok(await runAction("delete_note", { noteId: note.id }, brain(ryan)));
+    expect(ok(await runAction("list_notes", {}, as(ryan))).notes).toEqual([]);
   });
 
   it("needs the PIN on the kiosk", async () => {
