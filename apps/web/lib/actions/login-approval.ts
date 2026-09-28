@@ -15,11 +15,12 @@ import { fail } from "./result";
 // anyone else's reads as not there at all.
 //
 // - approve_login: the tapped number must be the one on the screen. A decoy
-//   denies the request (and the start route then refuses this method for
-//   that member for 15 minutes: someone may be pushing sign-ins at them).
+//   denies the request.
 //   That is still a success: the transaction must keep the denial, and brain
 //   tells the member what happened.
 // - deny_login: the member tapped Deny.
+// Either denial makes the start route refuse this method for that member
+// for 15 minutes: someone may be pushing sign-ins at them (push fatigue).
 //
 // Each decision is a compare-and-set on `pending` under the row's lock, so a
 // second tap, a replay with a new key or an expired request changes nothing.

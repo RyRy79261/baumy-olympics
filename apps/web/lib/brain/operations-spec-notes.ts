@@ -101,7 +101,8 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
         call: 'deny_login {"requestId": "<from the DM request>"}',
       },
     ],
-    returns: "`outcome`: `denied`; `device`.",
+    returns:
+      "`outcome`: `denied` (Sign in with Baumy is then off for this member for 15 minutes); `device`.",
     errors: ["NOT_FOUND", "INVALID_STATE"],
     reply:
       'Edit the DM, dropping the buttons: "✖️ Denied the sign-in on <device>." NOT_FOUND or INVALID_STATE: show `message`.',

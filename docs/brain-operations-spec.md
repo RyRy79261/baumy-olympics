@@ -411,7 +411,7 @@ Denies a 'Sign in with Baumy' request: the member tapped Deny.
 }
 ```
 
-**Returns** (`data`): `outcome`: `denied`; `device`.
+**Returns** (`data`): `outcome`: `denied` (Sign in with Baumy is then off for this member for 15 minutes); `device`.
 
 **Its errors:** `NOT_FOUND` (404), `INVALID_STATE` (422). Every call can also get the endpoint's codes (above).
 

@@ -241,7 +241,7 @@ describe("approve_login", () => {
 });
 
 describe("deny_login", () => {
-  it("denies a pending request, audited, without locking the method", async () => {
+  it("denies a pending request, audited, and locks the method", async () => {
     const ryan = await seedMember(db());
     const { id } = await requestFor(ryan);
     const res = await runAction(
@@ -257,7 +257,7 @@ describe("deny_login", () => {
       status: "denied",
       denyReason: "denied",
     });
-    expect(await isLoginLocked(db(), ryan, FIXED_NOW)).toBe(false);
+    expect(await isLoginLocked(db(), ryan, FIXED_NOW)).toBe(true);
     const [audit] = await t.db().select().from(auditEvents);
     expect(audit).toMatchObject({
       action: "deny_login",

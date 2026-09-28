@@ -16,6 +16,7 @@ import {
   readLoginCookie,
   type LoginApprovalDeps,
   type NewRequest,
+  type RequestAudit,
 } from "./flow";
 
 // The "Sign in with Baumy" routes against fakes (issue #80): the same answer
@@ -34,6 +35,7 @@ const RYAN = {
 interface Fake {
   deps: LoginApprovalDeps;
   created: NewRequest[];
+  audits: RequestAudit[];
   sent: LoginApprovalMessage[];
   pendingAfter: (() => Promise<void>)[];
   errors: string[];
@@ -45,6 +47,7 @@ interface Fake {
 function fake(overrides: Partial<LoginApprovalDeps> = {}): Fake {
   const f: Omit<Fake, "deps"> = {
     created: [],
+    audits: [],
     sent: [],
     pendingAfter: [],
     errors: [],
@@ -55,6 +58,7 @@ function fake(overrides: Partial<LoginApprovalDeps> = {}): Fake {
   let seq = 0;
   let bucket = 0;
   const deps: LoginApprovalDeps = {
+    enabled: () => true,
     now: () => NOW,
     // A fresh limiter per fake: the keys are the same across tests.
     rateLimiter: {
@@ -85,6 +89,9 @@ function fake(overrides: Partial<LoginApprovalDeps> = {}): Fake {
     sendApproval: async (message) => {
       f.sent.push(message);
       return { ok: true, data: { sent: true } };
+    },
+    auditRequest: async (row) => {
+      f.audits.push(row);
     },
     afterResponse: (fn) => {
       f.pendingAfter.push(fn);
@@ -164,11 +171,11 @@ describe("handleStart", () => {
     // The secret never leaves in the body.
     expect(JSON.stringify(a)).not.toContain(SECRET);
 
-    // Both requests are stored; only the member's names them, with its audit.
-    expect(f.created.map((c) => [c.memberId, c.audit])).toEqual([
-      [RYAN.memberId, { ip: "203.0.113.7" }],
-      [null, undefined],
-    ]);
+    // Both requests are stored the same way; only the member's names them.
+    expect(f.created.map((c) => c.memberId)).toEqual([RYAN.memberId, null]);
+    expect(Object.keys(f.created[0]!).sort()).toEqual(
+      Object.keys(f.created[1]!).sort(),
+    );
     expect(f.created[0]).toMatchObject({
       secret: SECRET,
       device: "Chrome on macOS",
@@ -176,9 +183,19 @@ describe("handleStart", () => {
     });
     expect(f.created[0]!.choices).toContain(a.code);
 
-    // The DM goes out after the response, for the member only.
+    // The audit row and the DM happen after the response, for the member only.
     expect(f.sent).toEqual([]);
+    expect(f.audits).toEqual([]);
     await drain(f);
+    expect(f.audits).toEqual([
+      {
+        memberId: RYAN.memberId,
+        requestId: "req-1",
+        device: "Chrome on macOS",
+        ip: "203.0.113.7",
+        now: NOW,
+      },
+    ]);
     expect(f.sent).toEqual([
       {
         requestId: "req-1",
@@ -208,6 +225,18 @@ describe("handleStart", () => {
     expect(f.created[0]!.memberId).toBeNull();
     await drain(f);
     expect(f.sent).toEqual([]);
+  });
+
+  it("still sends the DM when the audit row cannot be written", async () => {
+    const f = fake({
+      auditRequest: async () => {
+        throw new Error("db hiccup");
+      },
+    });
+    await handleStart(start({ email: "ryan@example.com" }), f.deps);
+    await drain(f);
+    expect(f.sent).toHaveLength(1);
+    expect(f.errors).toEqual(["[login-approval] could not audit the request"]);
   });
 
   it("logs a DM brain did not send, and still answers the same", async () => {
@@ -288,6 +317,22 @@ describe("handleStart", () => {
     expect(res.status).toBe(500);
     expect(JSON.stringify(await res.json())).not.toContain("postgres");
     expect(f.errors).toEqual(["[login-approval] start failed"]);
+  });
+});
+
+describe("the switch", () => {
+  it("answers 404 from every route while SIGN_IN_WITH_BAUMY is off", async () => {
+    const f = fake({ enabled: () => false });
+    f.claims.set(SECRET, { requestId: "req-1", authUserId: RYAN.authUserId });
+    for (const res of [
+      await handleStart(start({ email: "ryan@example.com" }), f.deps),
+      await handleStatus(withCookie("status", "GET"), f.deps),
+      await handleExchange(withCookie("exchange", "POST"), f.deps),
+    ]) {
+      expect(res.status).toBe(404);
+    }
+    expect(f.created).toEqual([]);
+    expect(f.signIns).toEqual([]);
   });
 });
 
