@@ -52,6 +52,12 @@ export const actionRequestStatus = pgEnum("action_request_status", [
 
 export const proofMode = pgEnum("proof_mode", ["none", "optional", "required"]);
 
+/**
+ * What kind of bounty a chore is (ADR 0005): buy or refill, or clean or fix.
+ * Mirrors `ChoreKind` in packages/types (a test in packages/db compares them).
+ */
+export const choreKind = pgEnum("chore_kind", ["consumable", "maintenance"]);
+
 export const confirmMode = pgEnum("confirm_mode", ["optimistic", "partner"]);
 
 export const ruleSource = pgEnum("rule_source", [
@@ -266,6 +272,12 @@ export const members = pgTable(
     authUserId: text("auth_user_id").unique(),
     displayName: text("display_name").notNull(),
     avatarSprite: text("avatar_sprite").notNull(),
+    /**
+     * The member's 16-bit character (ADR 0005 §5): `MemberAvatar` in
+     * packages/types. Null until they choose one; `avatarFor` then draws the
+     * default picked from their id.
+     */
+    avatar: jsonb("avatar"),
     color: text("color").notNull(),
     role: memberRole("role").notNull().default("member"),
     /** scrypt hash, never the PIN itself. */
@@ -408,6 +420,7 @@ export const chores = pgTable(
       .references(() => households.id),
     name: text("name").notNull(),
     sprite: text("sprite").notNull(),
+    kind: choreKind("kind").notNull().default("maintenance"),
     proofMode: proofMode("proof_mode").notNull().default("none"),
     confirmMode: confirmMode("confirm_mode").notNull().default("optimistic"),
     effortFactorPct: integer("effort_factor_pct").notNull().default(100),
@@ -848,6 +861,62 @@ export const notes = pgTable(
       .on(t.householdId, t.pinned, t.updatedAt)
       .where(sql`${t.deletedAt} IS NULL`),
   ],
+);
+
+/**
+ * A reminder for everyone (ADR 0005 §4): "Handyman on Wednesday". The
+ * kitchen screen shows it full-screen until every active member has
+ * acknowledged it (`reminder_acks`), or a member dismisses it for everyone
+ * (`dismissed_at`, `dismissed_by`, set together or not at all). The ack
+ * that leaves nobody waiting sets `completed_at` in the same transaction,
+ * so a reminder everyone has seen stays closed when someone joins later.
+ * `body` is plain text.
+ */
+export const reminders = pgTable(
+  "reminders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => members.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    dismissedBy: uuid("dismissed_by").references(() => members.id),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("reminders_household_open_idx")
+      .on(t.householdId, t.createdAt)
+      .where(sql`${t.dismissedAt} IS NULL AND ${t.completedAt} IS NULL`),
+    check(
+      "reminders_dismissed_together",
+      sql`(${t.dismissedAt} IS NULL) = (${t.dismissedBy} IS NULL)`,
+    ),
+  ],
+);
+
+/** "I read this": one row per member and reminder (the primary key). */
+export const reminderAcks = pgTable(
+  "reminder_acks",
+  {
+    reminderId: uuid("reminder_id")
+      .notNull()
+      .references(() => reminders.id),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id),
+    ackedAt: timestamp("acked_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.reminderId, t.memberId] })],
 );
 
 // ---------------------------------------------------------------------------

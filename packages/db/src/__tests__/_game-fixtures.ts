@@ -57,6 +57,9 @@ export interface SeedChoreInput {
   archivedAt?: Date | null;
   effectiveFrom?: Date;
   householdId?: string;
+  kind?: "consumable" | "maintenance";
+  /** Defaults to the database's now(). */
+  createdAt?: Date;
 }
 
 /** A chore with one `seed` rule version. */
@@ -73,6 +76,8 @@ export async function seedChore(
       confirmMode: input.confirmMode ?? "optimistic",
       proofMode: input.proofMode ?? "none",
       archivedAt: input.archivedAt ?? null,
+      ...(input.kind ? { kind: input.kind } : {}),
+      ...(input.createdAt ? { createdAt: input.createdAt } : {}),
     })
     .returning({ id: chores.id });
   const [rule] = await db

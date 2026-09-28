@@ -14,6 +14,7 @@ import type { ActionFailure } from "./result";
 export const ACTION_NAMES = [
   "whoami",
   "update_my_profile",
+  "update_avatar",
   "redeem_invite",
   "join_as_founder",
   "mint_invite",
@@ -61,6 +62,10 @@ export const ACTION_NAMES = [
   "list_shopping",
   "add_shopping_items",
   "check_off_shopping_items",
+  "list_reminders",
+  "create_reminder",
+  "acknowledge_reminder",
+  "dismiss_reminder",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 

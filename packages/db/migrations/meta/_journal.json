@@ -78,6 +78,13 @@
       "when": 1790511126138,
       "tag": "0010_service_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790583465781,
+      "tag": "0011_bounties_avatars_reminders",
+      "breakpoints": true
     }
   ]
 }
