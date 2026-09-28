@@ -65,6 +65,17 @@ const browser = new Headers({
 });
 
 describe("signInApproved", () => {
+  it("is marked SERVER_ONLY, so Better Auth's router never mounts it", () => {
+    // This is the wall; the ctx.request guard (below) is the second belt.
+    expect(
+      (
+        auth.api.signInApproved as unknown as {
+          options: { metadata?: { SERVER_ONLY?: boolean } };
+        }
+      ).options.metadata?.SERVER_ONLY,
+    ).toBe(true);
+  });
+
   it("is not reachable over HTTP", async () => {
     const res = await auth.handler(
       new Request(`${ORIGIN}/api/auth${APPROVAL_SIGN_IN_PATH}`, {
@@ -86,9 +97,15 @@ describe("signInApproved", () => {
     const cookies = headers.getSetCookie();
     const session = cookies.find((c) => c.startsWith("baumy.session_token="));
     expect(session).toMatch(/HttpOnly/i);
+    // A browser session: no Max-Age, unlike a password sign-in's 30 days.
+    expect(session).not.toMatch(/Max-Age/i);
+    expect(cookies.some((c) => c.startsWith("baumy.dont_remember="))).toBe(
+      true,
+    );
 
     // The cookie is a working session.
-    const cookie = session!.split(";")[0]!;
+    // What the browser sends back: the session and the dont_remember mark.
+    const cookie = cookies.map((c) => c.split(";")[0]).join("; ");
     const got = await auth.handler(
       new Request(`${ORIGIN}/api/auth/get-session`, { headers: { cookie } }),
     );
@@ -100,6 +117,12 @@ describe("signInApproved", () => {
     expect(body.session.id).toBe(response.sessionId);
     // The security page lists it with the device that asked.
     expect(body.session.userAgent).toContain("Chrome/140");
+    // And the server ends it within a day.
+    const { rows } = await client.query<{ hours: number }>(
+      "select extract(epoch from (expires_at - created_at)) / 3600 as hours from session where id = $1",
+      [response.sessionId],
+    );
+    expect(Number(rows[0]!.hours)).toBeLessThanOrEqual(24);
   });
 
   it("refuses an unknown user", async () => {
