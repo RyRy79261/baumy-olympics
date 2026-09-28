@@ -408,9 +408,10 @@ Worth knowing:
 - Passkeys and two-factor need a **confirmed email** (the sign-up link or
   Google). An unconfirmed account's passkeys and two-factor are cleared by a
   password reset.
-- Two-factor asks for a code after a **password** sign-in. Google and
-  passkey sign-ins are not asked: a passkey is two factors already, and
-  Google has its own.
+- Two-factor asks for a code after a **password** sign-in. Google,
+  passkey and Sign in with Baumy sign-ins are not asked: a passkey is two
+  factors already, Google has its own, and the Telegram tap counts as the
+  second factor (owner ruling 2026-09-29, ADR 0006).
 - Signing a device out ends its session at once, but a page it has open can
   keep working for up to **5 minutes** (the cookie cache); the page says so.
 - The Security page never lets you remove your last way in (a password,
@@ -903,6 +904,8 @@ switch it on, because it needs the brain side deployed first. Migrations
 - A session made this way is a browser session: its cookie goes when the
   browser closes and the server ends it after 24 hours at most, unlike the
   30 days of a password sign-in.
+- It works with two-factor on, and asks for no code: the tap is the second
+  factor (owner ruling 2026-09-29).
 
 ## Brain actions endpoint and Telegram linking (issue #27)
 
