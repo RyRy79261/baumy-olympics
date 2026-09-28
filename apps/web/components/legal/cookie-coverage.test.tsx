@@ -9,6 +9,7 @@ import { LAST_LOGIN_METHOD_COOKIE, SECURITY_COOKIES } from "@baumy/auth/env";
 import PrivacyPage from "@/app/privacy/page";
 import { REFRESH_COOKIE } from "@/lib/hub/refresh";
 import { KIOSK_COOKIE, KIOSK_MEMBER_COOKIE } from "@/lib/kiosk/cookies";
+import { LOGIN_COOKIE } from "@/lib/login-approval/flow";
 
 // Issues #87 and #89: the privacy page must name every cookie the app sets.
 //
@@ -34,9 +35,15 @@ const KNOWN: Record<string, string> = {
   KIOSK_COOKIE,
   KIOSK_MEMBER_COOKIE,
   "refreshCookieLine()": REFRESH_COOKIE,
+  // Sign in with Baumy's routes (lib/login-approval/flow.ts): its own cookie
+  // (loginCookie), and Better Auth's session cookies passed through.
+  '"set-cookie"': LOGIN_COOKIE,
 };
 
 /** Better Auth plugins and social providers the page was written against. */
+// baumy-approval-sign-in (issue #80) sets only the session cookies and
+// dont_remember, which the page names; the account-security plugins (issue
+// #79) set the cookies in SECURITY_COOKIES, named below.
 const AUTH_PLUGINS = [
   "bearer",
   "two-factor",
@@ -45,6 +52,7 @@ const AUTH_PLUGINS = [
   "baumy-email-proof",
   "baumy-trusted-devices",
   "baumy-new-way-in",
+  "baumy-approval-sign-in",
 ];
 const AUTH_SOCIAL = ["google"];
 
@@ -134,6 +142,7 @@ describe("the privacy page's cookie list", () => {
       ...Object.values(KNOWN),
       auth.sessionToken.name,
       auth.sessionData.name,
+      auth.dontRememberToken.name,
       LAST_LOGIN_METHOD_COOKIE,
       plugin(SECURITY_COOKIES.twoFactorChallenge).name,
       plugin(SECURITY_COOKIES.trustDevice).name,

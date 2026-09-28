@@ -21,6 +21,14 @@ import {
   KIOSK_MEMBER_COOKIE,
   KIOSK_MEMBER_MAX_AGE_S,
 } from "@/lib/kiosk/cookies";
+import {
+  LOGIN_REQUEST_RETENTION_MS,
+  LOGIN_REQUEST_TTL_MS,
+} from "@baumy/db/login-requests";
+import {
+  LOGIN_COOKIE,
+  LOGIN_COOKIE_MAX_AGE_S,
+} from "@/lib/login-approval/flow";
 
 // Public (issue #82): outside the (hub) gate, no session read. Every sentence
 // here describes what the code does; change the words in the same PR as the
@@ -38,6 +46,8 @@ const TWO_FACTOR_MIN = SECURITY_COOKIES.twoFactorChallengeMaxAgeSeconds / 60;
 const TRUST_DAYS = SECURITY_COOKIES.trustDeviceMaxAgeSeconds / DAY_S;
 const PASSKEY_CHALLENGE_MIN =
   SECURITY_COOKIES.passkeyChallengeMaxAgeSeconds / 60;
+const LOGIN_REQUEST_MIN = LOGIN_REQUEST_TTL_MS / 60_000;
+const LOGIN_REQUEST_HOURS = LOGIN_REQUEST_RETENTION_MS / 3_600_000;
 
 export const metadata: Metadata = { title: "Privacy - Baumy Olympics" };
 
@@ -212,7 +222,16 @@ export default function PrivacyPage() {
             to Anthropic. If you link your Telegram account, we keep your
             Telegram user id, and the bot can do things in this app for you when
             you ask it, or for another housemate after a confirm button.
-            Everything in Telegram also passes through Telegram.
+            Everything in Telegram also passes through Telegram. If Sign in with
+            Baumy is switched on and you use it, the bot messages you the
+            sign-in&apos;s device name (for example &quot;Chrome on macOS&quot;)
+            with the numbers to tap; the request (device name, the numbers and
+            what you answered) is deleted by the daily clean-up once it is more
+            than {LOGIN_REQUEST_HOURS} hours old (so within two days), and a
+            record that it was asked for, with the asking device&apos;s IP
+            address, stays in the audit log. baumy-brain keeps its own copy of
+            the device name and the numbers, in the pending sign-in card it
+            sends and in its log.
           </li>
           <li>
             <strong>Chatbots you connect:</strong> a chatbot you connect (for
@@ -281,6 +300,14 @@ export default function PrivacyPage() {
           <li>
             Short-lived helper cookies during a sign-in, for example the Google
             round trip.
+          </li>
+          <li>
+            <code>{LOGIN_COOKIE}</code>: only while you sign in with Baumy from
+            Telegram; it proves the approval is for this browser, and goes after{" "}
+            {LOGIN_COOKIE_MAX_AGE_S} seconds (a request lasts{" "}
+            {LOGIN_REQUEST_MIN} minutes). A session made that way is marked with{" "}
+            <code>{AUTH_COOKIE_PREFIX}.dont_remember</code> and ends when the
+            browser closes, or after a day at most.
           </li>
           <li>
             <code>{KIOSK_COOKIE}</code>: only on a paired kitchen iPad; it signs

@@ -8,6 +8,7 @@ import {
 } from "@baumy/auth/env";
 import { LegalLinks } from "@/components/legal/legal-page";
 import { redirectIfSignedIn } from "@/lib/auth";
+import { signInWithBaumyEnabled } from "@/lib/login-approval/flag";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { oauthErrorSentence } from "../messages";
 import { SignInForm, type LastLoginMethod } from "./sign-in-form";
@@ -39,6 +40,8 @@ export default async function SignInPage({
         passkeysEnabled={resolvePasskeyScope(process.env) !== null}
         lastMethod={lastMethod(jar.get(LAST_LOGIN_METHOD_COOKIE)?.value)}
         oauthError={oauthErrorSentence(error)}
+        // Off until the owner turns it on, once brain can send the DM (#80).
+        baumyEnabled={signInWithBaumyEnabled(process.env)}
         callbackURL={next}
       />
       <LegalLinks />

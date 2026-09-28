@@ -32,6 +32,9 @@ export NEON_LOCAL_PROXY=1
 # VERCEL_ENV is cleared so a shell that happens to carry it does not trip the
 # boot guard (lib/test-mode.ts) here; on Vercel that guard is the point.
 export E2E_TEST_MODE=1
+# "Sign in with Baumy" (issue #80) is off unless switched on; the fake brain
+# sends its DM here.
+export SIGN_IN_WITH_BAUMY=on
 unset VERCEL_ENV
 # The only target the harness accepts (apps/web/e2e/lib/env.ts).
 export E2E_BASE_URL="http://localhost:$PORT"

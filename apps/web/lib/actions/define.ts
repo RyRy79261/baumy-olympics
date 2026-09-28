@@ -23,6 +23,8 @@ export const ACTION_NAMES = [
   "set_kiosk_pin",
   "create_telegram_link_code",
   "link_telegram",
+  "approve_login",
+  "deny_login",
   "authorize_mcp_client",
   "list_mcp_connections",
   "revoke_mcp_connection",

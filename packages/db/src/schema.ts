@@ -418,6 +418,62 @@ export const telegramLinkCodes = pgTable(
 );
 
 /**
+ * Where a "Sign in with Baumy" request stands (issue #80). `expired` is not
+ * stored: a `pending` or `approved` row past its time reads as expired
+ * (`loginRequestState`, login-requests.ts).
+ */
+export const loginRequestStatus = pgEnum("login_request_status", [
+  "pending",
+  "approved",
+  "denied",
+  "used",
+]);
+
+/**
+ * "Sign in with Baumy" (issue #80, ADR 0006): a browser asks to sign in as an
+ * address; brain DMs the member's linked Telegram account "Tap the number on
+ * the screen", and the tap approves or denies it through `approve_login` /
+ * `deny_login`. The waiting browser holds the only copy of a random secret
+ * (an httpOnly cookie) and exchanges it once for a Better Auth session.
+ *
+ * - `member_id` is null when the address cannot sign in this way (no account,
+ *   no member, no Telegram link, locked): the row is still written and the
+ *   browser sees the same screen, so the answer never says which.
+ * - Only the sha256 of the secret is stored.
+ * - `code` is the number on the screen; `choices` is it plus four decoys,
+ *   in the order the Telegram buttons show them.
+ * - pending → approved → used, or pending → denied (`deny_reason`: `denied`
+ *   when the member tapped Deny, `wrong_code` when they tapped a decoy).
+ *   Either denial locks the method for that member for 15 minutes. Each step
+ *   is a compare-and-set on the status.
+ */
+export const loginRequests = pgTable(
+  "login_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    memberId: uuid("member_id").references(() => members.id),
+    secretHash: text("secret_hash").notNull().unique(),
+    code: integer("code").notNull(),
+    choices: integer("choices").array().notNull(),
+    /** A short summary of the browser that asked ("Chrome on macOS"). */
+    device: text("device").notNull(),
+    status: loginRequestStatus("status").notNull().default("pending"),
+    denyReason: text("deny_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("login_requests_member_id_idx").on(t.memberId, t.decidedAt),
+    index("login_requests_created_at_idx").on(t.createdAt),
+    check("login_requests_code_two_digits", sql`${t.code} BETWEEN 10 AND 99`),
+  ],
+);
+
+/**
  * A kitchen kiosk (SPEC §5, §6.2, §8): an iPad that stays signed in as a
  * DEVICE, not a person. An admin's `pair_kiosk` creates the row holding only
  * the sha256 of an 8-character pairing code (10 minutes, one use). The iPad
@@ -1029,9 +1085,13 @@ export const auditEvents = pgTable(
   "audit_events",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    actorMemberId: uuid("actor_member_id")
-      .notNull()
-      .references(() => members.id),
+    /**
+     * Null only when nobody is signed in to be the actor: "Sign in with
+     * Baumy" asked for a member's approval (`request_login`, issue #80), where
+     * the member is the target (`entity` member) and the requester is
+     * anonymous (its IP and device are in `payload`).
+     */
+    actorMemberId: uuid("actor_member_id").references(() => members.id),
     initiatedByMemberId: uuid("initiated_by_member_id").references(
       () => members.id,
     ),

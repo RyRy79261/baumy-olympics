@@ -203,6 +203,8 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 | --- | --- | --- | --- | --- |
 | [`whoami`](#whoami-who-am-i) | read | safe | never | yes |
 | [`link_telegram`](#link_telegram-link-a-telegram-account) | write | safe | never | no |
+| [`approve_login`](#approve_login-approve-a-sign-in) | write | confirm | always | no, only themself |
+| [`deny_login`](#deny_login-deny-a-sign-in) | write | safe | never | no, only themself |
 | [`list_chores`](#list_chores-list-chores) | read | safe | never | yes |
 | [`log_completion`](#log_completion-log-a-chore) | write | confirm | always | no, use `doneBy` |
 | [`get_pending_confirmations`](#get_pending_confirmations-claims-waiting-for-an-ok) | read | safe | never | yes |
@@ -316,6 +318,104 @@ Links the sender's Telegram account to the member who created the code in Olympi
 **Its errors:** `LINK_CODE_INVALID` (422), `TELEGRAM_ALREADY_LINKED` (422). Every call can also get the endpoint's codes (above).
 
 **Say back:** "Linked you as <displayName>." On LINK_CODE_INVALID: "That code didn't work. Make a new one in Olympics → Settings (it lasts 10 minutes)." On TELEGRAM_ALREADY_LINKED: show `message`.
+
+### `approve_login`: Approve a sign-in
+
+Approves a 'Sign in with Baumy' request with the number the member tapped in the approval DM.
+
+| | |
+| --- | --- |
+| Kind | `write` |
+| Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
+| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
+| `Idempotency-Key` | required; the same key again replays |
+| Rate limit | 10 per Telegram user and 60 per IP in 10 minutes |
+
+**When to use it.** ONLY from the number buttons of the approval DM (`POST /api/kitchen/login-approval` asked for it), as the member who tapped. Never from a conversation, never from the LLM, never on anyone's behalf: the number proves the person holding the phone is looking at the sign-in screen. Send the tapped number as it is; Olympics decides whether it is the right one.
+
+**Tool description** (the registry's, verbatim): Approves a 'Sign in with Baumy' request with the number the member tapped in the DM Baumy sent them. Only from that DM's buttons, never from a conversation. A number that is not the one on the sign-in screen blocks the sign-in.
+
+**Examples.**
+
+- "(taps 47 on the approval DM)" → `approve_login {"requestId": "<from the DM request>", "code": 47}`
+
+**Input** (JSON Schema of the body):
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "code": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 99
+    }
+  },
+  "required": [
+    "requestId",
+    "code"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Returns** (`data`): `outcome`: `approved` (the browser signs in now) or `blocked` (that was not the number on the screen, so the sign-in was refused and Sign in with Baumy is off for this member for 15 minutes); `device`, e.g. `Chrome on macOS`.
+
+**Its errors:** `NOT_FOUND` (404), `INVALID_STATE` (422). Every call can also get the endpoint's codes (above).
+
+**Say back:** Edit the DM, dropping the buttons. approved: "✅ Signed in on <device>." blocked: "🚫 That wasn't the number on the screen, so I blocked this sign-in. If it wasn't you, nothing happened; sign in with your password if it was." NOT_FOUND or INVALID_STATE: show `message`.
+
+### `deny_login`: Deny a sign-in
+
+Denies a 'Sign in with Baumy' request: the member tapped Deny.
+
+| | |
+| --- | --- |
+| Kind | `write` |
+| Risk | `safe`: runs straight away |
+| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
+| `Idempotency-Key` | required; the same key again replays |
+| Rate limit | 10 per Telegram user and 60 per IP in 10 minutes |
+
+**When to use it.** ONLY from the Deny button of the approval DM, as the member who tapped. Never from a conversation.
+
+**Tool description** (the registry's, verbatim): Denies a 'Sign in with Baumy' request: the member tapped Deny in the DM Baumy sent them. Only from that DM's buttons.
+
+**Examples.**
+
+- "(taps Deny on the approval DM)" → `deny_login {"requestId": "<from the DM request>"}`
+
+**Input** (JSON Schema of the body):
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "required": [
+    "requestId"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Returns** (`data`): `outcome`: `denied` (Sign in with Baumy is then off for this member for 15 minutes); `device`.
+
+**Its errors:** `NOT_FOUND` (404), `INVALID_STATE` (422). Every call can also get the endpoint's codes (above).
+
+**Say back:** Edit the DM, dropping the buttons: "✖️ Denied the sign-in on <device>." NOT_FOUND or INVALID_STATE: show `message`.
 
 ### `list_chores`: List chores
 

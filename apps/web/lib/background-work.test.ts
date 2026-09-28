@@ -10,7 +10,11 @@ import { withTransaction, type Queryable } from "@baumy/db";
 import { logCompletion } from "@baumy/db/completions";
 import { SEED_CHORES, seedChore, seedPlayer } from "@baumy/db/game-fixtures";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { completions, seasons } from "@baumy/db/schema";
+import {
+  LOGIN_REQUEST_RETENTION_MS,
+  insertLoginRequest,
+} from "@baumy/db/login-requests";
+import { completions, loginRequests, seasons } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
 import type * as NextServerModule from "next/server";
 import type { BlobStore } from "./photos/blob-store";
@@ -229,10 +233,40 @@ describe("runSweep", () => {
       ["seasons", true],
       ["weights", true],
       ["photos", false],
+      ["logins", true],
     ]);
     expect(errors).toHaveBeenCalledWith(
       "[sweep] photos failed: boom with [redacted] inside",
     );
+  });
+});
+
+describe("the logins step", () => {
+  it("deletes sign-in requests older than a day, and keeps newer ones", async () => {
+    const make = (secret: string, at: Date) =>
+      insertLoginRequest(db(), {
+        memberId: null,
+        secret,
+        code: 47,
+        choices: [12, 47, 83],
+        device: "a browser",
+        now: at,
+      });
+    const old = new Date(
+      SUNDAY_0230_UTC.getTime() - LOGIN_REQUEST_RETENTION_MS - 1,
+    );
+    await make("old-secret-0123456789abcdefghijklmnop", old);
+    const fresh = await make(
+      "new-secret-0123456789abcdefghijklmnop",
+      SUNDAY_0230_UTC,
+    );
+    const report = await runSweep(SUNDAY_0230_UTC, { blob: okStore() });
+    expect(detail(report, "logins")).toEqual({ deleted: 1 });
+    const left = await t
+      .db()
+      .select({ id: loginRequests.id })
+      .from(loginRequests);
+    expect(left).toEqual([{ id: fresh.id }]);
   });
 });
 
