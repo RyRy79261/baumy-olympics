@@ -112,6 +112,20 @@ test("the hub shell: Baumy by the brand, the page you are on framed", async ({
   }));
   expect(width.scroll).toBeLessThanOrEqual(width.client);
 
+  // "Needs your OK" (the nav link, or the pinned badge while claims wait)
+  // is wholly on screen at every width: nothing hides it in an overflow.
+  const inbox = page.getByRole("link", { name: /^Needs your OK/ });
+  await expect(inbox).toBeVisible();
+  const onScreen = await inbox.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const y = r.top + r.height / 2;
+    const hits = [r.left + 2, r.left + r.width / 2, r.right - 2].map((x) =>
+      el.contains(document.elementFromPoint(x, y)),
+    );
+    return r.left >= 0 && r.right <= window.innerWidth && hits.every(Boolean);
+  });
+  expect(onScreen).toBe(true);
+
   // The admin pages and the account fold into menus that close again.
   await expect(nav.getByRole("link", { name: "Members" })).toHaveCount(0);
   await openAdminMenu(page);
@@ -137,12 +151,13 @@ test("on a laptop the whole header is one row", async ({ page }, testInfo) => {
   const rows = await header.evaluate((h) => {
     const tops = [
       ...h.querySelectorAll(
-        'nav[aria-label="Main"] a, [data-testid$="-menu"] > button',
+        'nav[aria-label="Main"] a, [data-testid$="-menu"] > button, [data-testid="inbox-badge"]',
       ),
     ].map((el) => Math.round(el.getBoundingClientRect().top));
     return { tops: [...new Set(tops)], count: tops.length };
   });
-  expect(rows.count).toBeGreaterThanOrEqual(10);
+  // Eight pages (the inbox as a link or a badge), Admin and the account.
+  expect(rows.count).toBe(10);
   expect(rows.tops).toHaveLength(1);
   // And nothing in the nav is cut off: it does not need to scroll.
   const nav = page.getByRole("navigation", { name: "Main" });

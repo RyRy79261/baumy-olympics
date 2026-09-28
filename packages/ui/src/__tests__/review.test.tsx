@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AppShell, navItemClass } from "../app-shell";
+import { AppShell, navBadgeClass, navItemClass } from "../app-shell";
 import {
   BaumyCat,
   MARK_ART_PX,
@@ -174,15 +174,28 @@ describe("header tokens and calendar cells", () => {
     ).toContain("bg-bm-chrome");
   });
 
-  it("fold the nav into one row that scrolls, never wraps", () => {
+  it("keep the nav one row only from xl, wrapping (never scrolling) below", () => {
     const out = html(
       <AppShell brand="B" nav={<a>Hub</a>}>
         x
       </AppShell>,
     );
-    expect(out).toMatch(/aria-label="Main" class="[^"]*flex-nowrap/);
-    expect(out).toMatch(/aria-label="Main" class="[^"]*overflow-x-auto/);
+    const nav = /aria-label="Main" class="([^"]*)"/.exec(out)![1]!;
+    expect(nav.split(" ")).toContain("flex-wrap");
+    expect(nav).toContain("xl:flex-nowrap");
+    expect(nav).toContain("max-xl:basis-full");
+    expect(nav).not.toContain("overflow-x-auto");
+    expect(out).toMatch(/max-w-7xl[^"]*xl:flex-nowrap/);
     expect(navItemClass(false)).toContain("whitespace-nowrap");
+    // On a phone the brand shows only Baumy; the name stays for readers.
+    expect(out).toContain('<span class="max-sm:sr-only">B</span>');
+  });
+
+  it("pin the Needs-your-OK badge in yellow, stronger when it is the page", () => {
+    expect(navBadgeClass(false)).toContain("[--pf:var(--color-bm-yellow)]");
+    expect(navBadgeClass(false)).toContain("bg-bm-yellow/10");
+    expect(navBadgeClass(true)).toContain("bg-bm-yellow/25");
+    expect(navBadgeClass(false)).toContain("min-h-11");
   });
 
   it("draw square cells: a line frame, today a 4px violet one", () => {

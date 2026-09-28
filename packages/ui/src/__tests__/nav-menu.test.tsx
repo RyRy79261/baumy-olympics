@@ -50,12 +50,27 @@ describe("NavMenu", () => {
     expect(links()).toHaveLength(0);
   });
 
-  it("closes on Escape", () => {
+  it("closes on Escape and gives focus back to its button", () => {
     open();
+    act(() => links()[0]!.focus());
+    expect(document.activeElement).toBe(links()[0]);
     act(() => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     });
     expect(links()).toHaveLength(0);
+    expect(document.activeElement).toBe(button());
+  });
+
+  it("closes when focus leaves it, not when it moves inside", () => {
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    open();
+    act(() => links()[0]!.focus());
+    act(() => button().focus());
+    expect(links()).toHaveLength(1);
+    act(() => outside.focus());
+    expect(links()).toHaveLength(0);
+    outside.remove();
   });
 
   it("closes on a press outside, not inside", () => {

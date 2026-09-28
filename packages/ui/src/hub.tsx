@@ -201,7 +201,10 @@ export function BaumyButton({
       )}
       {...props}
     >
-      <Sprite name="baumy" state={state} size={6} />
+      {/* 2x on a phone, where the corner covers more of the page; 3x from
+          sm up. Only one shows (the other is display: none). */}
+      <Sprite name="baumy" state={state} size={4} className="sm:hidden" />
+      <Sprite name="baumy" state={state} size={6} className="max-sm:hidden" />
     </button>
   );
 }
