@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { addChore } from "../lib/chores";
 import { founderAdmin } from "../lib/household";
 import {
@@ -229,6 +229,16 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const chip = kiosk.getByTestId("acting-chip");
   await expect(chip.getByTestId("acting-as")).toHaveText(founder);
   await expectKioskTargets(chip);
+  // One character everywhere: the admin page draws the founder exactly as
+  // the kitchen screen does (the same colours, pixel for pixel).
+  const fills = (scope: Locator) =>
+    scope
+      .locator("[data-housemate] path")
+      .evaluateAll((ps) => ps.map((p) => p.getAttribute("fill")).sort());
+  const onKiosk = await fills(chip);
+  expect(onKiosk.length).toBeGreaterThan(3);
+  await page.goto("/admin/members");
+  expect(await fills(page.getByTestId(`member-${founder}`))).toEqual(onKiosk);
   const baumy = await openBaumySheet(kiosk);
   await expect(
     baumy

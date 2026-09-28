@@ -10,7 +10,7 @@ import {
   FormMessage,
   Input,
   Select,
-  Sprite,
+  Housemate,
 } from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
 import { toast } from "@/lib/ui/toast";
@@ -121,6 +121,11 @@ export interface MemberRowProps {
   active: boolean;
   isMe: boolean;
   telegramUserId: number | null;
+  /**
+   * Their character as every screen draws it (lib/members/characters.ts);
+   * a member who has left is drawn from their id.
+   */
+  character?: unknown;
 }
 
 /** One member: role, active or not, and how they look (manage_members). */
@@ -168,7 +173,12 @@ export function MemberControls(props: MemberRowProps) {
       data-testid={`member-${props.displayName}`}
     >
       <div className="flex flex-wrap items-center gap-3">
-        <Sprite name={props.avatarSprite} color={props.color} />
+        <Housemate
+          avatar={props.character}
+          memberId={props.id}
+          scale={2}
+          label={`${props.displayName}'s character`}
+        />
         <span className="font-semibold">{props.displayName}</span>
         <span className="text-sm text-bm-muted">
           {props.role === "admin" ? "Admin" : "Member"}
