@@ -244,17 +244,24 @@ export interface KioskMember {
   color: string;
 }
 
+/** An active member with their 16-bit character (`members.avatar`). */
+export interface KioskMemberWithAvatar extends KioskMember {
+  /** As stored: `avatarFor` (packages/types) reads it; null is the default. */
+  avatar: unknown;
+}
+
 /** The active members, in the order they joined: the kiosk's avatar bar. */
 export async function listActiveMembers(
   db: Queryable,
   householdId: string,
-): Promise<KioskMember[]> {
+): Promise<KioskMemberWithAvatar[]> {
   return db
     .select({
       id: members.id,
       displayName: members.displayName,
       avatarSprite: members.avatarSprite,
       color: members.color,
+      avatar: members.avatar,
     })
     .from(members)
     .where(

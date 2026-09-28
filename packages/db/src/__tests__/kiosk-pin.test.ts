@@ -130,7 +130,22 @@ describe("listActiveMembers and findActiveMember", () => {
       displayName: "B",
       avatarSprite: "cat",
       color: "#112233",
+      avatar: null,
     });
+    // A chosen character comes back as stored.
+    const character = {
+      hairStyle: "bob",
+      hairColor: "black",
+      skinTone: "tan",
+      shirtColor: "pink",
+    };
+    await t
+      .db()
+      .update(members)
+      .set({ avatar: character })
+      .where(eq(members.id, a));
+    const again = await listActiveMembers(db(), HOUSEHOLD_ID);
+    expect(again[1]?.avatar).toEqual(character);
     await expect(
       findActiveMember(db(), HOUSEHOLD_ID, a),
     ).resolves.toMatchObject({ id: a, displayName: "A" });
