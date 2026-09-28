@@ -1,4 +1,5 @@
 import {
+  countNotesEditedSince,
   findNote,
   insertNote,
   listNotes as listNoteRows,
@@ -68,15 +69,24 @@ async function reread(ctx: ActionCtx, id: string): Promise<NoteView> {
   return noteView(row!);
 }
 
+/** How far back a note counts as a new message (ADR 0005 §3). */
+export const NOTE_RECENT_MS = 24 * 60 * 60_000;
+
 export interface ListNotesData {
   notes: NoteView[];
+  /**
+   * How many live notes were added or had their words edited in the last
+   * 24 hours (pinning is not an edit), over all notes, not only the listed
+   * ones: the kitchen screen's Messages count.
+   */
+  recentCount: number;
 }
 
 export const listNotes = defineAction({
   name: "list_notes",
   title: "Notes",
   description:
-    "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created and last changed (ISO 8601, UTC). Notes are shared household text, never secrets.",
+    "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created and last changed (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets.",
   consent: "Read the household's notes",
   kind: "read",
   risk: "safe",
@@ -85,12 +95,18 @@ export const listNotes = defineAction({
   requires: "display",
   input: ListNotesInput,
   async execute(ctx, input) {
-    const rows = await listNoteRows(ctx.db, {
-      householdId: ctx.householdId,
-      pinnedOnly: input.pinnedOnly ?? false,
-      limit: input.limit ?? NOTE_LIST_MAX,
-    });
-    const data: ListNotesData = { notes: rows.map(noteView) };
+    const [rows, recentCount] = await Promise.all([
+      listNoteRows(ctx.db, {
+        householdId: ctx.householdId,
+        pinnedOnly: input.pinnedOnly ?? false,
+        limit: input.limit ?? NOTE_LIST_MAX,
+      }),
+      countNotesEditedSince(ctx.db, {
+        householdId: ctx.householdId,
+        since: new Date(ctx.now.getTime() - NOTE_RECENT_MS),
+      }),
+    ]);
+    const data: ListNotesData = { notes: rows.map(noteView), recentCount };
     return { ok: true, data };
   },
 });

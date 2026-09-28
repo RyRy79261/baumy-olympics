@@ -4,12 +4,10 @@ import { isUrgent } from "@/lib/chores/urgency";
 import { eventView } from "@/lib/calendar/view";
 import {
   HUB_EVENTS,
-  MESSAGES_WINDOW_MS,
   agendaTime,
   OVERDUE_AFTER_MS,
   clockLines,
   dueChores,
-  recentNoteCount,
   upcomingEvents,
   widgetState,
 } from "./view";
@@ -240,26 +238,6 @@ describe("clockLines", () => {
       time: "19:05",
       date: "Fri 15 Jan",
     });
-  });
-});
-
-describe("recentNoteCount", () => {
-  it("counts the notes created or changed in the last 24 hours", () => {
-    const ago = (ms: number) => ({
-      updatedAt: new Date(NOW.getTime() - ms).toISOString(),
-    });
-    expect(
-      recentNoteCount(
-        [
-          ago(0),
-          ago(HOUR),
-          ago(MESSAGES_WINDOW_MS - 1),
-          ago(MESSAGES_WINDOW_MS),
-        ],
-        NOW,
-      ),
-    ).toBe(3);
-    expect(recentNoteCount([], NOW)).toBe(0);
   });
 });
 
