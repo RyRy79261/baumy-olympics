@@ -11,6 +11,7 @@ import {
   passkey,
   session,
   user,
+  verification,
 } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
 import {
@@ -24,6 +25,7 @@ import type { Actor, MemberActor } from "@/lib/auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { ActionName } from "./define";
 import { runAction } from "./registry";
+import { SIGNED_OUT } from "./account-security";
 
 // Settings, Security (issue #79), through the real runAction on PGlite: the
 // member's own sessions, passkeys, Google link and first password. Every
@@ -231,7 +233,7 @@ describe("revoke_session and revoke_other_sessions", () => {
     const { sessionId: _drop, ...noSession } = me;
     expect(
       await run("revoke_other_sessions", {}, noSession as MemberActor),
-    ).toMatchObject({ ok: false, code: "FORBIDDEN" });
+    ).toMatchObject({ ok: false, code: "UNAUTHENTICATED" });
     const left = await t.db().select({ id: session.id }).from(session);
     expect(left).toHaveLength(2);
   });
@@ -324,6 +326,7 @@ describe("unlink_google", () => {
 
     const other = await seedMember(db(), { authUserId: "u3" });
     await seedUser("u3");
+    await seedSession("x", "u3", 1);
     await seedAccount("u3", "credential");
     expect(
       await run(
@@ -420,5 +423,114 @@ describe("who may", () => {
     // Present before absent: the sessions are all still there.
     const left = await t.db().select({ id: session.id }).from(session);
     expect(left.map((r) => r.id)).toEqual(["here"]);
+  });
+});
+
+describe("a device signed out elsewhere", () => {
+  const WRITES: [ActionName, unknown][] = [
+    ["revoke_session", { sessionId: "phone" }],
+    ["revoke_other_sessions", {}],
+    ["rename_passkey", { passkeyId: "pk", name: "Renamed" }],
+    ["remove_passkey", { passkeyId: "pk" }],
+    ["unlink_google", {}],
+    ["set_first_password", { password: "p".repeat(PASSWORD_MIN_LENGTH + 1) }],
+  ];
+
+  it("changes nothing, even while its cookie cache still says signed in", async () => {
+    for (const [name, input] of WRITES) {
+      const me = await arrange();
+      await seedSession("phone", "u1", 2);
+      await seedAccount("u1", "google");
+      await seedPasskey("pk", "u1");
+      await seedPasskey("pk2", "u1");
+      // Present before absent: this device's session is there...
+      expect(
+        await t
+          .db()
+          .select({ id: session.id })
+          .from(session)
+          .where(eq(session.id, "here")),
+      ).toHaveLength(1);
+      // ...then another device signs it out.
+      await t.db().delete(session).where(eq(session.id, "here"));
+      const res = await run(name, input, me);
+      expect(res, name).toMatchObject({
+        ok: false,
+        code: "UNAUTHENTICATED",
+        message: SIGNED_OUT,
+      });
+      expect(await t.db().select().from(session)).toHaveLength(1);
+      expect(await t.db().select().from(passkey)).toHaveLength(2);
+      expect(
+        await t.db().select({ n: passkey.name }).from(passkey),
+      ).not.toContainEqual({ n: "Renamed" });
+      expect(await t.db().select().from(account)).toEqual([
+        expect.objectContaining({ providerId: "google" }),
+      ]);
+      expect(await audits()).toEqual([]);
+      await t
+        .client()
+        .exec(
+          'truncate "session", "passkey", "account", "user", members, action_requests, audit_events cascade',
+        );
+    }
+  });
+
+  it("an expired session counts as signed out too", async () => {
+    const me = await arrange();
+    await t
+      .db()
+      .update(session)
+      .set({ expiresAt: new Date(FIXED_NOW.getTime() - 1) })
+      .where(eq(session.id, "here"));
+    expect(await run("revoke_other_sessions", {}, me)).toMatchObject({
+      code: "UNAUTHENTICATED",
+    });
+  });
+});
+
+describe("trusted devices", () => {
+  async function trust(id: string, userId: string) {
+    await t
+      .db()
+      .insert(verification)
+      .values({
+        id,
+        identifier: `trust-device-${id}`,
+        value: userId,
+        expiresAt: new Date(FIXED_NOW.getTime() + 24 * HOUR),
+      });
+  }
+  const trusted = async () =>
+    (await t.db().select({ id: verification.id }).from(verification))
+      .map((r) => r.id)
+      .sort();
+
+  it("are all forgotten when other devices are signed out, mine only", async () => {
+    const me = await arrange();
+    await seedSession("phone", "u1", 2);
+    await trust("mine-a", "u1");
+    await trust("mine-b", "u1");
+    await trust("theirs", "u2");
+    expect(await trusted()).toEqual(["mine-a", "mine-b", "theirs"]);
+    expect(await run("revoke_other_sessions", {}, me)).toMatchObject({
+      ok: true,
+    });
+    expect(await trusted()).toEqual(["theirs"]);
+    const [row] = await audits();
+    expect(row).toMatchObject({
+      payload: { count: 1, trustedDevicesForgotten: 2 },
+    });
+  });
+
+  it("are forgotten when one device is signed out", async () => {
+    const me = await arrange();
+    await seedSession("phone", "u1", 2);
+    await trust("mine", "u1");
+    expect(await trusted()).toEqual(["mine"]);
+    expect(
+      await run("revoke_session", { sessionId: "phone" }, me),
+    ).toMatchObject({ ok: true });
+    expect(await trusted()).toEqual([]);
   });
 });

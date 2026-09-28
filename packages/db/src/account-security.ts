@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gt, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, like, ne, sql } from "drizzle-orm";
 import type { Queryable } from "./index";
-import { account, passkey, session, user } from "./schema";
+import { account, passkey, session, user, verification } from "./schema";
 
 // Settings → Security (issue #79): the member's own ways in and the devices
 // signed in now, read and changed in OUR transaction, so each change is an
@@ -17,6 +17,55 @@ import { account, passkey, session, user } from "./schema";
 
 /** The provider id Better Auth gives a password. */
 export const CREDENTIAL_PROVIDER = "credential";
+
+/**
+ * Whether the session a request came in on still exists, belongs to `userId`
+ * and has not expired, read from the database (not Better Auth's 5-minute
+ * cookie cache) and share-locked for the rest of the transaction, so a device
+ * signed out elsewhere cannot change the account's security in that window.
+ */
+export async function isLiveSession(
+  db: Queryable,
+  { userId, sessionId, now }: { userId: string; sessionId: string; now: Date },
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: session.id })
+    .from(session)
+    .where(
+      and(
+        eq(session.id, sessionId),
+        eq(session.userId, userId),
+        gt(session.expiresAt, now),
+      ),
+    )
+    .for("share");
+  return rows.length > 0;
+}
+
+/**
+ * The prefix of the `verification` rows the twoFactor plugin keeps for a
+ * trusted device (Better Auth 1.6.25 `plugins/two-factor`: identifier
+ * `trust-device-<random>`, value = the user id). A browser whose trust cookie
+ * names a live row skips the code after a password.
+ */
+export const TRUSTED_DEVICE_PREFIX = "trust-device-";
+
+/** Forget every device the account trusted for two-factor; returns how many. */
+export async function forgetTrustedDevices(
+  db: Queryable,
+  userId: string,
+): Promise<number> {
+  const rows = await db
+    .delete(verification)
+    .where(
+      and(
+        eq(verification.value, userId),
+        like(verification.identifier, `${TRUSTED_DEVICE_PREFIX}%`),
+      ),
+    )
+    .returning({ id: verification.id });
+  return rows.length;
+}
 
 export interface AuthUserFlags {
   emailVerified: boolean;
