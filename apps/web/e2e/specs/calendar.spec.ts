@@ -134,6 +134,22 @@ test("on the kiosk, 19:00 in January and in July both stay 19:00", async ({
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
 
+  // A six-week month fits the portrait screen above the footer: no scroll.
+  await kiosk.goto("/kiosk/calendar?view=month&date=2026-11-10");
+  const lastWeek = kiosk.getByTestId("day-2026-12-06");
+  await expect(lastWeek).toBeVisible();
+  const fits = await kiosk.evaluate(() => {
+    const main = document.querySelector("main")!;
+    const nav = document.querySelector('nav[aria-label="Kiosk"]')!;
+    const last = document.querySelector('[data-testid="day-2026-12-06"]')!;
+    return {
+      scroll: main.scrollHeight <= main.clientHeight,
+      above:
+        last.getBoundingClientRect().bottom <= nav.getBoundingClientRect().top,
+    };
+  });
+  expect(fits).toEqual({ scroll: true, above: true });
+
   for (const [date, label] of [
     ["2027-01-15", "Fri 15 Jan"],
     ["2027-07-15", "Thu 15 Jul"],

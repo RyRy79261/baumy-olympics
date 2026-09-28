@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatDateKey } from "@baumy/core";
 import {
   Button,
@@ -17,6 +17,7 @@ import {
   Input,
   Select,
   Textarea,
+  cx,
   tabClass,
 } from "@baumy/ui";
 import {
@@ -36,6 +37,7 @@ import type {
 import {
   CALENDAR_VIEWS,
   KIOSK_MONTH_CHIPS,
+  kioskMonthChips,
   agendaDays,
   eventAccent,
   eventsOnDay,
@@ -104,6 +106,28 @@ export function CalendarBoard({
   const [deleting, setDeleting] = useState<CalendarEventView | null>(null);
   const size = kiosk ? "kiosk" : "default";
   const kioskMonth = kiosk && range.view === "month";
+  // The kitchen screen's month fills the page; each cell shows the chips
+  // its measured height holds (null until measured: KIOSK_MONTH_CHIPS).
+  const monthRef = useRef<HTMLDivElement>(null);
+  const [cellHeight, setCellHeight] = useState<number | null>(null);
+  const weeks = range.days.length / 7;
+  useEffect(() => {
+    const el = monthRef.current;
+    if (!kioskMonth || !el) return;
+    const measure = () => {
+      const cell = el.querySelector("li");
+      if (cell) setCellHeight(cell.getBoundingClientRect().height);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [kioskMonth, weeks]);
+  const chipsFor = (n: number) =>
+    cellHeight === null
+      ? Math.min(n, KIOSK_MONTH_CHIPS)
+      : kioskMonthChips(cellHeight, n);
   const phoneAgenda = !kiosk && range.view === "month";
   const newDate =
     range.view === "day"
@@ -113,7 +137,9 @@ export function CalendarBoard({
         : range.from;
 
   return (
-    <div className="flex flex-col gap-4">
+    // The kitchen screen's month fills what is left of the page, so it
+    // never scrolls under the footer (820×1180).
+    <div className={cx("flex flex-col gap-4", kioskMonth && "min-h-0 flex-1")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Calendar view" className="flex gap-2">
           {CALENDAR_VIEWS.map((v) => (
@@ -168,11 +194,21 @@ export function CalendarBoard({
       </div>
 
       {/* The month on a phone is an agenda (below); the grid is for sm up. */}
-      <div className={phoneAgenda ? "max-sm:hidden" : undefined}>
+      <div
+        className={
+          phoneAgenda
+            ? "max-sm:hidden"
+            : kioskMonth
+              ? "flex min-h-0 flex-1 flex-col"
+              : undefined
+        }
+        ref={monthRef}
+      >
         <CalendarGrid
           columns={range.view === "day" ? 1 : 7}
           weekdays={range.view === "month"}
           label={range.title}
+          fill={kioskMonth ? { rows: range.days.length / 7 } : undefined}
         >
           {range.days.map((day) => {
             const onDay = eventsOnDay(events, day);
@@ -189,6 +225,7 @@ export function CalendarBoard({
                 today={day === today}
                 muted={range.month !== null && !day.startsWith(range.month)}
                 tall={range.view !== "month"}
+                fill={kioskMonth}
               >
                 {kioskMonth ? (
                   // The kitchen screen's month (the prototype's): one-line
@@ -204,7 +241,7 @@ export function CalendarBoard({
                       }`}
                       className="absolute inset-0"
                     />
-                    {onDay.slice(0, KIOSK_MONTH_CHIPS).map((e) => (
+                    {onDay.slice(0, chipsFor(onDay.length)).map((e) => (
                       <CalendarChip
                         key={e.id}
                         title={e.title}
@@ -212,8 +249,10 @@ export function CalendarBoard({
                         kiosk
                       />
                     ))}
-                    {onDay.length > KIOSK_MONTH_CHIPS ? (
-                      <CalendarMore count={onDay.length - KIOSK_MONTH_CHIPS} />
+                    {onDay.length > chipsFor(onDay.length) ? (
+                      <CalendarMore
+                        count={onDay.length - chipsFor(onDay.length)}
+                      />
                     ) : null}
                   </>
                 ) : (
