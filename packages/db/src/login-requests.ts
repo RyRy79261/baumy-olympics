@@ -61,31 +61,12 @@ export function loginRequestState(
 }
 
 /**
- * Whether this Better Auth user has two-factor on. Sign in with Baumy makes
- * a session without a TOTP step, so until the owner rules whether a Telegram
- * tap counts as the second factor (ADR 0006, [UNRESOLVED]), such a user is
- * refused: fail closed.
- * Read from `user.two_factor_enabled`, which Better Auth's two-factor
- * plugin keeps (issue #79).
- */
-export async function userHasTwoFactor(
-  db: Queryable,
-  authUserId: string,
-): Promise<boolean> {
-  const rows = await db
-    .select({ on: user.twoFactorEnabled })
-    .from(user)
-    .where(eq(user.id, authUserId))
-    .limit(1);
-  return rows[0]?.on === true;
-}
-
-/**
  * Who may be asked, for an address typed on the sign-in page: an active
  * member of this household with an account at that address and a linked
- * Telegram id, without two-factor (`userHasTwoFactor`). Null for anything
- * else; the caller answers the same either
- * way. Better Auth stores addresses lowercased; so does this lookup.
+ * Telegram id. Two-factor makes no difference: the tap on the matching
+ * number counts as the second factor (owner ruling 2026-09-29, ADR 0006).
+ * Null for anything else; the caller answers the same either way. Better
+ * Auth stores addresses lowercased; so does this lookup.
  */
 export async function findLoginCandidate(
   db: Queryable,
@@ -110,8 +91,6 @@ export async function findLoginCandidate(
         eq(members.householdId, householdId),
         isNull(members.deactivatedAt),
         isNotNull(members.telegramUserId),
-        // In the same query, so a two-factor account costs no extra time.
-        eq(user.twoFactorEnabled, false),
       ),
     )
     .limit(1);
