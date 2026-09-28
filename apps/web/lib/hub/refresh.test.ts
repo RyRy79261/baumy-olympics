@@ -33,6 +33,7 @@ function counting() {
       },
       addShopping: async () => ({ ok: false, reason: "unavailable" }),
       checkOffShopping: async () => ({ ok: false, reason: "unavailable" }),
+      requestLoginApproval: async () => ({ ok: false, reason: "unavailable" }),
     },
     () => 0,
   );

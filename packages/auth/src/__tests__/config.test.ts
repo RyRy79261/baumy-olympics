@@ -44,7 +44,7 @@ describe("buildAuthOptions", () => {
     expect(options.rateLimit.modelName).toBe("rateLimit");
   });
 
-  it("turns on bearer, two-factor, passkeys, the last-used hint and the email-proof guards", () => {
+  it("turns on bearer, two-factor, passkeys, the last-used hint, the guards and Sign in with Baumy", () => {
     expect(options.plugins.map((p) => p.id)).toEqual([
       "bearer",
       "two-factor",
@@ -53,6 +53,7 @@ describe("buildAuthOptions", () => {
       "baumy-email-proof",
       "baumy-trusted-devices",
       "baumy-new-way-in",
+      "baumy-approval-sign-in",
     ]);
     expect(options.plugins[0]?.options).toEqual({ requireSignature: true });
   });

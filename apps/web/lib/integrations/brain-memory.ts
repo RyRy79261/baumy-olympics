@@ -2,7 +2,12 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { now } from "@/lib/clock";
-import type { BrainClient, BrainResult, ShoppingEntry } from "./brain";
+import type {
+  BrainClient,
+  BrainResult,
+  LoginApprovalMessage,
+  ShoppingEntry,
+} from "./brain";
 
 // The E2E fake brain (SPEC §10): an in-memory shopping list for
 // E2E_TEST_MODE=1 that answers like baumy-brain's kitchen API (issue #25):
@@ -15,6 +20,10 @@ import type { BrainClient, BrainResult, ShoppingEntry } from "./brain";
 // parallel do not see each other's outage: a request whose browser carries
 // the cookie `baumy_e2e_brain=down` gets `unavailable` from every call
 // (`downWhenAsked`, in front of the read cache).
+//
+// "Sign in with Baumy" (issue #80): each approval DM brain would send is kept
+// here instead, per Telegram user, so `/api/test/brain/login` can show a spec
+// what the member's Telegram shows and tap one of its buttons.
 //
 // The list lives on globalThis, so every route bundle of one server shares
 // it (as lib/clock.ts does).
@@ -36,6 +45,29 @@ type StoreGlobal = typeof globalThis & {
 
 function store() {
   return ((globalThis as StoreGlobal)[STORE_KEY] ??= { rows: [], seq: 0 });
+}
+
+const DMS_KEY = Symbol.for("baumy.brain.memory.login-dms");
+type DmGlobal = typeof globalThis & { [DMS_KEY]?: LoginApprovalMessage[] };
+
+function dms(): LoginApprovalMessage[] {
+  return ((globalThis as DmGlobal)[DMS_KEY] ??= []);
+}
+
+/** The newest approval DM sent to this Telegram user, or null. */
+export function memoryLoginApproval(
+  telegramUserId: number,
+): LoginApprovalMessage | null {
+  const all = dms();
+  for (let i = all.length - 1; i >= 0; i--) {
+    if (all[i]!.telegramUserId === telegramUserId) return all[i]!;
+  }
+  return null;
+}
+
+/** Tests: no approval DMs. */
+export function clearMemoryLoginApprovals(): void {
+  dms().length = 0;
 }
 
 /** Brain's exact match key: case and spacing do not matter. */
@@ -127,6 +159,8 @@ export function downWhenAsked(inner: BrainClient): BrainClient {
       (await isDown()) ? DOWN : inner.addShopping(items),
     checkOffShopping: async (items) =>
       (await isDown()) ? DOWN : inner.checkOffShopping(items),
+    requestLoginApproval: async (message) =>
+      (await isDown()) ? DOWN : inner.requestLoginApproval(message),
   };
 }
 
@@ -138,5 +172,12 @@ export function memoryBrain(): BrainClient {
     addShopping: (items) => ok({ ...memoryAdd(items), items: view() }),
     checkOffShopping: (items) =>
       ok({ ...memoryCheckOff(items), items: view() }),
+    requestLoginApproval: (message) => {
+      // Keep the last few per server: a spec reads the newest for its user.
+      const all = dms();
+      all.push(message);
+      if (all.length > 200) all.splice(0, all.length - 200);
+      return ok({ sent: true });
+    },
   };
 }

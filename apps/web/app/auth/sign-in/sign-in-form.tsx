@@ -17,6 +17,7 @@ import {
   signInErrorSentence,
   SOMETHING_WENT_WRONG,
 } from "../messages";
+import { BaumyApproval } from "./baumy-approval";
 import { TwoFactorChallenge } from "./two-factor-challenge";
 
 /** How this browser last signed in (the `baumy.last_login_method` cookie). */
@@ -38,14 +39,16 @@ function LastUsed({ children }: { children: ReactNode }) {
 }
 
 /**
- * Email and password sign-in, a passkey, and Google when this deployment has
- * its keys (issue #79, as camp-404 `apps/web/app/auth/sign-in-form.tsx`).
+ * Email and password sign-in, a passkey, Google when this deployment has its
+ * keys (issue #79, as camp-404 `apps/web/app/auth/sign-in-form.tsx`), and
+ * "Sign in with Baumy" (a Telegram tap, issue #80) when brain is set up.
  * With two-factor on, a correct password answers with a challenge instead of
  * a session, and the form becomes the code step in place.
  */
 export function SignInForm({
   googleEnabled,
   passkeysEnabled = false,
+  baumyEnabled = false,
   lastMethod = null,
   oauthError = null,
   callbackURL = "/",
@@ -53,6 +56,8 @@ export function SignInForm({
   googleEnabled: boolean;
   /** Passkeys have a host to bind to on this deployment. */
   passkeysEnabled?: boolean;
+  /** Brain can DM an approval here (lib/integrations/brain.ts). */
+  baumyEnabled?: boolean;
   lastMethod?: LastLoginMethod | null;
   /** What a failed Google round trip (`?error=`) says (oauthErrorSentence). */
   oauthError?: string | null;
@@ -64,6 +69,7 @@ export function SignInForm({
   const [error, setError] = useState<string | null>(oauthError);
   const [pending, setPending] = useState(false);
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
+  const [withBaumy, setWithBaumy] = useState(false);
 
   /** A full navigation, so the server renders the page with the cookie. */
   function goOnward() {
@@ -131,6 +137,18 @@ export function SignInForm({
   }
 
   if (needsTwoFactor) return <TwoFactorChallenge onVerified={goOnward} />;
+  if (withBaumy) {
+    return (
+      <div className="flex flex-col gap-4">
+        <PageHeading title="Sign in with Baumy" />
+        <BaumyApproval
+          initialEmail={email}
+          callbackURL={callbackURL}
+          onCancel={() => setWithBaumy(false)}
+        />
+      </div>
+    );
+  }
 
   const passkeyButton = passkeysEnabled ? (
     <Button variant="secondary" onClick={withPasskey} disabled={pending}>
@@ -197,6 +215,18 @@ export function SignInForm({
         ) : (
           googleButton
         )
+      ) : null}
+      {baumyEnabled ? (
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setError(null);
+            setWithBaumy(true);
+          }}
+          disabled={pending}
+        >
+          Sign in with Baumy
+        </Button>
       ) : null}
       <p>
         <Link href="/auth/forgot-password" className={linkClass}>

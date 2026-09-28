@@ -17,6 +17,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins/bearer";
 import { createHttpDb, schema, type Queryable } from "@baumy/db";
 import { forgetTrustedDevices } from "@baumy/db/account-security";
+import { approvalSignIn } from "./approval-sign-in";
 import { sendAuthEmail } from "./email";
 import {
   AUTH_COOKIE_PREFIX,
@@ -182,6 +183,9 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
       // Two-factor, passkeys, the email-proof guards and the last-used
       // sign-in hint (issue #79).
       ...accountSecurityPlugins(env),
+      // "Sign in with Baumy" (issue #80): a server-only endpoint that makes
+      // the session once the member approved it in Telegram.
+      approvalSignIn(),
     ],
 
     advanced: {

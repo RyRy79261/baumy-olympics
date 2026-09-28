@@ -22,7 +22,8 @@
   "dependencies": {
     "@baumy/db": "workspace:*",
     "@better-auth/passkey": "1.6.25",
-    "better-auth": "1.6.25"
+    "better-auth": "1.6.25",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@baumy/eslint-config": "workspace:*",

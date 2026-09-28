@@ -11,6 +11,10 @@ import {
   settleDueCompletions,
 } from "@baumy/db/sweep";
 import { applyDueSuggestions, computeSuggestions } from "@baumy/db/weights";
+import {
+  LOGIN_REQUEST_RETENTION_MS,
+  pruneLoginRequests,
+} from "@baumy/db/login-requests";
 import { now as clockNow } from "./clock";
 import { redactSecrets } from "./redact";
 import { blobStore, type BlobStore } from "./photos/blob-store";
@@ -40,6 +44,8 @@ import { isTestMode } from "./test-mode";
 //     goes first, outside any transaction (never hold one across a network
 //     call), then the pathname is cleared. A run that dies in between leaves
 //     the pathname, and the next run deletes the (already missing) file again.
+//  5. logins: delete "Sign in with Baumy" requests older than a day
+//     (issue #80); the audit rows stay.
 //
 // Every step is idempotent and claims rows with FOR UPDATE SKIP LOCKED
 // (packages/db/src/sweep.ts, weights.ts), so the cron and a page load at the
@@ -62,7 +68,7 @@ export function resetLocalCheckForTests(): void {
   lastLocalCheck = Number.NEGATIVE_INFINITY;
 }
 
-export type StepName = "settle" | "seasons" | "weights" | "photos";
+export type StepName = "settle" | "seasons" | "weights" | "photos" | "logins";
 
 export type StepReport =
   | { step: StepName; ok: true; detail: Record<string, number | string> }
@@ -159,6 +165,14 @@ export async function runSweep(
   );
   steps.push(
     await runStep("photos", () => prunePhotos(at, deps.blob ?? blobStore())),
+  );
+  steps.push(
+    await runStep("logins", async () => ({
+      deleted: await pruneLoginRequests(
+        createHttpDb() as unknown as Queryable,
+        new Date(at.getTime() - LOGIN_REQUEST_RETENTION_MS),
+      ),
+    })),
   );
   return { at: at.toISOString(), steps };
 }

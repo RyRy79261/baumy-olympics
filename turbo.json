@@ -34,6 +34,7 @@
     "MCP_PUBLIC_URL",
     "BRAIN_BASE_URL",
     "KITCHEN_API_TOKEN",
+    "SIGN_IN_WITH_BAUMY",
     "KIOSK_NIGHT_HOURS",
     "E2E_*"
   ],
