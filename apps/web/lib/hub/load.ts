@@ -11,6 +11,7 @@ import {
   upcomingEvents,
   widgetState,
   type HubChore,
+  type HubCounts,
   type HubEvent,
   type WidgetState,
 } from "./view";
@@ -44,6 +45,8 @@ export interface HubData {
   /** The pot's total, "€80.50", or why it cannot be shown. */
   pot: { ok: true; total: string } | { ok: false; message: string };
   notes: WidgetState<NoteView[]>;
+  /** The Urgent, New and Messages counts (ADR 0005 §1). */
+  counts: HubCounts;
   /**
    * brain's shopping list. Ready even when empty: the widget's quick-add
    * field is there either way.
@@ -71,6 +74,8 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
     read(() => runAction("list_chores", {}, ctx)),
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
     read(() => runAction("get_pot", {}, ctx)),
+    // The pinned notes for the widget, and the Messages count, which
+    // list_notes counts over every note.
     read(() =>
       runAction("list_notes", { pinnedOnly: true, limit: HUB_NOTES }, ctx),
     ),
@@ -106,8 +111,15 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
     notes: widgetState(
       notes,
       (d) => d.notes,
-      "Nothing is pinned. Pin a note on the Notes page.",
+      "Nothing is pinned. Pin a note on the Board.",
     ),
+    counts: {
+      urgent: chores.ok
+        ? chores.data.chores.filter((c) => c.urgent).length
+        : null,
+      new: chores.ok ? chores.data.chores.filter((c) => c.isNew).length : null,
+      messages: notes.ok ? notes.data.recentCount : null,
+    },
     shopping: shopping.ok
       ? { status: "ready", data: shopping.data.items }
       : { status: "unavailable", message: shopping.message },

@@ -833,6 +833,9 @@ export const potContributions = pgTable(
  * sanitising renderer (packages/ui `MarkdownBody`). `color` is a name from
  * `NOTE_COLORS` (packages/types), or null for a plain note. `delete_note` is
  * a soft delete: it sets `deleted_at`, and every read leaves those rows out.
+ * `edited_at` is when its words last changed (added or edited, not pinned):
+ * the kitchen screen's Messages count (ADR 0005 §3). Null on notes from
+ * before it existed, which count from `created_at`.
  */
 export const notes = pgTable(
   "notes",
@@ -854,6 +857,7 @@ export const notes = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (t) => [

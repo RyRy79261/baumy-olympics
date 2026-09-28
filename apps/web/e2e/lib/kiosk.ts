@@ -107,6 +107,6 @@ export async function openBaumySheet(kiosk: Page): Promise<Locator> {
 export async function openKioskChores(kiosk: Page) {
   await kioskNav(kiosk, "Bounties");
   await expect(
-    kiosk.getByRole("heading", { name: "Chores", level: 1 }),
+    kiosk.getByRole("heading", { name: "Bounties", level: 1 }),
   ).toBeVisible();
 }

@@ -33,13 +33,14 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     (await uiRequestCtx(undefined))!,
   );
   const waiting = pending.ok ? pending.data.needsYouCount : 0;
-  // The main pages are the nav; Admin and the account fold into menus
+  // The main pages are the nav, named as on the kitchen screen (ADR 0005:
+  // chores are Bounties, notes are the Board); Admin and the account fold into menus
   // (issue #64), so the header is one row on a laptop.
   const items: NavItem[] = [
     { href: "/", label: "Hub" },
-    { href: "/chores", label: "Chores" },
+    { href: "/chores", label: "Bounties" },
     { href: "/calendar", label: "Calendar" },
-    { href: "/notes", label: "Notes" },
+    { href: "/notes", label: "Board" },
     { href: "/shopping", label: "Shopping" },
     { href: "/scores", label: "Scores" },
     { href: "/pot", label: "Pot" },

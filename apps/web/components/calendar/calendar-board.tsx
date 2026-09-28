@@ -6,17 +6,18 @@ import { useState } from "react";
 import { formatDateKey } from "@baumy/core";
 import {
   Button,
+  CalendarChip,
   CalendarDayCell,
   CalendarEventButton,
   CalendarGrid,
+  CalendarMore,
   Dialog,
   Field,
   FormMessage,
   Input,
   Select,
   Textarea,
-  buttonClass,
-  navItemClass,
+  tabClass,
 } from "@baumy/ui";
 import {
   EVENT_DESCRIPTION_MAX,
@@ -34,6 +35,9 @@ import type {
 } from "@/lib/actions/calendar";
 import {
   CALENDAR_VIEWS,
+  KIOSK_MONTH_CHIPS,
+  agendaDays,
+  eventAccent,
   eventsOnDay,
   viewLabel,
   type CalendarEventView,
@@ -48,7 +52,10 @@ import { toast } from "@/lib/ui/toast";
 // from Google once. Tapping an event opens its sheet to edit it; deleting
 // asks again in a dialog of its own before anything is sent.
 //
-// Layout only: the look is the pixel kit's (packages/ui, issue #64).
+// Layout only: the look is the pixel kit's (packages/ui, issue #64), laid
+// out as the approved prototype's month grid (ADR 0005 §1): the title
+// between ◀ and ▶, Today at the end, and each event chip in the colour of
+// the member who added it (the house's amber otherwise).
 
 export interface CalendarActions {
   create: FormAction<CalendarWriteData>;
@@ -78,6 +85,7 @@ export function CalendarBoard({
   basePath,
   kiosk = false,
   memberNames,
+  memberColors = {},
   actions,
 }: {
   range: ViewRange;
@@ -88,11 +96,15 @@ export function CalendarBoard({
   kiosk?: boolean;
   /** Member id → display name, for "Added by". */
   memberNames: Record<string, string>;
+  /** Member id → colour (`#rrggbb`), for the event chips. */
+  memberColors?: Record<string, string>;
   actions: CalendarActions;
 }) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [deleting, setDeleting] = useState<CalendarEventView | null>(null);
   const size = kiosk ? "kiosk" : "default";
+  const kioskMonth = kiosk && range.view === "month";
+  const phoneAgenda = !kiosk && range.view === "month";
   const newDate =
     range.view === "day"
       ? range.date
@@ -103,78 +115,173 @@ export function CalendarBoard({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav aria-label="Calendar view" className="flex gap-1">
+        <nav aria-label="Calendar view" className="flex gap-2">
           {CALENDAR_VIEWS.map((v) => (
             <Link
               key={v}
               href={href(basePath, v, range.date)}
-              className={navItemClass(v === range.view)}
+              className={tabClass(v === range.view, "violet", kiosk)}
               aria-current={v === range.view ? "page" : undefined}
             >
               {viewLabel(v)}
             </Link>
           ))}
         </nav>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={href(basePath, range.view, range.prev)}
-            className={buttonClass("secondary", size)}
-          >
-            Previous
-          </Link>
-          <Link
-            href={href(basePath, range.view, today)}
-            className={buttonClass("secondary", size)}
-          >
-            Today
-          </Link>
-          <Link
-            href={href(basePath, range.view, range.next)}
-            className={buttonClass("secondary", size)}
-          >
-            Next
-          </Link>
-          <Button
-            size={size}
-            onClick={() => setSheet({ mode: "new", date: newDate })}
-          >
-            New event
-          </Button>
-        </div>
+        <Button
+          size={size}
+          onClick={() => setSheet({ mode: "new", date: newDate })}
+        >
+          New event
+        </Button>
       </div>
-      <h2 className="text-lg font-semibold" data-testid="calendar-title">
-        {range.title}
-      </h2>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <Link
+          href={href(basePath, range.view, range.prev)}
+          aria-label="Previous"
+          className={tabClass(false, "violet", kiosk) + " px-4 text-bm-text"}
+        >
+          <span aria-hidden="true">◀</span>
+        </Link>
+        <h2
+          className={
+            kiosk
+              ? "min-w-0 flex-1 text-center font-display text-xl leading-snug text-bm-text"
+              : "min-w-0 flex-1 text-center font-display text-sm leading-snug text-bm-text sm:text-lg"
+          }
+          data-testid="calendar-title"
+        >
+          {range.title}
+        </h2>
+        <Link
+          href={href(basePath, range.view, range.next)}
+          aria-label="Next"
+          className={tabClass(false, "violet", kiosk) + " px-4 text-bm-text"}
+        >
+          <span aria-hidden="true">▶</span>
+        </Link>
+        <Link
+          href={href(basePath, range.view, today)}
+          className={tabClass(false, "violet", kiosk)}
+        >
+          Today
+        </Link>
+      </div>
 
-      <CalendarGrid
-        columns={range.view === "day" ? 1 : 7}
-        weekdays={range.view === "month"}
-        label={range.title}
-      >
-        {range.days.map((day) => (
-          <CalendarDayCell
-            key={day}
-            data-testid={`day-${day}`}
-            label={formatDateKey(day)}
-            today={day === today}
-            muted={range.month !== null && !day.startsWith(range.month)}
-            tall={range.view !== "month"}
-          >
-            {eventsOnDay(events, day).map((e) => (
-              <CalendarEventButton
-                key={e.id}
-                title={e.title}
-                time={timeOn(e, day)}
-                kiosk={kiosk}
-                aria-label={`${e.title}, ${e.when}`}
-                onClick={() => setSheet({ mode: "edit", event: e })}
-              />
-            ))}
-          </CalendarDayCell>
-        ))}
-      </CalendarGrid>
-      {events.length === 0 ? (
-        <p className="text-sm text-bm-muted">Nothing on the calendar here.</p>
+      {/* The month on a phone is an agenda (below); the grid is for sm up. */}
+      <div className={phoneAgenda ? "max-sm:hidden" : undefined}>
+        <CalendarGrid
+          columns={range.view === "day" ? 1 : 7}
+          weekdays={range.view === "month"}
+          label={range.title}
+        >
+          {range.days.map((day) => {
+            const onDay = eventsOnDay(events, day);
+            return (
+              <CalendarDayCell
+                key={day}
+                data-testid={`day-${day}`}
+                label={formatDateKey(day)}
+                shortLabel={
+                  range.view === "month"
+                    ? String(Number(day.slice(8)))
+                    : undefined
+                }
+                today={day === today}
+                muted={range.month !== null && !day.startsWith(range.month)}
+                tall={range.view !== "month"}
+              >
+                {kioskMonth ? (
+                  // The kitchen screen's month (the prototype's): one-line
+                  // chips, "+N more", and the whole day a 56px target that
+                  // opens it, where each event is a button of its own.
+                  <>
+                    <Link
+                      href={href(basePath, "day", day)}
+                      aria-label={`${formatDateKey(day)}: ${
+                        onDay.length === 1
+                          ? "1 event"
+                          : `${onDay.length} events`
+                      }`}
+                      className="absolute inset-0"
+                    />
+                    {onDay.slice(0, KIOSK_MONTH_CHIPS).map((e) => (
+                      <CalendarChip
+                        key={e.id}
+                        title={e.title}
+                        accent={eventAccent(e, memberColors)}
+                        kiosk
+                      />
+                    ))}
+                    {onDay.length > KIOSK_MONTH_CHIPS ? (
+                      <CalendarMore count={onDay.length - KIOSK_MONTH_CHIPS} />
+                    ) : null}
+                  </>
+                ) : (
+                  onDay.map((e) => (
+                    <CalendarEventButton
+                      key={e.id}
+                      title={e.title}
+                      time={timeOn(e, day)}
+                      accent={eventAccent(e, memberColors)}
+                      kiosk={kiosk}
+                      aria-label={`${e.title}, ${e.when}`}
+                      onClick={() => setSheet({ mode: "edit", event: e })}
+                    />
+                  ))
+                )}
+              </CalendarDayCell>
+            );
+          })}
+        </CalendarGrid>
+        {events.length === 0 ? (
+          <p className="mt-4 text-sm text-bm-muted">
+            Nothing on the calendar here.
+          </p>
+        ) : null}
+      </div>
+
+      {phoneAgenda ? (
+        <ol
+          aria-label={`${range.title}, day by day`}
+          data-testid="month-agenda"
+          className="flex flex-col gap-5 sm:hidden"
+        >
+          {agendaDays(range, events, today).map((day) => {
+            const onDay = eventsOnDay(events, day);
+            return (
+              <li
+                key={day}
+                data-testid={`agenda-${day}`}
+                className="flex flex-col gap-1.5"
+              >
+                <h3 className="font-label text-sm font-bold tracking-wide text-bm-muted uppercase">
+                  {day === today
+                    ? `Today · ${formatDateKey(day)}`
+                    : formatDateKey(day)}
+                </h3>
+                {onDay.length > 0 ? (
+                  onDay.map((e) => (
+                    <CalendarEventButton
+                      key={e.id}
+                      title={e.title}
+                      time={timeOn(e, day)}
+                      accent={eventAccent(e, memberColors)}
+                      aria-label={`${e.title}, ${e.when}`}
+                      onClick={() => setSheet({ mode: "edit", event: e })}
+                    />
+                  ))
+                ) : (
+                  <p className="text-base text-bm-dim">Nothing planned.</p>
+                )}
+              </li>
+            );
+          })}
+          {agendaDays(range, events, today).length === 0 ? (
+            <li className="text-base text-bm-muted">
+              Nothing on the calendar this month.
+            </li>
+          ) : null}
+        </ol>
       ) : null}
 
       <Dialog

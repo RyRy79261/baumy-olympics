@@ -9,6 +9,7 @@ import {
   EFFORT_FACTOR_MIN,
 } from "@baumy/types";
 import {
+  BountyGlyph,
   Button,
   Card,
   Dialog,
@@ -16,7 +17,6 @@ import {
   FormMessage,
   Input,
   Select,
-  Sprite,
 } from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
 import type { ChoreView } from "@/lib/actions/list-chores";
@@ -284,7 +284,7 @@ export function ChoreAdminRow({ chore }: { chore: ChoreView }) {
       className="flex flex-wrap items-center gap-3 border-b border-bm-line py-3 last:border-b-0"
       data-testid={`admin-chore-${chore.name}`}
     >
-      <Sprite name={chore.sprite} />
+      <BountyGlyph sprite={chore.sprite} kind={chore.kind} size="small" />
       <span className="font-semibold">{chore.name}</span>
       <span className="text-sm text-bm-muted">
         {chore.basePoints !== null ? `${chore.basePoints} pts` : "no points"}
@@ -314,7 +314,7 @@ export function ChoreAdminRow({ chore }: { chore: ChoreView }) {
           <input type="hidden" name="choreId" value={chore.id} />
           <Button
             type="submit"
-            variant={chore.archived ? "secondary" : "danger"}
+            variant="secondary"
             disabled={archive.pending}
             aria-label={`${chore.archived ? "Restore" : "Archive"} ${chore.name}`}
           >

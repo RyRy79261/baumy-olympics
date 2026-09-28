@@ -9,11 +9,14 @@ import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { logCompletionAction } from "./actions";
 
-// /chores (SPEC §3.2): the chore grid. Tap a chore, check the preview, log
-// it. The data is `list_chores`, the same read the AI and MCP get.
+// /chores, shown as "Bounties" (SPEC §3.2; ADR 0005 §2): the bounty board.
+// Tap a bounty, check the preview, log it. The data is `list_chores`, the
+// same read the AI and MCP get. `?show=urgent` (or new, consumable,
+// maintenance) opens it on that tab: the hub's Urgent and New tiles link
+// there.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Chores - Baumy Olympics" };
+export const metadata: Metadata = { title: "Bounties - Baumy Olympics" };
 
 export default async function ChoresPage() {
   const me = await requireMemberPage();
@@ -26,8 +29,8 @@ export default async function ChoresPage() {
     <>
       <PageHeading
         eyebrow="Baumy Olympics"
-        title="Chores"
-        description="Tap a chore when it's done. Keep doing one to grow your streak; do someone else's to break theirs for a bonus."
+        title="Bounties"
+        description="Tap a bounty when it's done. Keep doing one to grow your streak; do someone else's to break theirs for a bonus."
       />
       {listed.ok ? (
         <ChoreGrid
