@@ -31,6 +31,7 @@ import {
   getSessionFromCtx,
 } from "better-auth/api";
 import { deleteSessionCookie } from "better-auth/cookies";
+import { DEVICE_SIGNED_OUT } from "./env";
 
 /** The endpoints that enrol a passkey or start two-factor. */
 export const ENROLMENT_PATHS: ReadonlySet<string> = new Set([
@@ -59,9 +60,7 @@ export const LIVE_SESSION_PATHS: ReadonlySet<string> = new Set([
   "/link-social",
 ]);
 
-/** What a signed-out device is told when it tries one of them. */
-export const DEVICE_SIGNED_OUT =
-  "This device was signed out. Sign in again to change your security settings.";
+export { DEVICE_SIGNED_OUT };
 
 export function emailProofGuards() {
   return {

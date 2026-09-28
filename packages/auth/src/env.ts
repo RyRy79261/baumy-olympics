@@ -260,6 +260,14 @@ export const AUTH_RP_NAME = "Baumy Olympics";
 export const LAST_LOGIN_METHOD_COOKIE = "baumy.last_login_method";
 
 /**
+ * What a signed-out device is told when it tries to add or change a way in
+ * (the email-proof guard's `SESSION_REVOKED`). Here, not in email-proof.ts,
+ * so client forms can show the same sentence (`@baumy/auth/env`).
+ */
+export const DEVICE_SIGNED_OUT =
+  "This device was signed out. Sign in again to change your security settings.";
+
+/**
  * The cookies the account-security plugins set (issue #79), as Better Auth
  * names them before the `baumy.` prefix, with the lifetimes security.ts
  * configures. The privacy page names them from here.
