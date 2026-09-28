@@ -245,3 +245,93 @@ describe("BaumySheet voice", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+// The kitchen dashboard's Baumy (ADR 0005 §1, issue #65): the cat itself is
+// the button, the sheet asks who is there while nobody is acting, and once
+// the sheet closes after an approval that scored, the cat says so.
+describe("BaumySheet on the kitchen dashboard", () => {
+  const proposal = {
+    proposalId: "p1",
+    name: "log_completion",
+    title: "Log a chore",
+    input: { choreId: "c1" },
+    preview: "Log Bins for Ryan: +10",
+    risk: "safe",
+    valid: true,
+    needsPin: false,
+    fields: [],
+  };
+
+  function mountCat(who?: React.ReactNode) {
+    const div = document.createElement("div");
+    document.body.append(div);
+    root = createRoot(div);
+    act(() =>
+      root!.render(<BaumySheet kiosk cat actingName="Ryan" who={who} />),
+    );
+    return div;
+  }
+
+  it("is the cat, and asks who is asking while nobody is", () => {
+    const div = mountCat(<button type="button">Kim</button>);
+    const cat = div.querySelector<HTMLButtonElement>("[data-voice-cat]")!;
+    expect(cat.getAttribute("aria-label")).toBe("Ask Baumy");
+    expect(cat.querySelector('[data-sprite="baumy"]')).not.toBeNull();
+    // The plinth button is not there.
+    expect(div.querySelectorAll('button[aria-label="Ask Baumy"]')).toHaveLength(
+      1,
+    );
+    act(() => cat.click());
+    const who = document.querySelector('[aria-label="Who\'s asking?"]')!;
+    expect(who.textContent).toContain("Kim");
+    act(() => root!.unmount());
+    root = null;
+    mountCat();
+    expect(document.querySelector('[aria-label="Who\'s asking?"]')).toBeNull();
+  });
+
+  it("says what an approval scored once the sheet closes", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/actions/run"
+        ? json({ ok: true, data: { totalPts: 10 } })
+        : json({
+            ok: true,
+            data: {
+              reply: "Bins it is.",
+              proposals: [proposal],
+              choices: { members: [], chores: [] },
+            },
+          }),
+    );
+    const div = mountCat();
+    const cat = div.querySelector<HTMLButtonElement>("[data-voice-cat]")!;
+    act(() => cat.click());
+    const input = document.querySelector<HTMLInputElement>("#baumy-text")!;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      set.call(input, "I did the bins");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const button = (name: string) =>
+      [...document.querySelectorAll("button")].find(
+        (b) => b.textContent?.trim() === name,
+      )!;
+    await act(async () => button("Send").click());
+    await settle();
+    await act(async () => button("Approve").click());
+    await settle();
+    expect(refresh).toHaveBeenCalled();
+    // Nothing is said while the sheet is open.
+    expect(cat.querySelector('[role="status"]')).toBeNull();
+    await act(async () => button("Close").click());
+    expect(cat.querySelector('[role="status"]')?.textContent).toBe(
+      "Purrfect. +10 for Ryan ✦",
+    );
+    // Opening the sheet again clears it.
+    act(() => cat.click());
+    expect(cat.querySelector('[role="status"]')).toBeNull();
+  });
+});
