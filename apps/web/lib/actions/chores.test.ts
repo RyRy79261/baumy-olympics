@@ -6,6 +6,7 @@ import { formatBerlinDateTime } from "@baumy/core";
 import type { Queryable } from "@baumy/db";
 import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
+import { CHORE_ICONS } from "@baumy/types";
 import {
   actionRequests,
   auditEvents,
@@ -957,6 +958,57 @@ describe("manage_chore", () => {
       ok: false,
       code: "INVALID_INPUT",
       issues: [{ path: ["kind"], message: "Pick consumable or maintenance." }],
+    });
+  });
+
+  it("sets a chore's icon on create and update, and keeps it when left out", async () => {
+    const spriteOf = async (id: string) =>
+      (
+        await t
+          .db()
+          .select({ sprite: chores.sprite })
+          .from(chores)
+          .where(eq(chores.id, id))
+      )[0]!.sprite;
+    const created = ok(
+      await runAction(
+        "manage_chore",
+        { ...windows, sprite: CHORE_ICONS[0] },
+        adminCtx(),
+      ),
+    );
+    expect(await spriteOf(created.choreId)).toBe(CHORE_ICONS[0]);
+
+    const update = {
+      op: "update",
+      choreId: trash,
+      name: "Trash",
+      basePoints: String(TRASH.basePoints),
+      cooldownHours: String(TRASH.cooldownMinutes / 60),
+      proofMode: "none",
+      confirmMode: "optimistic",
+      effortFactorPct: "100",
+    };
+    const before = await spriteOf(trash);
+    expect(before).toBeTruthy();
+    expect(CHORE_ICONS).not.toContain(before);
+    ok(await runAction("manage_chore", update, adminCtx()));
+    expect(await spriteOf(trash)).toBe(before);
+    ok(
+      await runAction(
+        "manage_chore",
+        { ...update, sprite: CHORE_ICONS[3] },
+        adminCtx({ now: at(1) }),
+      ),
+    );
+    expect(await spriteOf(trash)).toBe(CHORE_ICONS[3]);
+
+    await expect(
+      runAction("manage_chore", { ...update, sprite: "rocket" }, adminCtx()),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "INVALID_INPUT",
+      issues: [{ path: ["sprite"], message: "Pick one of the icons." }],
     });
   });
 
