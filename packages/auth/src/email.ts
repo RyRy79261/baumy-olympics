@@ -17,7 +17,8 @@ export const RESEND_ENDPOINT = "https://api.resend.com/emails";
 /** Reset and verification links expire after Better Auth's default, 1 hour. */
 const TOKEN_EXPIRY_HOURS = 1;
 
-export type AuthEmailKind = "reset" | "verify" | "password-reset-completed";
+export type AuthEmailKind =
+  "reset" | "verify" | "password-reset-completed" | "password-set";
 
 export interface AuthEmailInput {
   to: string;
@@ -77,6 +78,19 @@ export function buildAuthEmail(input: AuthEmailInput): AuthEmailBody {
           "If this was you, there is nothing to do.\n\n" +
           "If it wasn't, reset your password again straight away from the " +
           "sign-in page." +
+          SIGN_OFF,
+      };
+    case "password-set":
+      // A new way into the account (issue #79). If a stolen session added
+      // it, this email is how the owner finds out.
+      return {
+        subject: "A password was added to your Baumy Olympics account",
+        text:
+          "A password was just added to this Baumy Olympics account, so it " +
+          "can now also sign in with this email and that password.\n\n" +
+          "If this was you, there is nothing to do.\n\n" +
+          "If it wasn't, reset the password from the sign-in page straight " +
+          "away, then sign out every other device on Settings, Security." +
           SIGN_OFF,
       };
   }
