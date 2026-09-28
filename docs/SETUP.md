@@ -78,7 +78,7 @@ secrets from earlier ones.
 
 ### 5. Vercel Blob (photo proof)
 
-- [ ] **Create a PRIVATE Blob store** and connect it to `baumy-olympics-web`
+- [ ] **Create a PRIVATE Blob store in Frankfurt (`fra1`)** and connect it to `baumy-olympics-web`
       (Production); Vercel sets `BLOB_READ_WRITE_TOKEN`.
       Details: [Confirmations and photo proof](#confirmations-and-photo-proof-issue-15).
 
@@ -255,6 +255,8 @@ succeeds and any real query fails loudly.
 - [ ] **Create the Neon project** (region `aws-eu-central-1`, Frankfurt, next
       to the household). Note both connection strings from its dashboard: the
       pooled one (host contains `-pooler`) and the direct one.
+      The functions run next to it: `apps/web/vercel.json` pins them to
+      `fra1` (Frankfurt), and the privacy page says processing is in the EU.
 - [ ] **Set the database env vars in Vercel** (Production scope):
       `DATABASE_URL` = the pooled string, `DATABASE_URL_UNPOOLED` = the direct
       string. Never set `NEON_LOCAL_PROXY` on Vercel. Preview-scope values and
@@ -341,11 +343,11 @@ nobody is signed in (CI checks this against the real build).
       preview's sessions then do not work on production). Use
       `openssl rand -base64 32`. Never commit it.
 - [ ] **Set `BETTER_AUTH_URL`** (Production scope) to the address people
-      visit, `https://www.baumy.tech` (the apex redirects to it). Leave it unset on Preview:
+      visit: `https://www.baumy.tech` (owner decision 2026-09-28; the apex redirects to it). Leave it unset on Preview:
       a preview uses its own `VERCEL_URL`.
 - [ ] **Resend, for password reset.** Create a Resend account, verify the
       sending domain, then set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (for
-      example `Baumy Olympics <hello@your-domain>`) in Vercel. Without both,
+      example `Baumy Olympics <hello@baumy.tech>`) in Vercel. Without both,
       `/auth/forgot-password` says reset is off, and nobody can recover a
       forgotten password.
 - [ ] **Google sign-in (optional).** In Google Cloud Console create an OAuth
@@ -511,8 +513,12 @@ and store nothing, so a chore with "Photo proof: Required" cannot be logged.
 E2E and CI use an in-memory fake (`E2E_TEST_MODE=1`), so CI stays green
 without it.
 
-- [ ] **Create a PRIVATE Blob store** in Vercel (Storage → Blob → Create,
-      access "Private") and connect it to the project for Production (and
+- [ ] **Create a PRIVATE Blob store in Frankfurt** in Vercel (Storage → Blob
+      → Create, access "Private", region Frankfurt `fra1`; a store's region
+      is fixed when it is created and defaults to `iad1`, Washington). If an
+      existing store is in `iad1`, create a new one in `fra1` and swap the
+      token (no photos exist yet). The privacy page says photos are stored in
+      Frankfurt (the house's store is, owner 2026-09-28), so keep it there. Connect it to the project for Production (and
       Preview if you test photos there). Vercel then sets
       `BLOB_READ_WRITE_TOKEN` on the project.
 - [ ] **Add `BLOB_READ_WRITE_TOKEN` to `.env.example`** (agents cannot edit
@@ -785,8 +791,8 @@ e2e need nothing: off Vercel the issuer is the request's own address.
   ```
 
 - [ ] **After the deploy, check it:**
-      `curl https://<your-domain>/.well-known/oauth-authorization-server`
-      shows `"issuer": "https://<your-domain>"` and
+      `curl https://www.baumy.tech/.well-known/oauth-authorization-server`
+      shows `"issuer": "https://www.baumy.tech"` and
       `"code_challenge_methods_supported": ["S256"]`.
 - If a firewall or Cloudflare sits in front of Vercel, let
   `/.well-known/oauth-*` and `/api/mcp/*` through: claude.ai's probes look
@@ -803,12 +809,12 @@ right: mcp-handler's base path plus its transport). It needs nothing beyond
 `MCP_PUBLIC_URL` above: no Redis (SSE is off), no new variable. CI and e2e
 drive it with a scripted client (`apps/web/e2e/specs/mcp-server.spec.ts`).
 
-- [ ] **Check it answers:** `curl -i -X POST https://<your-domain>/api/mcp/mcp`
+- [ ] **Check it answers:** `curl -i -X POST https://www.baumy.tech/api/mcp/mcp`
       is a 401 whose `WWW-Authenticate` names
-      `resource_metadata="https://<your-domain>/.well-known/oauth-protected-resource"`.
+      `resource_metadata="https://www.baumy.tech/.well-known/oauth-protected-resource"`.
 - [ ] **Connect claude.ai** (Pro, Max, Team or Enterprise): Settings →
       Connectors → Add custom connector → paste
-      `https://<your-domain>/api/mcp/mcp` → Connect. Sign in to Baumy if
+      `https://www.baumy.tech/api/mcp/mcp` → Connect. Sign in to Baumy if
       asked, tick "Make changes as you (baumy:write)" only if Claude should
       log chores, and Approve. In a new chat ask "What are the Baumy
       standings?": Claude should call `get_standings`.
@@ -835,8 +841,8 @@ Telegram group. No migration.
       In baumy-brain's Vercel project set `KITCHEN_API_TOKEN` to it
       (Production) and redeploy.
 - [ ] **In this app's Vercel project** (Production and Preview) set
-      `BRAIN_BASE_URL` to brain's production URL, for example
-      `https://baumy-brain.vercel.app` (no trailing path), and
+      `BRAIN_BASE_URL` to brain's production URL,
+      `https://brain.baumy.tech` (no trailing path), and
       `KITCHEN_API_TOKEN` to the same token.
 - [ ] **Add these lines to `.env.example`** by hand (agents cannot edit
       `.env*` files); both are already in turbo `globalEnv`:
