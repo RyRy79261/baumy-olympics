@@ -2,10 +2,9 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { cx } from "./cx";
 import { Sprite, type SpriteState } from "./sprite";
 
-// NEUTRAL PLACEHOLDERS for the Baumy command sheet (SPEC §3.6; issue #7
-// restyles them here, and issue #22 draws the sprite's states): Baumy with a
-// speech bubble, and one proposal row of the review list. Pages only fill
-// them in.
+// The Baumy command sheet in the pixel kit (SPEC §3.6; ADR 0005): Baumy
+// (the cat, in its mood) with a speech bubble, and one proposal row of the
+// review list. Pages only fill them in.
 
 /**
  * Baumy's answer. The bubble is a polite live region, so a screen reader
@@ -24,23 +23,18 @@ export function SpeechBubble({
   className?: string;
 }) {
   return (
-    <div className={cx("flex items-start gap-3", className)}>
-      <Sprite
-        name="baumy"
-        state={state}
-        size={3}
-        color="#171717"
-        label={`Baumy (${state})`}
-      />
+    <div className={cx("flex items-end gap-4", className)}>
+      <Sprite name="baumy" state={state} size={3} label={`Baumy (${state})`} />
       <div
         role={tone === "error" ? "alert" : "status"}
         aria-live={tone === "error" ? "assertive" : "polite"}
         data-testid="baumy-says"
         className={cx(
-          "min-h-11 flex-1 rounded border px-3 py-2 text-base",
+          "m-1 min-h-11 flex-1 px-3 py-2 text-xl leading-snug",
+          "shadow-[0_-4px_0_var(--color-bm-bubble-ink),0_4px_0_var(--color-bm-bubble-ink),-4px_0_0_var(--color-bm-bubble-ink),4px_0_0_var(--color-bm-bubble-ink)]",
           tone === "error"
-            ? "border-red-700 bg-red-50 text-red-800"
-            : "border-neutral-400 bg-white text-neutral-900",
+            ? "bg-bm-red text-bm-ink"
+            : "bg-bm-bubble text-bm-bubble-ink",
         )}
       >
         {children}
@@ -87,19 +81,21 @@ export function ProposalItem({
     <li
       data-state={state}
       className={cx(
-        "flex flex-col gap-2 rounded border border-neutral-300 bg-white p-3",
+        "pixel-frame flex flex-col gap-2 bg-bm-surface p-3 text-bm-text",
+        state === "saved" && "[--pf:var(--color-bm-green)]",
+        state === "failed" && "[--pf:var(--color-bm-red)]",
         (state === "rejected" || state === "saved") && "opacity-75",
         className,
       )}
       {...props}
     >
-      <p className="text-base font-medium text-neutral-900">{preview}</p>
-      <p className="flex flex-wrap items-center gap-2 text-sm text-neutral-600">
+      <p className="text-xl leading-snug text-bm-text">{preview}</p>
+      <p className="flex flex-wrap items-center gap-2 font-label text-sm text-bm-muted uppercase">
         <span>{title}</span>
         {tags.map((t) => (
           <span
             key={t}
-            className="rounded border border-neutral-400 px-1.5 text-xs"
+            className="pixel-frame px-1.5 text-xs text-bm-amber [--pf:var(--color-bm-amber)]"
           >
             {t}
           </span>
@@ -110,8 +106,8 @@ export function ProposalItem({
         <p
           role={state === "failed" ? "alert" : "status"}
           className={cx(
-            "text-sm",
-            state === "failed" ? "text-red-800" : "text-neutral-700",
+            "text-base",
+            state === "failed" ? "text-bm-red" : "text-bm-muted",
           )}
         >
           {message}

@@ -20,7 +20,7 @@ import { toast } from "@/lib/ui/toast";
 // `AttestedForm`: on the kiosk it asks for the acting member's PIN, on a
 // phone the session vouches.
 //
-// NEUTRAL PLACEHOLDER layout; issue #7 restyles it through packages/ui.
+// Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
 export interface ClaimActions {
   confirm: FormAction<ClaimEventData>;
@@ -199,7 +199,7 @@ function ClaimCard({
       data-status={claim.status}
     >
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-neutral-700">{claimStatusLine(claim)}</p>
+        <p className="text-sm text-bm-muted">{claimStatusLine(claim)}</p>
         {claim.photoUrl ? (
           <ProofPhoto
             src={claim.photoUrl}
@@ -283,7 +283,7 @@ export function ClaimList({
   empty: string;
 }) {
   if (claims.length === 0) {
-    return <p className="text-sm text-neutral-600">{empty}</p>;
+    return <p className="text-sm text-bm-muted">{empty}</p>;
   }
   return (
     <ul className="flex flex-col gap-4">

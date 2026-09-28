@@ -3,8 +3,12 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 // A modal on the native <dialog> element: focus trapping, Escape and the
-// backdrop come from the browser. Issue #7 decides whether small screens get
-// a bottom sheet instead; the API stays `open` + `onClose`.
+// backdrop come from the browser. It is the calm module of ADR 0005 §1: a
+// square-bordered panel over a dimmed page. It is capped at the screen's
+// height and scrolls inside itself, so a tall one (a big household's "Who
+// did it?") never runs off a phone's screen out of reach. The API stays
+// `open` +
+// `onClose`.
 
 export function Dialog({
   open,
@@ -31,9 +35,9 @@ export function Dialog({
       ref={ref}
       aria-label={title}
       onClose={onClose}
-      className="m-auto w-full max-w-md rounded border border-neutral-400 bg-white p-6 text-neutral-900 backdrop:bg-black/40"
+      className="m-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain border-4 border-bm-line bg-bm-surface p-6 text-bm-text backdrop:bg-[rgb(8_4_14/0.82)]"
     >
-      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
+      <h2 className="mb-4 font-display text-base leading-relaxed">{title}</h2>
       {children}
     </dialog>
   );

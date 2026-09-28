@@ -64,7 +64,7 @@ export default async function PotPage() {
         </Card>
         <Card title="By month">
           {data.months.length === 0 ? (
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-bm-muted">
               Nothing in the pot yet this season.
             </p>
           ) : (

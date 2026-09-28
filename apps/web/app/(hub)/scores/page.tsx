@@ -115,7 +115,7 @@ export default async function ScoresPage() {
 
         <Card title="Streaks" description="Who holds each chore's streak now.">
           {streaks.data.current.length === 0 ? (
-            <p className="text-sm text-neutral-600">No streaks yet.</p>
+            <p className="text-sm text-bm-muted">No streaks yet.</p>
           ) : (
             <ul className="flex flex-col gap-2" data-testid="current-streaks">
               {streaks.data.current.map((r) => (
@@ -151,7 +151,7 @@ export default async function ScoresPage() {
 
         <Card title="Recent completions">
           {data.recent.length === 0 ? (
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-bm-muted">
               Nothing scored this season yet.
             </p>
           ) : (
@@ -220,19 +220,19 @@ export default async function ScoresPage() {
           description="A manual change to a season total. It counts once a second admin approves it."
         >
           {data.adjustments.length === 0 ? (
-            <p className="text-sm text-neutral-600">No adjustments.</p>
+            <p className="text-sm text-bm-muted">No adjustments.</p>
           ) : (
             <ul data-testid="adjustments">
               {data.adjustments.map((a) => (
                 <li
                   key={a.id}
-                  className="flex flex-wrap items-center gap-3 border-b border-neutral-200 py-3 last:border-b-0"
+                  className="flex flex-wrap items-center gap-3 border-b border-bm-line py-3 last:border-b-0"
                 >
                   <span className="font-mono">{signedPoints(a.points)}</span>
                   <span>
                     {a.memberName}: {a.reason}
                   </span>
-                  <span className="text-sm text-neutral-600">
+                  <span className="text-sm text-bm-muted">
                     {a.approvedByName
                       ? `Approved by ${a.approvedByName}`
                       : `Proposed by ${a.createdByName}, waiting for a second admin`}

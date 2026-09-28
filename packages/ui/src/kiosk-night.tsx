@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import { cx } from "./cx";
-import { Sprite } from "./sprite";
+import { BaumyCat } from "./baumy-cat";
 
-// NEUTRAL PLACEHOLDERS for the kiosk's always-on pieces (SPEC §8, issue #29;
-// issue #7 restyles them here): the night screen, and a one-line notice for
-// the idle countdown or a screen that may go to sleep. The final sleeping
-// Baumy is the owner's sprite sheet; `Sprite` keeps its API.
+// The kiosk's always-on pieces in the pixel kit (SPEC §8, issue #29; ADR
+// 0005 §6): the night screen (a dim night room with a sleeping Baumy and a
+// big dim clock), and a one-line notice for the idle countdown or a screen
+// that may go to sleep.
 
 /**
  * Night mode: the whole screen dims to a sleeping Baumy and a clock. It is
@@ -31,27 +31,28 @@ export function NightScreen({
       onClick={onWake}
       className={cx(
         "fixed inset-0 z-50 flex h-dvh w-screen touch-manipulation flex-col items-center justify-center gap-8",
-        "bg-neutral-950 text-neutral-200",
-        "focus-visible:outline-4 focus-visible:-outline-offset-8 focus-visible:outline-neutral-200",
+        "bg-[linear-gradient(180deg,#07040c_0%,#120a1d_60%,#1a0d18_100%)] text-[#3d2d57]",
+        "focus-visible:outline-4 focus-visible:-outline-offset-8 focus-visible:outline-bm-dim",
       )}
     >
-      <Sprite
-        name="baumy"
+      <BaumyCat
         state="sleeping"
-        size={8}
-        color="#262626"
+        scale={4}
         label="Baumy is asleep"
+        className="opacity-70"
       />
       <span className="flex flex-col items-center">
         <span
           data-testid="night-time"
-          className="font-mono text-8xl font-semibold tabular-nums"
+          className="font-display text-7xl text-[#3d2d57] [text-shadow:0_0_30px_rgb(143_125_255/0.2)] sm:text-8xl"
         >
           {time}
         </span>
-        <span className="text-xl text-neutral-300">{date}</span>
+        <span className="mt-4 font-label text-xl font-bold text-[#3d2d57] uppercase">
+          {date}
+        </span>
       </span>
-      <span className="text-base text-neutral-300">Touch to wake</span>
+      <span className="font-display text-base text-bm-dim">Touch to wake</span>
     </button>
   );
 }
@@ -71,7 +72,7 @@ export function KioskNotice({
     <p
       role="status"
       data-testid={testId}
-      className="pointer-events-none fixed inset-x-0 bottom-4 z-40 mx-auto w-fit max-w-[90vw] rounded border border-neutral-900 bg-white px-4 py-3 text-base font-medium text-neutral-900 shadow"
+      className="pixel-frame pixel-frame-4 pointer-events-none fixed inset-x-0 bottom-4 z-40 mx-auto w-fit max-w-[90vw] bg-bm-raised px-5 py-3 text-xl text-bm-text [--pf:var(--color-bm-text)]"
     >
       {children}
     </p>
@@ -96,7 +97,7 @@ export function KioskIndicator({
     <span
       role="status"
       data-testid={testId}
-      className="pointer-events-none fixed bottom-4 left-4 z-40 rounded border border-amber-800 bg-amber-50 px-2 py-1 text-sm font-medium text-amber-900"
+      className="pixel-frame pointer-events-none fixed bottom-4 left-4 z-40 bg-bm-amber/15 px-3 py-1 font-label text-sm font-bold text-bm-amber uppercase [--pf:var(--color-bm-amber)]"
     >
       {children}
     </span>

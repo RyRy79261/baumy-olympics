@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button, FormMessage, PageHeading } from "@baumy/ui";
 import { authClient } from "@/lib/auth-client";
 
 /**
@@ -34,17 +35,19 @@ export function SignOutView() {
 
   if (failed) {
     return (
-      <div>
-        <h1>You may still be signed in</h1>
-        <p role="alert">
+      <div className="flex flex-col gap-4">
+        <PageHeading title="You may still be signed in" />
+        <FormMessage tone="error">
           Signing out didn&rsquo;t finish. Check your connection and try again.
-        </p>
-        <button type="button" onClick={() => window.location.reload()}>
-          Try again
-        </button>
+        </FormMessage>
+        <Button onClick={() => window.location.reload()}>Try again</Button>
       </div>
     );
   }
 
-  return <p role="status">Signing you out...</p>;
+  return (
+    <p role="status" className="text-center font-display text-sm">
+      Signing you out...
+    </p>
+  );
 }

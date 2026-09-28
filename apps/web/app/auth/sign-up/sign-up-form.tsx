@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import {
+  Button,
+  Field,
+  FormMessage,
+  Input,
+  PageHeading,
+  linkClass,
+} from "@baumy/ui";
 import { PASSWORD_MIN_LENGTH } from "@baumy/auth/password";
 import { authClient } from "@/lib/auth-client";
 import { signUpErrorSentence, SOMETHING_WENT_WRONG } from "../messages";
@@ -60,65 +68,66 @@ export function SignUpForm({ googleEnabled }: { googleEnabled: boolean }) {
   }
 
   return (
-    <form onSubmit={submit}>
-      <h1>Create an account</h1>
-      <p>
-        <label htmlFor="signup-email">Email</label>
-        <br />
-        <input
-          id="signup-email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={pending}
-        />
-      </p>
-      <p>
-        <label htmlFor="signup-password">Password</label>
-        <br />
-        <input
-          id="signup-password"
-          type="password"
-          autoComplete="new-password"
-          minLength={PASSWORD_MIN_LENGTH}
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={pending}
-        />
-        <br />
-        <small>At least {PASSWORD_MIN_LENGTH} characters.</small>
-      </p>
-      <p>
-        <label htmlFor="signup-confirm">Confirm password</label>
-        <br />
-        <input
-          id="signup-confirm"
-          type="password"
-          autoComplete="new-password"
-          required
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          disabled={pending}
-        />
-      </p>
-      {error ? <p role="alert">{error}</p> : null}
-      <p>
-        <button type="submit" disabled={pending}>
-          {pending ? "Creating account..." : "Create account"}
-        </button>
-      </p>
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <PageHeading title="Create an account" />
+      <Field id="signup-email" label="Email">
+        {(control) => (
+          <Input
+            {...control}
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={pending}
+          />
+        )}
+      </Field>
+      <Field
+        id="signup-password"
+        label="Password"
+        hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}
+      >
+        {(control) => (
+          <Input
+            {...control}
+            type="password"
+            autoComplete="new-password"
+            minLength={PASSWORD_MIN_LENGTH}
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={pending}
+          />
+        )}
+      </Field>
+      <Field id="signup-confirm" label="Confirm password">
+        {(control) => (
+          <Input
+            {...control}
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            disabled={pending}
+          />
+        )}
+      </Field>
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      <Button type="submit" disabled={pending}>
+        {pending ? "Creating account..." : "Create account"}
+      </Button>
       {googleEnabled ? (
-        <p>
-          <button type="button" onClick={google} disabled={pending}>
-            Continue with Google
-          </button>
-        </p>
+        <Button variant="secondary" onClick={google} disabled={pending}>
+          Continue with Google
+        </Button>
       ) : null}
       <p>
-        Already have an account? <Link href="/auth/sign-in">Sign in</Link>
+        Already have an account?{" "}
+        <Link href="/auth/sign-in" className={linkClass}>
+          Sign in
+        </Link>
       </p>
     </form>
   );

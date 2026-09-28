@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
+import { AuthFrame } from "@baumy/ui";
 import { canDeliverAuthEmail } from "@baumy/auth/env";
 import { ForgotPasswordForm } from "./forgot-password-form";
-
-// Bare on purpose: restyled once the pixel UI kit lands (issue #7).
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -11,9 +10,9 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    <main>
+    <AuthFrame>
       {/* A provider, or the e2e capture file (refused on any deployment). */}
       <ForgotPasswordForm emailEnabled={canDeliverAuthEmail(process.env)} />
-    </main>
+    </AuthFrame>
   );
 }

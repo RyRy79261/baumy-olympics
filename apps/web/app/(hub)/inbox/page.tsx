@@ -121,7 +121,7 @@ export default async function InboxPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-bm-muted">
               None of your claims settled in the last 7 days.
             </p>
           )}

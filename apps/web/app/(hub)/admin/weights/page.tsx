@@ -28,10 +28,10 @@ export const metadata: Metadata = { title: "Weights - Baumy Olympics" };
 function Figure({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-xs uppercase tracking-widest text-neutral-600">
+      <dt className="text-xs uppercase tracking-widest text-bm-muted">
         {label}
       </dt>
-      <dd className="font-mono text-lg text-neutral-900">{value}</dd>
+      <dd className="font-mono text-lg text-bm-text">{value}</dd>
     </div>
   );
 }
@@ -42,11 +42,11 @@ function WeightRow({ row }: { row: WeightRowView }) {
   return (
     <li
       data-testid={`weight-${row.choreName}`}
-      className="flex flex-col gap-3 border-b border-neutral-200 py-4 last:border-b-0"
+      className="flex flex-col gap-3 border-b border-bm-line py-4 last:border-b-0"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-base font-semibold">{row.choreName}</h3>
-        <span className="text-sm text-neutral-600">
+        <span className="text-sm text-bm-muted">
           {verdictLabel(live)}
           {row.effortFactorPct !== 100
             ? ` Effort ${row.effortFactorPct}%.`
@@ -83,7 +83,7 @@ function WeightRow({ row }: { row: WeightRowView }) {
         <div
           data-testid="suggestion"
           data-status={s.status}
-          className="flex flex-col gap-3 rounded border border-neutral-300 p-3"
+          className="flex flex-col gap-3 border-2 border-bm-line p-3"
         >
           {s.status === "open" ? (
             <>
@@ -167,7 +167,7 @@ export default async function AdminWeightsPage() {
           ) : null}
           <Card title="Chores">
             {listed.data.chores.length === 0 ? (
-              <p className="text-sm text-neutral-600">No chores yet.</p>
+              <p className="text-sm text-bm-muted">No chores yet.</p>
             ) : (
               <ul>
                 {listed.data.chores.map((row) => (

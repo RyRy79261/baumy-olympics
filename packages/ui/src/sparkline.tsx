@@ -1,7 +1,6 @@
 import { cx } from "./cx";
 
-// NEUTRAL PLACEHOLDER (issue #7 restyles it here): a tiny line chart of a
-// short series, for the weights panel's interval history (SPEC §4.4). It
+// A tiny line chart of a short series, in teal with crisp pixel edges, for the weights panel's interval history (SPEC §4.4). It
 // holds no game logic; the page passes the values and the words.
 
 export interface SparklineProps {
@@ -46,14 +45,15 @@ export function Sparkline({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       data-points={values.length}
-      className={cx("inline-block text-neutral-900", className)}
+      shapeRendering="crispEdges"
+      className={cx("inline-block text-bm-teal", className)}
     >
       {values.length > 1 ? (
         <polyline
           points={points}
           fill="none"
           stroke="currentColor"
-          strokeWidth={1.5}
+          strokeWidth={2}
         />
       ) : null}
     </svg>
