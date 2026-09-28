@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
+import type * as AccountSecurity from "@baumy/db/account-security";
 import {
   actionRequests,
   auditEvents,
@@ -36,9 +37,30 @@ import {
 // live session, and a fresh sign-in or the password to hand out a token.
 
 const RIGHT_PASSWORD = "correct horse battery staple";
+
+/**
+ * What the re-auth path did, in order: the password check and the session
+ * lock (`isLiveSession`, `FOR SHARE`). PGlite has one connection, so the
+ * hang itself (Better Auth updating the session row on another connection
+ * while we hold the lock) cannot happen here; the order is pinned instead.
+ */
+const calls = vi.hoisted(() => [] as string[]);
 vi.mock("@/lib/auth/password-check", () => ({
-  verifyCurrentPassword: async (pw: string) => pw === RIGHT_PASSWORD,
+  verifyCurrentPassword: async (pw: string) => {
+    calls.push("verifyCurrentPassword");
+    return pw === RIGHT_PASSWORD;
+  },
 }));
+vi.mock("@baumy/db/account-security", async (importOriginal) => {
+  const real = await importOriginal<typeof AccountSecurity>();
+  return {
+    ...real,
+    isLiveSession: (...args: Parameters<typeof real.isLiveSession>) => {
+      calls.push("isLiveSession");
+      return real.isLiveSession(...args);
+    },
+  };
+});
 
 const { runAction } = await import("./registry");
 
@@ -48,6 +70,7 @@ const HOUR = 3_600_000;
 
 beforeEach(() => {
   __resetMemoryRateLimits();
+  calls.length = 0;
 });
 
 let seq = 0;
@@ -183,6 +206,52 @@ describe("create_service_token", () => {
     ];
     expect(rows.length).toBeGreaterThan(0);
     expect(JSON.stringify(rows)).not.toContain(RIGHT_PASSWORD);
+  });
+
+  it("checks the password before it locks the session row", async () => {
+    // Better Auth's verifyPassword may UPDATE the session row on its own
+    // connection; holding FOR SHARE on it first would hang the request.
+    for (const name of [
+      "create_service_token",
+      "rotate_service_token",
+    ] as const) {
+      if (name === "rotate_service_token") {
+        await runAction("create_service_token", {}, ctxFor(await freshAdmin()));
+      }
+      const actor = await admin();
+      calls.length = 0;
+      const res = await runAction(
+        name,
+        { name: "baumy-brain", currentPassword: RIGHT_PASSWORD },
+        ctxFor(actor),
+      );
+      expect(res.ok).toBe(true);
+      expect(calls).toEqual(["verifyCurrentPassword", "isLiveSession"]);
+    }
+  });
+
+  it("slows password guessing: the 6th try in 15 minutes is refused", async () => {
+    const actor = await admin();
+    for (let i = 0; i < 5; i += 1) {
+      await expect(
+        runAction(
+          "create_service_token",
+          { currentPassword: `wrong-${i}` },
+          ctxFor(actor),
+        ),
+      ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    }
+    calls.length = 0;
+    await expect(
+      runAction(
+        "create_service_token",
+        { currentPassword: RIGHT_PASSWORD },
+        ctxFor(actor),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "RATE_LIMITED" });
+    // Refused before any password check, and nothing minted.
+    expect(calls).toEqual([]);
+    expect(await listServiceTokens(db())).toHaveLength(0);
   });
 
   it("refuses a device that was signed out elsewhere", async () => {
