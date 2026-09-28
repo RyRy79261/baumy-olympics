@@ -25,6 +25,7 @@
     "./test-harness": "./src/__tests__/_harness.ts",
     "./game-fixtures": "./src/__tests__/_game-fixtures.ts",
     "./notes": "./src/notes.ts",
+    "./reminders": "./src/reminders.ts",
     "./ai-usage": "./src/ai-usage.ts",
     "./mcp-oauth": "./src/mcp-oauth.ts",
     "./service-tokens": "./src/service-tokens.ts"
