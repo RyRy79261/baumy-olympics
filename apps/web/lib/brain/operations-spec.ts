@@ -56,7 +56,16 @@ function gateOf(def: AnyActionDef, notes: BrainActionNotes): string {
 
 /** Whether `X-Baumy-On-Behalf-Of` is accepted for this action. */
 function behalfAllowed(spec: ToolSpec): boolean {
-  return spec.name !== LINK_ACTION && !spec.member_field;
+  return spec.name !== LINK_ACTION && !spec.member_field && !ownWordOnly(spec);
+}
+
+/**
+ * `attested` actions are the member's own word (a claim event, a note
+ * edit): requireAttested refuses them on anyone's behalf (issue #70).
+ */
+function ownWordOnly(spec: ToolSpec): boolean {
+  const def = REGISTRY[spec.name as keyof typeof REGISTRY] as AnyActionDef;
+  return def.requires === "attested";
 }
 
 function confirmLine(spec: ToolSpec): string {
@@ -84,6 +93,9 @@ function behalfLine(spec: ToolSpec): string {
   }
   if (spec.member_field) {
     return `no (400): name the housemate in \`${spec.member_field}\` instead`;
+  }
+  if (ownWordOnly(spec)) {
+    return "no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram";
   }
   return spec.kind === "write"
     ? "yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap"
@@ -174,7 +186,9 @@ function summaryTable(specs: ToolSpec[]): string {
         ? "yes"
         : s.member_field
           ? `no, use \`${s.member_field}\``
-          : "no";
+          : ownWordOnly(s)
+            ? "no, only themself"
+            : "no";
       return `| [\`${s.name}\`](#${s.name}-${anchorOf(s.title)}) | ${s.kind} | ${s.risk} | ${tapWhen(s)} | ${behalf} |`;
     }),
   ].join("\n");

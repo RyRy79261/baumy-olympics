@@ -138,7 +138,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
   },
   confirm_completion: {
     purpose: "Confirms a housemate's self-claimed chore, which verifies it.",
-    when: 'When someone says a housemate really did it ("yes, Sam did clean the bathroom"). Not for your own claims.',
+    when: 'When someone says a housemate really did it ("yes, Sam did clean the bathroom"). Not for your own claims, and never on behalf of someone else (403): if Jo says Sam did it, Jo confirms it herself.',
     examples: [
       {
         say: "yes Sam did the bathroom",

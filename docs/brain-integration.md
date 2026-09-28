@@ -84,6 +84,11 @@ brain sends `X-Baumy-On-Behalf-Of: <Sam's member id>` with Ryan in
   with a `member_field`: "Jo did the dishes" is `log_completion` with
   `doneBy: <Jo's id>`, which Ryan logs and vouches for. On-behalf would
   record that Jo logged it herself.
+- Never for someone's own word: the `attested` actions (the claim events
+  `confirm_completion`, `dispute_completion`, `undo_completion`,
+  `withdraw_dispute`, `concede_completion`, and the note writes) answer 403
+  `FORBIDDEN` on anyone's behalf (`requireAttested`), so nobody can confirm
+  their own claim by speaking as a housemate.
 - Admin actions stay unavailable, on anyone's behalf.
 - Brain can read member ids from `list_reminders` (`members`) or
   `get_standings`.

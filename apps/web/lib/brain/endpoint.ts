@@ -37,7 +37,9 @@ import { z } from "zod";
 //      runs as that housemate, an active member of this household (else 404
 //      NOT_FOUND), and the audit row names the asker as its initiator. Not
 //      for `link_telegram`, nor for an action that names its member in its
-//      input (`member_field`, e.g. log_completion's doneBy) → 400;
+//      input (`member_field`, e.g. log_completion's doneBy) → 400. An
+//      `attested` action (claim events, note writes) is refused later, by
+//      requireAttested, with 403: nobody attests for someone else;
 //   6. a `confirm` or `destructive` action, and any write on someone's
 //      behalf, needs `X-Baumy-Confirmed: 1`, which brain sends only after
 //      the person tapped its inline confirm button → else 428
@@ -294,15 +296,15 @@ async function onBehalfOf(
   }
   const id = MemberId.safeParse(raw);
   if (!id.success) return issue("Expected a member id (a UUID).");
-  if (id.data === asker.id) return { ok: true, target: null };
-  const target = await deps.findHousemate(id.data);
+  // Postgres answers an upper-case uuid too: compare the row it found.
+  const target = await deps.findHousemate(id.data.toLowerCase());
   if (!target) {
     return fail(
       "NOT_FOUND",
       "That person is not an active member of the household.",
     );
   }
-  return { ok: true, target };
+  return { ok: true, target: target.id === asker.id ? null : target };
 }
 
 /** POST /api/v1/actions/{name}: run one action for a Telegram user. */

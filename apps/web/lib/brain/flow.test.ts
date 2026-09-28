@@ -1,9 +1,13 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Queryable } from "@baumy/db";
+import { HOUSEHOLD_ID } from "@baumy/db/household";
 import {
   actionRequests,
   auditEvents,
+  choreRuleVersions,
+  chores,
+  completions,
   households,
   members,
 } from "@baumy/db/schema";
@@ -357,6 +361,113 @@ describe("the brain endpoint on PGlite", () => {
       { ...actor, "x-baumy-on-behalf-of": jo },
     );
     expect(await who.json()).toMatchObject({ data: { memberId: jo } });
+  });
+
+  it("never confirms, disputes, undoes, withdraws or concedes a claim on someone's behalf", async () => {
+    const ryan = await seedMember(db(), { telegramUserId: TG });
+    const jo = await seedMember(db(), { displayName: "Jo" });
+    const [chore] = await t
+      .db()
+      .insert(chores)
+      .values({
+        householdId: HOUSEHOLD_ID,
+        name: "Partner chore",
+        sprite: "partner-chore",
+        confirmMode: "partner",
+      })
+      .returning({ id: chores.id });
+    await t
+      .db()
+      .insert(choreRuleVersions)
+      .values({
+        choreId: chore!.id,
+        basePoints: 10,
+        cooldownMinutes: 60,
+        effectiveFrom: new Date(now().getTime() - 24 * 60 * 60_000),
+        source: "manual",
+      });
+    const actor = { "x-baumy-actor": `tg:${TG}` };
+    const logged = await call(
+      "log_completion",
+      { choreId: chore!.id },
+      {
+        ...actor,
+        "x-baumy-confirmed": "1",
+        "idempotency-key": "brain-log-0001",
+      },
+    );
+    expect(logged.status).toBe(200);
+    const { completionId, counted } = (
+      (await logged.json()) as {
+        data: { completionId: string; counted: boolean };
+      }
+    ).data;
+    expect(counted).toBe(false);
+
+    for (const [name, input] of [
+      ["confirm_completion", { completionId }],
+      ["dispute_completion", { completionId, reason: "Not done" }],
+      ["undo_completion", { completionId }],
+      ["withdraw_dispute", { completionId }],
+      ["concede_completion", { completionId }],
+    ] as const) {
+      const res = await call(name, input, {
+        ...actor,
+        "x-baumy-on-behalf-of": jo,
+        "x-baumy-confirmed": "1",
+        "idempotency-key": `brain-${name}-behalf`,
+      });
+      expect(res.status, name).toBe(403);
+      expect(await res.json()).toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("Only that housemate"),
+      });
+    }
+    const [row] = await t
+      .db()
+      .select()
+      .from(completions)
+      .where(eq(completions.id, completionId));
+    expect(row!.status).toBe("pending");
+    const audits = await t.db().select().from(auditEvents);
+    expect(audits.map((a) => a.action)).toEqual(["log_completion"]);
+    expect(audits[0]!.actorMemberId).toBe(ryan);
+  });
+
+  it("records the initiator on a non-transactional write done on someone's behalf", async () => {
+    const ryan = await seedMember(db(), { telegramUserId: TG });
+    const jo = await seedMember(db(), { displayName: "Jo" });
+    const actor = { "x-baumy-actor": `tg:${TG}` };
+    const event = await call("create_event", dinner(), {
+      ...actor,
+      "x-baumy-confirmed": "1",
+      "idempotency-key": "brain-event-0003",
+    });
+    const eventId = (
+      (await event.json()) as { data: { event: { id: string } } }
+    ).data.event.id;
+    const res = await call(
+      "delete_event",
+      { eventId },
+      {
+        ...actor,
+        "x-baumy-on-behalf-of": jo,
+        "x-baumy-confirmed": "1",
+        "idempotency-key": "brain-delete-behalf-1",
+      },
+    );
+    expect(res.status).toBe(200);
+    const [row] = await t
+      .db()
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "delete_event"));
+    expect(row).toMatchObject({
+      actorMemberId: jo,
+      initiatedByMemberId: ryan,
+      source: "brain",
+      entityId: eventId,
+    });
   });
 
   it("refuses a target who is unknown, deactivated or in another household", async () => {
