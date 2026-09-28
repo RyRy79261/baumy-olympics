@@ -39,10 +39,12 @@ describe("BountyRow", () => {
     expect(out).toContain("text-bm-amber");
     expect(out).toContain("Ryan · streak 3");
     expect(out).toContain("15 pts");
-    // New in yellow, Urgent and the status line in red.
+    // New in yellow; urgent is said once, by the status line in red.
     expect(out).toMatch(/text-bm-yellow uppercase">New</);
-    expect(out).toMatch(/text-bm-red uppercase">Urgent</);
     expect(out).toMatch(/text-bm-red">Due since/);
+    expect(out).not.toContain(">Urgent<");
+    // The kind and the streak are two phrases that each stay whole.
+    expect(out).toMatch(/whitespace-nowrap text-bm-amber">Consumable</);
     // The "Log it" at the end is only for the eye.
     expect(out).toContain('aria-hidden="true"');
     expect(out).toContain("Log it");
@@ -231,6 +233,23 @@ describe("status tiles", () => {
     expect(out).toContain("New");
     expect(out).toContain("grayscale");
     expect(out).not.toContain("data-count");
+    expect(out).not.toContain("Unavailable");
     expect(statusTileClass(false)).not.toContain("bg-bm-surface");
+  });
+
+  it("says Unavailable, with no badge and no zero, when the count could not be read", () => {
+    const out = html(
+      <StatusTileFace
+        icon="envelope"
+        label="Messages"
+        count={null}
+        accent="pink"
+      />,
+    );
+    expect(out).toContain("Messages");
+    expect(out).toContain("Unavailable");
+    expect(out).toContain("grayscale");
+    expect(out).not.toContain("data-count");
+    expect(out).not.toContain(">0<");
   });
 });
