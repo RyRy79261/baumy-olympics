@@ -7,7 +7,7 @@ import {
 } from "@playwright/test";
 import { PASSWORD, freshEmail, signIn, signUp } from "../lib/accounts";
 import { founderAdmin, mintCode, redeem } from "../lib/household";
-import { waitForAuthMail } from "../lib/mail";
+import { waitForAuthMail, waitForNotice } from "../lib/mail";
 import { totp } from "../lib/totp";
 
 // Settings, Security (issue #79): two-factor, passkeys, the last-used hint
@@ -190,6 +190,8 @@ test("passkeys: add, rename, sign in with one, and remove it", async ({
   const row = card.getByTestId("passkey-row");
   await expect(row).toContainText("Test key");
   await expect(card).toContainText("1 set up");
+  // A new way in is announced to the owner.
+  await waitForNotice(email, "passkey-added");
 
   await row.getByRole("button", { name: "Rename" }).click();
   await row.getByLabel("Passkey name").fill("Kitchen laptop");

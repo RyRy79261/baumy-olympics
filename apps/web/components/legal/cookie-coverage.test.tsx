@@ -44,6 +44,7 @@ const AUTH_PLUGINS = [
   "last-login-method",
   "baumy-email-proof",
   "baumy-trusted-devices",
+  "baumy-new-way-in",
 ];
 const AUTH_SOCIAL = ["google"];
 

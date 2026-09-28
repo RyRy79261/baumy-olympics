@@ -52,6 +52,7 @@ describe("buildAuthOptions", () => {
       "last-login-method",
       "baumy-email-proof",
       "baumy-trusted-devices",
+      "baumy-new-way-in",
     ]);
     expect(options.plugins[0]?.options).toEqual({ requireSignature: true });
   });

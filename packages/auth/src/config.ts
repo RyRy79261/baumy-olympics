@@ -15,7 +15,8 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins/bearer";
-import { createHttpDb, schema } from "@baumy/db";
+import { createHttpDb, schema, type Queryable } from "@baumy/db";
+import { forgetTrustedDevices } from "@baumy/db/account-security";
 import { sendAuthEmail } from "./email";
 import {
   AUTH_COOKIE_PREFIX,
@@ -92,6 +93,12 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
         await sendAuthEmail(env, { to: user.email, kind: "reset", url });
       },
       onPasswordReset: async ({ user }) => {
+        // A reset also forgets every device trusted for two-factor (issue
+        // #79): whoever reset the password must pass the code again.
+        await forgetTrustedDevices(
+          createHttpDb() as unknown as Queryable,
+          user.id,
+        );
         await sendAuthEmail(env, {
           to: user.email,
           kind: "password-reset-completed",

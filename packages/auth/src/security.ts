@@ -12,6 +12,7 @@ import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { lastLoginMethod } from "better-auth/plugins";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { passkey } from "@better-auth/passkey";
+import { sendAuthEmail } from "./email";
 import { emailProofGuards } from "./email-proof";
 import {
   AUTH_RP_NAME,
@@ -107,6 +108,86 @@ export function forgetTrustOnPasswordChange() {
   } satisfies BetterAuthPlugin;
 }
 
+/** The claims of a JWT, unverified; null if it is not one. */
+function jwtClaims(token: string): Record<string, unknown> | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const claims: unknown = JSON.parse(
+      Buffer.from(part, "base64url").toString("utf8"),
+    );
+    return claims && typeof claims === "object"
+      ? (claims as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Two things that follow a new way into an account (issue #79):
+ *
+ * - A new passkey is announced by email, as a first password is, so a
+ *   passkey added from a stolen session does not go unnoticed.
+ * - Linking Google ("Link Google", `linkSocial`) to an account whose email
+ *   Google says it has verified, and which is the account's own address,
+ *   confirms that address, as a Google sign-up does. A founder without
+ *   Resend can then join and add passkeys and two-factor. The id token came
+ *   straight from Google's token endpoint, the source Better Auth's own
+ *   Google provider reads the profile from.
+ */
+export function newWayInNotices(env: AuthEnv) {
+  return {
+    id: "baumy-new-way-in",
+    init(ctx) {
+      return {
+        options: {
+          databaseHooks: {
+            account: {
+              create: {
+                async after(account) {
+                  if (account.providerId !== "google" || !account.idToken) {
+                    return;
+                  }
+                  const claims = jwtClaims(account.idToken);
+                  if (claims?.email_verified !== true) return;
+                  const user = await ctx.internalAdapter.findUserById(
+                    account.userId,
+                  );
+                  if (
+                    !user ||
+                    user.emailVerified ||
+                    typeof claims.email !== "string" ||
+                    claims.email.toLowerCase() !== user.email.toLowerCase()
+                  ) {
+                    return;
+                  }
+                  await ctx.internalAdapter.updateUser(user.id, {
+                    emailVerified: true,
+                  });
+                },
+              },
+            },
+          },
+        },
+      };
+    },
+    hooks: {
+      after: [
+        {
+          matcher: (ctx) => ctx.path === "/passkey/verify-registration",
+          handler: createAuthMiddleware(async (ctx) => {
+            if (isAPIError(ctx.context.returned)) return;
+            const email = ctx.context.session?.user.email;
+            if (!email) return;
+            await sendAuthEmail(env, { to: email, kind: "passkey-added" });
+          }),
+        },
+      ],
+    },
+  } satisfies BetterAuthPlugin;
+}
+
 /** The two-factor step finishes a PASSWORD sign-in (Google is not asked). */
 const SECOND_STEP_PATHS = new Set([
   "/two-factor/verify-totp",
@@ -154,5 +235,6 @@ export function accountSecurityPlugins(env: AuthEnv) {
     // keep them once the owner resets, or skip two-factor through a link.
     emailProofGuards(),
     forgetTrustOnPasswordChange(),
+    newWayInNotices(env),
   ];
 }
