@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import {
@@ -18,6 +18,7 @@ import {
   listServiceTokens,
   revokeServiceToken,
 } from "@baumy/db/service-tokens";
+import type * as ServiceTokens from "@baumy/db/service-tokens";
 import { insertTelegramLinkCode } from "@baumy/db/telegram-link-codes";
 import { useTestDb } from "@baumy/db/test-harness";
 import { eq } from "drizzle-orm";
@@ -36,6 +37,19 @@ import { brainEndpointDeps } from "./wiring";
 // real members on PGlite, with the in-memory calendar (issue #27's
 // acceptance criteria, in-process). apps/web/e2e/specs/brain-api.spec.ts
 // does the same over HTTP against Docker Postgres.
+
+/** Makes the "last used" write throw, for one test. */
+const touch = vi.hoisted(() => ({ fail: false }));
+vi.mock("@baumy/db/service-tokens", async (importOriginal) => {
+  const real = await importOriginal<typeof ServiceTokens>();
+  return {
+    ...real,
+    touchServiceToken: (...args: Parameters<typeof real.touchServiceToken>) =>
+      touch.fail
+        ? Promise.reject(new Error("db down"))
+        : real.touchServiceToken(...args),
+  };
+});
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -300,6 +314,25 @@ describe("the brain endpoint on PGlite", () => {
     expect(after?.lastUsedAt).toBeInstanceOf(Date);
     expect(after!.lastUsedAt!.getTime()).toBeGreaterThanOrEqual(start);
     expect(after!.lastUsedAt!.getTime()).toBeLessThanOrEqual(now().getTime());
+  });
+
+  it("still lets brain in when the last-used write fails", async () => {
+    await seedMember(db(), { telegramUserId: TG });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    touch.fail = true;
+    try {
+      const res = await call("whoami", {}, { "x-baumy-actor": `tg:${TG}` });
+      expect(res.status).toBe(200);
+      expect(logged).toHaveBeenCalledWith(
+        "[brain] could not record last_used_at",
+        expect.any(Error),
+      );
+      const [row] = await listServiceTokens(db());
+      expect(row).toMatchObject({ name: "baumy-brain", lastUsedAt: null });
+    } finally {
+      touch.fail = false;
+      logged.mockRestore();
+    }
   });
 
   it("acts for a housemate on the asker's behalf, audited with both", async () => {
