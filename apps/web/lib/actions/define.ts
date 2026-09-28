@@ -192,6 +192,20 @@ export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
   transactional?: boolean;
   /** Overrides the defaults in run.ts. */
   rateLimit?: RateLimitSpec;
+  /**
+   * The input field that names the member the action is done for, when the
+   * action has one (`log_completion`'s `doneBy`). Acting for a housemate goes
+   * through that field, so brain's `X-Baumy-On-Behalf-Of` is refused for
+   * such an action (issue #70).
+   */
+  memberField?: string;
+  /**
+   * Only the member themself may say this (a claim event: confirm, dispute,
+   * undo, withdraw, concede). Brain's `X-Baumy-On-Behalf-Of` is refused for
+   * it with 403, so nobody confirms their own claim by speaking as a
+   * housemate (issue #70).
+   */
+  ownWordOnly?: true;
   /** Zod v4; `z.toJSONSchema` of it is the Claude and MCP tool schema. */
   input: I;
   /**

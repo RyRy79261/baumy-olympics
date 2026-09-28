@@ -265,7 +265,8 @@ export const deleteEvent = defineAction({
   consent: "Delete events from the house calendar",
   kind: "write",
   risk: "destructive",
-  surfaces: ["ui", "kiosk", "ai"],
+  // Brain behind its confirm button (issue #70); never MCP.
+  surfaces: ["ui", "kiosk", "ai", "brain"],
   requires: "member",
   transactional: false,
   input: z.strictObject({
