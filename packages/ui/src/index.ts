@@ -45,6 +45,7 @@ export { Dialog } from "./dialog";
 export { Checkbox, Field, FormMessage, Input, Select, Textarea } from "./field";
 export {
   HAIR_COLOURS,
+  HOUSE_COLOUR,
   HAIR_STYLE_HEADS,
   Housemate,
   SHIRT_COLOURS,
@@ -69,6 +70,7 @@ export {
   type AvatarButtonProps,
 } from "./kiosk-shell";
 export {
+  ActingChip,
   BountyRow,
   DayEventRow,
   EventChip,
@@ -83,6 +85,7 @@ export {
   SheetTabs,
   WeekdayRow,
   WhoLine,
+  actingDoneClass,
   bountyActionClass,
   kioskArrowClass,
   kioskNavItemClass,
@@ -106,6 +109,14 @@ export {
 export { NoteGrid, StickyNote } from "./note";
 export { PageHeading } from "./page-heading";
 export { PixelBubble } from "./pixel-bubble";
+export {
+  CatBubble,
+  CatButton,
+  CatLink,
+  CatSays,
+  CatText,
+  LevelBars,
+} from "./cat-bubble";
 export {
   BAUMY_COLOURS,
   BAUMY_FRAMES,

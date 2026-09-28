@@ -12,6 +12,12 @@ import {
   BaumyButton,
   BaumyCat,
   Button,
+  CatBubble,
+  CatButton,
+  CatLink,
+  CatSays,
+  CatText,
+  LevelBars,
   Dialog,
   Input,
   ScorePop,
@@ -29,10 +35,12 @@ import {
   type ReviewRow,
 } from "@/lib/ai/review";
 import { canRecord } from "@/lib/ai/voice";
-import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
+import { KIOSK_IDLE_MS, PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
+import { useIdle } from "@/components/kiosk/use-idle";
 import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
 import { ProposalRow } from "./proposal-row";
 import { useBaumyMood } from "./use-mood";
+import { useRecorder } from "./use-recorder";
 import { VoiceRecorder } from "./voice-recorder";
 
 // The Baumy sheet (SPEC §3.6), after intake-tracker's
@@ -52,6 +60,20 @@ import { VoiceRecorder } from "./voice-recorder";
 // Baumy's sprite follows lib/ai/mood.ts: listening while held, thinking
 // while transcribing and asking, talking with the answer, sad on an error,
 // happy (with the "+N" pop) when an approved row scores points.
+//
+// On the kitchen dashboard (`cat`, ADR 0005 §1, the approved prototype's
+// baumy-cat.tsx) the cat itself is the button and the talking happens in
+// its speech bubble: a tap starts listening ("Mrrp? I'm listening…", level
+// bars, "Done talking"), then what Baumy understood shows as "Got it! I'll
+// do this:" with "Yes, do it" and "No", through the same transcribe,
+// command and approve calls as the sheet. "Type instead" opens the sheet
+// with the same conversation. With nobody tapped in, the bubble first asks
+// who is talking; without a microphone, a tap opens the sheet.
+
+type CatMode = "who" | "ready" | "listening" | "thinking" | "answer";
+
+const VOICE_NOTE_HINT =
+  "Say it like a voice note: \u201cI bought cat food and the bins are out.\u201d";
 
 /** How long the "+N" stays after a save that scored. */
 const POP_MS = 1_600;
@@ -232,11 +254,8 @@ export function BaumySheet({
 
   const busy = asking || transcribing;
 
-  function close() {
-    // A recording in progress is dropped when the recorder unmounts.
-    feel({ type: "record_cancel" });
-    setMicHint(null);
-    setOpen(false);
+  /** Once the talking is over: Baumy says what the approvals scored. */
+  function sayEarned() {
     if (earned.current > 0) {
       setSays(
         `Purrfect. +${earned.current}${actingName ? ` for ${actingName}` : ""} ✦`,
@@ -245,37 +264,258 @@ export function BaumySheet({
     earned.current = 0;
   }
 
+  function close() {
+    // A recording in progress is dropped when the recorder unmounts.
+    feel({ type: "record_cancel" });
+    setMicHint(null);
+    setOpen(false);
+    sayEarned();
+  }
+
   function wake() {
     feel({ type: "wake" });
     setSays(null);
     setOpen(true);
   }
 
+  // ---------------------------------------------- the dashboard's cat
+  const [bubble, setBubble] = useState<CatMode | null>(null);
+  // A recording stopped by closing the bubble is dropped, not sent.
+  const dropClip = useRef(false);
+  const recorder = useRecorder({
+    onStart: () => feel({ type: "record_start" }),
+    onClip: (clip, mime) => {
+      if (!dropClip.current) void catHeard(clip, mime);
+    },
+    onCancel: (message) => {
+      if (dropClip.current) return;
+      feel({ type: "record_cancel" });
+      setReply({
+        text: message ?? "I didn't catch that. Tap me and try again?",
+        error: true,
+      });
+      setBubble("answer");
+    },
+    onUnavailable: (message) => {
+      // No microphone here: type instead, in the sheet.
+      feel({ type: "record_cancel" });
+      setMicOff(message);
+      setBubble(null);
+      setOpen(true);
+    },
+  });
+
+  // Tapped in from the bubble: ready to talk.
+  useEffect(() => {
+    if (bubble === "who" && actingName) setBubble("ready");
+  }, [bubble, actingName]);
+
+  function listen() {
+    dropClip.current = false;
+    setReply(null);
+    setRows([]);
+    setHeard(null);
+    setBubble("listening");
+    void recorder.begin();
+  }
+
+  async function catHeard(clip: Blob, mime: string) {
+    setBubble("thinking");
+    feel({ type: "record_stop" });
+    setTranscribing(true);
+    const result = await transcribeClip(clip, mime, surface);
+    setTranscribing(false);
+    if (!result.ok) {
+      setReply({ text: result.message, error: true });
+      feel({ type: "error" });
+      if (result.code === "NOT_CONFIGURED") setMicOff(result.message);
+      setBubble("answer");
+      return;
+    }
+    setHeard(result.data.text);
+    await send(result.data.text);
+    setBubble("answer");
+  }
+
+  function hideBubble() {
+    dropClip.current = true;
+    if (recorder.state !== "idle") {
+      recorder.finish();
+      feel({ type: "record_cancel" });
+    }
+    setBubble(null);
+    sayEarned();
+  }
+
+  function typeInstead() {
+    dropClip.current = true;
+    if (recorder.state !== "idle") {
+      recorder.finish();
+      feel({ type: "record_cancel" });
+    }
+    setBubble(null);
+    setOpen(true);
+  }
+
+  function tapCat() {
+    if (bubble !== null) {
+      hideBubble();
+      return;
+    }
+    feel({ type: "wake" });
+    setSays(null);
+    if (kiosk && !actingName) setBubble("who");
+    else if (showMic) listen();
+    else setOpen(true);
+  }
+
+  async function yesDoIt() {
+    await approveAll();
+    // Let the rows' last states render before reading them.
+    await new Promise((r) => setTimeout(r, 0));
+    // Everything is done and scored: the cat says so instead.
+    const unsettled = rowsRef.current.some(
+      (r) => r.state === "pending" || r.state === "failed",
+    );
+    if (!unsettled && earned.current > 0) hideBubble();
+  }
+
+  function noThanks() {
+    setRows((rs) =>
+      rs.map((r) =>
+        r.state === "pending" || r.state === "failed"
+          ? { ...r, state: "rejected", message: undefined }
+          : r,
+      ),
+    );
+    hideBubble();
+  }
+
+  // A bubble left open closes after a minute untouched.
+  useIdle(cat && bubble !== null, KIOSK_IDLE_MS, hideBubble);
+
   const targets = approveAllTargets(rows, kiosk);
   const skips = approveAllSkips(rows, kiosk);
+
+  const answer = reply?.error ? (
+    <CatText tone="error">{reply.text}</CatText>
+  ) : rows.length > 0 ? (
+    <>
+      <CatSays size="sm">Got it! I&apos;ll do this:</CatSays>
+      <ul className="mt-3 flex flex-col gap-1 font-body text-[22px] leading-snug">
+        {rows.map((r) => (
+          <li
+            key={r.proposal.proposalId}
+            data-testid={`cat-row-${r.proposal.name}`}
+            data-state={r.state}
+            className={r.state === "rejected" ? "line-through opacity-50" : ""}
+          >
+            {r.state === "saved" ? "\u2714" : "\u2022"} {r.proposal.preview}
+            {r.message ? (
+              <span className="block text-[16px] text-[#4a3a66]">
+                {r.message}
+              </span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {skips ? <CatText tone="muted">{skips}</CatText> : null}
+    </>
+  ) : (
+    <CatText>{reply?.text ?? ""}</CatText>
+  );
+
+  const catBubble =
+    bubble === null ? (
+      says ? (
+        <CatBubble mode="says">
+          <span role="status" className="font-display text-[16px]">
+            {says}
+          </span>
+        </CatBubble>
+      ) : null
+    ) : (
+      <CatBubble mode={bubble}>
+        {bubble === "who" ? (
+          <>
+            <CatSays>Mrrp? Who&apos;s talking?</CatSays>
+            <CatText tone="muted">Tap yourself first.</CatText>
+            <div className="mt-3 flex flex-wrap gap-2">{who}</div>
+          </>
+        ) : bubble === "ready" ? (
+          <>
+            <CatSays>Mrrp? Hi {actingName}.</CatSays>
+            {showMic ? (
+              <>
+                <CatText tone="muted">{VOICE_NOTE_HINT}</CatText>
+                <div className="mt-4 flex">
+                  <CatButton onClick={listen}>Start talking</CatButton>
+                </div>
+              </>
+            ) : null}
+          </>
+        ) : bubble === "listening" ? (
+          <>
+            <div className="flex items-center gap-4">
+              <LevelBars level={recorder.level} />
+              <CatSays>Mrrp? I&apos;m listening&hellip;</CatSays>
+            </div>
+            <CatText tone="muted">{VOICE_NOTE_HINT}</CatText>
+            <div className="mt-4 flex">
+              <CatButton
+                onClick={recorder.finish}
+                disabled={recorder.state !== "recording"}
+              >
+                Done talking
+              </CatButton>
+            </div>
+          </>
+        ) : bubble === "thinking" ? (
+          <CatSays>
+            {transcribing ? "Listening back\u2026" : "Hmm, let me think\u2026"}
+          </CatSays>
+        ) : (
+          <>
+            {answer}
+            <div className="mt-4 flex gap-3">
+              {targets.length > 0 ? (
+                <>
+                  <CatButton
+                    variant="go"
+                    disabled={bulk}
+                    onClick={() => void yesDoIt()}
+                  >
+                    {bulk ? "Saving\u2026" : "Yes, do it"}
+                  </CatButton>
+                  <CatButton variant="soft" disabled={bulk} onClick={noThanks}>
+                    No
+                  </CatButton>
+                </>
+              ) : (
+                <CatButton onClick={hideBubble}>OK</CatButton>
+              )}
+            </div>
+          </>
+        )}
+        <CatLink onClick={typeInstead}>Type instead</CatLink>
+      </CatBubble>
+    );
 
   return (
     <>
       {cat ? (
-        <button
-          type="button"
-          aria-label="Ask Baumy"
-          data-voice-cat
-          onClick={wake}
-          className="block touch-manipulation"
-        >
-          <BaumyCat
-            state={mood}
-            scale={4}
-            speech={
-              says ? (
-                <span role="status" className="font-display text-base">
-                  {says}
-                </span>
-              ) : undefined
-            }
-          />
-        </button>
+        <div className="relative" data-voice-cat>
+          {catBubble}
+          <button
+            type="button"
+            aria-label="Ask Baumy"
+            aria-expanded={bubble !== null}
+            onClick={tapCat}
+            className="block touch-manipulation"
+          >
+            <BaumyCat state={mood} scale={4} />
+          </button>
+        </div>
       ) : (
         <BaumyButton state={mood} onClick={wake} />
       )}

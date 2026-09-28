@@ -246,9 +246,10 @@ describe("BaumySheet voice", () => {
   });
 });
 
-// The kitchen dashboard's Baumy (ADR 0005 §1, issue #65): the cat itself is
-// the button, the sheet asks who is there while nobody is acting, and once
-// the sheet closes after an approval that scored, the cat says so.
+// The kitchen dashboard's Baumy (ADR 0005 §1, issue #65; the approved
+// prototype's baumy-cat.tsx): the cat is the button and the talking happens
+// in its speech bubble, through the same transcribe, command and approve
+// calls as the sheet; "Type instead" opens the sheet.
 describe("BaumySheet on the kitchen dashboard", () => {
   const proposal = {
     proposalId: "p1",
@@ -262,35 +263,142 @@ describe("BaumySheet on the kitchen dashboard", () => {
     fields: [],
   };
 
-  function mountCat(who?: React.ReactNode) {
-    const div = document.createElement("div");
+  let div: HTMLDivElement;
+  function mountCat(
+    props: { actingName?: string; voice?: boolean; who?: React.ReactNode } = {},
+  ) {
+    div = document.createElement("div");
     document.body.append(div);
     root = createRoot(div);
     act(() =>
-      root!.render(<BaumySheet kiosk cat actingName="Ryan" who={who} />),
+      root!.render(
+        <BaumySheet
+          kiosk
+          cat
+          voice={props.voice ?? true}
+          actingName={props.actingName}
+          who={props.who}
+        />,
+      ),
     );
-    return div;
   }
+  const cat = () =>
+    div.querySelector<HTMLButtonElement>('button[aria-label="Ask Baumy"]')!;
+  const bubble = () =>
+    document.querySelector<HTMLElement>('[data-testid="cat-bubble"]');
+  const button = (name: string) =>
+    [...document.querySelectorAll("button")].find(
+      (b) => b.textContent?.trim() === name,
+    )!;
+  const heardAndAnswered = (reply: string, proposals: unknown[]) =>
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/ai/transcribe"
+        ? json({ ok: true, data: { text: "I did the bins" } })
+        : url === "/api/actions/run"
+          ? json({ ok: true, data: { totalPts: 10 } })
+          : json({
+              ok: true,
+              data: {
+                reply,
+                proposals,
+                choices: { members: [], chores: [] },
+              },
+            }),
+    );
 
-  it("is the cat, and asks who is asking while nobody is", () => {
-    const div = mountCat(<button type="button">Kim</button>);
-    const cat = div.querySelector<HTMLButtonElement>("[data-voice-cat]")!;
-    expect(cat.getAttribute("aria-label")).toBe("Ask Baumy");
-    expect(cat.querySelector('[data-sprite="baumy"]')).not.toBeNull();
-    // The plinth button is not there.
+  it("is the cat itself, with no plinth", () => {
+    mountCat({ actingName: "Ryan" });
     expect(div.querySelectorAll('button[aria-label="Ask Baumy"]')).toHaveLength(
       1,
     );
-    act(() => cat.click());
-    const who = document.querySelector('[aria-label="Who\'s asking?"]')!;
-    expect(who.textContent).toContain("Kim");
-    act(() => root!.unmount());
-    root = null;
-    mountCat();
-    expect(document.querySelector('[aria-label="Who\'s asking?"]')).toBeNull();
+    expect(cat().querySelector('[data-sprite="baumy"]')).not.toBeNull();
+    expect(bubble()).toBeNull();
   });
 
-  it("says what an approval scored once the sheet closes", async () => {
+  it("asks who is talking while nobody is, then is ready once someone is", () => {
+    mountCat({ who: <button type="button">Kim</button> });
+    act(() => cat().click());
+    expect(bubble()!.dataset.mode).toBe("who");
+    expect(bubble()!.textContent).toContain("Who's talking?");
+    expect(bubble()!.textContent).toContain("Kim");
+    act(() =>
+      root!.render(
+        <BaumySheet kiosk cat voice actingName="Kim" who={<i>Kim</i>} />,
+      ),
+    );
+    expect(bubble()!.dataset.mode).toBe("ready");
+    expect(bubble()!.textContent).toContain("Hi Kim.");
+    expect(button("Start talking")).toBeDefined();
+  });
+
+  it("listens, shows what it understood, and does it on Yes", async () => {
+    heardAndAnswered("Bins it is.", [proposal]);
+    mountCat({ actingName: "Ryan" });
+    await act(async () => cat().click());
+    await settle();
+    expect(bubble()!.dataset.mode).toBe("listening");
+    expect(bubble()!.textContent).toContain("Mrrp? I'm listening");
+    expect(getUserMedia).toHaveBeenCalled();
+    await settle(300);
+    await act(async () => button("Done talking").click());
+    await settle();
+    await settle();
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      "/api/ai/transcribe",
+      "/api/ai/command",
+    ]);
+    expect(bubble()!.dataset.mode).toBe("answer");
+    expect(bubble()!.textContent).toContain("Got it! I'll do this:");
+    expect(bubble()!.textContent).toContain("Log Bins for Ryan: +10");
+    await act(async () => button("Yes, do it").click());
+    await settle(10);
+    expect(fetchMock.mock.calls.at(-1)![0]).toBe("/api/actions/run");
+    expect(refresh).toHaveBeenCalled();
+    // Done and scored: the cat says so instead.
+    expect(bubble()!.dataset.mode).toBe("says");
+    expect(bubble()!.textContent).toBe("Purrfect. +10 for Ryan ✦");
+  });
+
+  it("does nothing on No, and Type instead opens the sheet", async () => {
+    heardAndAnswered("Bins it is.", [proposal]);
+    mountCat({ actingName: "Ryan" });
+    await act(async () => cat().click());
+    await settle(300);
+    await act(async () => button("Done talking").click());
+    await settle();
+    await settle();
+    await act(async () => button("No").click());
+    expect(bubble()).toBeNull();
+    expect(fetchMock.mock.calls.map((c) => c[0])).not.toContain(
+      "/api/actions/run",
+    );
+    // Tapping again listens again; Type instead drops the clip.
+    await act(async () => cat().click());
+    await settle();
+    expect(bubble()!.dataset.mode).toBe("listening");
+    await act(async () => button("Type instead").click());
+    expect(bubble()).toBeNull();
+    expect(document.querySelector("dialog")!.hasAttribute("open")).toBe(true);
+    await settle(300);
+    expect(
+      fetchMock.mock.calls.filter((c) => c[0] === "/api/ai/transcribe"),
+    ).toHaveLength(1);
+  });
+
+  it("answers without proposals in the bubble, closed by OK", async () => {
+    heardAndAnswered("Ryan is winning.", []);
+    mountCat({ actingName: "Ryan" });
+    await act(async () => cat().click());
+    await settle(300);
+    await act(async () => button("Done talking").click());
+    await settle();
+    await settle();
+    expect(bubble()!.textContent).toContain("Ryan is winning.");
+    await act(async () => button("OK").click());
+    expect(bubble()).toBeNull();
+  });
+
+  it("opens the sheet at once without a microphone, and always asks who", async () => {
     fetchMock.mockImplementation(async (url: string) =>
       url === "/api/actions/run"
         ? json({ ok: true, data: { totalPts: 10 } })
@@ -303,9 +411,16 @@ describe("BaumySheet on the kitchen dashboard", () => {
             },
           }),
     );
-    const div = mountCat();
-    const cat = div.querySelector<HTMLButtonElement>("[data-voice-cat]")!;
-    act(() => cat.click());
+    mountCat({
+      actingName: "Ryan",
+      voice: false,
+      who: <button type="button">Ryan (picked)</button>,
+    });
+    act(() => cat().click());
+    expect(bubble()).toBeNull();
+    // Who is talking stays in the sheet, with the one acting picked.
+    const who = document.querySelector('[aria-label="Who\'s asking?"]')!;
+    expect(who.textContent).toContain("Ryan (picked)");
     const input = document.querySelector<HTMLInputElement>("#baumy-text")!;
     await act(async () => {
       const set = Object.getOwnPropertyDescriptor(
@@ -315,23 +430,17 @@ describe("BaumySheet on the kitchen dashboard", () => {
       set.call(input, "I did the bins");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    const button = (name: string) =>
-      [...document.querySelectorAll("button")].find(
-        (b) => b.textContent?.trim() === name,
-      )!;
     await act(async () => button("Send").click());
     await settle();
     await act(async () => button("Approve").click());
     await settle();
     expect(refresh).toHaveBeenCalled();
     // Nothing is said while the sheet is open.
-    expect(cat.querySelector('[role="status"]')).toBeNull();
+    expect(bubble()).toBeNull();
     await act(async () => button("Close").click());
-    expect(cat.querySelector('[role="status"]')?.textContent).toBe(
-      "Purrfect. +10 for Ryan ✦",
-    );
-    // Opening the sheet again clears it.
-    act(() => cat.click());
-    expect(cat.querySelector('[role="status"]')).toBeNull();
+    expect(bubble()!.textContent).toBe("Purrfect. +10 for Ryan ✦");
+    // Opening it again clears it.
+    act(() => cat().click());
+    expect(bubble()).toBeNull();
   });
 });
