@@ -125,9 +125,12 @@ test("a member signs in by tapping the number in Telegram", async ({
     phone.getByRole("heading", { name: "Settings", level: 1 }),
   ).toBeVisible();
 
-  // A second tap changes nothing: the request was answered.
-  const again = await tap(request, who.tg, code);
-  expect((await again.json()).code).toBe("INVALID_STATE");
+  // The same tap again (brain retrying with its key) replays the answer;
+  // Deny afterwards changes nothing: the request was answered.
+  const replay = await tap(request, who.tg, code);
+  expect((await replay.json()).data.outcome).toBe("approved");
+  const late = await tap(request, who.tg, "deny");
+  expect((await late.json()).code).toBe("INVALID_STATE");
   await context.close();
 });
 
@@ -145,7 +148,9 @@ test("a wrong number blocks the sign-in, and Deny denies it", async ({
   const first = await dmFor(request, who.tg);
   const denied = await tap(request, who.tg, "deny");
   expect((await denied.json()).data.outcome).toBe("denied");
-  await expect(phone.getByRole("alert")).toContainText("denied in Telegram");
+  await expect(
+    phone.getByRole("alert").filter({ hasText: "denied in Telegram" }),
+  ).toBeVisible();
   await expect(phone).toHaveURL(/\/auth\/sign-in/);
 
   // Then a decoy.
@@ -159,7 +164,9 @@ test("a wrong number blocks the sign-in, and Deny denies it", async ({
   const decoy = dm.choices.find((n) => n !== code)!;
   const blocked = await tap(request, who.tg, decoy);
   expect((await blocked.json()).data.outcome).toBe("blocked");
-  await expect(phone.getByRole("alert")).toContainText("denied in Telegram");
+  await expect(
+    phone.getByRole("alert").filter({ hasText: "denied in Telegram" }),
+  ).toBeVisible();
 
   // Still signed out: the session page sends us to sign in.
   await phone.goto("/settings");
