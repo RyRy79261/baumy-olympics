@@ -1,0 +1,1 @@
+ALTER TABLE "audit_events" ALTER COLUMN "actor_member_id" DROP NOT NULL;

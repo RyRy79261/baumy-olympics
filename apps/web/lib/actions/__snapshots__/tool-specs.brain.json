@@ -36,6 +36,58 @@
     "risk": "safe"
   },
   {
+    "name": "approve_login",
+    "title": "Approve a sign-in",
+    "description": "Approves a 'Sign in with Baumy' request with the number the member tapped in the DM Baumy sent them. Only from that DM's buttons, never from a conversation. A number that is not the one on the sign-in screen blocks the sign-in.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "code": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 99
+        }
+      },
+      "required": [
+        "requestId",
+        "code"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "confirm",
+    "own_word_only": true
+  },
+  {
+    "name": "deny_login",
+    "title": "Deny a sign-in",
+    "description": "Denies a 'Sign in with Baumy' request: the member tapped Deny in the DM Baumy sent them. Only from that DM's buttons.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "requestId"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "safe",
+    "own_word_only": true
+  },
+  {
     "name": "list_chores",
     "title": "List chores",
     "description": "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (due now or falling due before midnight in Berlin), `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",

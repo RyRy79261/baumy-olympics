@@ -176,6 +176,40 @@ describe("httpBrain", () => {
     );
   });
 
+  it("asks for a sign-in approval DM with the message as its body", async () => {
+    const { client, calls } = setup(async () => json({ ok: true, sent: true }));
+    const message = {
+      requestId: "0b0e6c1a-3a7e-4c38-9a53-6f1f3f0d2a11",
+      telegramUserId: 42,
+      device: "Chrome on macOS",
+      choices: [12, 47, 83],
+      expiresAt: "2026-09-28T10:02:00.000Z",
+    };
+    expect(await client.requestLoginApproval(message)).toEqual({
+      ok: true,
+      data: { sent: true },
+    });
+    expect(calls[0]!.url).toBe(
+      "https://brain.example.com/api/kitchen/login-approval",
+    );
+    expect(calls[0]!.init.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual(message);
+    expect(
+      (calls[0]!.init.headers as Record<string, string>).Authorization,
+    ).toBe(`Bearer ${CONFIG.token}`);
+    // Brain knows no such member: not an error, just not sent.
+    const unknown = setup(async () => json({ ok: true, sent: false }));
+    expect(await unknown.client.requestLoginApproval(message)).toEqual({
+      ok: true,
+      data: { sent: false },
+    });
+    const down = setup(async () => json({ ok: false }, 500));
+    expect(await down.client.requestLoginApproval(message)).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+  });
+
   it("answers not_configured when brain is not in the house group yet", async () => {
     const { client, logs } = setup(async () =>
       json({ ok: false, error: "not_configured", message: "…" }, 503),
@@ -287,9 +321,30 @@ describe("cachedBrain", () => {
       checkOffShopping: async () => {
         throw new Error("boom");
       },
+      requestLoginApproval: async () =>
+        ({ ok: true, data: { sent: true } }) as const,
     };
     return c;
   }
+
+  it("passes a sign-in approval straight through, keeping the list", async () => {
+    let t = 1_000_000;
+    const inner = counting();
+    const client = cachedBrain(inner, () => t);
+    await client.listShopping();
+    expect(
+      await client.requestLoginApproval({
+        requestId: "r",
+        telegramUserId: 1,
+        device: "d",
+        choices: [10, 11, 12],
+        expiresAt: "2026-09-28T10:02:00.000Z",
+      }),
+    ).toEqual({ ok: true, data: { sent: true } });
+    t += 1;
+    await client.listShopping();
+    expect(inner.reads).toBe(1);
+  });
 
   it("reuses a read for 30 seconds", async () => {
     let t = 1_000_000;
@@ -358,6 +413,13 @@ describe("brainClient", () => {
       await client.listShopping(),
       await client.addShopping(["milk"]),
       await client.checkOffShopping(["milk"]),
+      await client.requestLoginApproval({
+        requestId: "r",
+        telegramUserId: 1,
+        device: "d",
+        choices: [10, 11, 12],
+        expiresAt: "2026-09-28T10:02:00.000Z",
+      }),
     ]) {
       expect(r).toEqual({ ok: false, reason: "not_configured" });
     }
