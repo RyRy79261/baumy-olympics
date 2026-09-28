@@ -108,7 +108,7 @@ function BountyList({ rows }: { rows: BountyRowView[] }) {
           due={b.due}
           points={b.points}
           action={
-            b.coolingDown ? (
+            !b.loggable ? (
               <span className={cx(bountyActionClass, "opacity-40")}>
                 Not yet
               </span>
@@ -257,7 +257,7 @@ export function DashboardHeader({
   const close = () => setOpen(null);
   // A module left open closes after a minute untouched.
   useIdle(open !== null, KIOSK_IDLE_MS, close);
-  const count = (l: Listed<unknown>) => (l.ok ? l.rows.length : 0);
+  const count = (l: Listed<unknown>) => (l.ok ? l.rows.length : null);
   const titleId = `${id}-module`;
 
   return (

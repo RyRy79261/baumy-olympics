@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { defaultAvatar } from "@baumy/types";
 import { SHIRT_COLOURS } from "@baumy/ui";
@@ -78,10 +80,22 @@ function chore(over: Partial<ChoreView>): ChoreView {
     dueAt: null,
     urgent: false,
     isNew: false,
+    createdAt: at(-200),
     next: null,
     ...over,
   };
 }
+
+describe("the house's colour", () => {
+  it("is the kit's --color-bm-house, which no shirt uses", () => {
+    const css = readFileSync(
+      path.resolve(import.meta.dirname, "../../app/globals.css"),
+      "utf8",
+    );
+    expect(css).toContain(`--color-bm-house: ${HOUSE_COLOUR};`);
+    expect(Object.values(SHIRT_COLOURS)).not.toContain(HOUSE_COLOUR);
+  });
+});
 
 describe("members' colours", () => {
   it("is their character's shirt, their default one without a choice", () => {
@@ -123,11 +137,17 @@ describe("the header", () => {
 });
 
 describe("dueLabel", () => {
-  it("says how late a due bounty is, in hours then days", () => {
+  it("says never done, and no points yet for a chore without a weight", () => {
     expect(dueLabel(chore({ state: "due", dueAt: null }), NOW)).toEqual({
-      text: "Due now",
+      text: "Never done",
       tone: "late",
     });
+    expect(dueLabel(chore({ state: "unavailable", dueAt: null }), NOW)).toEqual(
+      { text: "No points yet", tone: "later" },
+    );
+  });
+
+  it("says how late a due bounty is, in hours then days", () => {
     expect(dueLabel(chore({ state: "due", dueAt: at(-0.5) }), NOW)).toEqual({
       text: "Due now",
       tone: "late",
@@ -205,21 +225,40 @@ describe("bountyRows", () => {
         length: 6,
         colour: SHIRT_COLOURS.pink,
       },
-      coolingDown: false,
+      loggable: true,
     });
     // What you would score, once someone is asking; the holder's colour
     // falls back to the house's for someone who left.
     expect(rows[2]).toMatchObject({
       points: 23,
-      coolingDown: true,
+      loggable: false,
       streak: { holderName: "Kim", colour: HOUSE_COLOUR },
     });
   });
 
-  it("picks the new ones, never one that cannot be logged", () => {
-    expect(
-      bountyRows(chores, isNewBounty, MEMBERS, NOW).map((r) => r.name),
-    ).toEqual(["Cat food"]);
+  it("picks every new one, one without a weight last and not loggable", () => {
+    const rows = bountyRows(chores, isNewBounty, MEMBERS, NOW);
+    expect(rows.map((r) => r.name)).toEqual(["Cat food", "Unweighted"]);
+    // Exactly list_chores' isNew, so the icon's count is the list's.
+    expect(rows).toHaveLength(chores.filter((c) => c.isNew).length);
+    expect(rows[1]).toMatchObject({
+      loggable: false,
+      due: { text: "No points yet" },
+    });
+  });
+
+  it("sorts a never-done chore by when it was added, under real lateness", () => {
+    const rows = bountyRows(
+      [
+        chore({ name: "Fresh", state: "due", createdAt: at(-1) }),
+        chore({ name: "Bins", state: "due", dueAt: at(-3) }),
+        chore({ name: "Ancient", state: "due", createdAt: at(-72) }),
+      ],
+      () => true,
+      MEMBERS,
+      NOW,
+    );
+    expect(rows.map((r) => r.name)).toEqual(["Ancient", "Bins", "Fresh"]);
   });
 
   it("breaks a tie on the deadline by name", () => {

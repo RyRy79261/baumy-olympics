@@ -129,6 +129,22 @@ describe("loadDashboard", () => {
     ]);
   });
 
+  it("gives members who have not chosen a character shirts of their own", async () => {
+    const more = [
+      await seedMember(db(), { displayName: "Jo" }),
+      await seedMember(db(), { displayName: "Sam" }),
+      await seedMember(db(), { displayName: "Mika" }),
+    ];
+    const data = await loadDashboard(kioskCtx(), "2026-09", db());
+    expect(data.members.map((m) => m.id).sort()).toEqual(
+      [ryan, ...more].sort(),
+    );
+    const shirts = data.members.map(
+      (m) => (m.avatar as { shirtColor: string }).shirtColor,
+    );
+    expect(new Set(shirts).size).toBe(4);
+  });
+
   it("says the calendar is not connected, and reads everything else", async () => {
     await seedChore(db(), SEED_CHORES.trash);
     setCalendarClientForTests(unconfiguredCalendar);

@@ -8,6 +8,7 @@ import { cx } from "./cx";
 import { Glyph, PixelIcon } from "./pixel/glyph";
 import type { GlyphName } from "./pixel/glyphs";
 import type { PixelIconName } from "./pixel/icons";
+import { PixelScroll } from "./pixel-scroll";
 
 // The portrait kitchen dashboard in the pixel kit (ADR 0005; the approved
 // prototype's variant A on proto/kiosk-home-pixel, calm-kit.tsx and
@@ -43,6 +44,8 @@ function frame(colour: string, width = 3): CSSProperties {
  * One of the header's (at most three) notification icons: a 16-bit icon
  * over its label, with a count badge. At zero it goes dim and loses the
  * badge, but still opens its module (which then says there is nothing).
+ * A count of null means it could not be read: dim too, with no badge, and
+ * says "unavailable" rather than a zero that is not true.
  */
 export function NotificationIcon({
   icon,
@@ -55,15 +58,16 @@ export function NotificationIcon({
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   icon: PixelIconName;
   label: string;
-  count: number;
+  count: number | null;
   tone: DashboardTone;
 }) {
-  const live = count > 0;
+  const live = count !== null && count > 0;
   return (
     <button
       type={type}
-      aria-label={`${label}: ${count}`}
-      data-count={count}
+      aria-label={`${label}: ${count ?? "unavailable"}`}
+      data-count={count ?? undefined}
+      data-status={count === null ? "unavailable" : "ready"}
       className={cx("relative block h-[124px] w-[120px] shrink-0", className)}
       {...props}
     >
@@ -151,8 +155,8 @@ export function ModulePanel({
         </button>
       </header>
       {tabs ? <div className="px-7 pb-4">{tabs}</div> : null}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-7 pb-7">
-        {children}
+      <div className="flex min-h-0 flex-1 flex-col pr-4 pb-7 pl-7">
+        <PixelScroll tone="#1a1127">{children}</PixelScroll>
       </div>
     </section>
   );
@@ -366,6 +370,43 @@ export function MessageRow({
 }
 
 // ---------------------------------------------------------------- month grid
+
+/**
+ * Who is acting on the kitchen screen, in the month bar: their character and
+ * name, and the way to stop (a "Done" submit the caller wraps in its form).
+ * The next person sees at a glance whose name a tap would log under.
+ */
+export function ActingChip({
+  who,
+  name,
+  done,
+}: {
+  /** Their Housemate. */
+  who: ReactNode;
+  name: string;
+  /** The "Done" button. */
+  done: ReactNode;
+}) {
+  return (
+    <div
+      data-testid="acting-chip"
+      className="pixel-frame flex h-14 min-w-0 items-center gap-2 bg-bm-raised pl-2 [--pf-w:3px] [--pf:var(--color-bm-violet)]"
+    >
+      {who}
+      <span
+        data-testid="acting-as"
+        className="min-w-0 truncate font-label text-[14px] font-bold text-bm-text uppercase"
+      >
+        {name}
+      </span>
+      {done}
+    </div>
+  );
+}
+
+/** The class of the acting chip's "Done": a 56px target. */
+export const actingDoneClass =
+  "grid h-14 min-w-14 place-items-center px-2 font-label text-[13px] font-bold text-bm-muted uppercase";
 
 /** The class of the month bar's and the day sheet's ◀ ▶ (56px, 64px). */
 export const kioskArrowClass =

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { listActiveMembers } from "@baumy/db/members";
+import { rosterAvatars } from "@baumy/types";
 import { AvatarButton, Button, KioskShell, KioskTopBar } from "@baumy/ui";
 import { BaumySheet } from "@/components/baumy/baumy-sheet";
 import { IdleReset } from "@/components/kiosk/idle-reset";
@@ -28,7 +29,7 @@ import { clearPickAction, pickMemberAction } from "../actions";
 // (820×1180), signed in as a paired DEVICE. The home is the dashboard; every
 // page has the footer nav (Home, Bounties, Calendar, Board, Shop, Scores)
 // with Baumy standing over its right end, and the other pages have the
-// avatar bar on top. Tapping an avatar (there, or in Baumy's sheet) makes
+// avatar bar on top. Tapping an avatar (there, or in Baumy's bubble or sheet) makes
 // that member the one acting; 60 seconds idle forgets them and goes home.
 // It holds the screen wake lock, sleeps at night (issue #29) and registers
 // the offline page's service worker. An unpaired or revoked device is sent
@@ -58,6 +59,8 @@ export default async function KioskLayout({
     HOUSEHOLD_ID,
   );
 
+  // Members who have not chosen a character wear shirts nobody else wears.
+  const roster = rosterAvatars(people);
   const avatars = people.map((p) => (
     <form key={p.id} action={pickMemberAction}>
       <input type="hidden" name="memberId" value={p.id} />
@@ -66,7 +69,7 @@ export default async function KioskLayout({
         displayName={p.displayName}
         sprite={p.avatarSprite}
         color={p.color}
-        avatar={p.avatar}
+        avatar={roster.get(p.id)}
         memberId={p.id}
         selected={p.id === kiosk.memberId}
       />
@@ -83,7 +86,7 @@ export default async function KioskLayout({
           cat
           actingName={kiosk.displayName}
           voice={voiceConfigured()}
-          who={kiosk.memberId ? undefined : avatars}
+          who={avatars}
         />
       }
     >

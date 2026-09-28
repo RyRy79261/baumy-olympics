@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  ActingChip,
+  actingDoneClass,
   BountyRow,
   DayEventRow,
   EventChip,
@@ -65,6 +67,43 @@ describe("NotificationIcon", () => {
   });
 });
 
+describe("NotificationIcon that could not be read", () => {
+  it("says unavailable, dim and with no badge, never a false zero", () => {
+    const out = html(
+      <NotificationIcon icon="siren" label="Urgent" tone="red" count={null} />,
+    );
+    expect(out).toContain('aria-label="Urgent: unavailable"');
+    expect(out).toContain('data-status="unavailable"');
+    expect(out).not.toContain("data-count");
+    expect(out).toContain("grayscale(1)");
+    expect(out).not.toContain("data-badge");
+    expect(
+      html(
+        <NotificationIcon icon="star" label="New" tone="yellow" count={0} />,
+      ),
+    ).toContain('data-status="ready"');
+  });
+});
+
+describe("ActingChip", () => {
+  it("names who is acting beside their character, with Done", () => {
+    const out = html(
+      <ActingChip
+        who={<i>ryan</i>}
+        name="Ryan"
+        done={<button className={actingDoneClass}>Done</button>}
+      />,
+    );
+    expect(out).toContain('data-testid="acting-chip"');
+    expect(out).toMatch(/data-testid="acting-as"[^>]*>Ryan</);
+    expect(out).toContain("<i>ryan</i>");
+    expect(out).toContain(">Done</button>");
+    // Both the chip and its Done are 56px targets.
+    expect(out).toContain("h-14");
+    expect(actingDoneClass).toContain("h-14 min-w-14");
+  });
+});
+
 describe("ModulePanel and SheetTabs", () => {
   it("frames the module in its accent, with a 64px close and the tabs", () => {
     const out = html(
@@ -87,6 +126,9 @@ describe("ModulePanel and SheetTabs", () => {
     expect(out).toContain("size-16");
     expect(out).toContain("<div>tabs</div>");
     expect(out).toContain("<p>rows</p>");
+    // The list scrolls in the pixel scrollbar, with "More below" when long.
+    expect(out).toContain("data-scroll-list");
+    expect(out).toContain("data-track");
     expect(
       html(
         <ModulePanel
