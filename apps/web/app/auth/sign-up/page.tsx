@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AuthFrame } from "@baumy/ui";
 import { isGoogleConfigured } from "@baumy/auth/env";
+import { LegalLinks } from "@/components/legal/legal-page";
 import { redirectIfSignedIn } from "@/lib/auth";
 import { SignUpForm } from "./sign-up-form";
 
@@ -15,6 +16,7 @@ export default async function SignUpPage() {
   return (
     <AuthFrame>
       <SignUpForm googleEnabled={isGoogleConfigured(process.env)} />
+      <LegalLinks />
     </AuthFrame>
   );
 }
