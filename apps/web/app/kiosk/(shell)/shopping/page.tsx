@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FormMessage, PageHeading, buttonClass } from "@baumy/ui";
+import { AutoRefresh } from "@/components/hub/auto-refresh";
 import { ShoppingList } from "@/components/shopping/shopping-list";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { runAction } from "@/lib/actions/registry";
 import { getKioskActor } from "@/lib/auth";
+import { skipShoppingCacheOnRefresh } from "@/lib/hub/refresh-server";
 import {
   kioskAddShoppingAction,
   kioskCheckOffShoppingAction,
@@ -22,6 +24,9 @@ export default async function KioskShoppingPage() {
   const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
   const ctx = (await kioskRequestCtx(undefined, undefined))!;
+  // The list left the kitchen home (ADR 0005), so this page re-reads itself
+  // every 60 seconds, asking brain afresh each time (SPEC §6.6, §8).
+  await skipShoppingCacheOnRefresh();
   const listed = await runAction("list_shopping", {}, ctx);
   const acting = Boolean(kiosk.memberId);
   return (
@@ -53,6 +58,7 @@ export default async function KioskShoppingPage() {
       ) : (
         <FormMessage tone="error">{listed.message}</FormMessage>
       )}
+      <AutoRefresh />
     </>
   );
 }

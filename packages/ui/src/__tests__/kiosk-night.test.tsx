@@ -76,24 +76,18 @@ describe("KioskIndicator", () => {
     expect(out).toContain("Screen may sleep");
     expect(out).toContain("fixed");
     expect(out).toContain("pointer-events-none");
+    // In the gap over the footer nav (84px), never over its labels.
+    expect(out).toContain("bottom-[100px]");
   });
 });
 
 describe("KioskShell skin", () => {
   it("is day unless told night", () => {
+    expect(renderToStaticMarkup(<KioskShell>x</KioskShell>)).toContain(
+      'data-skin="day"',
+    );
     expect(
-      renderToStaticMarkup(
-        <KioskShell brand="B" avatars={null}>
-          x
-        </KioskShell>,
-      ),
-    ).toContain('data-skin="day"');
-    expect(
-      renderToStaticMarkup(
-        <KioskShell brand="B" avatars={null} skin="night">
-          x
-        </KioskShell>,
-      ),
+      renderToStaticMarkup(<KioskShell skin="night">x</KioskShell>),
     ).toContain('data-skin="night"');
   });
 });

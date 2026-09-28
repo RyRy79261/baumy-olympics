@@ -1,9 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import {
   BaumyButton,
+  BaumyCat,
   Button,
   Dialog,
   Input,
@@ -51,16 +58,29 @@ const POP_MS = 1_600;
 
 const noSubscribe = () => () => {};
 
+/** How long Baumy's "Purrfect" bubble stays after the sheet closes. */
+const SAYS_MS = 4_000;
+
 export function BaumySheet({
   kiosk = false,
   actingName,
   voice = false,
+  cat = false,
+  who,
 }: {
   kiosk?: boolean;
   /** The kiosk's acting member, for "Ryan's PIN". */
   actingName?: string;
   /** This deployment can transcribe speech (GROQ_API_KEY, or the e2e fake). */
   voice?: boolean;
+  /**
+   * The kitchen dashboard's Baumy (ADR 0005 §1): the cat itself, standing
+   * over the footer's end, and its speech bubble says what an approval
+   * scored once the sheet closes. Otherwise the button on its plinth.
+   */
+  cat?: boolean;
+  /** The kiosk's avatars, while nobody is acting: "Who's asking?". */
+  who?: ReactNode;
 }) {
   const router = useRouter();
   const surface = kiosk ? "kiosk" : "ui";
@@ -77,6 +97,14 @@ export function BaumySheet({
   const [micOff, setMicOff] = useState<string | null>(null);
   const [micHint, setMicHint] = useState<string | null>(null);
   const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
+  // What approvals scored while the sheet was open, and the bubble saying it.
+  const earned = useRef(0);
+  const [says, setSays] = useState<string | null>(null);
+  useEffect(() => {
+    if (!says) return;
+    const timer = setTimeout(() => setSays(null), SAYS_MS);
+    return () => clearTimeout(timer);
+  }, [says]);
   const textRef = useRef<HTMLInputElement>(null);
   // Whether this browser can record; false while rendering on the server.
   const recordable = useSyncExternalStore(
@@ -157,6 +185,7 @@ export function BaumySheet({
       const points = typeof pts === "number" ? pts : null;
       feel({ type: "points", points });
       if (points !== null && points > 0) {
+        earned.current += points;
         const key = Date.now();
         setPop({ key, points });
         setTimeout(() => setPop((p) => (p?.key === key ? null : p)), POP_MS);
@@ -208,6 +237,18 @@ export function BaumySheet({
     feel({ type: "record_cancel" });
     setMicHint(null);
     setOpen(false);
+    if (earned.current > 0) {
+      setSays(
+        `Purrfect. +${earned.current}${actingName ? ` for ${actingName}` : ""} ✦`,
+      );
+    }
+    earned.current = 0;
+  }
+
+  function wake() {
+    feel({ type: "wake" });
+    setSays(null);
+    setOpen(true);
   }
 
   const targets = approveAllTargets(rows, kiosk);
@@ -215,16 +256,40 @@ export function BaumySheet({
 
   return (
     <>
-      <BaumyButton
-        state={mood}
-        onClick={() => {
-          feel({ type: "wake" });
-          setOpen(true);
-        }}
-      />
+      {cat ? (
+        <button
+          type="button"
+          aria-label="Ask Baumy"
+          data-voice-cat
+          onClick={wake}
+          className="block touch-manipulation"
+        >
+          <BaumyCat
+            state={mood}
+            scale={4}
+            speech={
+              says ? (
+                <span role="status" className="font-display text-base">
+                  {says}
+                </span>
+              ) : undefined
+            }
+          />
+        </button>
+      ) : (
+        <BaumyButton state={mood} onClick={wake} />
+      )}
       <Dialog open={open} onClose={close} title="Ask Baumy">
         <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">
           {pop ? <ScorePop key={pop.key} points={pop.points} /> : null}
+          {who ? (
+            <section aria-label="Who's asking?" className="flex flex-col gap-2">
+              <p className="font-label text-sm font-bold text-bm-muted uppercase">
+                Who&apos;s asking? Tap yourself.
+              </p>
+              <div className="flex flex-wrap gap-2">{who}</div>
+            </section>
+          ) : null}
           <SpeechBubble
             state={mood}
             tone={reply?.error && !busy ? "error" : "normal"}

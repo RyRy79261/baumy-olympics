@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { AvatarButton, KioskShell } from "../kiosk-shell";
+import { AvatarButton, KioskShell, KioskTopBar } from "../kiosk-shell";
 import { PIN_MAX_LENGTH, PinPad } from "../pin-pad";
 
 beforeAll(() => {
@@ -98,29 +98,38 @@ describe("PinPad", () => {
 });
 
 describe("KioskShell and AvatarButton", () => {
-  it("frames the kiosk without page scrolling, with the avatar bar", () => {
+  it("frames the kiosk without page scrolling, footer and Baumy on top", () => {
     const out = renderToStaticMarkup(
-      <KioskShell
-        brand="Baumy"
-        avatars={
-          <AvatarButton displayName="Ryan" sprite="cat" color="#123456" />
-        }
-        status={<span>Acting as Ryan</span>}
-      >
+      <KioskShell footer={<nav>Footer</nav>} corner={<span>Cat</span>}>
         body
       </KioskShell>,
     );
     expect(out).toContain("overflow-hidden");
     expect(out).toContain("touch-manipulation");
+    expect(out).toContain("h-dvh");
+    // The content keeps the footer's 84px clear; Baumy sits over its end.
+    expect(out).toContain("pb-[84px]");
+    expect(out).toContain("<nav>Footer</nav>");
+    expect(out).toMatch(/absolute right-3\.5 bottom-1 z-30"><span>Cat/);
+    const bare = renderToStaticMarkup(<KioskShell>x</KioskShell>);
+    expect(bare).toContain('data-skin="day"');
+    expect(bare).not.toContain("z-30");
+  });
+
+  it("puts the avatar bar and its status over the other pages", () => {
+    const out = renderToStaticMarkup(
+      <KioskTopBar
+        avatars={
+          <AvatarButton displayName="Ryan" sprite="cat" color="#123456" />
+        }
+        status={<span>Acting as Ryan</span>}
+      />,
+    );
     expect(out).toContain('aria-label="Who is here"');
     expect(out).toContain("Acting as Ryan");
-    expect(
-      renderToStaticMarkup(
-        <KioskShell brand="B" avatars={null}>
-          x
-        </KioskShell>,
-      ),
-    ).not.toContain("gap-3");
+    expect(renderToStaticMarkup(<KioskTopBar avatars={null} />)).not.toContain(
+      "gap-3",
+    );
   });
 
   it("marks the acting member as pressed, with a 64px target", () => {
