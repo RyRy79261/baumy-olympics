@@ -47,6 +47,19 @@ describe("CalendarDayCell", () => {
   });
 });
 
+describe("CalendarDayCell's short label", () => {
+  it("shows the day number from sm up, the full day on a phone and to readers", () => {
+    const out = html(<CalendarDayCell label="Fri 15 Jan" shortLabel="15" />);
+    expect(out).toContain('<span class="sm:hidden">Fri 15 Jan</span>');
+    expect(out).toContain('aria-hidden="true">15</span>');
+    expect(out).toContain(
+      '<span class="max-sm:hidden sr-only">Fri 15 Jan</span>',
+    );
+    const plain = html(<CalendarDayCell label="Fri 15 Jan" />);
+    expect(plain).not.toContain("sm:hidden");
+  });
+});
+
 describe("CalendarEventButton", () => {
   it("is a 44px button with the time and title, 56px on the kiosk", () => {
     const out = html(<CalendarEventButton title="Dinner" time="19:00" />);
@@ -57,5 +70,21 @@ describe("CalendarEventButton", () => {
     expect(
       html(<CalendarEventButton title="Dinner" time="19:00" kiosk />),
     ).toContain("min-h-14");
+  });
+
+  it("takes whose colour it is, violet without one", () => {
+    const plain = html(<CalendarEventButton title="Dinner" time="19:00" />);
+    expect(plain).toContain("[--chip:var(--color-bm-violet)]");
+    expect(plain).not.toContain("style=");
+    const ryan = html(
+      <CalendarEventButton
+        title="Dinner"
+        time="19:00"
+        accent="#3b82c4"
+        style={{ width: 10 }}
+      />,
+    );
+    expect(ryan).toContain("--chip:#3b82c4");
+    expect(ryan).toContain("width:10px");
   });
 });

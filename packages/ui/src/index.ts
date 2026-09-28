@@ -28,6 +28,22 @@ export {
   CalendarGrid,
   type CalendarEventButtonProps,
 } from "./calendar";
+export {
+  AgendaItem,
+  BOUNTY_KIND_LABEL,
+  BountyGlyph,
+  BountyList,
+  BountyRow,
+  BountySummary,
+  StatusTileFace,
+  TabLabel,
+  statusTileClass,
+  tabClass,
+  type BountyFields,
+  type BountyKind,
+  type BountyRowProps,
+  type TabAccent,
+} from "./bounties";
 export { Card } from "./card";
 export { CheckItemButton, CheckList } from "./check-list";
 export {
@@ -73,7 +89,7 @@ export {
   isAllowedNoteUrl,
 } from "./markdown";
 export { NoteGrid, StickyNote } from "./note";
-export { PageHeading } from "./page-heading";
+export { PageHeading, SectionHeading } from "./page-heading";
 export { PixelBubble } from "./pixel-bubble";
 export {
   BAUMY_COLOURS,

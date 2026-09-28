@@ -39,3 +39,24 @@ export function PageHeading({
     </div>
   );
 }
+
+/**
+ * A section's heading inside a page (the inbox's "Waiting on you"): a
+ * Silkscreen label, quieter than the page's h1 and a Card's title.
+ */
+export function SectionHeading({
+  id,
+  children,
+}: {
+  id?: string;
+  children: ReactNode;
+}) {
+  return (
+    <h2
+      id={id}
+      className="mb-3 font-label text-base font-bold tracking-wider text-bm-muted uppercase"
+    >
+      {children}
+    </h2>
+  );
+}

@@ -88,7 +88,7 @@ export function NoteGrid({
   return (
     <div
       className={cx(
-        "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3",
+        "grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3",
         className,
       )}
       {...props}
