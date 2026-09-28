@@ -8,6 +8,8 @@ import {
   type Proposal,
   type ProposalChoices,
 } from "@/lib/ai/proposal";
+import { runGate } from "@/lib/auth/gates";
+import type { PinVerifier } from "@/lib/auth/pin";
 import type { AnyActionDef, Gate, RequestCtx } from "./define";
 
 // Turn a write Claude asked for into a proposal (SPEC §3.6, §6.3): the same
@@ -37,6 +39,9 @@ export type Proposer = (
   ctx: RequestCtx,
   choices: ProposalChoices,
 ) => Promise<Proposal>;
+
+/** Never called: the attested gate, the only one that checks a PIN, is skipped. */
+const noPinHere: PinVerifier = async () => ({ ok: false, reason: "no_pin" });
 
 function asRecord(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v)
@@ -98,6 +103,16 @@ export function createProposer(
         preview = await def.preview({ ...ctx, db: deps.readDb() }, parsed.data);
       } catch (err) {
         deps.logError(`[propose:${name}] preview failed`, err);
+      }
+    }
+    // Who may approve it: the gate runAction will run, now, so a proposal
+    // nobody here can approve (an admin action asked for by a member, or at
+    // the kiosk) says so instead of failing on approval. The attested gate
+    // is left for approval, where the kiosk sends the PIN.
+    if (gate !== "attested") {
+      const allowed = await runGate(gate, ctx, def, noPinHere);
+      if (!allowed.ok) {
+        return { ...common, preview, valid: false, error: allowed.message };
       }
     }
     return {

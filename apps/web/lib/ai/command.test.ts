@@ -127,6 +127,9 @@ async function tally() {
   };
 }
 
+/** The admin writes Baumy may propose (issue #107). */
+const ADMIN_ON_AI = ["create_bounty", "update_bounty", "add_pot_contribution"];
+
 describe("runCommand", () => {
   it("'I took the trash out' reads the chores, then proposes log_completion for the right chore and member", async () => {
     const { create, sent } = script(
@@ -344,12 +347,17 @@ describe("runCommand", () => {
 });
 
 describe("the ai tool list", () => {
-  it("is exactly the registry's ai actions, and leaves every admin or ui-only action out", () => {
+  it("is exactly the registry's ai actions, and leaves every other admin or ui-only action out", () => {
     const names = toolSpecs("ai").map((s) => s.name);
     expect(names).toContain("log_completion");
     expect(names).toContain("get_standings");
+    // SPEC §12 decision 10 as amended 2026-09-29 (issue #107).
+    for (const allowed of ADMIN_ON_AI) expect(names).toContain(allowed);
     for (const def of Object.values(REGISTRY)) {
-      if (def.requires === "admin" || !def.surfaces.includes("ai")) {
+      if (
+        (def.requires === "admin" && !ADMIN_ON_AI.includes(def.name)) ||
+        !def.surfaces.includes("ai")
+      ) {
         expect(names, def.name).not.toContain(def.name);
       } else {
         expect(names, def.name).toContain(def.name);
@@ -358,7 +366,6 @@ describe("the ai tool list", () => {
     for (const admin of [
       "manage_chore",
       "adjust_points",
-      "add_pot_contribution",
       "set_prize_mode",
       "mint_invite",
       "manage_members",

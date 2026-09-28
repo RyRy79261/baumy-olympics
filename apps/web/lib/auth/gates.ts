@@ -7,7 +7,7 @@ import type { PinVerdict, PinVerifier } from "./pin";
 // "Authorization", SPEC §6.2). Only `runAction` calls these, through
 // `runGate`; nothing hand-rolls a check at a call site.
 //
-// Kiosk actors never pass `requireSession` or `requireAdmin`. Every gate but
+// Kiosk and MCP actors never pass `requireSession` or `requireAdmin`. Every gate but
 // `requireService` also needs an active household member behind the actor.
 
 export type GateResult = { ok: true } | ActionFailure;
@@ -102,13 +102,25 @@ export function requireAccount(ctx: RequestCtx): GateResult {
       );
 }
 
-/** An admin, signed in with a real session. */
+const ADMINS_ONLY = fail("FORBIDDEN", "Only a household admin can do this.");
+
+/**
+ * An admin, signed in with a real session; or brain speaking in a linked
+ * admin's own name, never on someone's behalf (issue #107). Only the admin
+ * actions offered on the brain surface get that far: the surface check runs
+ * first. Never the kiosk or an MCP token.
+ */
 export function requireAdmin(ctx: RequestCtx): GateResult {
+  const { actor } = ctx;
+  if (actor.kind === "service") {
+    if (!actor.memberId) return NOT_A_MEMBER;
+    return actor.role === "admin" && !actor.initiatorMemberId
+      ? OK
+      : ADMINS_ONLY;
+  }
   const session = requireSession(ctx);
   if (!session.ok) return session;
-  if (ctx.actor.kind !== "member" || ctx.actor.role !== "admin") {
-    return fail("FORBIDDEN", "Only a household admin can do this.");
-  }
+  if (actor.kind !== "member" || actor.role !== "admin") return ADMINS_ONLY;
   return OK;
 }
 

@@ -1,16 +1,24 @@
 import { z } from "zod";
-import { berlinMonthKey, seasonYear } from "@baumy/core";
+import { berlinMonthKey, formatMonthKey, seasonYear } from "@baumy/core";
 import { findActiveMember } from "@baumy/db/members";
 import { addPotContribution as insertPotContribution } from "@baumy/db/scores";
 import { ensureSeason } from "@baumy/db/seasons";
 import { PotAmountCents, PotMonth, PotNote, potMonthDate } from "@baumy/types";
+import { formatEuros } from "@/lib/scores/view";
 import { defineAction } from "./define";
 import { fail } from "./result";
 
 // A month's money into the year-end pot (SPEC §4.5). The pot is a ledger
-// only: the money moves at the bank. Admin only and UI only (SPEC §12
-// decision 10). The month picks the season: this year's pot, or last year's
-// until that season closes (a December payment logged in January).
+// only: the money moves at the bank. Admin only; the AI command and brain
+// may propose it too, in the admin's own name (SPEC §12 decision 10, amended
+// 2026-09-29, issue #107). The month (default: this Berlin month) picks the
+// season: this year's pot, or last year's until that season closes (a
+// December payment logged in January).
+
+/** "€20", or "€20.50" when there are cents. */
+function euros(cents: number): string {
+  return formatEuros(cents).replace(/\.00$/, "");
+}
 
 export interface AddPotContributionData {
   contributionId: string;
@@ -23,19 +31,36 @@ export const addPotContribution = defineAction({
   name: "add_pot_contribution",
   title: "Add to the pot",
   description:
-    "Records a monthly contribution to the season's savings pot: the month (YYYY-MM), the amount in euros, who paid it (default: you) and an optional note.",
+    "Records a monthly contribution to the season's savings pot: the amount in euros, the month (YYYY-MM, default: this month), who paid it (a member id, default: you) and an optional note. Only a household admin may do this, in their own name.",
   consent: "Record money paid into the pot",
   kind: "write",
   risk: "confirm",
-  surfaces: ["ui"],
+  surfaces: ["ui", "ai", "brain"],
   requires: "admin",
+  ownWordOnly: true,
   input: z.strictObject({
-    month: PotMonth,
+    month: PotMonth.optional(),
     amount: PotAmountCents,
     contributedBy: z.uuid("Pick a member.").optional(),
     note: PotNote.optional(),
   }),
-  async execute(ctx, input) {
+  async preview(ctx, input) {
+    const parts = [`Add ${euros(input.amount)} to the pot`];
+    if (input.month && input.month !== berlinMonthKey(ctx.now)) {
+      parts.push(`for ${formatMonthKey(input.month)}`);
+    }
+    if (input.contributedBy && input.contributedBy !== ctx.actor.memberId) {
+      const payer = await findActiveMember(
+        ctx.db,
+        ctx.householdId,
+        input.contributedBy,
+      );
+      parts.push(payer ? `from ${payer.displayName}` : "from someone unknown");
+    }
+    return parts.join(" ");
+  },
+  async execute(ctx, raw) {
+    const input = { ...raw, month: raw.month ?? berlinMonthKey(ctx.now) };
     const payer = input.contributedBy ?? ctx.actor.memberId!;
     const member = await findActiveMember(ctx.db, ctx.householdId, payer);
     if (!member) return fail("NOT_FOUND", "That member was not found.");

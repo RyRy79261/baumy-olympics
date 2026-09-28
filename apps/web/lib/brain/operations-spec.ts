@@ -30,7 +30,8 @@ const GATES: Record<Gate, string> = {
     "the member themself: brain counts as the member (the kiosk would need their PIN)",
   service:
     "the service token alone; the member comes from the code, so an unlinked sender may call it",
-  admin: "an admin in the app",
+  admin:
+    "a linked admin, in their own name only (a member gets 403 `FORBIDDEN`)",
   session: "a real session in the app",
   account: "a real session in the app",
 };

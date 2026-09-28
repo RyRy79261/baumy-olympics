@@ -41,6 +41,8 @@ export const ACTION_NAMES = [
   "list_chores",
   "log_completion",
   "manage_chore",
+  "create_bounty",
+  "update_bounty",
   "get_pending_confirmations",
   "confirm_completion",
   "dispute_completion",
@@ -87,7 +89,8 @@ export const ACTION_NAME_PATTERN = /^[a-z0-9_]{1,64}$/;
  *   `surfaces` includes "kiosk";
  * - `display`: `member`, or, for a read offered on the kiosk, the paired
  *   kiosk with nobody picked (the kitchen screen's hub widgets);
- * - `admin`: an admin with a real session;
+ * - `admin`: an admin with a real session, or brain speaking in a linked
+ *   admin's own name (issue #107);
  * - `attested`: the member themself (a session, MCP or brain is its own
  *   member; the kiosk must send that member's PIN with the request);
  * - `session`: a real cookie or bearer session, never the kiosk, MCP or brain;
@@ -190,7 +193,10 @@ export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
   consent: string;
   kind: ActionKind;
   risk: ActionRisk;
-  /** Admin-only actions are `["ui"]`. */
+  /**
+   * Admin-only actions are `["ui"]`, except the bounty and pot writes, which
+   * the AI command and brain may also propose (SPEC §12 decision 10).
+   */
   surfaces: readonly Surface[];
   /** A gate, or a function of the parsed input that picks one. */
   requires: Gate | ((ctx: RequestCtx, input: z.output<I>) => Gate);
