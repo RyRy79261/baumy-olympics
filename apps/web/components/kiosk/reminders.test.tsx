@@ -12,11 +12,13 @@ import {
 import { defaultAvatar } from "@baumy/types";
 import type { ListRemindersData, ReminderView } from "@/lib/actions/reminders";
 import { REMINDER_POLL_MS } from "@/lib/kiosk/constants";
+import { NIGHT_EVENT } from "@/lib/kiosk/night";
 
 // The kitchen screen's reminder overlay (ADR 0005 §4, issue #66): it shows
 // the oldest reminder, each face's tap acknowledges as that face, the last
 // one lingers for its tick and then goes, "Dismiss for everyone" asks who,
-// and a poll brings a reminder posted elsewhere.
+// a poll brings a reminder posted elsewhere (only away from home and while
+// awake), and a reminder coming up closes any open dialog.
 
 const seenAction = vi.fn();
 const dismissAction = vi.fn();
@@ -26,6 +28,10 @@ vi.mock("@/app/kiosk/reminder-actions", () => ({
   kioskDismissReminderAction: (f: FormData) => dismissAction(f),
   kioskRemindersAction: () => listAction(),
 }));
+
+// Which kiosk page is open: the home page refreshes itself.
+let pathname = "/kiosk/chores";
+vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 
 const { KioskReminders, SEEN_LINGER_MS } = await import("./reminders");
 
@@ -42,6 +48,7 @@ beforeEach(() => {
   seenAction.mockReset();
   dismissAction.mockReset();
   listAction.mockReset();
+  pathname = "/kiosk/chores";
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -201,6 +208,58 @@ describe("KioskReminders", () => {
     expect(div.querySelector('[role="alert"]')?.textContent).toBe(
       "That reminder has already been dismissed.",
     );
+  });
+
+  it("closes an open dialog (a PIN pad) when a reminder comes up", () => {
+    const dialog = document.createElement("dialog");
+    dialog.close = vi.fn(() => dialog.removeAttribute("open"));
+    dialog.setAttribute("open", "");
+    document.body.append(dialog);
+    mount({ ...DATA, reminders: [] });
+    expect(dialog.close).not.toHaveBeenCalled();
+    act(() => root!.render(<KioskReminders initial={DATA} />));
+    expect(title()).toBe("Handyman on Wednesday");
+    expect(dialog.close).toHaveBeenCalledOnce();
+    dialog.remove();
+  });
+
+  it("polls only away from home and while awake, and at once on waking", async () => {
+    const night = (asleep: boolean) =>
+      act(async () => {
+        window.dispatchEvent(
+          new CustomEvent(NIGHT_EVENT, { detail: { asleep } }),
+        );
+      });
+    listAction.mockResolvedValue({
+      ok: true,
+      data: { ...DATA, reminders: [] },
+    });
+    // Away from home: every minute.
+    mount({ ...DATA, reminders: [] });
+    await act(async () => {
+      vi.advanceTimersByTime(REMINDER_POLL_MS);
+    });
+    expect(listAction).toHaveBeenCalledTimes(1);
+    // Asleep: nothing; waking asks at once.
+    await night(true);
+    await act(async () => {
+      vi.advanceTimersByTime(3 * REMINDER_POLL_MS);
+    });
+    expect(listAction).toHaveBeenCalledTimes(1);
+    await night(false);
+    expect(listAction).toHaveBeenCalledTimes(2);
+    act(() => root!.unmount());
+    root = null;
+    div.remove();
+
+    // On the home page its own refresh brings them: no reads of our own.
+    pathname = "/kiosk";
+    listAction.mockClear();
+    mount({ ...DATA, reminders: [] });
+    await act(async () => {
+      vi.advanceTimersByTime(3 * REMINDER_POLL_MS);
+    });
+    expect(listAction).not.toHaveBeenCalled();
   });
 
   it("brings a reminder posted elsewhere on the next poll, and takes the shell's", async () => {

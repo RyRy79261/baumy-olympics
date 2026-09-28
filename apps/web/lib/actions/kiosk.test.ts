@@ -13,7 +13,6 @@ import {
   sessionActor,
 } from "@/test-utils/actions";
 import type { KioskActor } from "@/lib/auth";
-import { KIOSK_MEMBER_COOKIE } from "@/lib/kiosk/cookies";
 import type * as Selection from "@/lib/kiosk/selection";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 
@@ -23,10 +22,12 @@ import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 
 const getKioskActor = vi.fn<() => Promise<KioskActor | null>>();
 vi.mock("@/lib/auth", () => ({ getKioskActor: () => getKioskActor() }));
+// The kiosk's cookies, to prove a face's tap never changes who is picked.
 const setCookie = vi.fn();
+const removeCookie = vi.fn();
 vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-forwarded-for": "7.7.7.7" }),
-  cookies: async () => ({ set: setCookie }),
+  cookies: async () => ({ set: setCookie, delete: removeCookie }),
 }));
 // Picking reads through the HTTP driver; here it reads the test database.
 vi.mock("@/lib/kiosk/selection", async (importOriginal) => {
@@ -60,6 +61,7 @@ beforeAll(async () => {
 beforeEach(() => {
   getKioskActor.mockReset();
   setCookie.mockReset();
+  removeCookie.mockReset();
   __resetMemoryRateLimits();
 });
 
@@ -169,7 +171,7 @@ describe("kioskActionAsFace", () => {
     return r.data.reminderId;
   }
 
-  it("picks the tapped face and acknowledges as them, whoever was picked", async () => {
+  it("acknowledges as the tapped face, and leaves whoever was picked picked", async () => {
     const ryan = await seedMember(db(), { createdAt: before });
     const jo = await seedMember(db(), {
       displayName: "Jo",
@@ -196,11 +198,19 @@ describe("kioskActionAsFace", () => {
       ok: true,
       data: { reminderId, memberId: jo, seenByEveryone: false },
     });
-    expect(setCookie).toHaveBeenCalledWith(
-      KIOSK_MEMBER_COOKIE,
-      jo,
-      expect.objectContaining({ httpOnly: true }),
-    );
+    // The pick is not touched: Ryan is still the one acting, so Ryan's next
+    // tap is Ryan's, not Jo's.
+    expect(setCookie).not.toHaveBeenCalled();
+    expect(removeCookie).not.toHaveBeenCalled();
+    await expect(
+      kioskActionForm(
+        "acknowledge_reminder",
+        form({ reminderId, requestId: "req-face-0004" }),
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      data: { reminderId, memberId: ryan, seenByEveryone: true },
+    });
   });
 
   it("refuses a face that is not an active member, picking nobody", async () => {
