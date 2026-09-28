@@ -191,7 +191,12 @@ export function Screensaver({
               z
             </span>
           </span>
-          <BaumyCat state="sleeping" scale={3} facing="right" />
+          <BaumyCat
+            state="sleeping"
+            scale={3}
+            facing="right"
+            showMark={false}
+          />
         </span>
         <span className="block h-[12px] w-[200px] -translate-x-[40px] bg-[#3a2518] shadow-[0_4px_0_#1a0f0a]" />
       </span>

@@ -31,6 +31,9 @@ describe("Screensaver", () => {
     );
     expect(out).toContain("fixed inset-0");
     expect(out).toContain('data-state="sleeping"');
+    // Two floating z's, as in the prototype; not the cat's own mark too.
+    expect(out.match(/>z<\/span>/g)).toHaveLength(2);
+    expect(out).not.toContain("data-mark");
     expect(out).toContain("23:41");
     expect(out).toContain("Sunday 27 September · all quiet");
     expect(out).toContain("TAP ANYWHERE TO WAKE");

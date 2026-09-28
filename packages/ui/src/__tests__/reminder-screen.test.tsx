@@ -3,7 +3,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ReminderScreen, type ReminderFace } from "../reminder-screen";
+import { defaultAvatar } from "@baumy/types";
+import { SHIRT_COLOURS } from "../housemate";
+import {
+  ReminderScreen,
+  faceColour,
+  type ReminderFace,
+} from "../reminder-screen";
 
 // The kitchen screen's full-screen reminder (ADR 0005 §4): every face with
 // its own "I've seen it", the count, and "Dismiss for everyone", which asks
@@ -27,7 +33,6 @@ const FACES: ReminderFace[] = [
   {
     id: "m1",
     displayName: "Ryan",
-    color: "#4ff5e6",
     avatar: {
       hairStyle: "short",
       hairColor: "brown",
@@ -39,7 +44,6 @@ const FACES: ReminderFace[] = [
   {
     id: "m2",
     displayName: "Jo",
-    color: "#ff8fc7",
     avatar: null,
     seen: false,
   },
@@ -68,6 +72,15 @@ const button = (name: string) =>
   [...div.querySelectorAll("button")].find(
     (b) => (b.getAttribute("aria-label") ?? b.textContent) === name,
   );
+
+describe("faceColour", () => {
+  it("is the character's shirt, chosen or default, never members.color", () => {
+    expect(faceColour(FACES[0]!)).toBe(SHIRT_COLOURS.teal);
+    expect(faceColour(FACES[1]!)).toBe(
+      SHIRT_COLOURS[defaultAvatar("m2").shirtColor],
+    );
+  });
+});
 
 describe("ReminderScreen", () => {
   it("takes over the screen with the note, who posted it and the count", () => {
@@ -98,6 +111,9 @@ describe("ReminderScreen", () => {
     expect(out).toContain("I&#x27;ve seen it");
     expect(out).toContain("Dismiss for everyone");
     expect(out).toContain("everyone tap your face pls");
+    // Names and the seen card take the shirt colour.
+    expect(out).toContain(`color:${SHIRT_COLOURS.teal}`);
+    expect(out).toContain(`background:${SHIRT_COLOURS.teal}26`);
   });
 
   it("leaves the body out when there is none", () => {
@@ -151,6 +167,10 @@ describe("ReminderScreen", () => {
     const jo = [...chooser.querySelectorAll("button")].find(
       (b) => b.textContent === "Jo",
     )!;
+    // A long name is cut short, like on the face cards, in their colour.
+    expect(jo.className).toContain("truncate");
+    expect(jo.getAttribute("aria-label")).toBe("Jo");
+    expect(jo.style.color).not.toBe("");
     act(() => jo.click());
     expect(onDismissAs).toHaveBeenCalledWith("m2");
     act(() => button("Cancel")!.click());
