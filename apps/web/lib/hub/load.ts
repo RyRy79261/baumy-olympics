@@ -8,9 +8,11 @@ import type { ShoppingEntry } from "@/lib/integrations/brain";
 import { formatEuros, gapLabel } from "@/lib/scores/view";
 import {
   dueChores,
+  recentNoteCount,
   upcomingEvents,
   widgetState,
   type HubChore,
+  type HubCounts,
   type HubEvent,
   type WidgetState,
 } from "./view";
@@ -44,6 +46,8 @@ export interface HubData {
   /** The pot's total, "€80.50", or why it cannot be shown. */
   pot: { ok: true; total: string } | { ok: false; message: string };
   notes: WidgetState<NoteView[]>;
+  /** The Urgent, New and Messages counts (ADR 0005 §1). */
+  counts: HubCounts;
   /**
    * brain's shopping list. Ready even when empty: the widget's quick-add
    * field is there either way.
@@ -71,9 +75,9 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
     read(() => runAction("list_chores", {}, ctx)),
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
     read(() => runAction("get_pot", {}, ctx)),
-    read(() =>
-      runAction("list_notes", { pinnedOnly: true, limit: HUB_NOTES }, ctx),
-    ),
+    // Every note (pinned first): the pinned ones for the widget, the
+    // recent ones for the Messages count.
+    read(() => runAction("list_notes", {}, ctx)),
     read(() => runAction("list_shopping", {}, ctx)),
   ]);
   return {
@@ -105,9 +109,16 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
       : { ok: false, message: pot.message },
     notes: widgetState(
       notes,
-      (d) => d.notes,
-      "Nothing is pinned. Pin a note on the Notes page.",
+      (d) => d.notes.filter((n) => n.pinned).slice(0, HUB_NOTES),
+      "Nothing is pinned. Pin a note on the Board.",
     ),
+    counts: {
+      urgent: chores.ok
+        ? chores.data.chores.filter((c) => c.urgent).length
+        : null,
+      new: chores.ok ? chores.data.chores.filter((c) => c.isNew).length : null,
+      messages: notes.ok ? recentNoteCount(notes.data.notes, ctx.now) : null,
+    },
     shopping: shopping.ok
       ? { status: "ready", data: shopping.data.items }
       : { status: "unavailable", message: shopping.message },

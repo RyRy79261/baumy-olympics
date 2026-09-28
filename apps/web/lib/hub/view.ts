@@ -5,6 +5,7 @@ import {
   formatDateKey,
 } from "@baumy/core";
 import type { ChoreView } from "@/lib/actions/list-chores";
+import type { NoteView } from "@/lib/actions/notes";
 import type { ActionResult } from "@/lib/actions/result";
 import type { CalendarEventView } from "@/lib/calendar/view";
 import { streakLabel } from "@/lib/chores/view";
@@ -47,6 +48,8 @@ export interface HubEvent {
   /** "19:00–20:30", "All day", "Until 11:00" or "From 22:00". */
   time: string;
   location: string | null;
+  /** The member who added it in the app, for its colour; or null. */
+  addedBy: string | null;
 }
 
 function timeToday(e: CalendarEventView, today: string): string {
@@ -79,7 +82,23 @@ export function upcomingEvents(
       title: e.title,
       time: timeToday(e, today),
       location: e.location,
+      addedBy: e.addedBy,
     }));
+}
+
+/**
+ * An event's time as the agenda shows it: the start large, the end under it
+ * ("19:00–20:30" is "19:00" and "to 20:30"; "Until 11:00" is "Now" and
+ * "to 11:00"; "From 22:00" is "22:00" and "till late").
+ */
+export function agendaTime(time: string): { time: string; until?: string } {
+  const [from, to] = time.split("–");
+  if (to) return { time: from!, until: `to ${to}` };
+  if (time.startsWith("Until "))
+    return { time: "Now", until: `to ${time.slice(6)}` };
+  if (time.startsWith("From "))
+    return { time: time.slice(5), until: "till late" };
+  return { time };
 }
 
 /** How long a chore is due before the hub calls it overdue. */
@@ -89,11 +108,30 @@ export const OVERDUE_AFTER_MS = 24 * 60 * 60_000;
 export interface HubChore {
   id: string;
   name: string;
+  /** What `chores.sprite` stores, for its glyph. */
+  sprite: string;
+  /** Consumable or maintenance (ADR 0005 §2). */
+  kind: ChoreView["kind"];
+  /** Added in the last 3 days. */
+  isNew: boolean;
+  /** Base points, or null while it has none. */
+  points: number | null;
   /** "Due since Wed 30 Sep, 08:00", "Never done" or "Due at 18:00". */
   when: string;
   overdue: boolean;
   /** "Ryan · streak 3", or "No streak yet". */
   streak: string;
+}
+
+function bountyOf(c: ChoreView) {
+  return {
+    id: c.id,
+    name: c.name,
+    sprite: c.sprite,
+    kind: c.kind,
+    isNew: c.isNew,
+    points: c.basePoints,
+  };
 }
 
 /**
@@ -113,8 +151,7 @@ export function dueChores(chores: ChoreView[], now: Date): HubChore[] {
     .map((c): HubChore => {
       const since = c.dueAt ? Date.parse(c.dueAt) : null;
       return {
-        id: c.id,
-        name: c.name,
+        ...bountyOf(c),
         when:
           since === null
             ? "Never done"
@@ -129,8 +166,7 @@ export function dueChores(chores: ChoreView[], now: Date): HubChore[] {
     .filter((c) => c.state !== "due" && c.urgent)
     .sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!))
     .map((c): HubChore => ({
-      id: c.id,
-      name: c.name,
+      ...bountyOf(c),
       when: `Due at ${berlinTimeKey(new Date(c.dueAt!))}`,
       overdue: false,
       streak: streakLabel(c),
@@ -144,4 +180,27 @@ export function clockLines(now: Date): { time: string; date: string } {
     time: berlinTimeKey(now),
     date: formatDateKey(berlinDateKey(now)),
   };
+}
+
+/** How long a note counts as a new message (ADR 0005 §3). */
+export const MESSAGES_WINDOW_MS = 24 * 60 * 60_000;
+
+/**
+ * The hub's three counts (ADR 0005 §1): urgent bounties, new bounties, and
+ * messages, the notes created or changed in the last 24 hours. Null when
+ * the read behind it failed, so the tile says nothing rather than zero.
+ */
+export interface HubCounts {
+  urgent: number | null;
+  new: number | null;
+  messages: number | null;
+}
+
+/** How many notes were created or changed in the last 24 hours. */
+export function recentNoteCount(
+  notes: readonly Pick<NoteView, "updatedAt">[],
+  now: Date,
+): number {
+  const since = now.getTime() - MESSAGES_WINDOW_MS;
+  return notes.filter((n) => Date.parse(n.updatedAt) > since).length;
 }

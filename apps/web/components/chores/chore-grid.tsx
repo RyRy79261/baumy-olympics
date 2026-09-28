@@ -3,11 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  BountyList,
+  BountyRow,
   ChoiceGroup,
-  ChoreTile,
   Dialog,
   ScorePop,
   StreakBrokenBanner,
+  TabLabel,
+  tabClass,
+  type TabAccent,
 } from "@baumy/ui";
 import { AttestedForm } from "@/components/kiosk/attested-form";
 import { PhotoPicker } from "@/components/photos/photo-picker";
@@ -16,11 +20,21 @@ import type { FormAction } from "@/components/use-action-form";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
 import type { ActionResult } from "@/lib/actions/result";
-import { previewFor, statusLabel, streakLabel } from "@/lib/chores/view";
+import {
+  bountyCounts,
+  filterBounties,
+  previewFor,
+  sortBounties,
+  statusLabel,
+  streakLabel,
+  type BountyFilter,
+} from "@/lib/chores/view";
 import { toast } from "@/lib/ui/toast";
 
-// The chore grid (SPEC §3.2), the same on the phone (/chores) and on the
-// kiosk (acting as the member whose avatar was tapped). Tapping a tile opens
+// The bounty board (SPEC §3.2; ADR 0005 §2): chores presented as bounties,
+// the same on the phone (/chores) and on the kiosk (acting as the member
+// whose avatar was tapped). The urgent ones come first; one row of tabs
+// narrows the board to the urgent, the new, or one kind. Tapping a row opens
 // a sheet with the preview ("+25, streak 2") and a confirm button. Logging
 // for someone else is a choice in the sheet; on the kiosk it asks for the
 // LOGGER's PIN (AttestedForm), on a phone the session vouches.
@@ -35,6 +49,24 @@ export interface GridMember {
 }
 
 const POP_MS = 2500;
+
+/** The board's tabs, in order, each with its accent (ADR 0005 §8). */
+const TABS: { filter: BountyFilter; label: string; accent: TabAccent }[] = [
+  { filter: "all", label: "All", accent: "violet" },
+  { filter: "urgent", label: "Urgent", accent: "red" },
+  { filter: "new", label: "New", accent: "yellow" },
+  { filter: "consumable", label: "Consumables", accent: "amber" },
+  { filter: "maintenance", label: "Maintenance", accent: "teal" },
+];
+
+/** What the board says when a tab keeps nothing. */
+const EMPTY: Record<BountyFilter, string> = {
+  all: "",
+  urgent: "Nothing is urgent. Baumy approves.",
+  new: "No new bounties this week.",
+  consumable: "No consumables to buy or refill.",
+  maintenance: "No maintenance bounties.",
+};
 const BANNER_MS = 6000;
 
 export function ChoreGrid({
@@ -42,6 +74,7 @@ export function ChoreGrid({
   members,
   actorId,
   kiosk = false,
+  initialFilter = "all",
   action,
 }: {
   chores: ChoreView[];
@@ -49,8 +82,11 @@ export function ChoreGrid({
   /** The member acting: the signed-in one, or the kiosk's picked avatar. */
   actorId: string;
   kiosk?: boolean;
+  /** The tab to start on (the hub's Urgent and New tiles link to theirs). */
+  initialFilter?: BountyFilter;
   action: FormAction<LogCompletionData>;
 }) {
+  const [filter, setFilter] = useState<BountyFilter>(initialFilter);
   const [openId, setOpenId] = useState<string | null>(null);
   const [doneBy, setDoneBy] = useState(actorId);
   const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
@@ -116,10 +152,13 @@ export function ChoreGrid({
     setBroken(d.brokenLen !== null ? d : null);
   }
 
+  const counts = bountyCounts(chores);
+  const shown = filterBounties(sortBounties(chores), filter);
+
   if (chores.length === 0) {
     return (
       <p className="text-sm text-bm-muted">
-        No chores yet. An admin can add them under Edit chores.
+        No bounties yet. An admin can add them under Edit chores.
       </p>
     );
   }
@@ -137,23 +176,46 @@ export function ChoreGrid({
       ) : null}
       {pop ? <ScorePop key={pop.key} points={pop.points} /> : null}
 
-      <ul
-        className={
-          kiosk
-            ? "grid grid-cols-2 gap-3"
-            : "grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        }
-        aria-label="Chores"
+      <div
+        role="group"
+        aria-label="Show"
+        className="mb-2 flex flex-wrap gap-2"
+        data-testid="bounty-tabs"
       >
-        {chores.map((c) => (
+        {TABS.map((t) => {
+          const on = t.filter === filter;
+          return (
+            <button
+              key={t.filter}
+              type="button"
+              aria-pressed={on}
+              data-tab={t.filter}
+              className={tabClass(on, t.accent, kiosk)}
+              onClick={() => setFilter(t.filter)}
+            >
+              <TabLabel
+                label={t.label}
+                count={counts[t.filter]}
+                on={on}
+                accent={t.accent}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      <BountyList aria-label="Bounties">
+        {shown.map((c) => (
           <li key={c.id} data-testid={`chore-${c.name}`}>
-            <ChoreTile
+            <BountyRow
               name={c.name}
               sprite={c.sprite}
+              kind={c.kind}
               points={c.basePoints}
               streak={streakLabel(c)}
               status={statusLabel(c)}
-              state={c.state}
+              urgent={c.urgent}
+              isNew={c.isNew}
               kiosk={kiosk}
               disabled={c.state === "unavailable"}
               onClick={() => {
@@ -164,7 +226,12 @@ export function ChoreGrid({
             />
           </li>
         ))}
-      </ul>
+      </BountyList>
+      {shown.length === 0 ? (
+        <p className="py-10 text-center text-xl text-bm-muted">
+          {EMPTY[filter]}
+        </p>
+      ) : null}
 
       <Dialog
         open={open !== null}

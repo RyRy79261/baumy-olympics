@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  HOUSE_EVENT_ACCENT,
+  eventAccent,
   eventView,
   eventsOnDay,
   isOnDay,
@@ -179,5 +181,17 @@ describe("parseViewParams", () => {
       "Week",
       "Month",
     ]);
+  });
+});
+
+describe("eventAccent", () => {
+  const colors = { ryan: "#3b82c4", odd: "red; background: url(x)" };
+  it("is the adding member's colour, else the house's", () => {
+    expect(eventAccent({ addedBy: "ryan" }, colors)).toBe("#3b82c4");
+    expect(eventAccent({ addedBy: null }, colors)).toBe(HOUSE_EVENT_ACCENT);
+    expect(eventAccent({ addedBy: "gone" }, colors)).toBe(HOUSE_EVENT_ACCENT);
+  });
+  it("never puts anything but #rrggbb into a style", () => {
+    expect(eventAccent({ addedBy: "odd" }, colors)).toBe(HOUSE_EVENT_ACCENT);
   });
 });

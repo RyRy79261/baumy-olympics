@@ -93,7 +93,13 @@ describe("loadHub", () => {
     expect(hub.events).toEqual({
       status: "ready",
       data: [
-        { id: "dinner", title: "Dinner", time: "19:00–20:00", location: null },
+        {
+          id: "dinner",
+          title: "Dinner",
+          time: "19:00–20:00",
+          location: null,
+          addedBy: null,
+        },
       ],
     });
     expect(hub.chores).toMatchObject({
@@ -117,6 +123,26 @@ describe("loadHub", () => {
       status: "ready",
       data: [{ id: pinned.ok && pinned.data.note.id, title: "Wifi" }],
     });
+    // Trash was never done, so it is urgent; both notes are from today.
+    expect(hub.counts).toMatchObject({ urgent: 1, messages: 2 });
+    expect(hub.counts.new).toEqual(expect.any(Number));
+  });
+
+  it("counts nothing for a tile whose read failed", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const registry = await import("@/lib/actions/registry");
+    const real = registry.runAction;
+    vi.spyOn(registry, "runAction").mockImplementation(((
+      name: string,
+      input: unknown,
+      ctx: never,
+    ) =>
+      name === "list_chores" || name === "list_notes"
+        ? Promise.reject(new Error("boom"))
+        : real(name, input, ctx)) as never);
+    const hub = await loadHub(ctxFor(sessionActor(ryan)));
+    expect(hub.counts).toEqual({ urgent: null, new: null, messages: null });
+    expect(hub.standings.status).toBe("ready");
   });
 
   it("shows brain's shopping list, empty or not", async () => {
@@ -170,7 +196,7 @@ describe("loadHub", () => {
     });
     expect(hub.notes).toEqual({
       status: "empty",
-      message: "Nothing is pinned. Pin a note on the Notes page.",
+      message: "Nothing is pinned. Pin a note on the Board.",
     });
   });
 
