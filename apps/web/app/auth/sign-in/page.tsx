@@ -6,6 +6,7 @@ import {
   isGoogleConfigured,
   resolvePasskeyScope,
 } from "@baumy/auth/env";
+import { LegalLinks } from "@/components/legal/legal-page";
 import { redirectIfSignedIn } from "@/lib/auth";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { SignInForm, type LastLoginMethod } from "./sign-in-form";
@@ -39,6 +40,7 @@ export default async function SignInPage({
         oauthFailed={Boolean(error)}
         callbackURL={next}
       />
+      <LegalLinks />
     </AuthFrame>
   );
 }

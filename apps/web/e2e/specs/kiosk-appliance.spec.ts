@@ -77,6 +77,15 @@ test("the manifest installs /kiosk full screen in portrait, with icons", async (
     const img = await page.request.get(icon.src);
     expect(img.status(), icon.src).toBe(200);
     expect(img.headers()["content-type"], icon.src).toBe("image/png");
+    // The Baumy badge (issue #81) at the size the manifest promises: the
+    // PNG header's width and height.
+    const png = await img.body();
+    const side = Number(icon.sizes.split("x")[0]);
+    expect(png.subarray(1, 4).toString("ascii"), icon.src).toBe("PNG");
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)], icon.src).toEqual([
+      side,
+      side,
+    ]);
   }
 
   // Every page links the manifest and the iPad's home-screen icon.

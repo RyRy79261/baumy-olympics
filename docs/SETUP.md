@@ -347,6 +347,13 @@ nobody is signed in (CI checks this against the real build).
       and `GOOGLE_CLIENT_SECRET` (Production scope). The button only appears
       when both are set. Previews cannot finish a Google sign-in (Google only
       calls back registered URIs); use email and password there.
+- [ ] **The consent screen's logo (optional).** Google Cloud Console →
+      Google Auth Platform → Branding → App logo: upload
+      `design/logo/baumy-badge-120.png` (120×120, the size Google asks for).
+      Adding a logo makes Google want to verify the app's branding before
+      the logo shows to anyone outside it; an app left in **Testing** (with
+      the housemates added as test users) skips that, so skip the logo or
+      stay in Testing unless you mean to go through verification.
 - [ ] **Never set** `AUTH_EMAIL_CAPTURE_FILE`, `AUTH_RATE_LIMIT_WINDOW_SECONDS`
       or `AUTH_RATE_LIMIT_MAX` on Vercel. All three are ignored
       there anyway; they exist only for the e2e harness.

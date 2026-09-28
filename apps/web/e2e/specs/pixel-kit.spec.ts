@@ -81,7 +81,7 @@ test("Baumy's frames play, and stand still under reduced motion", async ({
   expect((await animation()).name).toBe("none");
 });
 
-test("the hub shell: Baumy by the brand, the page you are on framed", async ({
+test("the hub shell: the Baumy badge by the brand, the page you are on framed", async ({
   page,
 }, testInfo) => {
   await founderAdmin(page, testInfo.project.name);
@@ -90,7 +90,11 @@ test("the hub shell: Baumy by the brand, the page you are on framed", async ({
     await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
   ).toBe(PLUM);
   const header = page.locator("header").first();
-  await expect(header.locator('[data-sprite="baumy"]')).toHaveCount(1);
+  // The brand mark is the app icon's badge (issue #81).
+  await expect(header.locator('[data-sprite="baumy-badge"]')).toHaveCount(1);
+  await expect(
+    header.locator('[data-sprite="baumy-badge"] svg'),
+  ).toHaveAttribute("viewBox", "0 0 40 40");
   const nav = page.getByRole("navigation", { name: "Main" });
   const current = nav.locator('[aria-current="page"]');
   await expect(current).toHaveText("Bounties");
