@@ -100,6 +100,10 @@ describe("BaumyButton", () => {
     expect(out).toContain("bg-bm-raised");
     // 34 x 32 art pixels at scale 3: a target far past 64px.
     expect(out).toContain("width:102px;height:96px");
+    // 2x on a phone: 68 x 64, the 3x cat hidden there and vice versa.
+    expect(out).toContain("width:68px;height:64px");
+    expect(out).toMatch(/data-sprite="baumy"[^>]*class="[^"]*sm:hidden/);
+    expect(out).toMatch(/data-sprite="baumy"[^>]*class="[^"]*max-sm:hidden/);
     expect(out).toContain('data-state="listening"');
   });
 

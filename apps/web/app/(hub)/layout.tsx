@@ -7,7 +7,7 @@ import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
-import { HubMenu, NavLinks, type NavItem } from "./nav-links";
+import { HubMenu, InboxBadge, NavLinks, type NavItem } from "./nav-links";
 
 // The hub's shell (SPEC §7) around every page for household members. The
 // gate here is for the frame; each page runs its own gate too, because a
@@ -33,8 +33,8 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     (await uiRequestCtx(undefined))!,
   );
   const waiting = pending.ok ? pending.data.needsYouCount : 0;
-  // The main pages sit in one row; Admin and the account fold into menus
-  // (issue #64), so the header stays one row on a laptop.
+  // The main pages are the nav; Admin and the account fold into menus
+  // (issue #64), so the header is one row on a laptop.
   const items: NavItem[] = [
     { href: "/", label: "Hub" },
     { href: "/chores", label: "Chores" },
@@ -43,10 +43,11 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     { href: "/shopping", label: "Shopping" },
     { href: "/scores", label: "Scores" },
     { href: "/pot", label: "Pot" },
-    {
-      href: "/inbox",
-      label: waiting > 0 ? `Needs your OK (${waiting})` : "Needs your OK",
-    },
+    // With claims waiting, the inbox is pinned as a badge in the top row
+    // instead, so the count is seen at every width.
+    ...(waiting > 0
+      ? []
+      : ([{ href: "/inbox", label: "Needs your OK" }] as NavItem[])),
   ];
   const admin: NavItem[] = [
     { href: "/admin/members", label: "Members" },
@@ -59,6 +60,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
       nav={<NavLinks items={items} />}
       user={
         <>
+          {waiting > 0 ? <InboxBadge waiting={waiting} /> : null}
           {me.role === "admin" ? (
             <HubMenu label="Admin" items={admin} data-testid="admin-menu" />
           ) : null}

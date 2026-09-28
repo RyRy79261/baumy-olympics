@@ -6,9 +6,10 @@ import { cx } from "./cx";
 
 // A menu in the hub header (issue #64): a nav-styled button that opens a
 // pixel-framed panel of links under it. The hub keeps its main pages in the
-// one-row nav and folds the rest (Admin, the account) into these. It closes
-// on Escape, on a press outside, and when `closeKey` changes (the app passes
-// the path, so following a link closes it).
+// nav and folds the rest (Admin, the account) into these. It closes on
+// Escape (focus goes back to its button), on a press outside, when focus
+// leaves it (tabbing past the last link), and when `closeKey` changes (the
+// app passes the path, so following a link closes it).
 
 export function NavMenu({
   label,
@@ -28,6 +29,7 @@ export function NavMenu({
   const [openAt, setOpenAt] = useState<string | null>(null);
   const open = openAt === closeKey;
   const ref = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -35,7 +37,9 @@ export function NavMenu({
       if (!ref.current?.contains(e.target as Node)) setOpenAt(null);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenAt(null);
+      if (e.key !== "Escape") return;
+      setOpenAt(null);
+      trigger.current?.focus();
     };
     document.addEventListener("pointerdown", onPress);
     document.addEventListener("keydown", onKey);
@@ -46,8 +50,18 @@ export function NavMenu({
   }, [open]);
 
   return (
-    <div ref={ref} className="relative" data-testid={testId}>
+    <div
+      ref={ref}
+      className="relative"
+      data-testid={testId}
+      onBlur={(e) => {
+        // Focus moved somewhere outside the menu and its button.
+        const next = e.relatedTarget as Node | null;
+        if (open && next && !ref.current?.contains(next)) setOpenAt(null);
+      }}
+    >
       <button
+        ref={trigger}
         type="button"
         aria-expanded={open}
         onClick={() => setOpenAt(open ? null : closeKey)}

@@ -4,7 +4,7 @@
 // the approved prototype's (proto/kiosk-home-pixel): Baumy is Camp 404's
 // INKBLOT cat through Scale2x, and new glyphs go into pixel/glyphs.ts.
 
-export { AppShell, navItemClass } from "./app-shell";
+export { AppShell, navBadgeClass, navItemClass } from "./app-shell";
 export { NavMenu } from "./nav-menu";
 export { AuthFrame, linkClass } from "./auth-frame";
 export { ProposalItem, SpeechBubble, type ProposalState } from "./baumy";
