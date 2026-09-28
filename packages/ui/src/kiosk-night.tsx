@@ -1,61 +1,8 @@
 import type { ReactNode } from "react";
-import { cx } from "./cx";
-import { BaumyCat } from "./baumy-cat";
 
-// The kiosk's always-on pieces in the pixel kit (SPEC §8, issue #29; ADR
-// 0005 §6): the night screen (a dim night room with a sleeping Baumy and a
-// big dim clock), and a one-line notice for the idle countdown or a screen
-// that may go to sleep.
-
-/**
- * Night mode: the whole screen dims to a sleeping Baumy and a clock. It is
- * one big button, so a touch anywhere wakes the screen and never lands on
- * whatever is underneath.
- */
-export function NightScreen({
-  time,
-  date,
-  onWake,
-}: {
-  /** "23:41". */
-  time: string;
-  /** "Sunday 27 September". */
-  date: string;
-  onWake: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid="night-screen"
-      aria-label={`Night mode, ${time}. Touch to wake the screen.`}
-      onClick={onWake}
-      className={cx(
-        "fixed inset-0 z-50 flex h-dvh w-screen touch-manipulation flex-col items-center justify-center gap-8",
-        "bg-[linear-gradient(180deg,#07040c_0%,#120a1d_60%,#1a0d18_100%)] text-[#3d2d57]",
-        "focus-visible:outline-4 focus-visible:-outline-offset-8 focus-visible:outline-bm-dim",
-      )}
-    >
-      <BaumyCat
-        state="sleeping"
-        scale={4}
-        label="Baumy is asleep"
-        className="opacity-70"
-      />
-      <span className="flex flex-col items-center">
-        <span
-          data-testid="night-time"
-          className="font-display text-7xl text-[#3d2d57] [text-shadow:0_0_30px_rgb(143_125_255/0.2)] sm:text-8xl"
-        >
-          {time}
-        </span>
-        <span className="mt-4 font-label text-xl font-bold text-[#3d2d57] uppercase">
-          {date}
-        </span>
-      </span>
-      <span className="font-display text-base text-bm-dim">Touch to wake</span>
-    </button>
-  );
-}
+// The kiosk's always-on pieces in the pixel kit (SPEC §8, issue #29): a
+// one-line notice for the idle countdown or a screen that may go to sleep.
+// The night screen is the Screensaver now (screensaver.tsx, ADR 0005 §6).
 
 /**
  * A short notice pinned to the bottom of the kiosk (a polite live region):

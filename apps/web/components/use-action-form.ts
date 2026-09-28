@@ -13,7 +13,7 @@ export type FormAction<T> = (
   form: FormData,
 ) => Promise<ActionResult<T>>;
 
-function newRequestId(): string {
+export function newRequestId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }

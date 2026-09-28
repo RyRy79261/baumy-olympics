@@ -156,6 +156,10 @@ describe("KioskModal", () => {
     expect(onClose).not.toHaveBeenCalled();
     await act(async () => dialog.click());
     expect(onClose).toHaveBeenCalledTimes(1);
+    // Closed from outside (a reminder coming up closes every open dialog):
+    // it reports the close, so the page's state follows and it stays shut.
+    await act(async () => dialog.close());
+    expect(onClose).toHaveBeenCalledTimes(2);
 
     await act(async () =>
       root!.render(

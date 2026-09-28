@@ -4,10 +4,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { KioskShell } from "../kiosk-shell";
-import { KioskIndicator, KioskNotice, NightScreen } from "../kiosk-night";
+import { KioskIndicator, KioskNotice } from "../kiosk-night";
+import { SCREENSAVER_ART, Screensaver } from "../screensaver";
 
-// The kiosk's always-on pieces (SPEC §8, issue #29): the night screen wakes
-// on a touch anywhere, the notice is a polite live region, and the shell
+// The kiosk's always-on pieces (SPEC §8, issue #29; ADR 0005 §6): the
+// screensaver wakes on a touch anywhere, the notice is a polite live region, and the shell
 // carries its time-of-day skin for issue #7 to theme.
 
 beforeAll(() => {
@@ -23,17 +24,33 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("NightScreen", () => {
-  it("covers the screen with a sleeping Baumy and the clock", () => {
+describe("Screensaver", () => {
+  it("covers the screen with the night room, the clock and a sleeping Baumy", () => {
     const out = renderToStaticMarkup(
-      <NightScreen time="23:41" date="Sunday 27 September" onWake={() => {}} />,
+      <Screensaver time="23:41" date="Sunday 27 September" onWake={() => {}} />,
     );
     expect(out).toContain("fixed inset-0");
     expect(out).toContain('data-state="sleeping"');
+    // Two floating z's, as in the prototype; not the cat's own mark too.
+    expect(out.match(/>z<\/span>/g)).toHaveLength(2);
+    expect(out).not.toContain("data-mark");
     expect(out).toContain("23:41");
-    expect(out).toContain("Sunday 27 September");
-    expect(out).toContain("Touch to wake");
+    expect(out).toContain("Sunday 27 September · all quiet");
+    expect(out).toContain("TAP ANYWHERE TO WAKE");
     expect(out).toContain('type="button"');
+    // The three raccoons: into the bin, off with a sock, pushing a box.
+    for (const r of ["bin", "sock", "box"]) {
+      expect(out).toContain(`data-raccoon="${r}"`);
+    }
+    expect(out.match(/data-light/g)).toHaveLength(16);
+    expect(out).toContain("@keyframes bm-ss-run");
+  });
+
+  it("draws the floor clutter from its own grids", () => {
+    for (const grid of Object.values(SCREENSAVER_ART)) {
+      const width = grid[0]!.length;
+      expect(grid.every((row) => row.length === width)).toBe(true);
+    }
   });
 
   it("wakes on a tap, and only on the tap's click", () => {
@@ -42,9 +59,12 @@ describe("NightScreen", () => {
     document.body.append(div);
     root = createRoot(div);
     act(() =>
-      root!.render(<NightScreen time="01:00" date="d" onWake={onWake} />),
+      root!.render(<Screensaver time="01:00" date="d" onWake={onWake} />),
     );
     const screen = div.querySelector("button")!;
+    expect(screen.getAttribute("aria-label")).toBe(
+      "Screensaver, 01:00. Tap anywhere to wake the screen.",
+    );
     act(() => {
       screen.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     });

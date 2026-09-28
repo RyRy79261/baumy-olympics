@@ -11,7 +11,6 @@ import { BaumySheet } from "@/components/baumy/baumy-sheet";
 import { IdleReset } from "@/components/kiosk/idle-reset";
 import { KeepScreenOn } from "@/components/kiosk/keep-screen-on";
 import { KioskFrame, KioskNav } from "@/components/kiosk/kiosk-frame";
-import { NightMode } from "@/components/kiosk/night-mode";
 import { KioskOverlays } from "@/components/kiosk/overlays";
 import { RegisterServiceWorker } from "@/components/kiosk/service-worker";
 import { getKioskActor } from "@/lib/auth";
@@ -31,7 +30,7 @@ import { clearPickAction, pickMemberAction } from "../actions";
 // with Baumy standing over its right end, and the other pages have the
 // avatar bar on top. Tapping an avatar (there, or in Baumy's bubble or sheet) makes
 // that member the one acting; 60 seconds idle forgets them and goes home.
-// It holds the screen wake lock, sleeps at night (issue #29) and registers
+// It holds the screen wake lock (issue #29) and registers
 // the offline page's service worker. An unpaired or revoked device is sent
 // to /kiosk/pair. Nothing here links to the hub or to admin pages, and
 // admin actions refuse the kiosk anyway. Full-screen overlays (issue #66's
@@ -115,9 +114,10 @@ export default async function KioskLayout({
       </KioskFrame>
       <KeepScreenOn />
       <IdleReset memberPicked={Boolean(kiosk.memberId)} />
-      <NightMode serverNow={at.toISOString()} window={night} />
+      {/* Issue #66: the full-screen reminder and the raccoon screensaver
+          (at night, and after 5 minutes untouched), over every page. */}
+      <KioskOverlays serverNow={at.toISOString()} window={night} />
       <RegisterServiceWorker />
-      <KioskOverlays />
     </KioskShell>
   );
 }

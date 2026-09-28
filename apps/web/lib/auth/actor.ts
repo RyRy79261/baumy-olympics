@@ -68,6 +68,11 @@ export interface MemberActor {
   role?: MemberRole;
   /** The member's display name, with `memberId`. */
   displayName?: string;
+  /**
+   * The member's 16-bit character (`members.avatar`, null until chosen),
+   * with `memberId`: the hub header and Settings draw it.
+   */
+  avatar?: unknown;
 }
 
 /**
@@ -149,6 +154,7 @@ export const getActor = cache(async (): Promise<Actor | null> => {
               memberId: member.id,
               role: member.role,
               displayName: member.displayName,
+              avatar: member.avatar,
             }
           : {}),
       };
