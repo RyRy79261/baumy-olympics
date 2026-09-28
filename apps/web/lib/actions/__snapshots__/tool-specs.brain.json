@@ -38,7 +38,7 @@
   {
     "name": "list_chores",
     "title": "List chores",
-    "description": "Lists the household's chores with their ids, base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
+    "description": "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (due now or falling due before midnight in Berlin), `isNew` (added in the last 3 days), and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -655,5 +655,92 @@
     },
     "kind": "read",
     "risk": "safe"
+  },
+  {
+    "name": "list_reminders",
+    "title": "Reminders",
+    "description": "Lists the household's active reminders (posted, and neither dismissed nor seen by every member yet), the oldest first, each with its id, title, body, who posted it, when (ISO 8601, UTC), the member ids who have seen it and those still to see it; and the active members (id, name, colour, character).",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "kind": "read",
+    "risk": "safe"
+  },
+  {
+    "name": "create_reminder",
+    "title": "Post a reminder",
+    "description": "Posts a reminder for the whole household: a short title and an optional plain-text body of a sentence or two. The kitchen screen shows it full-screen until every member has tapped Seen, or someone dismisses it. For things everyone must read (a tradesperson coming, the water off), not for chores or notes.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "A short headline, e.g. \"Handyman on Wednesday\"."
+        },
+        "body": {
+          "description": "A sentence or two of detail, as plain text. Optional.",
+          "type": "string",
+          "maxLength": 280
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "safe"
+  },
+  {
+    "name": "acknowledge_reminder",
+    "title": "Mark a reminder seen",
+    "description": "Records that you have read a reminder. Once every member has, it leaves the kitchen screen for good. Seeing it twice changes nothing.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reminderId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The reminder's id, from list_reminders."
+        }
+      },
+      "required": [
+        "reminderId"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "safe"
+  },
+  {
+    "name": "dismiss_reminder",
+    "title": "Dismiss a reminder",
+    "description": "Takes a reminder off the kitchen screen for everyone, whether or not everyone has seen it. Ask first.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reminderId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The reminder's id, from list_reminders."
+        }
+      },
+      "required": [
+        "reminderId"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "confirm"
   }
 ]

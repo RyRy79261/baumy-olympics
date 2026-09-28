@@ -6,13 +6,18 @@ import {
   type ChoreDueState,
 } from "@baumy/core";
 import { listChoreBoard } from "@baumy/db/chores";
-import type { ConfirmMode, ProofMode } from "@baumy/types";
+import type { ChoreKind, ConfirmMode, ProofMode } from "@baumy/types";
+import { isNewChore, isUrgent } from "@/lib/chores/urgency";
 import { defineAction } from "./define";
 
 // The chore grid (SPEC §3.1, §3.2), on every surface: each chore with its
 // points, who holds its streak and for how long, whether it is due, and what
 // logging it now would score for the member asking. The AI reads it to find
 // chore ids; the grid builds its tiles and previews from it.
+//
+// The kitchen screen shows chores as bounties (ADR 0005): each has a kind,
+// and `urgent` and `isNew` (lib/chores/urgency.ts) are what its Urgent and
+// New icons count.
 
 /** What logging a chore now would score (`nextScore` in packages/core). */
 export interface NextScoreView {
@@ -28,6 +33,8 @@ export interface ChoreView {
   id: string;
   name: string;
   sprite: string;
+  /** Consumable (buy or refill) or maintenance (clean or fix). */
+  kind: ChoreKind;
   proofMode: ProofMode;
   confirmMode: ConfirmMode;
   effortFactorPct: number;
@@ -43,6 +50,10 @@ export interface ChoreView {
   state: ChoreDueState | "unavailable";
   availableAt: string | null;
   dueAt: string | null;
+  /** Due now, or falling due before Berlin midnight (`isUrgent`). */
+  urgent: boolean;
+  /** Created in the last 3 days (`NEW_BOUNTY_MS`). */
+  isNew: boolean;
   /**
    * For the member asking; null when the chore cannot be scored now, or when
    * nobody is asking (the kitchen screen before anyone taps in).
@@ -60,7 +71,7 @@ export const listChores = defineAction({
   name: "list_chores",
   title: "List chores",
   description:
-    "Lists the household's chores with their ids, base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
+    "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (due now or falling due before midnight in Berlin), `isNew` (added in the last 3 days), and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
   consent: "See the household's chores, streaks and points",
   kind: "read",
   risk: "safe",
@@ -97,10 +108,13 @@ export const listChores = defineAction({
         const scorable = c.rule !== null && c.archivedAt === null;
         const next =
           scorable && me ? nextScore(c.rule!.basePoints, c.streak, me) : null;
+        const state = scorable && timing ? timing.state : "unavailable";
+        const dueAt = iso(timing?.dueAt ?? null);
         return {
           id: c.id,
           name: c.name,
           sprite: c.sprite,
+          kind: c.kind,
           proofMode: c.proofMode,
           confirmMode: c.confirmMode,
           effortFactorPct: c.effortFactorPct,
@@ -110,9 +124,11 @@ export const listChores = defineAction({
           intervalMinutes: interval,
           streak: c.streak,
           lastDoneAt: iso(c.lastDoneAt),
-          state: scorable && timing ? timing.state : "unavailable",
+          state,
           availableAt: iso(timing?.availableAt ?? null),
-          dueAt: iso(timing?.dueAt ?? null),
+          dueAt,
+          urgent: isUrgent({ state, dueAt }, ctx.now),
+          isNew: isNewChore(c.createdAt, ctx.now),
           next: next
             ? {
                 totalPts: next.totalPts,

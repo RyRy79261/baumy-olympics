@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   BasePoints,
+  CHORE_KINDS,
   CHORE_NAME_MAX,
+  ChoreKind,
   COMPLETION_NOTE_MAX,
   ChoreName,
   CompletionNote,
@@ -33,6 +35,16 @@ describe("modes", () => {
     expect(ProofMode.options).toEqual(["none", "optional", "required"]);
     expect(ConfirmMode.options).toEqual(["optimistic", "partner"]);
     expect(ProofMode.safeParse("always").success).toBe(false);
+  });
+});
+
+describe("ChoreKind", () => {
+  it("is consumable or maintenance, the chore_kind pg enum", () => {
+    expect(ChoreKind.options).toEqual([...CHORE_KINDS]);
+    expect(CHORE_KINDS).toEqual(["consumable", "maintenance"]);
+    expect(ChoreKind.safeParse("errand").error?.issues[0]?.message).toBe(
+      "Pick consumable or maintenance.",
+    );
   });
 });
 

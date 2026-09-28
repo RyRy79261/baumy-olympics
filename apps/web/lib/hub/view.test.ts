@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChoreView } from "@/lib/actions/list-chores";
+import { isUrgent } from "@/lib/chores/urgency";
 import { eventView } from "@/lib/calendar/view";
 import {
   HUB_EVENTS,
@@ -96,11 +97,13 @@ describe("upcomingEvents", () => {
   });
 });
 
+/** A chore as list_chores returns it: `urgent` is computed the same way. */
 function chore(over: Partial<ChoreView>): ChoreView {
-  return {
+  const c: ChoreView = {
     id: over.name ?? "c",
     name: "c",
     sprite: "broom",
+    kind: "maintenance",
     proofMode: "none",
     confirmMode: "optimistic",
     effortFactorPct: 100,
@@ -113,9 +116,12 @@ function chore(over: Partial<ChoreView>): ChoreView {
     state: "due",
     availableAt: null,
     dueAt: null,
+    urgent: false,
+    isNew: false,
     next: null,
     ...over,
   };
+  return { ...c, urgent: over.urgent ?? isUrgent(c, NOW) };
 }
 
 describe("dueChores", () => {
@@ -154,6 +160,12 @@ describe("dueChores", () => {
     expect(list[3]!.streak).toBe("Ryan · streak 3");
     expect(list[4]).toMatchObject({ when: "Due at 14:00", overdue: false });
     expect(list[5]!.when).toBe("Due at 15:00");
+  });
+
+  it("lists a chore that is not due yet exactly when list_chores calls it urgent", () => {
+    const soon = { name: "Soon", state: "done", dueAt: iso(3) } as const;
+    expect(dueChores([chore(soon)], NOW).map((c) => c.name)).toEqual(["Soon"]);
+    expect(dueChores([chore({ ...soon, urgent: false })], NOW)).toEqual([]);
   });
 
   it("calls a chore overdue after a day of being due", () => {

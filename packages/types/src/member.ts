@@ -39,6 +39,97 @@ export const AvatarSprite = z.enum(AVATAR_SPRITES, {
 });
 export type AvatarSprite = z.infer<typeof AvatarSprite>;
 
+/**
+ * A member's 16-bit character (ADR 0005 §5), stored in `members.avatar` as
+ * the ids below. The art (issue #7's kit) decides what each id looks like,
+ * so the palette can change without a data migration.
+ */
+export const AVATAR_HAIR_STYLES = ["short", "long", "spiky", "bob"] as const;
+export const AVATAR_HAIR_COLORS = [
+  "brown",
+  "auburn",
+  "black",
+  "platinum",
+  "blonde",
+] as const;
+export const AVATAR_SKIN_TONES = [
+  "pale",
+  "light",
+  "tan",
+  "brown",
+  "deep",
+] as const;
+export const AVATAR_SHIRT_COLORS = [
+  "teal",
+  "pink",
+  "yellow",
+  "violet",
+  "amber",
+  "green",
+] as const;
+
+export const AvatarHairStyle = z.enum(AVATAR_HAIR_STYLES, {
+  error: "Pick one of the hair styles.",
+});
+export const AvatarHairColor = z.enum(AVATAR_HAIR_COLORS, {
+  error: "Pick one of the hair colours.",
+});
+export const AvatarSkinTone = z.enum(AVATAR_SKIN_TONES, {
+  error: "Pick one of the skin tones.",
+});
+export const AvatarShirtColor = z.enum(AVATAR_SHIRT_COLORS, {
+  error: "Pick one of the shirt colours.",
+});
+
+/** A whole character: what `update_avatar` takes and `members.avatar` holds. */
+export const MemberAvatar = z.strictObject({
+  hairStyle: AvatarHairStyle.describe("The hair style."),
+  hairColor: AvatarHairColor.describe("The hair colour."),
+  skinTone: AvatarSkinTone.describe("The skin tone."),
+  shirtColor: AvatarShirtColor.describe("The shirt colour."),
+});
+export type MemberAvatar = z.infer<typeof MemberAvatar>;
+
+/** A small, stable hash of a string (FNV-1a), for picking defaults. */
+function fnv1a(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h;
+}
+
+function pick<T>(options: readonly T[], seed: number): T {
+  return options[seed % options.length]!;
+}
+
+/**
+ * The character a member has until they choose one: picked from their id,
+ * so it never changes and housemates usually differ. Nobody has to choose.
+ */
+export function defaultAvatar(memberId: string): MemberAvatar {
+  const h = fnv1a(memberId);
+  return {
+    hairStyle: pick(AVATAR_HAIR_STYLES, h),
+    hairColor: pick(AVATAR_HAIR_COLORS, h >>> 4),
+    skinTone: pick(AVATAR_SKIN_TONES, h >>> 8),
+    shirtColor: pick(AVATAR_SHIRT_COLORS, h >>> 12),
+  };
+}
+
+/**
+ * The character to draw for a member: what they chose, or the default when
+ * `members.avatar` is null or holds an id the art no longer has.
+ */
+export function avatarFor(member: {
+  id: string;
+  avatar: unknown;
+}): MemberAvatar {
+  const chosen = MemberAvatar.safeParse(member.avatar);
+  return chosen.success ? chosen.data : defaultAvatar(member.id);
+}
+
 /** The same values as the `member_role` pg enum. */
 export const MemberRole = z.enum(["admin", "member"], {
   error: "Pick admin or member.",

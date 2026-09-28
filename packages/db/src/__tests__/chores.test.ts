@@ -1,4 +1,5 @@
 import { expectedIntervalMinutes, seasonBounds, seasonYear } from "@baumy/core";
+import { CHORE_KINDS } from "@baumy/types";
 import { asc, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
@@ -21,6 +22,7 @@ import {
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import {
+  choreKind,
   choreRuleVersions,
   chores,
   completionScores,
@@ -62,6 +64,12 @@ function selfClaim(choreId: string, member: string, when: Date) {
   });
 }
 
+describe("chore_kind", () => {
+  it("has the values of ChoreKind in packages/types", () => {
+    expect(choreKind.enumValues).toEqual([...CHORE_KINDS]);
+  });
+});
+
 describe("STARTER_CHORES", () => {
   it("lists the eleven chores of SPEC §4.7", () => {
     expect(STARTER_CHORES.map((c) => c.name)).toEqual([
@@ -92,6 +100,12 @@ describe("STARTER_CHORES", () => {
     }
   });
 
+  it("are all maintenance: none of them is bought or refilled", () => {
+    expect(new Set(STARTER_CHORES.map((c) => c.kind))).toEqual(
+      new Set(["maintenance"]),
+    );
+  });
+
   it("starterChore finds one by name and refuses an unknown one", () => {
     expect(starterChore("Keller").basePoints).toBe(55);
     expect(() => starterChore("Garden")).toThrow("No starter chore");
@@ -112,6 +126,7 @@ describe("seedStarterChores", () => {
       .select({
         name: chores.name,
         sprite: chores.sprite,
+        kind: chores.kind,
         proofMode: chores.proofMode,
         confirmMode: chores.confirmMode,
         effortFactorPct: chores.effortFactorPct,
@@ -129,6 +144,7 @@ describe("seedStarterChores", () => {
       expect(rows.find((r) => r.name === starter.name)).toEqual({
         name: starter.name,
         sprite: starter.sprite,
+        kind: "maintenance",
         proofMode: "none",
         confirmMode: "optimistic",
         effortFactorPct: 100,
@@ -200,11 +216,14 @@ describe("listChoreBoard", () => {
   it("shows the weight now, this season's streak and when it was last done", async () => {
     const ryan = await seedPlayer(db(), "Ryan");
     const partner = await seedPlayer(db(), "Partner");
-    const { choreId: trash, ruleVersionId } = await seedChore(
-      db(),
-      SEED_CHORES.trash,
-    );
-    const { choreId: dishes } = await seedChore(db(), SEED_CHORES.dishes);
+    const { choreId: trash, ruleVersionId } = await seedChore(db(), {
+      ...SEED_CHORES.trash,
+      createdAt: at(-24),
+    });
+    const { choreId: dishes } = await seedChore(db(), {
+      ...SEED_CHORES.dishes,
+      kind: "consumable",
+    });
     await selfClaim(trash, ryan, at(0));
     await selfClaim(trash, ryan, at(48));
     await selfClaim(trash, partner, at(96));
@@ -220,10 +239,12 @@ describe("listChoreBoard", () => {
       id: trash,
       name: "Trash",
       sprite: "trash",
+      kind: "maintenance",
       proofMode: "none",
       confirmMode: "optimistic",
       effortFactorPct: 100,
       archivedAt: null,
+      createdAt: at(-24),
       rule: {
         id: ruleVersionId,
         basePoints: SEED_CHORES.trash.basePoints,
@@ -234,6 +255,7 @@ describe("listChoreBoard", () => {
     });
     expect(board[0]).toMatchObject({
       id: dishes,
+      kind: "consumable",
       streak: null,
       lastDoneAt: null,
     });
@@ -420,6 +442,7 @@ describe("chore admin writes", () => {
         householdId: HOUSEHOLD_ID,
         name: "Windows",
         sprite: "windows",
+        kind: "consumable",
         proofMode: "optional",
         confirmMode: "partner",
         effortFactorPct: 150,
@@ -432,6 +455,7 @@ describe("chore admin writes", () => {
     expect(chore).toMatchObject({
       name: "Windows",
       sprite: "windows",
+      kind: "consumable",
       proofMode: "optional",
       confirmMode: "partner",
       effortFactorPct: 150,

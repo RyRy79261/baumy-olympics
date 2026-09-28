@@ -1,7 +1,5 @@
 import {
-  addDaysToDateKey,
   berlinDateKey,
-  berlinDateTimeToUtc,
   berlinTimeKey,
   formatBerlinDateTime,
   formatDateKey,
@@ -104,9 +102,6 @@ export interface HubChore {
  * once it has been due for a day.
  */
 export function dueChores(chores: ChoreView[], now: Date): HubChore[] {
-  const tomorrow = berlinDateTimeToUtc(
-    addDaysToDateKey(berlinDateKey(now), 1),
-  ).getTime();
   const due = chores
     .filter((c) => c.state === "due")
     .sort(
@@ -129,13 +124,9 @@ export function dueChores(chores: ChoreView[], now: Date): HubChore[] {
       };
     });
   const later = chores
-    .filter(
-      (c) =>
-        c.state !== "due" &&
-        c.state !== "unavailable" &&
-        c.dueAt !== null &&
-        Date.parse(c.dueAt) < tomorrow,
-    )
+    // `urgent` is list_chores' (isUrgent): the same split the kitchen
+    // screen's Urgent icon counts.
+    .filter((c) => c.state !== "due" && c.urgent)
     .sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!))
     .map((c): HubChore => ({
       id: c.id,

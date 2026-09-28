@@ -28,6 +28,7 @@ import { manageChoreAction } from "./actions";
 
 export interface ChoreFormValues {
   name: string;
+  kind: ChoreView["kind"];
   basePoints: number;
   cooldownHours: number;
   proofMode: ChoreView["proofMode"];
@@ -37,6 +38,7 @@ export interface ChoreFormValues {
 
 const NEW_CHORE: ChoreFormValues = {
   name: "",
+  kind: "maintenance",
   basePoints: 20,
   cooldownHours: 24,
   proofMode: "none",
@@ -59,6 +61,19 @@ function ChoreFields({
       <Field id={`${prefix}-name`} label="Name" errors={errors.name}>
         {(control) => (
           <Input {...control} name="name" required defaultValue={values.name} />
+        )}
+      </Field>
+      <Field
+        id={`${prefix}-kind`}
+        label="Kind"
+        hint="Buy or refill, or clean or fix."
+        errors={errors.kind}
+      >
+        {(control) => (
+          <Select {...control} name="kind" defaultValue={values.kind}>
+            <option value="maintenance">Maintenance</option>
+            <option value="consumable">Consumable</option>
+          </Select>
         )}
       </Field>
       <Field
@@ -219,6 +234,7 @@ function EditChoreDialog({
           prefix={`edit-${chore.id}`}
           values={{
             name: chore.name,
+            kind: chore.kind,
             basePoints: chore.basePoints ?? NEW_CHORE.basePoints,
             cooldownHours:
               chore.cooldownMinutes !== null
@@ -275,7 +291,7 @@ export function ChoreAdminRow({ chore }: { chore: ChoreView }) {
         {chore.cooldownMinutes !== null
           ? ` · cooldown ${chore.cooldownMinutes / 60}h`
           : ""}
-        {` · proof ${chore.proofMode} · ${chore.confirmMode} · effort ${chore.effortFactorPct}%`}
+        {` · ${chore.kind} · proof ${chore.proofMode} · ${chore.confirmMode} · effort ${chore.effortFactorPct}%`}
         {chore.archived ? " · archived" : ""}
       </span>
       <span className="ml-auto flex gap-2">

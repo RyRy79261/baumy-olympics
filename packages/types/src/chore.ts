@@ -26,6 +26,17 @@ export const ConfirmMode = z.enum(["optimistic", "partner"], {
 });
 export type ConfirmMode = z.infer<typeof ConfirmMode>;
 
+/**
+ * What kind of bounty a chore is (ADR 0005): something to buy or refill, or
+ * something to clean or fix. The same values as the `chore_kind` pg enum.
+ */
+export const CHORE_KINDS = ["consumable", "maintenance"] as const;
+
+export const ChoreKind = z.enum(CHORE_KINDS, {
+  error: "Pick consumable or maintenance.",
+});
+export type ChoreKind = z.infer<typeof ChoreKind>;
+
 export const BASE_POINTS_MIN = 1;
 export const BASE_POINTS_MAX = 200;
 
