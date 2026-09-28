@@ -38,3 +38,7 @@ We considered three options:
 - Two repos have to change. The brain-side PRs (the kitchen shopping API, and the Olympics client with `/link` and the calendar and chore intents) are tracked as issues with the `repo:baumy-brain` label, filed in that repo.
 - If brain is down, the kiosk shows the shopping list as "unavailable" and nothing else is affected. It never throws, following camp-404's result-union pattern.
 - Brain could use the MCP server instead of the HTTP endpoint. We rejected that for v1, because brain wants a deterministic HTTP call, not an OAuth dance.
+
+## Note (2026-09-28, issue #70)
+
+The owner widened brain's side: brain may call every member action, including the destructive ones (`delete_event`, `delete_note`), always behind its inline confirm button, and may act on a housemate's behalf with `X-Baumy-On-Behalf-Of: <member id>` (the audit row keeps both the housemate and the asker; any write on someone's behalf needs the asker's tap). Admin actions stay UI only. Everything brain's agent needs is `docs/brain-operations-spec.md`, generated from the registry; brain carries a copy in its repo.
