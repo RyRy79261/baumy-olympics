@@ -26,6 +26,7 @@ import {
   memoryBrain,
 } from "@/lib/integrations/brain-memory";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
+import { NEW_BOUNTY_MS } from "@/lib/chores/urgency";
 import { HUB_NOTES, loadHub } from "./load";
 
 // The hub's reads through the real runAction on PGlite (issue #20): each
@@ -77,7 +78,15 @@ afterEach(() => {
 
 describe("loadHub", () => {
   it("fills every widget from its action", async () => {
-    await seedChore(db(), SEED_CHORES.trash);
+    // Trash was added long ago; Dishes an hour ago, so it is new.
+    await seedChore(db(), {
+      ...SEED_CHORES.trash,
+      createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS - HOUR),
+    });
+    await seedChore(db(), {
+      ...SEED_CHORES.dishes,
+      createdAt: new Date(FIXED_NOW.getTime() - HOUR),
+    });
     const pinned = await runAction(
       "create_note",
       { title: "Wifi", bodyMd: "guest", pinned: true },
@@ -104,7 +113,10 @@ describe("loadHub", () => {
     });
     expect(hub.chores).toMatchObject({
       status: "ready",
-      data: [{ name: SEED_CHORES.trash.name, when: "Never done" }],
+      data: [
+        { name: SEED_CHORES.dishes.name, when: "Never done", isNew: true },
+        { name: SEED_CHORES.trash.name, when: "Never done", isNew: false },
+      ],
     });
     expect(hub.standings).toEqual({
       status: "ready",
@@ -123,9 +135,9 @@ describe("loadHub", () => {
       status: "ready",
       data: [{ id: pinned.ok && pinned.data.note.id, title: "Wifi" }],
     });
-    // Trash was never done, so it is urgent; both notes are from today.
-    expect(hub.counts).toMatchObject({ urgent: 1, messages: 2 });
-    expect(hub.counts.new).toEqual(expect.any(Number));
+    // Neither was ever done, so both are urgent; only Dishes is new; both
+    // notes are from today.
+    expect(hub.counts).toEqual({ urgent: 2, new: 1, messages: 2 });
   });
 
   it("counts nothing for a tile whose read failed", async () => {

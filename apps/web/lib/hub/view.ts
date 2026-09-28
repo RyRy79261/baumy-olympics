@@ -5,7 +5,6 @@ import {
   formatDateKey,
 } from "@baumy/core";
 import type { ChoreView } from "@/lib/actions/list-chores";
-import type { NoteView } from "@/lib/actions/notes";
 import type { ActionResult } from "@/lib/actions/result";
 import type { CalendarEventView } from "@/lib/calendar/view";
 import { streakLabel } from "@/lib/chores/view";
@@ -182,25 +181,14 @@ export function clockLines(now: Date): { time: string; date: string } {
   };
 }
 
-/** How long a note counts as a new message (ADR 0005 §3). */
-export const MESSAGES_WINDOW_MS = 24 * 60 * 60_000;
-
 /**
  * The hub's three counts (ADR 0005 §1): urgent bounties, new bounties, and
- * messages, the notes created or changed in the last 24 hours. Null when
- * the read behind it failed, so the tile says nothing rather than zero.
+ * messages, the notes added or edited in the last 24 hours (list_notes'
+ * `recentCount`). Null when the read behind it failed: the tile then says
+ * so instead of showing a zero.
  */
 export interface HubCounts {
   urgent: number | null;
   new: number | null;
   messages: number | null;
-}
-
-/** How many notes were created or changed in the last 24 hours. */
-export function recentNoteCount(
-  notes: readonly Pick<NoteView, "updatedAt">[],
-  now: Date,
-): number {
-  const since = now.getTime() - MESSAGES_WINDOW_MS;
-  return notes.filter((n) => Date.parse(n.updatedAt) > since).length;
 }

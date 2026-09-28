@@ -8,7 +8,6 @@ import type { ShoppingEntry } from "@/lib/integrations/brain";
 import { formatEuros, gapLabel } from "@/lib/scores/view";
 import {
   dueChores,
-  recentNoteCount,
   upcomingEvents,
   widgetState,
   type HubChore,
@@ -75,9 +74,11 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
     read(() => runAction("list_chores", {}, ctx)),
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
     read(() => runAction("get_pot", {}, ctx)),
-    // Every note (pinned first): the pinned ones for the widget, the
-    // recent ones for the Messages count.
-    read(() => runAction("list_notes", {}, ctx)),
+    // The pinned notes for the widget, and the Messages count, which
+    // list_notes counts over every note.
+    read(() =>
+      runAction("list_notes", { pinnedOnly: true, limit: HUB_NOTES }, ctx),
+    ),
     read(() => runAction("list_shopping", {}, ctx)),
   ]);
   return {
@@ -109,7 +110,7 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
       : { ok: false, message: pot.message },
     notes: widgetState(
       notes,
-      (d) => d.notes.filter((n) => n.pinned).slice(0, HUB_NOTES),
+      (d) => d.notes,
       "Nothing is pinned. Pin a note on the Board.",
     ),
     counts: {
@@ -117,7 +118,7 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
         ? chores.data.chores.filter((c) => c.urgent).length
         : null,
       new: chores.ok ? chores.data.chores.filter((c) => c.isNew).length : null,
-      messages: notes.ok ? recentNoteCount(notes.data.notes, ctx.now) : null,
+      messages: notes.ok ? notes.data.recentCount : null,
     },
     shopping: shopping.ok
       ? { status: "ready", data: shopping.data.items }
