@@ -12,7 +12,6 @@ import {
 } from "@baumy/ui";
 import { authClient } from "@/lib/auth-client";
 import {
-  OAUTH_FAILED,
   passkeyErrorSentence,
   PASSKEY_DIDNT_FINISH,
   signInErrorSentence,
@@ -48,23 +47,21 @@ export function SignInForm({
   googleEnabled,
   passkeysEnabled = false,
   lastMethod = null,
-  oauthFailed = false,
+  oauthError = null,
   callbackURL = "/",
 }: {
   googleEnabled: boolean;
   /** Passkeys have a host to bind to on this deployment. */
   passkeysEnabled?: boolean;
   lastMethod?: LastLoginMethod | null;
-  /** Landed here from a failed Google round trip (`?error=`). */
-  oauthFailed?: boolean;
+  /** What a failed Google round trip (`?error=`) says (oauthErrorSentence). */
+  oauthError?: string | null;
   /** Where to go once signed in: a path on this site (safeCallbackUrl). */
   callbackURL?: string;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(
-    oauthFailed ? OAUTH_FAILED : null,
-  );
+  const [error, setError] = useState<string | null>(oauthError);
   const [pending, setPending] = useState(false);
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
 

@@ -237,6 +237,7 @@ export function GoogleCard({
   linkFailed: boolean;
 }) {
   const [pending, setPending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(
     linkFailed
       ? "Linking Google didn't finish. It must be the Google account with this email."
@@ -246,6 +247,7 @@ export function GoogleCard({
     const result = await unlinkGoogleAction(prev, form);
     if (result.ok) toast.success("Google is unlinked.");
     else toast.error(result.message);
+    setConfirming(false);
     return result;
   });
 
@@ -259,19 +261,37 @@ export function GoogleCard({
       }
       description={
         linked
-          ? "You can sign in with Google."
-          : "Link the Google account with your email, then sign in with one tap."
+          ? "Continue with Google signs you in. Unlink it and it won't, until you link it here again."
+          : "Continue with Google signs in only to an account that has linked it here. Link the Google account with your email."
       }
       data-testid="google-card"
     >
       {error ? <FormMessage tone="error">{error}</FormMessage> : null}
       {linked ? (
-        <form action={unlink.formAction}>
-          <input type="hidden" name="requestId" value={unlink.requestId} />
-          <Button type="submit" variant="danger" disabled={unlink.pending}>
-            {unlink.pending ? "Unlinking..." : "Unlink Google"}
+        confirming ? (
+          <form action={unlink.formAction} className="flex flex-col gap-3">
+            <input type="hidden" name="requestId" value={unlink.requestId} />
+            <p className="text-base">
+              Unlink Google? Continue with Google will stop signing you in.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" variant="danger" disabled={unlink.pending}>
+                {unlink.pending ? "Unlinking..." : "Yes, unlink Google"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setConfirming(false)}
+                disabled={unlink.pending}
+              >
+                Keep it linked
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <Button variant="danger" onClick={() => setConfirming(true)}>
+            Unlink Google
           </Button>
-        </form>
+        )
       ) : (
         <Button
           variant="secondary"
@@ -303,6 +323,7 @@ export function GoogleCard({
 /** One passkey: its name (renamable) and a Remove button. */
 function PasskeyRow({ pk }: { pk: PasskeyView }) {
   const [renaming, setRenaming] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const rename = useActionForm<Out<"rename_passkey">>(async (prev, form) => {
     const result = await renamePasskeyAction(prev, form);
     if (result.ok) setRenaming(false);
@@ -311,7 +332,10 @@ function PasskeyRow({ pk }: { pk: PasskeyView }) {
   const remove = useActionForm<Out<"remove_passkey">>(async (prev, form) => {
     const result = await removePasskeyAction(prev, form);
     if (result.ok) toast.success("Passkey removed.");
-    else toast.error(result.message);
+    else {
+      toast.error(result.message);
+      setConfirming(false);
+    }
     return result;
   });
   const name = pk.name?.trim() || "Passkey";
@@ -365,23 +389,47 @@ function PasskeyRow({ pk }: { pk: PasskeyView }) {
               {when(pk.createdAt)}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" onClick={() => setRenaming(true)}>
-              Rename
-            </Button>
-            <form action={remove.formAction}>
+          {confirming ? (
+            <form
+              action={remove.formAction}
+              className="flex w-full flex-col gap-3"
+            >
               <input type="hidden" name="requestId" value={remove.requestId} />
               <input type="hidden" name="passkeyId" value={pk.id} />
+              <p className="text-base">
+                Remove {name}? It stops signing in on that device.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="submit"
+                  variant="danger"
+                  disabled={remove.pending}
+                >
+                  {remove.pending ? "Removing..." : "Yes, remove it"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setConfirming(false)}
+                  disabled={remove.pending}
+                >
+                  Keep it
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" onClick={() => setRenaming(true)}>
+                Rename
+              </Button>
               <Button
-                type="submit"
                 variant="danger"
-                disabled={remove.pending}
+                onClick={() => setConfirming(true)}
                 aria-label={`Remove ${name}`}
               >
-                {remove.pending ? "Removing..." : "Remove"}
+                Remove
               </Button>
-            </form>
-          </div>
+            </div>
+          )}
         </>
       )}
     </li>

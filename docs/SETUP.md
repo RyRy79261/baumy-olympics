@@ -61,13 +61,17 @@ secrets from earlier ones.
       Details: [Passkeys, two-factor and devices](#passkeys-two-factor-and-devices-issue-79).
 - [ ] **Resend account:** verify the sending domain, then set
       `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Without it nobody can reset a
-      password, and founders can verify only through Google.
+      password, and founders can verify only by signing up with Google.
 - [ ] **Google sign-in (optional):** OAuth client with JavaScript origin
       `https://www.baumy.tech` and redirect
       `https://www.baumy.tech/api/auth/callback/google` (the same URI serves
       "Link Google" on Settings, Security); set `GOOGLE_CLIENT_ID`
       and `GOOGLE_CLIENT_SECRET`. You need Resend **or** this so founders can
-      verify their address.
+      verify their address. Without Resend, a founder must **sign up with
+      Continue with Google**: since issue #79 Google never joins an existing
+      password account by itself (only "Link Google" on Settings, Security
+      does), so a founder who signed up with a password first cannot verify
+      through Google.
 - [ ] **`FOUNDER_EMAILS`** (Production): your address and your partner's,
       comma-separated.
       Details: [Auth](#auth-issue-6), [Membership](#membership-issue-9).
@@ -441,7 +445,8 @@ first admin, so everyone who signs up waits on `/join`.
 - [ ] **Make verification possible.** A founder must confirm their address
       before `/join` lets them in as admin. That needs Resend
       (`RESEND_API_KEY` and `RESEND_FROM_EMAIL`, see "Auth" above) or
-      Google sign-in (Google addresses count as verified).
+      signing up with Google (Google addresses count as verified; a Google
+      sign-in no longer links itself to an existing password account).
 - [ ] **After the first production deploy**: sign up with a founder address,
       open the confirmation email, go to `/join` and press "Join as admin".
       Then open `/admin/members`, create an invite code and check that a

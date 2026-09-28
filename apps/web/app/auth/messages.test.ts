@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   forgotPasswordErrorSentence,
+  GOOGLE_NOT_LINKED,
+  OAUTH_FAILED,
+  oauthErrorSentence,
   PASSKEY_DIDNT_FINISH,
   passkeyErrorSentence,
   twoFactorErrorSentence,
@@ -116,5 +119,15 @@ describe("passkeys and two-factor", () => {
     expect(twoFactorErrorSentence({ status: 502 }, "totp")).toBe(
       SOMETHING_WENT_WRONG,
     );
+  });
+});
+
+describe("oauthErrorSentence", () => {
+  it("says why Google did not sign in, and never echoes the code", () => {
+    expect(oauthErrorSentence(undefined)).toBeNull();
+    expect(oauthErrorSentence("account_not_linked")).toBe(GOOGLE_NOT_LINKED);
+    expect(GOOGLE_NOT_LINKED).toMatch(/link Google on Settings/);
+    expect(oauthErrorSentence("<script>alert(1)</script>")).toBe(OAUTH_FAILED);
+    expect(oauthErrorSentence("state_mismatch")).toBe(OAUTH_FAILED);
   });
 });
