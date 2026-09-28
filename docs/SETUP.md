@@ -55,14 +55,16 @@ secrets from earlier ones.
 
 - [ ] **`BETTER_AUTH_SECRET`** (Production and Preview,
       `openssl rand -base64 32`) and **`BETTER_AUTH_URL`** (Production =
-      `https://baumy.tech`). Passkeys are bound to that host for life, so set
-      it before anyone adds one; leave `PASSKEY_RP_ID` unset.
+      `https://www.baumy.tech`; the apex `baumy.tech` redirects to it), plus
+      **`PASSKEY_RP_ID=baumy.tech`** (Production). Passkeys are bound to
+      `baumy.tech` for life, so set both before anyone adds one.
       Details: [Passkeys, two-factor and devices](#passkeys-two-factor-and-devices-issue-79).
 - [ ] **Resend account:** verify the sending domain, then set
       `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Without it nobody can reset a
       password, and founders can verify only through Google.
-- [ ] **Google sign-in (optional):** OAuth client with redirect
-      `https://baumy.tech/api/auth/callback/google` (the same URI serves
+- [ ] **Google sign-in (optional):** OAuth client with JavaScript origin
+      `https://www.baumy.tech` and redirect
+      `https://www.baumy.tech/api/auth/callback/google` (the same URI serves
       "Link Google" on Settings, Security); set `GOOGLE_CLIENT_ID`
       and `GOOGLE_CLIENT_SECRET`. You need Resend **or** this so founders can
       verify their address.
@@ -107,7 +109,7 @@ secrets from earlier ones.
 
 ### 10. MCP (claude.ai connector)
 
-- [ ] **`MCP_PUBLIC_URL`** (Production) = the custom domain, never a
+- [ ] **`MCP_PUBLIC_URL`** (Production) = `https://www.baumy.tech`, never a
       `*.vercel.app` address. Without it MCP answers 503.
       Details: [MCP OAuth](#mcp-oauth-issue-23).
 
@@ -125,8 +127,9 @@ for each are in the sections below):
 
 ```sh
 FOUNDER_EMAILS=
-# Optional (issue #79): the domain passkeys are bound to. Leave unset for
-# baumy.tech: passkeys then bind to BETTER_AUTH_URL's host.
+# Optional (issue #79): the domain passkeys are bound to, the site's host or
+# a parent of it. Production: baumy.tech (the app is www.baumy.tech).
+# Unset, passkeys bind to BETTER_AUTH_URL's own host.
 PASSKEY_RP_ID=
 BLOB_READ_WRITE_TOKEN=
 CRON_SECRET=
@@ -334,7 +337,7 @@ nobody is signed in (CI checks this against the real build).
       preview's sessions then do not work on production). Use
       `openssl rand -base64 32`. Never commit it.
 - [ ] **Set `BETTER_AUTH_URL`** (Production scope) to the address people
-      visit, `https://baumy.tech`. Leave it unset on Preview:
+      visit, `https://www.baumy.tech` (the apex redirects to it). Leave it unset on Preview:
       a preview uses its own `VERCEL_URL`.
 - [ ] **Resend, for password reset.** Create a Resend account, verify the
       sending domain, then set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (for
@@ -343,7 +346,7 @@ nobody is signed in (CI checks this against the real build).
       forgotten password.
 - [ ] **Google sign-in (optional).** In Google Cloud Console create an OAuth
       client (type Web application) with the authorised redirect URI
-      `https://baumy.tech/api/auth/callback/google`, then set `GOOGLE_CLIENT_ID`
+      `https://www.baumy.tech/api/auth/callback/google` (JavaScript origin `https://www.baumy.tech`), then set `GOOGLE_CLIENT_ID`
       and `GOOGLE_CLIENT_SECRET` (Production scope). The button only appears
       when both are set. Previews cannot finish a Google sign-in (Google only
       calls back registered URIs); use email and password there.
@@ -368,23 +371,27 @@ authenticator app plus backup codes), linking and unlinking Google, adding a
 first password to a Google-only account, and the devices signed in now. No
 new service: it all runs on Better Auth and our own tables (migration 0014).
 
-- [ ] **`BETTER_AUTH_URL=https://baumy.tech`** (Production) is what passkeys
-      bind to. The relying-party id is the base URL's host, `baumy.tech`,
-      and only `https://baumy.tech` may use them. A passkey made under one id
-      never works under another, so do not change the domain once people
-      have added passkeys.
-- [ ] **Serve one host.** Redirect `www.baumy.tech` to `https://baumy.tech`
-      in Vercel (Settings → Domains). A passkey ceremony from any other
-      origin is refused.
-- [ ] **`PASSKEY_RP_ID`: leave it unset.** It exists for serving the app on a
-      subdomain (for example `olympics.baumy.tech` with `PASSKEY_RP_ID=baumy.tech`).
-      If it is set to anything that is not the site's host or a parent of it,
-      passkeys switch **off** (fail closed) and the deploy log says so.
-      Previews bind passkeys to their own `*.vercel.app` host, so a passkey
-      made on a preview never works on production, and the other way round.
-- [ ] **Google redirect.** The OAuth client's authorised redirect URI is
-      `https://baumy.tech/api/auth/callback/google`. Signing in and "Link
-      Google" both use it.
+- [ ] **`BETTER_AUTH_URL=https://www.baumy.tech`** and
+      **`PASSKEY_RP_ID=baumy.tech`** (both Production). The canonical app is
+      `https://www.baumy.tech`; passkeys are bound to the registrable domain
+      `baumy.tech` (the relying-party id), and a ceremony is accepted only
+      from the origin `https://www.baumy.tech`. A passkey made under one id
+      never works under another, so do not change `PASSKEY_RP_ID` once people
+      have added passkeys. Binding to `baumy.tech` rather than the www host
+      keeps them working if the app ever moves to the apex or another
+      subdomain.
+- [ ] **Serve one host.** Redirect the apex `baumy.tech` to
+      `https://www.baumy.tech` in Vercel (Settings → Domains). A passkey
+      ceremony from any other origin is refused.
+- [ ] **If `PASSKEY_RP_ID` is wrong,** meaning it is neither the site's host
+      nor a parent of it, passkeys switch **off** (fail closed) and the
+      deploy log says so. Leave it unset on Preview: previews bind passkeys
+      to their own `*.vercel.app` host, so a passkey made on a preview never
+      works on production, and the other way round.
+- [ ] **Google.** The OAuth client's authorised JavaScript origin is
+      `https://www.baumy.tech`, and its redirect URI is
+      `https://www.baumy.tech/api/auth/callback/google`. Signing in and
+      "Link Google" both use it.
 - [ ] **After deploy:** on your phone, add a passkey on Settings → Security,
       sign out, and sign in with "Sign in with a passkey". Then turn on
       two-factor with an authenticator app and keep the backup codes.
@@ -757,7 +764,7 @@ key is needed; the tables come with migration `0009_mcp_oauth.sql`. CI and
 e2e need nothing: off Vercel the issuer is the request's own address.
 
 - [ ] **Set `MCP_PUBLIC_URL`** on the Vercel project (Production) to the
-      address people use, for example `https://baumy.example.com` (the
+      address people use, `https://www.baumy.tech` (the
       custom domain, never the `*.vercel.app` deployment address, which is
       behind Vercel's login). Without it every `/api/mcp/oauth/*` and
       `/.well-known/oauth-*` answer is 503 "MCP is not configured". Set it
