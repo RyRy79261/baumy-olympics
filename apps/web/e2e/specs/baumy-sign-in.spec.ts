@@ -112,7 +112,7 @@ test("a member signs in by tapping the number in Telegram", async ({
 
   const code = await askBaumy(phone, who.email);
   const dm = await dmFor(request, who.tg);
-  expect(dm.choices).toHaveLength(3);
+  expect(dm.choices).toHaveLength(5);
   expect(dm.choices).toContain(code);
 
   const res = await tap(request, who.tg, code);
@@ -134,7 +134,7 @@ test("a member signs in by tapping the number in Telegram", async ({
   await context.close();
 });
 
-test("a wrong number blocks the sign-in, and Deny denies it", async ({
+test("Deny denies the sign-in and pauses the method for that member", async ({
   page,
   browser,
   request,
@@ -143,7 +143,6 @@ test("a wrong number blocks the sign-in, and Deny denies it", async ({
   const context = await browser.newContext();
   const phone = await context.newPage();
 
-  // Deny first: a plain denial does not lock the method.
   await askBaumy(phone, who.email);
   const first = await dmFor(request, who.tg);
   const denied = await tap(request, who.tg, "deny");
@@ -153,13 +152,27 @@ test("a wrong number blocks the sign-in, and Deny denies it", async ({
   ).toBeVisible();
   await expect(phone).toHaveURL(/\/auth\/sign-in/);
 
-  // Then a decoy.
+  // Asking again shows the same screen, but no DM goes out for 15 minutes.
   await phone.getByRole("button", { name: "Try again" }).click();
   await phone.getByRole("button", { name: "Send to Telegram" }).click();
-  const shown = phone.getByTestId("baumy-login-code");
-  await expect(shown).toHaveText(/^\d{2}$/);
-  const code = Number(await shown.textContent());
-  const dm = await dmFor(request, who.tg, first.requestId);
+  await expect(phone.getByTestId("baumy-login-code")).toHaveText(/^\d{2}$/);
+  await phone.waitForTimeout(2_000);
+  expect((await dmFor(request, who.tg)).requestId).toBe(first.requestId);
+  await context.close();
+});
+
+test("a number that is not on the screen blocks the sign-in", async ({
+  page,
+  browser,
+  request,
+}, testInfo) => {
+  const who = await linkedHousemate(page, browser, testInfo.project.name);
+  const context = await browser.newContext();
+  const phone = await context.newPage();
+
+  const code = await askBaumy(phone, who.email);
+  const dm = await dmFor(request, who.tg);
+  expect(dm.choices).toHaveLength(5);
   expect(dm.choices).toContain(code);
   const decoy = dm.choices.find((n) => n !== code)!;
   const blocked = await tap(request, who.tg, decoy);
