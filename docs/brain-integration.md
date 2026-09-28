@@ -48,7 +48,9 @@ Each tool carries `risk`:
 - `safe` (for example `create_note`, `link_telegram`, every read): brain may
   run it straight from the conversation.
 - `confirm` (for example `create_event`, `update_event`, `log_completion`,
-  `confirm_completion`, `dispute_completion`, `dismiss_reminder`): brain shows
+  `confirm_completion`, `dispute_completion`, `dismiss_reminder`,
+  `approve_login`, whose confirm button is the number the member taps in
+  the sign-in DM, below): brain shows
   an inline confirm button with what it is about to do, and sends the call
   with `X-Baumy-Confirmed: 1` only after the tap. Without the header the
   answer is 428 `CONFIRMATION_REQUIRED` and nothing runs.
@@ -89,8 +91,9 @@ brain sends `X-Baumy-On-Behalf-Of: <Sam's member id>` with Ryan in
   `dispute_completion`, `undo_completion`, `withdraw_dispute`,
   `concede_completion`, marked `own_word_only` in the tool list) answer 403
   `FORBIDDEN` on anyone's behalf, before the confirm check, so nobody can
-  confirm their own claim by speaking as a housemate. Everything else,
-  notes included, works on a housemate's behalf.
+  confirm their own claim by speaking as a housemate. The sign-in answers
+  (`approve_login`, `deny_login`) are `own_word_only` too. Everything
+  else, notes included, works on a housemate's behalf.
 - Admin actions stay unavailable, on anyone's behalf.
 - Brain can read member ids from `list_reminders` (`members`) or
   `get_standings`.
@@ -152,6 +155,44 @@ It refuses, with 422:
 Linking a member who was linked to another Telegram account moves the link.
 An admin can also set or clear anyone's Telegram user id directly on
 `/admin/members` (`manage_members`, op `set_telegram`).
+
+## Sign in with Baumy (`approve_login`, `deny_login`)
+
+Issue #80, ADR 0006. Someone taps **Sign in with Baumy** on the sign-in page
+(the kitchen iPad, say) and enters their email. The page shows a two-digit
+number, and Olympics asks brain to DM that member:
+
+```http
+POST {BRAIN_BASE_URL}/api/kitchen/login-approval
+Authorization: Bearer $KITCHEN_API_TOKEN
+Content-Type: application/json
+
+{"requestId": "<uuid>", "telegramUserId": 123456789, "device": "Safari on iPad",
+ "choices": [12, 47, 83], "expiresAt": "2026-09-28T10:02:00.000Z"}
+```
+
+Brain answers `{ok: true, sent: true}`, or `{ok: true, sent: false}` when
+that Telegram id is not an active member of the house (nothing is sent). It
+DMs only that member, never the group: "Sign in on Safari on iPad? Tap the
+number on the screen." with one button per number, in the order given, and
+**Deny**. The call is made after the sign-in page got its answer, so whether
+it happens never shows on the page.
+
+A tap calls, as the member who tapped (`X-Baumy-Actor: tg:<from.id>`, never
+on anyone's behalf):
+
+- a number: `approve_login {"requestId": "<uuid>", "code": 47}` with
+  `X-Baumy-Confirmed: 1` (the tap is the confirmation) and a fresh
+  `Idempotency-Key` per tap. `data.outcome` is `approved` (the page signs
+  in) or `blocked` (a decoy: the request is denied and Sign in with Baumy is
+  off for that member for 15 minutes);
+- **Deny**: `deny_login {"requestId": "<uuid>"}`; `data.outcome` is
+  `denied`.
+
+Then edit the DM, dropping the buttons. `NOT_FOUND` (not this member's
+request) and `INVALID_STATE` (expired, or already answered) carry a
+`message` to show. These two actions come only from those buttons: never
+from a conversation, and never offered to brain's LLM.
 
 ## Service tokens
 
