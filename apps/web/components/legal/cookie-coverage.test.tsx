@@ -38,7 +38,9 @@ const KNOWN: Record<string, string> = {
 };
 
 /** Better Auth plugins and social providers the page was written against. */
-const AUTH_PLUGINS = ["bearer"];
+// baumy-approval-sign-in (issue #80) sets only the session cookies and
+// dont_remember, which the page names.
+const AUTH_PLUGINS = ["bearer", "baumy-approval-sign-in"];
 const AUTH_SOCIAL = ["google"];
 
 function sourceFiles(dir: string): string[] {
