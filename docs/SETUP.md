@@ -54,13 +54,16 @@ secrets from earlier ones.
 ### 4. Auth, founders and email (Resend, optional Google sign-in)
 
 - [ ] **`BETTER_AUTH_SECRET`** (Production and Preview,
-      `openssl rand -base64 32`) and **`BETTER_AUTH_URL`** (Production = the
-      custom domain).
+      `openssl rand -base64 32`) and **`BETTER_AUTH_URL`** (Production =
+      `https://baumy.tech`). Passkeys are bound to that host for life, so set
+      it before anyone adds one; leave `PASSKEY_RP_ID` unset.
+      Details: [Passkeys, two-factor and devices](#passkeys-two-factor-and-devices-issue-79).
 - [ ] **Resend account:** verify the sending domain, then set
       `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Without it nobody can reset a
       password, and founders can verify only through Google.
 - [ ] **Google sign-in (optional):** OAuth client with redirect
-      `<BETTER_AUTH_URL>/api/auth/callback/google`; set `GOOGLE_CLIENT_ID`
+      `https://baumy.tech/api/auth/callback/google` (the same URI serves
+      "Link Google" on Settings, Security); set `GOOGLE_CLIENT_ID`
       and `GOOGLE_CLIENT_SECRET`. You need Resend **or** this so founders can
       verify their address.
 - [ ] **`FOUNDER_EMAILS`** (Production): your address and your partner's,
@@ -122,6 +125,9 @@ for each are in the sections below):
 
 ```sh
 FOUNDER_EMAILS=
+# Optional (issue #79): the domain passkeys are bound to. Leave unset for
+# baumy.tech: passkeys then bind to BETTER_AUTH_URL's host.
+PASSKEY_RP_ID=
 BLOB_READ_WRITE_TOKEN=
 CRON_SECRET=
 GOOGLE_CALENDAR_ID=
@@ -328,7 +334,7 @@ nobody is signed in (CI checks this against the real build).
       preview's sessions then do not work on production). Use
       `openssl rand -base64 32`. Never commit it.
 - [ ] **Set `BETTER_AUTH_URL`** (Production scope) to the address people
-      visit, for example `https://baumy.example`. Leave it unset on Preview:
+      visit, `https://baumy.tech`. Leave it unset on Preview:
       a preview uses its own `VERCEL_URL`.
 - [ ] **Resend, for password reset.** Create a Resend account, verify the
       sending domain, then set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (for
@@ -337,7 +343,7 @@ nobody is signed in (CI checks this against the real build).
       forgotten password.
 - [ ] **Google sign-in (optional).** In Google Cloud Console create an OAuth
       client (type Web application) with the authorised redirect URI
-      `<BETTER_AUTH_URL>/api/auth/callback/google`, then set `GOOGLE_CLIENT_ID`
+      `https://baumy.tech/api/auth/callback/google`, then set `GOOGLE_CLIENT_ID`
       and `GOOGLE_CLIENT_SECRET` (Production scope). The button only appears
       when both are set. Previews cannot finish a Google sign-in (Google only
       calls back registered URIs); use email and password there.
@@ -347,6 +353,47 @@ nobody is signed in (CI checks this against the real build).
 - [ ] **After the first production deploy**, sign up at `/auth/sign-up`,
       sign out, sign in, and request a password reset to check the email
       arrives. The deploy log should show no `[auth]` warning.
+
+## Passkeys, two-factor and devices (issue #79)
+
+Settings → Security (`/settings/security`) has passkeys, two-factor (an
+authenticator app plus backup codes), linking and unlinking Google, adding a
+first password to a Google-only account, and the devices signed in now. No
+new service: it all runs on Better Auth and our own tables (migration 0014).
+
+- [ ] **`BETTER_AUTH_URL=https://baumy.tech`** (Production) is what passkeys
+      bind to. The relying-party id is the base URL's host, `baumy.tech`,
+      and only `https://baumy.tech` may use them. A passkey made under one id
+      never works under another, so do not change the domain once people
+      have added passkeys.
+- [ ] **Serve one host.** Redirect `www.baumy.tech` to `https://baumy.tech`
+      in Vercel (Settings → Domains). A passkey ceremony from any other
+      origin is refused.
+- [ ] **`PASSKEY_RP_ID`: leave it unset.** It exists for serving the app on a
+      subdomain (for example `olympics.baumy.tech` with `PASSKEY_RP_ID=baumy.tech`).
+      If it is set to anything that is not the site's host or a parent of it,
+      passkeys switch **off** (fail closed) and the deploy log says so.
+      Previews bind passkeys to their own `*.vercel.app` host, so a passkey
+      made on a preview never works on production, and the other way round.
+- [ ] **Google redirect.** The OAuth client's authorised redirect URI is
+      `https://baumy.tech/api/auth/callback/google`. Signing in and "Link
+      Google" both use it.
+- [ ] **After deploy:** on your phone, add a passkey on Settings → Security,
+      sign out, and sign in with "Sign in with a passkey". Then turn on
+      two-factor with an authenticator app and keep the backup codes.
+
+Worth knowing:
+
+- Passkeys and two-factor need a **confirmed email** (the sign-up link or
+  Google). An unconfirmed account's passkeys and two-factor are cleared by a
+  password reset.
+- Two-factor asks for a code after a **password** sign-in. Google and
+  passkey sign-ins are not asked: a passkey is two factors already, and
+  Google has its own.
+- Signing a device out ends its session at once, but a page it has open can
+  keep working for up to **5 minutes** (the cookie cache); the page says so.
+- The Security page never lets you remove your last way in (a password,
+  Google or a passkey).
 
 ## Action registry (issue #8)
 

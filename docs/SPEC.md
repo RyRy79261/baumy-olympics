@@ -323,7 +323,7 @@ Seeding (added 2026-09-27, issue #14): `STARTER_CHORES` in `packages/db/src/chor
 
 The schema is one hand-written file and is the only source of truth. Migrations are generated only (see AGENTS.md). All ids are `uuid` with `defaultRandom()`, except where noted, and all times are `timestamptz`. Every household-scoped table has `household_id`. There is only one household, but the column costs nothing and matches brain's `group_id` scoping.
 
-**Auth (Better Auth, copied from camp-404 `packages/db/src/schema.ts` around lines 376–530):** `user`, `session`, `account`, `verification`, `rate_limit`. The `passkey` and `two_factor` tables are left out of v1.
+**Auth (Better Auth, copied from camp-404 `packages/db/src/schema.ts` around lines 376–530):** `user`, `session`, `account`, `verification`, `rate_limit`. [CORRECTION 2026-09-28] `passkey`, `two_factor` and `user.two_factor_enabled` were added with passkeys and two-factor (issue #79, migration 0014).
 
 **Identity**
 
@@ -428,7 +428,12 @@ packages/{eslint-config,typescript-config}
 ### 6.2 Auth (ADR 0001)
 
 - Self-hosted **Better Auth pinned to exactly `1.6.25`**, copied from camp-404 `packages/auth/src/config.ts` and `env.ts`.
-- **Sign-in methods:** email and password, with Google as an optional social provider.
+- **Sign-in methods:** email and password, with Google as an optional social provider. Since issue #79 (2026-09-28, camp-404 parity) also passkeys, and two-factor after a password:
+  - **Passkeys** (`@better-auth/passkey` 1.6.25, pinned with better-auth): the relying-party id is `BETTER_AUTH_URL`'s host, or `PASSKEY_RP_ID` when that is the host or a parent of it; a ceremony is checked against the trusted origins under that id. Anything else, or a deployment with no base URL, turns passkeys off: every `/passkey/*` endpoint answers 503 `PASSKEYS_NOT_CONFIGURED` and the buttons are hidden (`resolvePasskeyScope`, fail closed). Adding one needs a session under a day old (Better Auth's fresh-session rule).
+  - **Two-factor** (Better Auth `twoFactor`): TOTP from an authenticator app plus 10 one-time backup codes, stored encrypted; optional per member; "trust this device" lasts 30 days. It challenges password sign-ins only: a passkey is two factors already and Google is not asked (Better Auth 1.6.25 behaviour, as camp-404).
+  - **Email proof** (`packages/auth/src/email-proof.ts`, from camp-404): an unconfirmed account cannot enrol a passkey or two-factor, a password reset of an unconfirmed account clears both, and a verification link never opens a session that skips two-factor.
+  - **Last used:** the `baumy.last_login_method` cookie (Better Auth `lastLoginMethod`, not httpOnly, not a secret) marks email, Google or passkey on the sign-in page.
+  - **Settings → Security** (`/settings/security`): password (change, or `set_first_password` for a Google- or passkey-only account, which emails the owner), two-factor, passkeys (add through the browser; `rename_passkey`, `remove_passkey`), Google (link through Better Auth's `linkSocial`, `unlink_google`), and the signed-in devices (`get_account_security`, `revoke_session`, `revoke_other_sessions`), each labelled from its user agent with no IP or place, "this device" first, and the 5-minute revocation lag stated. Admins also see the paired kiosks, linked to `/admin/members`. The actions are `session`-gated and UI-only; removing a passkey or unlinking Google is refused (`LAST_SIGN_IN_METHOD`) when it would leave no way in. The ceremonies that must run between the browser and Better Auth (sign-in, adding a passkey, the two-factor steps, linking Google, changing the password) stay Better Auth endpoints, like sign-in itself.
 - **Session:** `session.expiresIn = 30d`, `updateAge = 1d`, cookie cache 300s. The session is longer than camp-404's because this is a household app. Sessions run in the app's own process against our own Neon tables.
 - **Hardening:** fail closed when `BETTER_AUTH_SECRET` is missing (`authMayServe`); `changeEmail` is off; trusted origins are absolute.
 - **Mobile-friendly tokens:** the Better Auth `bearer()` plugin is on from day one, so a future Capacitor or native shell can send `Authorization: Bearer`. This avoids the Neon Auth problem on Android. `lib/auth.ts#getActor()` accepts a cookie session, a bearer token, or a kiosk-device cookie, and returns one `Actor`. The bearer plugin runs with `requireSignature: true`: the token is the signed cookie value from the `set-auth-token` header, so a raw `session.token` read from the database is not a credential (added 2026-09-27, issue #6).
@@ -673,17 +678,17 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
 
 [UNRESOLVED 2026-09-27] `INVITE_CODES` is listed below, but nothing reads it: since issue #9 invite codes are minted by an admin on `/admin/members` and stored in `invite_codes`, and the first admin comes from `FOUNDER_EMAILS`. Drop it, or say what it should seed.
 
-| Group    | Variables                                                                                                                                                    |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Database | `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_LOCAL_PROXY`, `PROD_DB_HOST` (the migrate guard refuses it on previews, ADR 0004)                             |
-| Auth     | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `FOUNDER_EMAILS`, `INVITE_CODES` |
-| Calendar | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_CLIENT_EMAIL`, `GOOGLE_CALENDAR_PRIVATE_KEY`                                                                          |
-| Blob     | `BLOB_READ_WRITE_TOKEN`                                                                                                                                      |
-| AI       | `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `AI_DAILY_COMMANDS_PER_MEMBER`                                                                                          |
-| MCP      | `MCP_PUBLIC_URL`                                                                                                                                             |
-| Brain    | `BRAIN_BASE_URL`, `KITCHEN_API_TOKEN` (Olympics → brain). `BRAIN_SERVICE_TOKEN` lives only in brain's env; Olympics keeps its hash in `service_tokens`.      |
-| Cron     | `CRON_SECRET`                                                                                                                                                |
-| E2E      | `E2E_TEST_MODE`, `E2E_*`                                                                                                                                     |
+| Group    | Variables                                                                                                                                                                                           |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database | `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_LOCAL_PROXY`, `PROD_DB_HOST` (the migrate guard refuses it on previews, ADR 0004)                                                                    |
+| Auth     | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `PASSKEY_RP_ID` (optional, issue #79), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `FOUNDER_EMAILS`, `INVITE_CODES` |
+| Calendar | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_CLIENT_EMAIL`, `GOOGLE_CALENDAR_PRIVATE_KEY`                                                                                                                 |
+| Blob     | `BLOB_READ_WRITE_TOKEN`                                                                                                                                                                             |
+| AI       | `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `AI_DAILY_COMMANDS_PER_MEMBER`                                                                                                                                 |
+| MCP      | `MCP_PUBLIC_URL`                                                                                                                                                                                    |
+| Brain    | `BRAIN_BASE_URL`, `KITCHEN_API_TOKEN` (Olympics → brain). `BRAIN_SERVICE_TOKEN` lives only in brain's env; Olympics keeps its hash in `service_tokens`.                                             |
+| Cron     | `CRON_SECRET`                                                                                                                                                                                       |
+| E2E      | `E2E_TEST_MODE`, `E2E_*`                                                                                                                                                                            |
 
 ---
 
@@ -781,7 +786,7 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
 - Replacing brain's memory, reminders or shopping list. We also do not copy brain's tables.
 - Offline-first sync (unlike intake-tracker). The server is authoritative.
 - Websockets or realtime push. Recipes, meal planning and timers are also out.
-- Passkeys and 2FA, which are deferred. Better Auth plugins can add them later.
+- ~~Passkeys and 2FA, which are deferred.~~ [CORRECTION 2026-09-28] Built in issue #79 (§6.2).
 - Admin actions (chores, weights, adjustments, pot, prize mode, members, kiosk pairing) through the AI command, MCP or brain. They are UI only.
 - Prize modes other than `points`.
 - The `baumy-bot` ROS2 robot. A future robot could call the same MCP or action API.
@@ -813,7 +818,12 @@ Decided 2026-09-28 (issue #70):
 15. **Brain gets every member action**, including destructive ones (`delete_event`, `delete_note`, `dismiss_reminder`, …), always behind brain's inline confirm button. Admin actions stay UI only (decision 10 stands). MCP is unchanged.
 16. **Baumy can act on behalf of housemates** (`X-Baumy-On-Behalf-Of`). Any write on someone else's behalf needs the asker's confirm tap, even a `safe` one; reads do not. The audit row records both the housemate (actor) and the linked member who asked (initiator). Admin actions stay unavailable.
 
+Decided 2026-09-28 (issue #79):
+
+17. **Sign-in at camp-404's level:** "the same level of login refinement as on camp-404: passkeys, google auth, device management". Passkeys, two-factor (authenticator app and backup codes), Google linking, a first password for a Google-only account, and a device list with sign-out, on Settings → Security (§6.2).
+18. **Domain:** the app is served at `https://baumy.tech` (apex). It lives only in env (`BETTER_AUTH_URL`, `MCP_PUBLIC_URL`), never in code; passkeys bind to that host.
+
 Still open:
 
-- **Domain** for the app and for MCP (`MCP_PUBLIC_URL`, and later the passkey rpID).
+- ~~**Domain** for the app and for MCP (`MCP_PUBLIC_URL`, and later the passkey rpID).~~ Decided: `baumy.tech` (decision 18).
 - **Which Google Calendar** to share with the service account.
