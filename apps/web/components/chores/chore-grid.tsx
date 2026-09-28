@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -154,15 +155,20 @@ export function ChoreGrid({
 
   /**
    * Choose a tab, and keep it in the address (`?show=`) so a refresh or
-   * coming back shows the same tab. replaceState: no new history entry and
-   * no server round trip (Next.js keeps its router in step with it).
+   * coming back shows the same tab. Through the router (replace, no new
+   * history entry, no scroll), so its own idea of the URL has ?show= too:
+   * a bare replaceState was undone by the re-render after logging a chore.
    */
   function choose(next: BountyFilter) {
     setFilter(next);
-    const url = new URL(window.location.href);
-    if (next === "all") url.searchParams.delete("show");
-    else url.searchParams.set("show", next);
-    window.history.replaceState(window.history.state, "", url);
+    const params = new URLSearchParams(window.location.search);
+    if (next === "all") params.delete("show");
+    else params.set("show", next);
+    const query = params.toString();
+    router.replace(
+      `${window.location.pathname}${query ? `?${query}` : ""}` as Route,
+      { scroll: false },
+    );
   }
 
   const counts = bountyCounts(chores);

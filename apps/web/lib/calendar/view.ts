@@ -126,8 +126,10 @@ export function eventsOnDay(
 /**
  * The month view on a phone, as an agenda: today first (when it is in the
  * month), then only the later days that have events; for another month,
- * every day of it that has events. The stacked grid of 35 empty boxes put
- * today three screens down.
+ * every day of it that has events. The days of the next month that close
+ * the grid's last week are in too (an event on 2 Oct shows on 28 Sep, as
+ * the grid would show it); the previous month's opening days are not. The
+ * stacked grid of 35 empty boxes put today three screens down.
  */
 export function agendaDays(
   range: Pick<ViewRange, "days" | "month">,
@@ -135,7 +137,7 @@ export function agendaDays(
   today: string,
 ): string[] {
   const days = range.days.filter(
-    (d) => range.month === null || d.startsWith(range.month),
+    (d) => range.month === null || d >= `${range.month}-01`,
   );
   const busy = (d: string) => eventsOnDay(events, d).length > 0;
   return days.includes(today)

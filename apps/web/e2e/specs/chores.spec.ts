@@ -63,8 +63,11 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
   await tabs.getByRole("button", { name: /^Maintenance/ }).click();
   await expect(tile(page, name)).toBeVisible();
 
-  // The first log: the preview, then the points it promised.
+  // The first log, from the Maintenance tab: the preview, then the points
+  // it promised; the tab stays in the address through the log.
   await page.goto("/chores");
+  await tabs.getByRole("button", { name: /^Maintenance/ }).click();
+  await expect(page).toHaveURL(/\/chores\?show=maintenance$/);
   await expect(tile(page, name)).toContainText("No streak yet");
   let sheet = await openChore(page, name);
   await expect(sheet.getByTestId("log-preview")).toContainText("+20, streak 1");
@@ -78,6 +81,12 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
   ).toBeVisible();
   await expect(tile(page, name)).toContainText(`${me} · streak 1`);
   await expect(tile(page, name)).toContainText("Again from");
+  await expect(page).toHaveURL(/\/chores\?show=maintenance$/);
+  await page.reload();
+  await expect(
+    tabs.getByRole("button", { name: /^Maintenance/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(tile(page, name)).toBeVisible();
 
   // The second, inside the 48h cooldown: a toast, and nothing stored.
   sheet = await openChore(page, name);
