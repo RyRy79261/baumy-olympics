@@ -199,7 +199,10 @@ too; the lines are in brain's SETUP.md and the PR bodies).
 - [ ] Review the `display` gate that lets an idle paired kiosk read five hub
       widgets (issue #20).
 - [ ] Approve the pixel art and UI kit (issue #7): every screen is a neutral
-      placeholder until then.
+      placeholder until then. [CORRECTION 2026-09-28] The kit landed with
+      issue #64 (ADR 0005, `packages/ui`): check the hub, sign-in and kiosk
+      against the prototype (`proto/kiosk-home-pixel`). The "deferred to
+      issue #7" items below are restyled in the same files.
 
 ## GitHub repository (issue #2)
 

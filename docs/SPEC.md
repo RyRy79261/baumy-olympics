@@ -87,7 +87,7 @@ Details settled while building it (added 2026-09-27, issue #20):
 
 - Any member may add, change, pin or delete any note; it is the household's board. On the kiosk every change needs the acting member's PIN in that request (`requires: "attested"`).
 - The body is markdown and is only ever rendered by `MarkdownBody` (`packages/ui/src/markdown.tsx`, ported from camp-404): raw HTML is shown as the text it was typed as, the rehype-sanitize schema is an allow-list of the tags markdown makes, links keep only http, https, mailto and in-app paths, images are never loaded (their alt text shows), and headings become bold lines. A single newline is a line break.
-- `color` is a name from `NOTE_COLORS` (`packages/types`) or null; issue #7 decides the palette.
+- `color` is a name from `NOTE_COLORS` (`packages/types`) or null; issue #7 decides the palette. [CORRECTION 2026-09-28] Issue #64 (the pixel kit) draws each colour as the nearest kit accent: yellow, pink, blue as teal, green, orange as amber, purple as violet (`packages/ui/src/note.tsx`).
 - Delete is a soft delete (`deleted_at`); nothing in the app brings a note back.
 
 ### 3.6 Baumy the cat and the AI command
