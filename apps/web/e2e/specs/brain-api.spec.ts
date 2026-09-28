@@ -47,7 +47,7 @@ test("brain links a member by code, then adds a confirmed calendar event once", 
   const tg = tgId();
   const actor = { "x-baumy-actor": `tg:${tg}` };
 
-  // The tool list carries each action's risk, and nothing destructive.
+  // The tool list carries each action's risk, destructive ones included.
   const list = await request.get("/api/v1/actions", {
     headers: { authorization: `Bearer ${brain.token}` },
   });
@@ -56,7 +56,10 @@ test("brain links a member by code, then adds a confirmed calendar event once", 
     actions: { name: string; risk: string }[];
   };
   expect(actions.find((a) => a.name === "create_event")?.risk).toBe("confirm");
-  expect(actions.map((a) => a.name)).not.toContain("delete_event");
+  expect(actions.find((a) => a.name === "delete_event")?.risk).toBe(
+    "destructive",
+  );
+  expect(actions.map((a) => a.name)).not.toContain("manage_members");
 
   // Not linked yet: only link_telegram works.
   const early = await call(brain, "whoami", {}, actor);
@@ -129,21 +132,41 @@ test("brain links a member by code, then adds a confirmed calendar event once", 
     page.getByRole("button", { name: new RegExp(`^${title}, `) }),
   ).toHaveCount(1);
 
-  // Destructive and admin actions are not brain's.
-  for (const name of ["delete_event", "manage_members"]) {
-    const res = await call(
-      brain,
-      name,
-      {},
-      {
-        ...actor,
-        "x-baumy-confirmed": "1",
-        "idempotency-key": `x-${rand()}-01`,
-      },
-    );
-    expect(res.status()).toBe(403);
-    expect((await res.json()).code).toBe("SURFACE_FORBIDDEN");
-  }
+  // A destructive action needs the confirm tap too (issue #70).
+  const eventId = (first as { data: { event: { id: string } } }).data.event.id;
+  const deleteKey = { "idempotency-key": `delete-${rand()}-0001` };
+  const unconfirmedDelete = await call(
+    brain,
+    "delete_event",
+    { eventId },
+    { ...actor, ...deleteKey },
+  );
+  expect(unconfirmedDelete.status()).toBe(428);
+  const deleted = await call(
+    brain,
+    "delete_event",
+    { eventId },
+    { ...actor, ...deleteKey, "x-baumy-confirmed": "1" },
+  );
+  expect(deleted.status()).toBe(200);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: new RegExp(`^${title}, `) }),
+  ).toHaveCount(0);
+
+  // Admin actions are not brain's.
+  const admin = await call(
+    brain,
+    "manage_members",
+    {},
+    {
+      ...actor,
+      "x-baumy-confirmed": "1",
+      "idempotency-key": `x-${rand()}-01`,
+    },
+  );
+  expect(admin.status()).toBe(403);
+  expect((await admin.json()).code).toBe("SURFACE_FORBIDDEN");
 
   // A revoked token stops working on its next request.
   revokeServiceToken(tokenName);

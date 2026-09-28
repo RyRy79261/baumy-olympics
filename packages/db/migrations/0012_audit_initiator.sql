@@ -1,0 +1,2 @@
+ALTER TABLE "audit_events" ADD COLUMN "initiated_by_member_id" uuid;--> statement-breakpoint
+ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_initiated_by_member_id_members_id_fk" FOREIGN KEY ("initiated_by_member_id") REFERENCES "public"."members"("id") ON DELETE no action ON UPDATE no action;

@@ -12,6 +12,7 @@ import {
   bearerToken,
   handleBrainAction,
   handleListActions,
+  needsConfirmation,
   parseActor,
   statusFor,
   type BrainEndpointDeps,
@@ -22,7 +23,10 @@ import {
 // exception, the confirm header, the surface filter and the idempotency key.
 // lib/brain/flow.test.ts runs the same routes against the real registry.
 
-const MEMBER = "22222222-2222-4222-8222-222222222222";
+// Hex letters in both, so upper-casing them changes them.
+const MEMBER = "2a2b2c2d-2e2f-4a2b-8c2d-2e2f2a2b2c2d";
+const HOUSEMATE = "3a3b3c3d-3e3f-4a3b-8c3d-3e3f3a3b3c3d";
+const STRANGER = "44444444-4444-4444-8444-444444444444";
 const LINKED_TG = 1001;
 const UNLINKED_TG = 2002;
 const NOW = new Date("2026-09-27T10:00:00.000Z");
@@ -58,6 +62,12 @@ function setup(
     findMember: vi.fn(async (tg: number) =>
       tg === LINKED_TG ? { id: MEMBER } : null,
     ),
+    // Postgres matches a uuid in any case; the row's id is lower-case.
+    findHousemate: vi.fn(async (id: string) =>
+      id.toLowerCase() === HOUSEMATE || id.toLowerCase() === MEMBER
+        ? { id: id.toLowerCase() }
+        : null,
+    ),
     specs: () => toolSpecs("brain"),
     isAction: (name) => actionKind(name) !== undefined,
     runAction,
@@ -77,6 +87,7 @@ function post(
     confirmed?: string;
     key?: string | null;
     body?: string;
+    onBehalfOf?: string;
   } = {},
 ) {
   const headers: Record<string, string> = {
@@ -89,6 +100,9 @@ function post(
   if (actor) headers["x-baumy-actor"] = actor;
   if (opts.confirmed !== undefined) {
     headers["x-baumy-confirmed"] = opts.confirmed;
+  }
+  if (opts.onBehalfOf !== undefined) {
+    headers["x-baumy-on-behalf-of"] = opts.onBehalfOf;
   }
   const key = opts.key === undefined ? "brain-key-0001" : opts.key;
   if (key) headers["idempotency-key"] = key;
@@ -109,7 +123,7 @@ async function body(res: Response) {
 }
 
 describe("GET /api/v1/actions", () => {
-  it("lists the brain tools with their risk, never destructive or admin ones", async () => {
+  it("lists the brain tools with their risk, destructive ones included, never admin ones", async () => {
     const { deps } = setup();
     const res = await handleListActions(get(), deps);
     expect(res.status).toBe(200);
@@ -123,7 +137,10 @@ describe("GET /api/v1/actions", () => {
     expect(actions.find((a) => a.name === "create_event")?.risk).toBe(
       "confirm",
     );
-    expect(names).not.toContain("delete_event");
+    expect(names).toContain("delete_event");
+    expect(actions.find((a) => a.name === "delete_event")?.risk).toBe(
+      "destructive",
+    );
     expect(names).not.toContain("manage_members");
   });
 
@@ -219,9 +236,9 @@ describe("POST /api/v1/actions/{name}", () => {
     expect(runAction).not.toHaveBeenCalled();
   });
 
-  it("says SURFACE_FORBIDDEN for admin and destructive actions, 404 for unknown ones", async () => {
+  it("says SURFACE_FORBIDDEN for admin and UI-only actions, 404 for unknown ones", async () => {
     const { deps, runAction } = setup();
-    for (const name of ["delete_event", "delete_note", "manage_members"]) {
+    for (const name of ["manage_members", "update_my_profile", "mint_invite"]) {
       const res = await handleBrainAction(
         post(name, { confirmed: "1" }),
         name,
@@ -324,6 +341,30 @@ describe("POST /api/v1/actions/{name}", () => {
       deps,
     );
     expect(safe.status).toBe(200);
+  });
+
+  it("needs X-Baumy-Confirmed: 1 for destructive actions too", async () => {
+    const { deps, runAction } = setup();
+    for (const name of ["delete_event", "delete_note"]) {
+      const res = await handleBrainAction(post(name), name, deps);
+      expect(res.status).toBe(428);
+      expect(await body(res)).toMatchObject({ code: "CONFIRMATION_REQUIRED" });
+    }
+    expect(runAction).not.toHaveBeenCalled();
+    const res = await handleBrainAction(
+      post("delete_event", {
+        confirmed: "1",
+        body: JSON.stringify({ eventId: "abcde12345" }),
+      }),
+      "delete_event",
+      deps,
+    );
+    expect(res.status).toBe(200);
+    expect(runAction).toHaveBeenCalledWith(
+      "delete_event",
+      { eventId: "abcde12345" },
+      expect.objectContaining({ source: "brain" }),
+    );
   });
 
   it("needs a valid Idempotency-Key on writes, but not on reads", async () => {
@@ -457,6 +498,241 @@ describe("POST /api/v1/actions/{name}", () => {
   });
 });
 
+describe("X-Baumy-On-Behalf-Of", () => {
+  it("refuses the claim events on someone's behalf with 403, before asking for a tap", async () => {
+    const { deps, runAction } = setup();
+    for (const name of [
+      "confirm_completion",
+      "dispute_completion",
+      "undo_completion",
+      "withdraw_dispute",
+      "concede_completion",
+    ]) {
+      // No confirm header: still 403, not 428.
+      const res = await handleBrainAction(
+        post(name, { onBehalfOf: HOUSEMATE }),
+        name,
+        deps,
+      );
+      expect(res.status, name).toBe(403);
+      expect(await body(res)).toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("Only that housemate can"),
+      });
+    }
+    expect(runAction).not.toHaveBeenCalled();
+    // For the asker themself they run as before, behind the tap.
+    const own = await handleBrainAction(
+      post("confirm_completion", { confirmed: "1" }),
+      "confirm_completion",
+      deps,
+    );
+    expect(own.status).toBe(200);
+  });
+
+  it("lets the note writes run on someone's behalf, behind the tap", async () => {
+    const { deps, runAction } = setup();
+    for (const name of [
+      "create_note",
+      "update_note",
+      "pin_note",
+      "delete_note",
+    ]) {
+      const res = await handleBrainAction(
+        post(name, { onBehalfOf: HOUSEMATE, confirmed: "1" }),
+        name,
+        deps,
+      );
+      expect(res.status, name).toBe(200);
+    }
+    expect(runAction).toHaveBeenCalledTimes(4);
+    for (const call of runAction.mock.calls) {
+      expect(call[2].actor).toMatchObject({
+        memberId: HOUSEMATE,
+        initiatorMemberId: MEMBER,
+      });
+    }
+  });
+
+  it("runs a confirmed write as the housemate, with the asker as initiator", async () => {
+    const { deps, runAction } = setup();
+    const res = await handleBrainAction(
+      post("acknowledge_reminder", {
+        onBehalfOf: HOUSEMATE,
+        confirmed: "1",
+        body: JSON.stringify({ reminderId: STRANGER }),
+      }),
+      "acknowledge_reminder",
+      deps,
+    );
+    expect(res.status).toBe(200);
+    expect(deps.findHousemate).toHaveBeenCalledWith(HOUSEMATE);
+    expect(runAction.mock.calls[0]![2].actor).toEqual({
+      kind: "service",
+      tokenName: "baumy-brain",
+      telegramUserId: LINKED_TG,
+      memberId: HOUSEMATE,
+      initiatorMemberId: MEMBER,
+    });
+  });
+
+  it("needs X-Baumy-Confirmed: 1 for any write on someone's behalf, safe ones too", async () => {
+    const { deps, runAction } = setup();
+    // Safe for the asker themself: no confirmation.
+    const own = await handleBrainAction(
+      post("acknowledge_reminder"),
+      "acknowledge_reminder",
+      deps,
+    );
+    expect(own.status).toBe(200);
+    expect(runAction).toHaveBeenCalledTimes(1);
+    for (const name of ["acknowledge_reminder", "create_note"]) {
+      const res = await handleBrainAction(
+        post(name, { onBehalfOf: HOUSEMATE }),
+        name,
+        deps,
+      );
+      expect(res.status).toBe(428);
+      expect(await body(res)).toMatchObject({
+        code: "CONFIRMATION_REQUIRED",
+        message: expect.stringContaining("housemate"),
+      });
+    }
+    expect(runAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs a read on someone's behalf without confirmation", async () => {
+    const { deps, runAction } = setup();
+    const res = await handleBrainAction(
+      post("get_pending_confirmations", { onBehalfOf: HOUSEMATE, key: null }),
+      "get_pending_confirmations",
+      deps,
+    );
+    expect(res.status).toBe(200);
+    expect(runAction.mock.calls[0]![2].actor).toMatchObject({
+      memberId: HOUSEMATE,
+      initiatorMemberId: MEMBER,
+    });
+  });
+
+  it("refuses a target who is not an active member of this household", async () => {
+    const { deps, runAction } = setup();
+    // Unknown, deactivated or in another household: findHousemate says null.
+    const res = await handleBrainAction(
+      post("create_note", { onBehalfOf: STRANGER, confirmed: "1" }),
+      "create_note",
+      deps,
+    );
+    expect(res.status).toBe(404);
+    expect(await body(res)).toMatchObject({ code: "NOT_FOUND" });
+    for (const bad of ["not-a-uuid", "tg:1001", "12345"]) {
+      const r = await handleBrainAction(
+        post("create_note", { onBehalfOf: bad, confirmed: "1" }),
+        "create_note",
+        deps,
+      );
+      expect(r.status).toBe(400);
+      expect(await body(r)).toMatchObject({
+        code: "INVALID_INPUT",
+        issues: [{ path: ["x-baumy-on-behalf-of"] }],
+      });
+    }
+    expect(runAction).not.toHaveBeenCalled();
+  });
+
+  it("treats the asker's own id, in any case, as no on-behalf at all", async () => {
+    const { deps, runAction } = setup();
+    for (const own of [MEMBER, MEMBER.toUpperCase()]) {
+      const res = await handleBrainAction(
+        post("create_reminder", {
+          onBehalfOf: own,
+          body: JSON.stringify({ title: "Hi" }),
+        }),
+        "create_reminder",
+        deps,
+      );
+      // A safe write for the asker: no confirmation needed.
+      expect(res.status).toBe(200);
+    }
+    for (const call of runAction.mock.calls) {
+      expect(call[2].actor).toEqual({
+        kind: "service",
+        tokenName: "baumy-brain",
+        telegramUserId: LINKED_TG,
+        memberId: MEMBER,
+      });
+    }
+    // An upper-cased housemate id is still that housemate.
+    const res = await handleBrainAction(
+      post("create_reminder", {
+        onBehalfOf: HOUSEMATE.toUpperCase(),
+        confirmed: "1",
+      }),
+      "create_reminder",
+      deps,
+    );
+    expect(res.status).toBe(200);
+    expect(runAction.mock.calls[2]![2].actor).toMatchObject({
+      memberId: HOUSEMATE,
+      initiatorMemberId: MEMBER,
+    });
+  });
+
+  it("refuses it for link_telegram and for actions that name their member in the input", async () => {
+    const { deps, runAction } = setup();
+    const done = await handleBrainAction(
+      post("log_completion", { onBehalfOf: HOUSEMATE, confirmed: "1" }),
+      "log_completion",
+      deps,
+    );
+    expect(done.status).toBe(400);
+    expect(await body(done)).toMatchObject({
+      code: "INVALID_INPUT",
+      message: expect.stringContaining("doneBy"),
+    });
+    for (const actor of [`tg:${LINKED_TG}`, `tg:${UNLINKED_TG}`]) {
+      const link = await handleBrainAction(
+        post("link_telegram", {
+          actor,
+          onBehalfOf: HOUSEMATE,
+          body: JSON.stringify({ code: "ABCDEFGH23" }),
+        }),
+        "link_telegram",
+        deps,
+      );
+      expect(link.status).toBe(400);
+    }
+    expect(runAction).not.toHaveBeenCalled();
+  });
+
+  it("still refuses an unlinked asker before looking at the header", async () => {
+    const { deps } = setup();
+    const res = await handleBrainAction(
+      post("create_note", {
+        actor: `tg:${UNLINKED_TG}`,
+        onBehalfOf: HOUSEMATE,
+        confirmed: "1",
+      }),
+      "create_note",
+      deps,
+    );
+    expect(res.status).toBe(403);
+    expect(await body(res)).toMatchObject({ code: "TELEGRAM_NOT_LINKED" });
+    expect(deps.findHousemate).not.toHaveBeenCalled();
+  });
+
+  it("does not open admin actions on anyone's behalf", async () => {
+    const { deps } = setup();
+    const res = await handleBrainAction(
+      post("manage_members", { onBehalfOf: HOUSEMATE, confirmed: "1" }),
+      "manage_members",
+      deps,
+    );
+    expect(res.status).toBe(403);
+    expect(await body(res)).toMatchObject({ code: "SURFACE_FORBIDDEN" });
+  });
+});
+
 describe("helpers", () => {
   it("parses the bearer and the actor header", () => {
     expect(bearerToken("Bearer abc")).toBe("abc");
@@ -468,6 +744,23 @@ describe("helpers", () => {
     expect(parseActor("tg:0")).toBeNull();
     expect(parseActor("tg:1 2")).toBeNull();
     expect(parseActor(null)).toBeNull();
+  });
+
+  it("says which requests need confirmation", () => {
+    expect(needsConfirmation({ kind: "read", risk: "safe" }, false)).toBe(
+      false,
+    );
+    expect(needsConfirmation({ kind: "read", risk: "safe" }, true)).toBe(false);
+    expect(needsConfirmation({ kind: "write", risk: "safe" }, false)).toBe(
+      false,
+    );
+    expect(needsConfirmation({ kind: "write", risk: "safe" }, true)).toBe(true);
+    expect(needsConfirmation({ kind: "write", risk: "confirm" }, false)).toBe(
+      true,
+    );
+    expect(
+      needsConfirmation({ kind: "write", risk: "destructive" }, false),
+    ).toBe(true);
   });
 
   it("maps codes to statuses, domain refusals to 422", () => {

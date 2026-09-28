@@ -173,6 +173,8 @@ export const logCompletionAction = defineAction({
     i.doneBy !== undefined && i.doneBy !== ctx.actor.memberId
       ? "attested"
       : "member",
+  // "Jo did the dishes" is doneBy: Jo, logged (and vouched for) by the asker.
+  memberField: "doneBy",
   input,
   async preview(ctx, i) {
     const doneBy = doerOf(ctx, i);

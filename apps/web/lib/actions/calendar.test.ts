@@ -573,22 +573,32 @@ describe("delete_event", () => {
     expect(await memoryCalendar().get(event.id)).toMatchObject({ ok: true });
   });
 
-  it("is never offered over MCP or to brain", async () => {
+  it("is never offered over MCP; brain may delete (issue #70)", async () => {
     const me = await seedMember(db());
     expect(REGISTRY.delete_event.risk).toBe("destructive");
-    for (const [actor, source] of [
-      [mcp(me), "mcp"],
-      [brain(me), "brain"],
-    ] as const) {
-      expect(
-        await run(
-          "delete_event",
-          { eventId: "abcde123" },
-          ctxFor(actor, { source } as Partial<RequestCtx>),
-        ),
-      ).toMatchObject({ code: "SURFACE_FORBIDDEN" });
-    }
+    const { event } = ok(
+      await run("create_event", dinner("2027-01-15"), ctxFor(sessionActor(me))),
+    ) as { event: { id: string } };
+    seen = [];
+    expect(
+      await run(
+        "delete_event",
+        { eventId: event.id },
+        ctxFor(mcp(me), { source: "mcp" }),
+      ),
+    ).toMatchObject({ code: "SURFACE_FORBIDDEN" });
     expect(seen).toEqual([]);
+    const data = ok(
+      await run(
+        "delete_event",
+        { eventId: event.id },
+        ctxFor(brain(me), { source: "brain" }),
+      ),
+    );
+    expect(data).toEqual({ eventId: event.id, title: "Dinner" });
+    expect(await memoryCalendar().get(event.id)).toMatchObject({
+      reason: "not_found",
+    });
   });
 
   it("does not find a private or missing event, and reports a failed delete", async () => {
