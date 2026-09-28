@@ -61,15 +61,17 @@ export function ChoreTile({
   type = "button",
   ...props
 }: ChoreTileProps) {
+  const due = state === "due";
   return (
     <button
       type={type}
       data-state={state}
       className={cx(
+        // Calm (ADR 0005 §8): every tile keeps the dim line frame; "due" is
+        // said once, by the status line in red.
         "pixel-frame flex w-full items-center gap-3 bg-bm-surface p-3 text-left text-bm-text",
         "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50",
-        state === "due" ? "[--pf:var(--color-bm-text)]" : "text-bm-muted",
-        kiosk ? "min-h-20 text-lg" : "min-h-16 text-base",
+        kiosk ? "min-h-24 gap-4 p-4 text-lg" : "min-h-16 text-base",
         className,
       )}
       {...props}
@@ -87,15 +89,27 @@ export function ChoreTile({
           accent="var(--color-bm-text)"
         />
       </span>
-      {/* w-0 + flex-1: the truncated lines never widen the tile (or the
-          grid it sits in) past a phone's screen. */}
-      <span data-tile-text className="flex w-0 min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-baseline justify-between gap-2">
-          <span className="truncate text-xl leading-tight font-semibold text-bm-text">
+      {/* w-0 + flex-1: the text never widens the tile (or the grid it sits
+          in) past the screen; long names wrap to two lines instead. */}
+      <span data-tile-text className="flex w-0 min-w-0 flex-1 flex-col gap-1">
+        <span className="flex items-start justify-between gap-2">
+          <span
+            data-tile-name
+            className={cx(
+              "line-clamp-2 leading-tight font-semibold [overflow-wrap:anywhere] text-bm-text",
+              kiosk ? "text-2xl" : "text-xl",
+            )}
+          >
             {name}
           </span>
           {points !== null ? (
-            <span className="shrink-0 font-display text-xs text-bm-yellow">
+            <span
+              data-tile-points
+              className={cx(
+                "shrink-0 font-display text-bm-yellow",
+                kiosk ? "pt-1 text-base" : "pt-0.5 text-xs",
+              )}
+            >
               {points} pts
             </span>
           ) : null}
@@ -104,10 +118,8 @@ export function ChoreTile({
           {streak}
         </span>
         <span
-          className={cx(
-            "truncate",
-            state === "due" ? "text-bm-text" : "text-bm-dim",
-          )}
+          data-tile-status
+          className={cx("truncate", due ? "text-bm-red" : "text-bm-dim")}
         >
           {status}
         </span>
@@ -194,7 +206,7 @@ export function ChoiceGroup({
           <label
             key={o.value}
             className={cx(
-              "pixel-frame inline-flex cursor-pointer items-center gap-2 px-3 font-label font-bold uppercase",
+              "pixel-frame pixel-frame-within inline-flex cursor-pointer items-center gap-2 px-3 font-label font-bold uppercase",
               o.value === value
                 ? "bg-bm-violet/15 text-bm-text [--pf:var(--color-bm-violet)]"
                 : "text-bm-muted",

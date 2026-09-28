@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
-import { Button, ToastItem as ToastCard, ToastList } from "@baumy/ui";
+import { ToastItem as ToastCard, ToastList } from "@baumy/ui";
 import {
   dismissToast,
   getServerToasts,
@@ -19,14 +19,7 @@ function ToastItem({ toast }: { toast: ToastRecord }) {
     return () => clearTimeout(timer);
   }, [toast.id, toast.duration]);
   return (
-    <ToastCard
-      variant={toast.variant}
-      action={
-        <Button variant="ghost" onClick={() => dismissToast(toast.id)}>
-          Dismiss
-        </Button>
-      }
-    >
+    <ToastCard variant={toast.variant} onDismiss={() => dismissToast(toast.id)}>
       {toast.title}{" "}
     </ToastCard>
   );

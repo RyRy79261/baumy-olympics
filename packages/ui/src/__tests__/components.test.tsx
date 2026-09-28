@@ -245,8 +245,10 @@ describe("Sprite", () => {
       );
     }
     // A still state is marked some other way than motion.
-    expect(html(<Sprite name="baumy" state="sad" />)).toContain("×");
+    expect(html(<Sprite name="baumy" state="sad" />)).toContain(">x</span>");
     expect(html(<Sprite name="baumy" state="sleeping" />)).toContain("z");
-    expect(html(<Sprite name="baumy" state="idle" />)).not.toContain("×");
+    expect(html(<Sprite name="baumy" state="idle" />)).not.toContain(
+      "data-mark",
+    );
   });
 });

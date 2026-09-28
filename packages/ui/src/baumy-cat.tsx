@@ -8,6 +8,7 @@ import {
   type BaumyAnimation,
 } from "./pixel/baumy-cat";
 import { SpriteStrip } from "./pixel/pixel-art";
+import { gridSize, type Palette } from "./pixel/pixel-grid";
 
 // Baumy, the house cat (ADR 0005 §1, §7): Camp 404's INKBLOT cat at twice
 // the pixels (pixel/baumy-cat.ts). It just sits being a cat, and its state
@@ -53,6 +54,51 @@ export function baumyFrames(state: SpriteState): string[][] {
   );
 }
 
+/**
+ * The colours a state is drawn in. Asleep, the eye pixel takes the coat's
+ * colour, so the eye reads as shut: a colour change on the same frame, not
+ * new art.
+ */
+export function baumyPalette(state: SpriteState): Palette {
+  return state === "sleeping"
+    ? { ...BAUMY_COLOURS, E: BAUMY_COLOURS.K! }
+    : BAUMY_COLOURS;
+}
+
+/** How tall a mark is, in art pixels. */
+export const MARK_ART_PX = 6;
+
+/**
+ * Where a state mark goes, in art pixels: centred over the head (the top
+ * rows of drawn pixels, mirrored when Baumy faces left), with its top in the
+ * empty rows above it (never above the frame).
+ */
+export function markAnchor(
+  frame: readonly string[],
+  facing: "left" | "right",
+): { top: number; x: number } {
+  const { w } = gridSize(frame);
+  const top = Math.max(
+    0,
+    frame.findIndex((row) => /[^.]/.test(row)),
+  );
+  let lo = w;
+  let hi = -1;
+  for (const row of frame.slice(top, top + 4)) {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] !== ".") {
+        lo = Math.min(lo, x);
+        hi = Math.max(hi, x);
+      }
+    }
+  }
+  const centre = (lo + hi + 1) / 2;
+  return {
+    top: Math.max(0, top - MARK_ART_PX - 1),
+    x: facing === "left" ? w - centre : centre,
+  };
+}
+
 export function BaumyCat({
   state = "idle",
   scale = 3,
@@ -73,7 +119,9 @@ export function BaumyCat({
   className?: string;
 }) {
   const { frameMs } = BAUMY_STATE_FRAMES[state];
+  const frames = baumyFrames(state);
   const mark = STATE_MARK[state];
+  const anchor = mark ? markAnchor(frames[0]!, facing) : null;
   return (
     <span
       data-sprite="baumy"
@@ -104,18 +152,26 @@ export function BaumyCat({
         </span>
       ) : null}
       <SpriteStrip
-        frames={baumyFrames(state)}
-        palette={BAUMY_COLOURS}
+        frames={frames}
+        palette={baumyPalette(state)}
         scale={scale}
         frameMs={frameMs}
         flip={facing === "left"}
         className="block"
       />
-      {mark ? (
+      {mark && anchor ? (
+        // Above the drawn head, in the empty rows the art leaves there, as
+        // violet pixel type (the prototype's sleeping "z"). Inside the art's
+        // box, so a plinth or a clip never cuts it off.
         <span
           aria-hidden
           data-mark
-          className="absolute -top-2 -right-2 bg-bm-text px-1 font-display text-[10px] leading-4 text-bm-ink"
+          className="absolute -translate-x-1/2 font-display leading-none text-bm-violet [text-shadow:1px_1px_0_var(--color-bm-ink)]"
+          style={{
+            top: anchor.top * scale,
+            left: anchor.x * scale,
+            fontSize: Math.max(8, MARK_ART_PX * scale),
+          }}
         >
           {mark}
         </span>

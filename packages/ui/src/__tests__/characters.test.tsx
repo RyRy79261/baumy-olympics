@@ -296,7 +296,7 @@ describe("Toasts", () => {
     const out = html(
       <ToastList aria-label="Notifications">
         <ToastItem variant="error">Nope</ToastItem>
-        <ToastItem variant="success" action={<button>Dismiss</button>}>
+        <ToastItem variant="success" onDismiss={() => undefined}>
           Saved
         </ToastItem>
         <ToastItem variant="info">FYI</ToastItem>

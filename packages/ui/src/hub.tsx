@@ -86,7 +86,7 @@ export function HubGrid({
     <div
       className={cx(
         kiosk
-          ? "grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3"
+          ? "grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3 pb-32"
           : "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3",
         className,
       )}
@@ -191,13 +191,17 @@ export function BaumyButton({
       type={type}
       aria-label="Ask Baumy"
       className={cx(
-        "fixed right-4 bottom-4 z-10 inline-flex min-h-16 min-w-16 touch-manipulation items-end justify-center",
-        "drop-shadow-[0_4px_0_rgb(0_0_0/0.45)] active:translate-y-px",
+        // Baumy sits on a small raised plinth in the corner (the prototype's
+        // footer end), so it reads against any page; the shells keep that
+        // corner clear (AppShell's bottom padding, HubGrid's on the kiosk).
+        "fixed right-3 bottom-3 z-10 inline-flex touch-manipulation items-end justify-center",
+        "pixel-frame pixel-frame-4 bg-bm-raised px-3 pt-2 pb-3 [--pf:var(--color-bm-violet)]",
+        "shadow-[0_6px_0_rgb(0_0_0/0.45)] active:translate-y-px",
         className,
       )}
       {...props}
     >
-      <Sprite name="baumy" state={state} size={3} />
+      <Sprite name="baumy" state={state} size={6} />
     </button>
   );
 }
