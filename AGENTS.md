@@ -25,6 +25,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 | `pnpm db:local:test`                                    | Run the `*.local.test.ts` files (db, web) that need Docker Postgres.        |
 | `pnpm --filter @baumy/db db:generate`                   | Generate a migration after editing `schema.ts`.                             |
 | `pnpm brain:spec`                                       | Regenerate `docs/brain-operations-spec.md` from the action registry.        |
+| `pnpm --filter @baumy/web logo:png`                     | Rewrite `design/logo/` from the badge grid after changing the badge.        |
 | `pnpm turbo run format:check lint typecheck test build` | **The gate.** Run it before every push.                                     |
 | `E2E_SERVE=build ./scripts/e2e-local.sh [specs/<area>]` | Run Playwright against Docker Postgres.                                     |
 | `for t in scripts/tests/*.test.sh; do bash "$t"; done`  | Test the deploy scripts (docs/deploy.md).                                   |
