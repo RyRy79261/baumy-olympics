@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { buildAuthOptions } from "../config";
@@ -540,5 +540,225 @@ describe("passkeys on www.baumy.tech", () => {
     await expect(signIn.json()).resolves.toMatchObject({
       rpId: "baumy.tech",
     });
+  });
+});
+
+describe("endpoints an audited action replaces", () => {
+  it("answer 404, while the rest of the passkey plugin answers", async () => {
+    const { cookie, userId } = await signUp("owner@example.com");
+    userRow(userId).emailVerified = true;
+    // Present before absent: the plugin is mounted and listing works.
+    const list = await call("/passkey/list-user-passkeys", { cookie });
+    expect(list.status).toBe(200);
+    for (const [path, body] of [
+      ["/passkey/delete-passkey", { id: "pk" }],
+      ["/passkey/update-passkey", { id: "pk", name: "x" }],
+      ["/unlink-account", { providerId: "google" }],
+      ["/revoke-session", { token: "t" }],
+      ["/revoke-sessions", {}],
+      ["/revoke-other-sessions", {}],
+    ] as const) {
+      const res = await call(path, { body, cookie });
+      expect(res.status, path).toBe(404);
+    }
+    expect(db.session!.filter((s) => s.userId === userId)).toHaveLength(1);
+  });
+});
+
+describe("trusted devices and a changed password", () => {
+  it("a changed password forgets every trusted device, so the code is asked again", async () => {
+    const { cookie, userId } = await signUp("owner@example.com");
+    userRow(userId).emailVerified = true;
+    const started = await call("/two-factor/enable", {
+      body: { password: PASSWORD },
+      cookie,
+    });
+    const { totpURI } = (await started.json()) as { totpURI: string };
+    const enrolled = await call("/two-factor/verify-totp", {
+      body: { code: totpFromUri(totpURI) },
+      cookie,
+    });
+    expect(enrolled.status).toBe(200);
+    // Turning two-factor on refreshes this device's session cookie.
+    const owner = cookiesFrom(enrolled, cookie);
+
+    // Sign in on a device and trust it.
+    const first = await call("/sign-in/email", {
+      body: { email: "owner@example.com", password: PASSWORD },
+    });
+    const trusted = await call("/two-factor/verify-totp", {
+      body: { code: totpFromUri(totpURI), trustDevice: true },
+      cookie: cookiesFrom(first),
+    });
+    expect(trusted.status).toBe(200);
+    const device = cookiesFrom(trusted, cookiesFrom(first));
+    const trustRows = () =>
+      db.verification!.filter((v) =>
+        String(v.identifier).startsWith("trust-device-"),
+      );
+    expect(trustRows()).toHaveLength(1);
+
+    // The control: while trusted, a password alone signs that device in.
+    const skip = await call("/sign-in/email", {
+      body: { email: "owner@example.com", password: PASSWORD },
+      cookie: device,
+    });
+    await expect(skip.json()).resolves.not.toHaveProperty("twoFactorRedirect");
+
+    const newPassword = "a whole new passphrase for this";
+    const changed = await call("/change-password", {
+      body: {
+        currentPassword: PASSWORD,
+        newPassword,
+        revokeOtherSessions: true,
+      },
+      cookie: owner,
+    });
+    expect(changed.status).toBe(200);
+    expect(trustRows()).toEqual([]);
+
+    const again = await call("/sign-in/email", {
+      body: { email: "owner@example.com", password: newPassword },
+      cookie: device,
+    });
+    await expect(again.json()).resolves.toMatchObject({
+      twoFactorRedirect: true,
+    });
+  });
+
+  it("a refused password change forgets nothing", async () => {
+    const { cookie, userId } = await signUp("owner@example.com");
+    db.verification!.push({
+      id: "t1",
+      identifier: "trust-device-x",
+      value: userId,
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const res = await call("/change-password", {
+      body: {
+        currentPassword: "not it at all, no",
+        newPassword: "whatever it is now",
+      },
+      cookie,
+    });
+    expect(res.status).toBe(400);
+    expect(db.verification!.map((v) => v.id)).toContain("t1");
+  });
+});
+
+describe("Google sign-in never links itself", () => {
+  const GOOGLE = {
+    GOOGLE_CLIENT_ID: "client-id",
+    GOOGLE_CLIENT_SECRET: "client-secret",
+  };
+
+  function b64url(value: unknown): string {
+    return Buffer.from(JSON.stringify(value)).toString("base64url");
+  }
+
+  /** Google's token endpoint, answering with an id token for `email`. */
+  function fakeGoogle(email: string, sub: string) {
+    const idToken = `${b64url({ alg: "RS256", typ: "JWT" })}.${b64url({
+      iss: "https://accounts.google.com",
+      aud: "client-id",
+      sub,
+      email,
+      email_verified: true,
+      name: "Owner",
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })}.sig`;
+    return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : ((input as Request).url ?? String(input));
+      if (String(url).startsWith("https://oauth2.googleapis.com/token")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "at",
+            id_token: idToken,
+            expires_in: 3600,
+            token_type: "Bearer",
+            scope: "openid email profile",
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      throw new Error(`unexpected fetch ${String(url)}`);
+    });
+  }
+
+  /** Start "Continue with Google" and come back from Google with a code. */
+  async function continueWithGoogle(cookie = "") {
+    const start = await call("/sign-in/social", {
+      body: { provider: "google", callbackURL: "/" },
+      cookie,
+    });
+    expect(start.status).toBe(200);
+    const { url } = (await start.json()) as { url: string };
+    const state = new URL(url).searchParams.get("state")!;
+    const jar = cookiesFrom(start, cookie);
+    const headers = new Headers({ cookie: jar });
+    return auth.handler(
+      new Request(
+        `${BASE}/api/auth/callback/google?code=the-code&state=${encodeURIComponent(state)}`,
+        { headers, redirect: "manual" },
+      ),
+    );
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("refuses to join a password account with the same email, and adds no Google account", async () => {
+    auth = makeAuth(GOOGLE);
+    const { userId } = await signUp("owner@example.com");
+    userRow(userId).emailVerified = true;
+    fakeGoogle("owner@example.com", "google-sub-1");
+
+    const res = await continueWithGoogle();
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("error=account_not_linked");
+    expect(hasSessionCookie(res)).toBe(false);
+    expect(db.account!.filter((a) => a.providerId === "google")).toEqual([]);
+  });
+
+  it("still signs up a Google address with no account", async () => {
+    auth = makeAuth(GOOGLE);
+    fakeGoogle("new@example.com", "google-sub-2");
+    const res = await continueWithGoogle();
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).not.toContain("error=");
+    expect(hasSessionCookie(res)).toBe(true);
+    const user = db.user!.find((u) => u.email === "new@example.com")!;
+    expect(user.emailVerified).toBe(true);
+    expect(
+      db.account!.filter(
+        (a) => a.providerId === "google" && a.userId === user.id,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("signs in once the owner has linked Google", async () => {
+    auth = makeAuth(GOOGLE);
+    const { userId } = await signUp("owner@example.com");
+    userRow(userId).emailVerified = true;
+    // What "Link Google" (linkSocial) leaves behind.
+    db.account!.push({
+      id: "g1",
+      accountId: "google-sub-3",
+      providerId: "google",
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    fakeGoogle("owner@example.com", "google-sub-3");
+    const res = await continueWithGoogle();
+    expect(res.headers.get("location")).not.toContain("error=");
+    expect(hasSessionCookie(res)).toBe(true);
   });
 });
