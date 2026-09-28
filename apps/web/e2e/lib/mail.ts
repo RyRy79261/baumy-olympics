@@ -6,7 +6,8 @@
 
 import { readFile } from "node:fs/promises";
 
-type AuthMailKind = "reset" | "verify" | "password-reset-completed";
+type AuthMailKind =
+  "reset" | "verify" | "password-reset-completed" | "password-set";
 
 interface CapturedMail {
   at: string;
