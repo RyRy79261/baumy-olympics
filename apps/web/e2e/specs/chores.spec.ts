@@ -20,17 +20,40 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
 
   // The starter chores of SPEC §4.7 are seeded.
   await expect(
-    page.getByRole("link", { name: "Chores", exact: true }).first(),
+    page.getByRole("link", { name: "Bounties", exact: true }).first(),
   ).toBeVisible();
   await page.goto("/chores");
   await expect(
-    page.getByRole("heading", { name: "Chores", level: 1 }),
+    page.getByRole("heading", { name: "Bounties", level: 1 }),
   ).toBeVisible();
   for (const seeded of ["Trash", "Dishes", "Keller"]) {
     await expect(page.getByTestId(`chore-${seeded}`)).toBeVisible();
   }
 
   await addChore(page, { name, basePoints: 20, cooldownHours: 48 });
+
+  // Never done and just added: an urgent, new maintenance bounty. The hub's
+  // Urgent tile opens the board on its tab, and the kind tabs narrow it.
+  await page.goto("/");
+  const urgentTile = page.getByTestId("hub-tile-urgent");
+  await expect(urgentTile).toHaveAccessibleName(/^Urgent: [1-9]\d*$/);
+  await urgentTile.click();
+  await expect(page).toHaveURL(/\/chores\?show=urgent$/);
+  const tabs = page.getByRole("group", { name: "Show" });
+  await expect(tabs.getByRole("button", { name: /^Urgent/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(tile(page, name)).toContainText("New");
+  await expect(tile(page, name)).toContainText("Urgent");
+  await expect(tile(page, name)).toContainText("Maintenance");
+  await tabs.getByRole("button", { name: /^Consumables/ }).click();
+  await expect(
+    tabs.getByRole("button", { name: /^Consumables/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId(`chore-${name}`)).toHaveCount(0);
+  await tabs.getByRole("button", { name: /^Maintenance/ }).click();
+  await expect(tile(page, name)).toBeVisible();
 
   // The first log: the preview, then the points it promised.
   await page.goto("/chores");
@@ -94,6 +117,7 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
   await expect(page.getByTestId(`admin-chore-${name}`)).not.toContainText(
     "archived",
   );
-  await page.goto("/chores");
+  await page.goto("/chores?show=consumable");
   await expect(tile(page, name)).toContainText("30 pts");
+  await expect(tile(page, name)).toContainText("Consumable");
 });
