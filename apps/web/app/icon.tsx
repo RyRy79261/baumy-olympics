@@ -2,7 +2,7 @@ import { renderAppIcon } from "@/components/app-icon";
 
 // The app's icons (issue #29): the browser tab and the manifest's launcher
 // sizes, one route per size (/icon/192, /icon/512, /icon/maskable). Built
-// once at build time; a placeholder until the pixel art lands.
+// once at build time: the Baumy badge (components/app-icon.ts, issue #81).
 
 export function generateImageMetadata() {
   return [
@@ -19,6 +19,6 @@ export function generateImageMetadata() {
 
 export default async function Icon({ id }: { id: Promise<string> }) {
   const which = await id;
-  if (which === "maskable") return renderAppIcon(512, true);
+  if (which === "maskable") return renderAppIcon(512, "maskable");
   return renderAppIcon(Number(which));
 }

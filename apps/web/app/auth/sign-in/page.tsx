@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AuthFrame } from "@baumy/ui";
 import { isGoogleConfigured } from "@baumy/auth/env";
+import { LegalLinks } from "@/components/legal/legal-page";
 import { redirectIfSignedIn } from "@/lib/auth";
 import { signInWithBaumyEnabled } from "@/lib/login-approval/flag";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
@@ -27,6 +28,7 @@ export default async function SignInPage({
         oauthFailed={Boolean(error)}
         callbackURL={next}
       />
+      <LegalLinks />
     </AuthFrame>
   );
 }

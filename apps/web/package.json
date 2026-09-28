@@ -16,7 +16,8 @@
     "test:e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
     "test:local": "vitest run --config vitest.local.config.ts",
-    "brain:spec": "vitest run lib/brain/operations-spec.test.ts --update"
+    "brain:spec": "vitest run lib/brain/operations-spec.test.ts --update",
+    "logo:png": "BAUMY_WRITE_LOGO=1 vitest run lib/brand/logo-files.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
