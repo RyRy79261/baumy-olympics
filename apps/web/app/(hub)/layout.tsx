@@ -6,19 +6,22 @@ import { findKioskPinLockedAt } from "@baumy/db/members";
 import { AppShell, FormMessage, Housemate, navItemClass } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
-import { requireMemberPage } from "@/lib/auth";
+import { memberOrVisitorPage } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
 import { activeCharacters } from "@/lib/members/characters";
 import { HubMenu, InboxBadge, NavLinks, type NavItem } from "./nav-links";
 
 // The hub's shell (SPEC §7) around every page for household members. The
 // gate here is for the frame; each page runs its own gate too, because a
-// layout is not re-rendered on every client navigation.
+// layout is not re-rendered on every client navigation. Nobody signed in
+// gets no frame: `/` is then the public landing page (issue #96), and every
+// other hub page's own gate sends them to sign-in.
 
 export const dynamic = "force-dynamic";
 
 export default async function HubLayout({ children }: { children: ReactNode }) {
-  const me = await requireMemberPage();
+  const me = await memberOrVisitorPage();
+  if (!me) return children;
   // Their character as every screen draws it (lib/members/characters.ts).
   const characters = await activeCharacters(
     createHttpDb() as unknown as Queryable,
