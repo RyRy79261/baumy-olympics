@@ -1,15 +1,10 @@
 import "server-only";
 
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { getKioskActor } from "@/lib/auth";
 import { now } from "@/lib/clock";
-import {
-  KIOSK_MEMBER_COOKIE,
-  KIOSK_MEMBER_MAX_AGE_S,
-  kioskCookieOptions,
-} from "@/lib/kiosk/cookies";
 import { pickKioskMember, type PickedMember } from "@/lib/kiosk/selection";
 import { getClientIp } from "@/lib/rate-limit";
 import type { ActionName, RequestCtx } from "./define";
@@ -90,11 +85,14 @@ export const FACE_FIELD = "memberId";
 
 /**
  * Run `name` from the kiosk as the face that was tapped (the reminder's
- * "I've seen it", ADR 0005 §4): that member is picked, exactly as if their
- * avatar had been tapped (the same check, the same cookie), and the action
- * runs as them and only them. The face field never reaches the action's
- * input. No PIN is asked for: the actions this serves are `member`, and
- * runAction's gates refuse an `attested` one without its PIN anyway.
+ * "I've seen it", ADR 0005 §4): the face must be an active member (the same
+ * check as tapping their avatar), and the action runs as them and only them,
+ * for this one request. It does NOT change who is picked on the kiosk: the
+ * person who was acting before the tap is still the one acting after it, so
+ * their next tap is never recorded as whoever acknowledged a reminder. The
+ * face field never reaches the action's input. No PIN is asked for: the
+ * actions this serves are `member`, and runAction's gates refuse an
+ * `attested` one without its PIN anyway.
  */
 export async function kioskActionAsFace<N extends ActionName>(
   name: N,
@@ -110,11 +108,6 @@ export async function kioskActionAsFace<N extends ActionName>(
         ? fail("UNAUTHENTICATED", NOT_PAIRED_MESSAGE)
         : picked;
     }
-    (await cookies()).set(
-      KIOSK_MEMBER_COOKIE,
-      picked.data.memberId,
-      kioskCookieOptions(KIOSK_MEMBER_MAX_AGE_S),
-    );
     const rest = new FormData();
     for (const [key, value] of form.entries()) {
       if (key !== FACE_FIELD) rest.append(key, value);

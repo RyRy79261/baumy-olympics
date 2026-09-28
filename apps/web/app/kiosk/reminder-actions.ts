@@ -9,8 +9,8 @@ import type {
 import type { ActionResult } from "@/lib/actions/result";
 
 // The kitchen screen's full-screen reminder (ADR 0005 §4, issue #66):
-// thin wrappers around the registry. A face's tap picks that member and acts
-// as them (kioskActionAsFace), with no PIN.
+// thin wrappers around the registry. A face's tap acts as that member for
+// that one request (kioskActionAsFace), with no PIN and no change of pick.
 
 /** The reminders on the kitchen screen now (the reminder's poll). */
 export async function kioskRemindersAction(): Promise<

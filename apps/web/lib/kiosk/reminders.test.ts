@@ -35,9 +35,15 @@ const DATA: ListRemindersData = {
 
 describe("reminderFaces", () => {
   it("draws everyone asked, in join order, and who has seen it", () => {
+    const face = (id: string, displayName: string, seen: boolean) => ({
+      id,
+      displayName,
+      avatar: defaultAvatar(id),
+      seen,
+    });
     expect(reminderFaces(DATA, REMINDER)).toEqual([
-      { ...member("a", "Ana"), seen: false },
-      { ...member("b", "Ben"), seen: true },
+      face("a", "Ana", false),
+      face("b", "Ben", true),
     ]);
   });
 });

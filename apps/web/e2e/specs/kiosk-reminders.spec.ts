@@ -5,8 +5,8 @@ import { expectKioskTargets, pairedKiosk } from "../lib/kiosk";
 // Issue #66 (ADR 0005 §4, §5), on the kitchen iPad against Docker Postgres:
 // a member chooses their character in Settings and it shows in the hub
 // header and on the kiosk; they post a reminder from the hub; the kiosk
-// shows it full-screen with every face; a face's tap picks that member and
-// records it as them; once everyone has seen it, it closes. A second
+// shows it full-screen with every face; a face's tap records it as that member
+// without changing who is picked; once everyone has seen it, it closes. A second
 // reminder is dismissed for everyone, as whoever says so.
 //
 // The household is shared by every spec running at once, so under
@@ -124,6 +124,10 @@ test("choose a character, post a reminder, and see it on the kiosk until everyon
       .getByRole("button", { name, exact: true })
       .locator("[data-housemate]"),
   ).toHaveAttribute("data-hair", "spiky");
+  // The founder is acting on the kiosk when the reminder comes up.
+  const founder = `Founder ${project}`;
+  await kiosk.getByRole("button", { name: founder, exact: true }).click();
+  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
   await showReminders(kiosk);
   const reminder = kiosk.locator("[data-reminder]");
   await clearOlder(kiosk, reminder, title);
@@ -145,13 +149,14 @@ test("choose a character, post a reminder, and see it on the kiosk until everyon
   ).toHaveAttribute("data-hair", "spiky");
   await expectKioskTargets(reminder);
 
-  // Jo's face: it is Jo who has seen it, and Jo who is picked now.
+  // Jo's face: it is Jo who has seen it, and the founder is still the one
+  // acting (a face's tap never changes who is picked).
   await reminder.getByRole("button", { name: `I've seen it, ${name}` }).click();
   await expect(
     reminder.getByRole("button", { name: `${name} has seen it` }),
   ).toBeDisabled();
   await expect(count).toHaveText(`1 of ${total} have seen it`);
-  await expect(kiosk.getByTestId("acting-as")).toHaveText(name);
+  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
   // It was recorded, not just drawn.
   await kiosk.reload();
   await kiosk.waitForLoadState("networkidle");

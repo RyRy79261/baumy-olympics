@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReminderScreen } from "@baumy/ui";
 import {
@@ -9,19 +10,22 @@ import {
 } from "@/app/kiosk/reminder-actions";
 import type { ListRemindersData, ReminderView } from "@/lib/actions/reminders";
 import { REMINDER_POLL_MS } from "@/lib/kiosk/constants";
+import { NIGHT_EVENT, type NightEventDetail } from "@/lib/kiosk/night";
 import {
   markSeen,
   reminderFaces,
   withoutReminder,
 } from "@/lib/kiosk/reminders";
 import { newRequestId } from "../use-action-form";
+import { closeOpenDialogs } from "./idle-reset";
 
 // The kitchen screen's full-screen reminder (ADR 0005 §4, issue #66). The
-// shell renders it with the reminders at render time, and it asks again
-// every 30 seconds (and when the iPad wakes), so a reminder posted from a
-// phone or by Baumy arrives on its own. It shows the oldest reminder over
-// everything; each face's "I've seen it" picks that member and records it
-// as them; "Dismiss for everyone" asks who first. Once everyone has seen
+// shell renders it with the reminders at render time; away from the home
+// page it asks again every minute while awake, and at once when the screen
+// wakes, so a reminder posted from a phone or by Baumy arrives on its own.
+// It shows the oldest reminder over everything; each face's "I've seen it"
+// records it as that member, without changing who is picked on the kiosk;
+// "Dismiss for everyone" asks who first. Once everyone has seen
 // it, the last "Seen" shows for a moment, then the next reminder (or the
 // page) comes back.
 
@@ -45,7 +49,7 @@ export function KioskReminders({
   initial: ListRemindersData | null;
 }) {
   const [data, setData] = useState(initial);
-  // A new render of the shell (a tap sets the pick cookie, the home's
+  // A new render of the shell (an avatar tap, the home page's
   // refresh) brings fresher reminders: take them.
   const [fromServer, setFromServer] = useState(initial);
   if (initial !== fromServer) {
@@ -70,21 +74,42 @@ export function KioskReminders({
     }
   }, []);
 
+  // Only reads it needs: the home page's own 60-second refresh renders the
+  // shell again (and so brings the reminders), and a sleeping screen shows
+  // nothing, so the timer asks only away from home and while awake. Waking
+  // (a tap on the screensaver, the iPad's screen coming on) asks at once.
+  const pathname = usePathname();
+  const onHome = pathname === "/kiosk";
+  const asleep = useRef(false);
   useEffect(() => {
-    const id = window.setInterval(() => void poll(), REMINDER_POLL_MS);
+    const id = window.setInterval(() => {
+      if (!onHome && !asleep.current) void poll();
+    }, REMINDER_POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") void poll();
     };
+    const onNight = (e: Event) => {
+      asleep.current = (e as CustomEvent<NightEventDetail>).detail.asleep;
+      if (!asleep.current) void poll();
+    };
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener(NIGHT_EVENT, onNight);
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
-      window.clearTimeout(linger.current);
+      window.removeEventListener(NIGHT_EVENT, onNight);
     };
-  }, [poll]);
+  }, [poll, onHome]);
+  useEffect(() => () => window.clearTimeout(linger.current), []);
 
   const current = lingering?.reminder ?? data?.reminders[0] ?? null;
   const shownData = lingering?.data ?? data;
+  // A reminder coming up closes whatever was open (a PIN pad, a sheet), as
+  // the screensaver does: nothing waits half-done under it.
+  const currentId = current?.id;
+  useEffect(() => {
+    if (currentId) closeOpenDialogs(document);
+  }, [currentId]);
   if (!current || !shownData) return null;
 
   const seen = async (memberId: string) => {
