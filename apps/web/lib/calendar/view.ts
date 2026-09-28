@@ -7,6 +7,7 @@ import {
   formatMonthKey,
 } from "@baumy/core";
 import { isCalendarDate } from "@baumy/types";
+import { HOUSE_COLOUR } from "@baumy/ui";
 
 // What the house calendar shows (SPEC §3.3). Pure and client-safe: the
 // actions build `CalendarEventView`s with it, and /calendar and the kiosk lay
@@ -249,11 +250,11 @@ export function parseViewParams(
 }
 
 /**
- * The chip colour of an event nobody in the app added: the house's, a
- * neutral grey, since amber already means consumable (ADR 0005 §8) and
- * members' own colours include oranges.
+ * The chip colour of an event nobody in the app added: the house's
+ * (packages/ui `HOUSE_COLOUR`, `--color-bm-house`), a grey-violet no shirt
+ * uses, since amber already means consumable (ADR 0005 §8).
  */
-export const HOUSE_EVENT_ACCENT = "var(--color-bm-muted)";
+export const HOUSE_EVENT_ACCENT = HOUSE_COLOUR;
 
 /**
  * An event chip's colour (the prototype's month grid): the colour of the

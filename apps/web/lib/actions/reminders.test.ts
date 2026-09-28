@@ -9,7 +9,7 @@ import {
   reminders,
 } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
-import { defaultAvatar } from "@baumy/types";
+import { rosterAvatars } from "@baumy/types";
 import {
   FIXED_NOW,
   accountActor,
@@ -179,6 +179,16 @@ describe("create_reminder", () => {
 });
 
 describe("list_reminders", () => {
+  it("draws members who have not chosen in shirts of their own, as the dashboard does", async () => {
+    for (const name of ["Sam", "Mika", "Kim", "Lou"]) {
+      await seedMember(db(), { displayName: name });
+    }
+    const listed = await list();
+    const shirts = listed.members.map((m) => m.avatar.shirtColor);
+    expect(listed.members).toHaveLength(6);
+    expect(new Set(shirts).size).toBe(6);
+  });
+
   it("lists the active reminders with who has seen them, and every active member's character", async () => {
     const chosen = {
       hairStyle: "bob",
@@ -206,7 +216,11 @@ describe("list_reminders", () => {
           id: ryan,
           displayName: "Ryan",
           color: "#336699",
-          avatar: defaultAvatar(ryan),
+          // The roster's character: the one every screen draws.
+          avatar: rosterAvatars([
+            { id: ryan, avatar: null },
+            { id: jo, avatar: chosen },
+          ]).get(ryan),
         },
         { id: jo, displayName: "Jo", color: "#336699", avatar: chosen },
       ],

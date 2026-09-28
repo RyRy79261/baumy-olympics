@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { rosterAvatars } from "@baumy/types";
+import { rosterColours } from "@/lib/members/characters";
 import { berlinDateKey } from "@baumy/core";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
@@ -53,7 +55,7 @@ export default async function CalendarPage({
           memberNames={Object.fromEntries(
             people.map((p) => [p.id, p.displayName]),
           )}
-          memberColors={Object.fromEntries(people.map((p) => [p.id, p.color]))}
+          memberColors={rosterColours(rosterAvatars(people))}
           actions={{
             create: createEventAction,
             update: updateEventAction,
