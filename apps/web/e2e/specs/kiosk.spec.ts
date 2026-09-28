@@ -2,12 +2,13 @@ import { expect, test } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 import {
   expectKioskTargets,
+  KIOSK_VIEWPORT,
   openKioskChores,
   pairCode,
   typePin,
 } from "../lib/kiosk";
 
-// Issue #10 end to end, on the kitchen iPad (ipad-landscape), against Docker
+// Issue #10 end to end, on the kitchen iPad (ipad-portrait), against Docker
 // Postgres: an admin pairs a kiosk, the code works once, a member taps their
 // avatar and checks their PIN (wrong, then right, then asked again), every
 // kiosk touch target is at least 56px, idling forgets who is acting, and a
@@ -20,7 +21,7 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad in landscape.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const suffix = Math.random().toString(36).slice(2, 8);
   const name = `Kiosker ${suffix}`;
   const deviceName = `iPad ${suffix}`;
@@ -44,7 +45,7 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
 
   // The iPad: not paired yet, so /kiosk sends it to /kiosk/pair.
   const ipad = await browser.newContext({
-    viewport: { width: 1180, height: 820 },
+    viewport: KIOSK_VIEWPORT,
     hasTouch: true,
   });
   await ipad.clock.install();
@@ -87,6 +88,13 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
     await expect(kiosk).toHaveURL(/\/kiosk$/);
   }
 
+  // The home is the dashboard, with no avatar bar; the chores have one.
+  await expectKioskTargets(kiosk.locator("main"));
+  await openKioskChores(kiosk);
+  await expect(
+    kiosk.getByText("Tap your avatar at the top to start."),
+  ).toBeVisible();
+
   // Tap the member's avatar.
   const avatar = kiosk.getByRole("button", { name, exact: true });
   await expect(avatar).toHaveAttribute("aria-pressed", "false");
@@ -94,8 +102,6 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   await expect(kiosk.getByTestId("acting-as")).toHaveText(name);
   await expect(avatar).toHaveAttribute("aria-pressed", "true");
   await expectKioskTargets(kiosk.locator("header"));
-  await expectKioskTargets(kiosk.locator("main"));
-  await openKioskChores(kiosk);
   await expectKioskTargets(kiosk.locator("main"));
 
   // Check my PIN: the first request has no PIN, so the pad opens.
@@ -125,8 +131,11 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toBeHidden();
 
-  // 60 seconds untouched: nobody is acting any more.
+  // 60 seconds untouched: home, and nobody is acting any more.
   await ipad.clock.fastForward(61_000);
+  await expect(kiosk).toHaveURL(/\/kiosk$/);
+  await expect(kiosk.getByTestId("kiosk-home")).toBeVisible();
+  await openKioskChores(kiosk);
   await expect(
     kiosk.getByText("Tap your avatar", { exact: true }),
   ).toBeVisible();

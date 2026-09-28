@@ -6,15 +6,15 @@ import {
   type Page,
 } from "@playwright/test";
 import { founderAdmin } from "../lib/household";
-import { expectKioskTargets, pairCode } from "../lib/kiosk";
+import { expectKioskTargets, kioskNav, pairedKiosk } from "../lib/kiosk";
 
 // Issue #26, with the fake brain (lib/integrations/brain-memory.ts) and
 // /api/test/brain standing in for the house Telegram group, which writes
 // brain's list without going through Olympics:
 //
-// - something added in "Telegram" shows on the kitchen screen at its next
-//   60-second re-read, which skips the 30s cache; and what the kiosk adds or
-//   ticks off, "Telegram" sees at once;
+// - something added in "Telegram" shows on the kitchen screen's Shop page
+//   at its next re-read, which skips the 30s cache; and what the kiosk adds
+//   or ticks off, "Telegram" sees at once;
 // - with brain down (the `baumy_e2e_brain=down` cookie, for this browser
 //   only), the widget says the list is unavailable and the rest of the hub
 //   works;
@@ -23,7 +23,10 @@ import { expectKioskTargets, pairCode } from "../lib/kiosk";
 // The fake list is shared by the specs running in parallel, so each item
 // has a name of its own.
 
-const HUB_REFRESH_MS = 60_000;
+/** The kiosk page re-reads itself, as it does coming back into view. */
+async function rereads(kiosk: Page) {
+  await kiosk.evaluate(() => window.dispatchEvent(new Event("focus")));
+}
 
 async function telegram(request: APIRequestContext) {
   const res = await request.get("/api/test/brain");
@@ -49,7 +52,7 @@ test("the kitchen screen and Telegram share one shopping list", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad in landscape.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const tag = Math.random().toString(36).slice(2, 8);
   const oatMilk = `Oat milk ${tag}`;
   const eggs = `Eggs ${tag}`;
@@ -57,46 +60,46 @@ test("the kitchen screen and Telegram share one shopping list", async ({
   const founder = `Founder ${project}`;
 
   await founderAdmin(page, project);
-  const code = await pairCode(page, `iPad ${tag}`);
-  // The iPad's own clock, so a spec can step to its next 60s re-read.
-  const ipad = await browser.newContext({
-    viewport: { width: 1180, height: 820 },
-    hasTouch: true,
-  });
-  await ipad.clock.install();
-  const kiosk = await ipad.newPage();
-  await kiosk.goto("/kiosk/pair");
-  await kiosk.getByLabel("Pairing code").fill(code);
-  await kiosk.getByRole("button", { name: "Pair this kiosk" }).click();
-  await expect(kiosk).toHaveURL(/\/kiosk$/);
+  const { context, page: kiosk } = await pairedKiosk(
+    browser,
+    page,
+    `iPad ${tag}`,
+  );
 
-  // Before anyone taps in: the list can be read, not changed.
-  const widget = kiosk.getByTestId("widget-shopping");
-  await expect(widget).toBeVisible();
-  await expect(widget).toHaveAttribute("data-status", "ready");
-  await expect(widget.getByLabel("Add to the list")).toHaveCount(0);
-  await expect(row(widget, oatMilk)).toHaveCount(0);
+  // The list is the footer's Shop (ADR 0005: the home is the dashboard).
+  // Before anyone taps in it can be read, not changed.
+  await kioskNav(kiosk, "Shop");
+  await expect(
+    kiosk.getByRole("heading", { name: "Shopping list", level: 1 }),
+  ).toBeVisible();
+  const list = kiosk.locator("main");
+  await expect(
+    kiosk.getByText("Tap your avatar at the top to add or tick off items."),
+  ).toBeVisible();
+  await expect(list.getByLabel("Add to the list")).toHaveCount(0);
+  await expect(row(list, oatMilk)).toHaveCount(0);
 
-  // Added in Telegram: the kiosk shows it at its next re-read, although the
-  // server read the list moments ago (and would keep it for 30 seconds).
+  // Added in Telegram: the kiosk shows it at its next re-read (here, coming
+  // back into view), although the server read the list moments ago (and
+  // would keep it for 30 seconds).
   await telegramSays(page.request, { add: [oatMilk] });
-  await ipad.clock.fastForward(HUB_REFRESH_MS);
-  await expect(row(widget, oatMilk)).toBeVisible();
+  await rereads(kiosk);
+  await expect(row(list, oatMilk)).toBeVisible();
 
   // Someone taps in and adds two things at once, with no PIN.
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  await widget.getByLabel("Add to the list").fill(`${eggs}, ${bread}`);
-  await widget.getByRole("button", { name: "Add", exact: true }).click();
+  await list.getByLabel("Add to the list").fill(`${eggs}, ${bread}`);
+  await list.getByRole("button", { name: "Add", exact: true }).click();
   await expect(
     kiosk
       .getByRole("status")
       .filter({ hasText: `Added ${eggs} and ${bread}.` }),
   ).toBeVisible();
-  await expect(row(widget, eggs)).toBeVisible();
-  await expect(row(widget, bread)).toBeVisible();
-  await expect(widget.getByLabel("Add to the list")).toHaveValue("");
-  await expectKioskTargets(widget);
+  await expect(row(list, eggs)).toBeVisible();
+  await expect(row(list, bread)).toBeVisible();
+  await expect(list.getByLabel("Add to the list")).toHaveValue("");
+  await expectKioskTargets(list);
   // Telegram sees them at once.
   expect(await telegram(page.request)).toEqual(
     expect.arrayContaining([oatMilk, eggs, bread]),
@@ -104,18 +107,11 @@ test("the kitchen screen and Telegram share one shopping list", async ({
 
   // Ticked off in Telegram: gone from the kiosk at its next re-read.
   await telegramSays(page.request, { checkOff: [eggs] });
-  await ipad.clock.fastForward(HUB_REFRESH_MS);
-  await expect(row(widget, oatMilk)).toBeVisible();
-  await expect(row(widget, eggs)).toHaveCount(0);
+  await rereads(kiosk);
+  await expect(row(list, oatMilk)).toBeVisible();
+  await expect(row(list, eggs)).toHaveCount(0);
 
-  // The whole list has a page of its own, where one tap ticks an item off,
-  // here and in Telegram. (The minute idle forgot who was acting.)
-  await widget.getByRole("link", { name: "List" }).click();
-  await expect(
-    kiosk.getByRole("heading", { name: "Shopping list", level: 1 }),
-  ).toBeVisible();
-  await kiosk.getByRole("button", { name: founder, exact: true }).click();
-  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+  // One tap ticks an item off, here and in Telegram.
   await kiosk
     .getByRole("button", { name: `Check off ${oatMilk}`, exact: true })
     .click();
@@ -125,9 +121,8 @@ test("the kitchen screen and Telegram share one shopping list", async ({
   await expect(row(kiosk, bread)).toBeVisible();
   await expect(row(kiosk, oatMilk)).toHaveCount(0);
   expect(await telegram(page.request)).not.toContain(oatMilk);
-  await expectKioskTargets(kiosk.locator("main"));
 
-  await ipad.close();
+  await context.close();
 });
 
 test("with brain down the widget says so, and the rest of the hub works", async ({
@@ -135,7 +130,7 @@ test("with brain down the widget says so, and the rest of the hub works", async 
   context,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-landscape", "The kiosk has its own spec.");
+  test.skip(project === "ipad-portrait", "The kiosk has its own spec.");
   const tag = Math.random().toString(36).slice(2, 8);
   const tea = `Tea ${tag}`;
   const coffee = `Coffee ${tag}`;

@@ -22,7 +22,7 @@ test("on the kiosk, break the partner's streak and log for someone else", async 
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad in landscape.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const suffix = Math.random().toString(36).slice(2, 8);
   const chore = `Bins ${suffix}`;
   const founder = `Founder ${project}`;
@@ -47,9 +47,9 @@ test("on the kiosk, break the partner's streak and log for someone else", async 
   const kiosk = ipad.page;
 
   // The founder does it twice: a streak of 2.
+  await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  await openKioskChores(kiosk);
   for (const [points, streak] of [
     [20, 1],
     [25, 2],

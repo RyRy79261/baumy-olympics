@@ -1,7 +1,12 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { addChore } from "../lib/chores";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import { expectKioskTargets, pairedKiosk, typePin } from "../lib/kiosk";
+import {
+  expectKioskTargets,
+  openKioskChores,
+  pairedKiosk,
+  typePin,
+} from "../lib/kiosk";
 
 // Issue #21 on the kitchen iPad, with the scripted fake Claude: the founder
 // logs a chore through Baumy (their own claim, no PIN); the partner then
@@ -27,7 +32,7 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad in landscape.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const suffix = Math.random().toString(36).slice(2, 8);
   const chore = `Kettle ${suffix}`;
   const founder = `Founder ${project}`;
@@ -56,12 +61,14 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   await expect(sheet.getByTestId("baumy-says")).toHaveText(
     "Tap your avatar first, then ask Baumy.",
   );
-  await sheet.getByRole("button", { name: "Close" }).click();
 
-  // The founder logs it through Baumy: their own claim needs no PIN.
-  await kiosk.getByRole("button", { name: founder, exact: true }).click();
-  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  sheet = await openBaumy(kiosk);
+  // On the dashboard the avatars are in the sheet itself: the founder taps
+  // in there and logs it through Baumy (their own claim needs no PIN).
+  const who = sheet.getByRole("region", { name: "Who's asking?" });
+  await expect(who).toBeVisible();
+  await expectKioskTargets(who);
+  await who.getByRole("button", { name: founder, exact: true }).click();
+  await expect(who).toHaveCount(0);
   await say(sheet, `I cleaned the ${chore}`);
   const log = sheet.getByTestId("proposal-log_completion");
   await expect(log).toContainText(`Log ${chore} for ${founder}: +10`);
@@ -71,7 +78,14 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   await expect(log.getByTestId("proposal-state")).toHaveText("Done");
   await sheet.getByRole("button", { name: "Close" }).click();
 
-  // The partner asks Baumy to confirm it: the row needs their PIN.
+  // After a save that scored, Baumy says so from the corner.
+  await expect(
+    kiosk.locator("[data-voice-cat]").getByRole("status"),
+  ).toHaveText(`Purrfect. +10 for ${founder} ✦`);
+
+  // The partner asks Baumy to confirm it (tapping in on another page, where
+  // the avatar bar is): the row needs their PIN.
+  await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: partner, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(partner);
   sheet = await openBaumy(kiosk);

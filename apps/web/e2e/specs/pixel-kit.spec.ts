@@ -3,7 +3,7 @@ import { founderAdmin } from "../lib/household";
 import { openAccountMenu, openAdminMenu } from "../lib/nav";
 
 // Issue #64: the pixel UI kit (ADR 0005), a visual smoke in every project
-// (desktop-chromium, ipad-landscape, mobile-360). The pages are dark plum,
+// (desktop-chromium, ipad-portrait, mobile-360). The pages are dark plum,
 // set in the pixel fonts, with Baumy (Camp 404's cat) drawn as a sprite
 // strip that plays only when motion is allowed.
 

@@ -23,7 +23,7 @@ test("the scoreboard adds up a few logs, and the pot takes money", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-landscape", "The kiosk has no scoreboard yet.");
+  test.skip(project === "ipad-portrait", "The kiosk has no scoreboard yet.");
   const tag = Math.random().toString(36).slice(2, 8);
   const player = `Player ${tag}`;
   const trash = `Bins ${tag}`;

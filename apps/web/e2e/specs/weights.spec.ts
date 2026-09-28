@@ -31,7 +31,7 @@ test("a suggestion is scheduled on /admin/weights and vetoed by the partner", as
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-landscape", "The kiosk has no weights panel.");
+  test.skip(project === "ipad-portrait", "The kiosk has no weights panel.");
   const tag = Math.random().toString(36).slice(2, 8);
   const chore = `Wipe ${tag}`;
   const partnerName = `Partner ${tag}`;
