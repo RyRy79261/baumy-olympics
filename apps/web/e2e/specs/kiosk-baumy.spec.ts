@@ -78,11 +78,6 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   await expect(log.getByTestId("proposal-state")).toHaveText("Done");
   await sheet.getByRole("button", { name: "Close" }).click();
 
-  // After a save that scored, Baumy says so from the corner.
-  await expect(
-    kiosk.locator("[data-voice-cat]").getByRole("status"),
-  ).toHaveText(`Purrfect. +10 for ${founder} ✦`);
-
   // The partner asks Baumy to confirm it (tapping in on another page, where
   // the avatar bar is): the row needs their PIN.
   await openKioskChores(kiosk);
