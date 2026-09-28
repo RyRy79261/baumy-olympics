@@ -5,8 +5,10 @@ import {
   type Browser,
   type Page,
 } from "@playwright/test";
-import { freshEmail, signUp } from "../lib/accounts";
+import { PASSWORD, freshEmail, signUp } from "../lib/accounts";
 import { founderAdmin, mintCode, redeem } from "../lib/household";
+import { waitForAuthMail } from "../lib/mail";
+import { totp } from "../lib/totp";
 
 // "Sign in with Baumy" end to end (issue #80), against Docker Postgres. The
 // member's Telegram is the fake brain of E2E_TEST_MODE: /api/test/brain/login
@@ -23,11 +25,32 @@ interface Housemate {
   tg: number;
 }
 
+/**
+ * Turn two-factor on from Settings, Security, as security.spec.ts does: the
+ * address is confirmed first (two-factor needs it), and the codes come from
+ * the setup key, as an authenticator app's would.
+ */
+async function turnOnTwoFactor(member: Page, email: string) {
+  await member.goto(await waitForAuthMail(email, "verify"));
+  await member.goto("/settings/security");
+  const card = member.getByTestId("two-factor-card");
+  await expect(card).toContainText("Off");
+  await card.getByRole("button", { name: "Turn on two-factor" }).click();
+  await card.getByLabel("Your password").fill(PASSWORD);
+  await card.getByRole("button", { name: "Continue" }).click();
+  const secret = (await card.getByTestId("totp-secret").textContent())!;
+  await card.getByLabel("6-digit code").fill(totp(secret));
+  await card.getByRole("button", { name: "Verify and turn on" }).click();
+  await card.getByRole("button", { name: /I.ve saved them/ }).click();
+  await expect(card).toContainText("On");
+}
+
 /** A new member with a password account, linked to a Telegram id by the admin. */
 async function linkedHousemate(
   page: Page,
   browser: Browser,
   project: string,
+  { twoFactor = false }: { twoFactor?: boolean } = {},
 ): Promise<Housemate> {
   await founderAdmin(page, project);
   const code = await mintCode(page, 1);
@@ -38,6 +61,7 @@ async function linkedHousemate(
   await signUp(member, email);
   await redeem(member, code, name);
   await expect(member).toHaveURL(/\/$/);
+  if (twoFactor) await turnOnTwoFactor(member, email);
   await context.close();
 
   const tg = tgId();
@@ -131,6 +155,38 @@ test("a member signs in by tapping the number in Telegram", async ({
   expect((await replay.json()).data.outcome).toBe("approved");
   const late = await tap(request, who.tg, "deny");
   expect((await late.json()).code).toBe("INVALID_STATE");
+  await context.close();
+});
+
+test("with two-factor on, the tap is the second factor: no code step", async ({
+  page,
+  browser,
+  request,
+}, testInfo) => {
+  // Owner ruling 2026-09-29 (issue #95, ADR 0006).
+  const who = await linkedHousemate(page, browser, testInfo.project.name, {
+    twoFactor: true,
+  });
+  const context = await browser.newContext();
+  const phone = await context.newPage();
+
+  const code = await askBaumy(phone, who.email);
+  const dm = await dmFor(request, who.tg);
+  expect(dm.choices).toContain(code);
+  const res = await tap(request, who.tg, code);
+  expect((await res.json()).data.outcome).toBe("approved");
+
+  // Straight in, as without two-factor: no "One more step" in between.
+  await phone.waitForURL((url) => url.pathname === "/settings");
+  await expect(
+    phone.getByRole("heading", { name: "Settings", level: 1 }),
+  ).toBeVisible();
+  await expect(
+    phone.getByRole("heading", { name: "One more step" }),
+  ).toHaveCount(0);
+  // And the account still has two-factor on.
+  await phone.goto("/settings/security");
+  await expect(phone.getByTestId("two-factor-card")).toContainText("On");
   await context.close();
 });
 
