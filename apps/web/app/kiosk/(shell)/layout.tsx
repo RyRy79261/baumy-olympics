@@ -62,6 +62,7 @@ export default async function KioskLayout({
             displayName={p.displayName}
             sprite={p.avatarSprite}
             color={p.color}
+            memberId={p.id}
             selected={p.id === kiosk.memberId}
           />
         </form>
@@ -77,7 +78,7 @@ export default async function KioskLayout({
             </form>
           </>
         ) : (
-          <span className="text-base text-neutral-600">Tap your avatar</span>
+          <span className="text-base text-bm-muted">Tap your avatar</span>
         )
       }
     >

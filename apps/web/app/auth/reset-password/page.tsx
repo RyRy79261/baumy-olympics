@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
+import { AuthFrame } from "@baumy/ui";
 import { ResetPasswordForm } from "./reset-password-form";
 
-// Bare on purpose: restyled once the pixel UI kit lands (issue #7).
-//
 // Better Auth's /api/auth/reset-password/<token> checks the emailed token and
 // redirects here with `?token=`, or with `?error=` when it refused the token.
 
@@ -18,8 +17,8 @@ export default async function ResetPasswordPage({
 }) {
   const { token, error } = await searchParams;
   return (
-    <main>
+    <AuthFrame>
       <ResetPasswordForm token={error ? null : token?.trim() || null} />
-    </main>
+    </AuthFrame>
   );
 }

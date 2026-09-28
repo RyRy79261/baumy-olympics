@@ -48,7 +48,7 @@ import { toast } from "@/lib/ui/toast";
 // from Google once. Tapping an event opens its sheet to edit it; deleting
 // asks again in a dialog of its own before anything is sent.
 //
-// NEUTRAL PLACEHOLDER layout; issue #7 restyles it through packages/ui.
+// Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
 export interface CalendarActions {
   create: FormAction<CalendarWriteData>;
@@ -174,9 +174,7 @@ export function CalendarBoard({
         ))}
       </CalendarGrid>
       {events.length === 0 ? (
-        <p className="text-sm text-neutral-600">
-          Nothing on the calendar here.
-        </p>
+        <p className="text-sm text-bm-muted">Nothing on the calendar here.</p>
       ) : null}
 
       <Dialog
@@ -254,17 +252,17 @@ function EventDetails({
 }) {
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-      <dt className="text-neutral-600">When</dt>
+      <dt className="text-bm-muted">When</dt>
       <dd data-testid="event-when">{event.when}</dd>
       {event.location ? (
         <>
-          <dt className="text-neutral-600">Where</dt>
+          <dt className="text-bm-muted">Where</dt>
           <dd>{event.location}</dd>
         </>
       ) : null}
       {event.addedBy ? (
         <>
-          <dt className="text-neutral-600">Added by</dt>
+          <dt className="text-bm-muted">Added by</dt>
           <dd data-testid="event-added-by">
             {memberNames[event.addedBy] ?? "a former member"}
           </dd>
@@ -409,7 +407,7 @@ function EventForm({
           />
         )}
       </Field>
-      <p className="text-sm text-neutral-600">Times are Berlin time.</p>
+      <p className="text-sm text-bm-muted">Times are Berlin time.</p>
       {state && !state.ok && state.code !== "INVALID_INPUT" ? (
         <FormMessage tone="error">{state.message}</FormMessage>
       ) : null}

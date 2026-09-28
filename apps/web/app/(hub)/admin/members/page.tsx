@@ -76,7 +76,7 @@ export default async function AdminMembersPage() {
 
         <Card title="Invite codes">
           {codes.length === 0 ? (
-            <p className="text-sm text-neutral-600">No codes yet.</p>
+            <p className="text-sm text-bm-muted">No codes yet.</p>
           ) : (
             <ul className="flex flex-col gap-3">
               {codes.map((c) => {
@@ -98,7 +98,7 @@ export default async function AdminMembersPage() {
                         : STATE_LABEL[state]}
                     </span>
                     {c.createdByName ? (
-                      <span className="text-neutral-600">
+                      <span className="text-bm-muted">
                         by {c.createdByName}
                       </span>
                     ) : null}
@@ -116,7 +116,7 @@ export default async function AdminMembersPage() {
 
         <Card title="Kiosks">
           {devices.length === 0 ? (
-            <p className="text-sm text-neutral-600">No kiosks yet.</p>
+            <p className="text-sm text-bm-muted">No kiosks yet.</p>
           ) : (
             <ul className="flex flex-col gap-3">
               {devices.map((d) => {
@@ -130,7 +130,7 @@ export default async function AdminMembersPage() {
                     <span className="font-semibold">{d.name}</span>
                     <span>{DEVICE_STATE_LABEL[state]}</span>
                     {state === "paired" && d.pairedAt ? (
-                      <span className="text-neutral-600">
+                      <span className="text-bm-muted">
                         since {day(d.pairedAt)}
                         {d.lastSeenAt
                           ? `, last seen ${d.lastSeenAt.toISOString().slice(0, 16).replace("T", " ")} UTC`

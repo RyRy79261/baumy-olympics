@@ -25,7 +25,7 @@ import { LiveClock } from "./live-clock";
 // three columns by two rows that never scroll: each widget clips what does
 // not fit). Each widget shows its own empty or unavailable state.
 //
-// NEUTRAL PLACEHOLDER layout; issue #7 restyles it through packages/ui.
+// Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
 export interface HubLinks {
   calendar: Route;
@@ -84,7 +84,7 @@ export function HubDashboard({
         <div className="flex min-h-0 flex-col gap-3">
           <section
             aria-label="Clock"
-            className="rounded border border-neutral-300 bg-white p-3"
+            className="border-2 border-bm-line bg-bm-surface p-3"
           >
             <LiveClock serverNow={hub.now} kiosk={kiosk} />
           </section>
@@ -147,7 +147,7 @@ export function HubDashboard({
               data-testid="hub-pot"
               className={cx(
                 "text-sm",
-                pot.ok ? "font-medium text-neutral-900" : "text-red-800",
+                pot.ok ? "font-medium text-bm-text" : "text-bm-red",
               )}
             >
               {pot.ok ? `Pot: ${pot.total}` : pot.message}

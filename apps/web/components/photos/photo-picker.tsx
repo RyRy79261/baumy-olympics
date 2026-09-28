@@ -53,7 +53,7 @@ export function PhotoPicker({
       {/* The native input lies, invisible, over the button-looking label, so
           it keeps keyboard focus and a touch target as big as the label
           (56px on the kiosk). */}
-      <div className="relative focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-neutral-900">
+      <div className="relative focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-bm-yellow">
         <label
           htmlFor={id}
           className={buttonClass(

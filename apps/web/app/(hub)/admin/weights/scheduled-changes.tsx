@@ -32,9 +32,7 @@ export function ScheduledChanges({
           {c.canVeto ? (
             <VetoWeightButton suggestionId={c.id} choreName={c.choreName} />
           ) : (
-            <span className="text-sm text-neutral-600">
-              You scheduled this.
-            </span>
+            <span className="text-sm text-bm-muted">You scheduled this.</span>
           )}
         </li>
       ))}

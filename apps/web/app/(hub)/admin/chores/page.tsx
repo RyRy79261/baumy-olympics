@@ -29,7 +29,7 @@ export default async function AdminChoresPage() {
           {!listed.ok ? (
             <FormMessage tone="error">{listed.message}</FormMessage>
           ) : listed.data.chores.length === 0 ? (
-            <p className="text-sm text-neutral-600">No chores yet.</p>
+            <p className="text-sm text-bm-muted">No chores yet.</p>
           ) : (
             <ul>
               {listed.data.chores.map((c) => (

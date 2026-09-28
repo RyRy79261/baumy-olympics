@@ -13,7 +13,7 @@ export function CalendarStatus({ failure }: { failure: ActionFailure }) {
         data-testid="calendar-not-configured"
         className="max-w-xl"
       >
-        <p className="text-sm text-neutral-700">
+        <p className="text-sm text-bm-muted">
           The house calendar is not configured on this deployment. Once an admin
           shares the Google Calendar with the house&apos;s service account and
           sets GOOGLE_CALENDAR_ID, GOOGLE_CALENDAR_CLIENT_EMAIL and

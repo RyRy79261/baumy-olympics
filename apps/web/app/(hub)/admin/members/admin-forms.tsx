@@ -164,13 +164,13 @@ export function MemberControls(props: MemberRowProps) {
 
   return (
     <li
-      className="flex flex-col gap-4 border-b border-neutral-200 py-4 last:border-b-0"
+      className="flex flex-col gap-4 border-b border-bm-line py-4 last:border-b-0"
       data-testid={`member-${props.displayName}`}
     >
       <div className="flex flex-wrap items-center gap-3">
         <Sprite name={props.avatarSprite} color={props.color} />
         <span className="font-semibold">{props.displayName}</span>
-        <span className="text-sm text-neutral-600">
+        <span className="text-sm text-bm-muted">
           {props.role === "admin" ? "Admin" : "Member"}
           {props.active ? "" : " · deactivated"}
           {props.isMe ? " · you" : ""}

@@ -106,7 +106,7 @@ function FieldInput({
       );
     case "readonly":
       return (
-        <p id={id} className="text-sm break-all text-neutral-700">
+        <p id={id} className="text-sm break-all text-bm-muted">
           {text || "(none)"}
         </p>
       );
@@ -150,7 +150,7 @@ export function ProposalRow({
       message={message}
     >
       {proposal.issues && proposal.issues.length > 0 && open ? (
-        <ul className="list-disc pl-5 text-sm text-red-800">
+        <ul className="list-disc pl-5 text-sm text-bm-red">
           {proposal.issues.map((i) => (
             <li key={`${i.path.join(".")}:${i.message}`}>
               {i.path.join(".") || "input"}: {i.message}
