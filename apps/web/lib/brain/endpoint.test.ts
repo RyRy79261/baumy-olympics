@@ -61,8 +61,11 @@ function setup(
     findMember: vi.fn(async (tg: number) =>
       tg === LINKED_TG ? { id: MEMBER } : null,
     ),
+    // Postgres matches a uuid in any case; the row's id is lower-case.
     findHousemate: vi.fn(async (id: string) =>
-      id === HOUSEMATE || id === MEMBER ? { id } : null,
+      id.toLowerCase() === HOUSEMATE || id.toLowerCase() === MEMBER
+        ? { id: id.toLowerCase() }
+        : null,
     ),
     specs: () => toolSpecs("brain"),
     isAction: (name) => actionKind(name) !== undefined,
@@ -581,19 +584,41 @@ describe("X-Baumy-On-Behalf-Of", () => {
     expect(runAction).not.toHaveBeenCalled();
   });
 
-  it("treats the asker's own id as no on-behalf at all", async () => {
+  it("treats the asker's own id, in any case, as no on-behalf at all", async () => {
     const { deps, runAction } = setup();
+    for (const own of [MEMBER, MEMBER.toUpperCase()]) {
+      const res = await handleBrainAction(
+        post("create_reminder", {
+          onBehalfOf: own,
+          body: JSON.stringify({ title: "Hi" }),
+        }),
+        "create_reminder",
+        deps,
+      );
+      // A safe write for the asker: no confirmation needed.
+      expect(res.status).toBe(200);
+    }
+    for (const call of runAction.mock.calls) {
+      expect(call[2].actor).toEqual({
+        kind: "service",
+        tokenName: "baumy-brain",
+        telegramUserId: LINKED_TG,
+        memberId: MEMBER,
+      });
+    }
+    // An upper-cased housemate id is still that housemate.
     const res = await handleBrainAction(
-      post("create_note", { onBehalfOf: MEMBER }),
-      "create_note",
+      post("create_reminder", {
+        onBehalfOf: HOUSEMATE.toUpperCase(),
+        confirmed: "1",
+      }),
+      "create_reminder",
       deps,
     );
     expect(res.status).toBe(200);
-    expect(runAction.mock.calls[0]![2].actor).toEqual({
-      kind: "service",
-      tokenName: "baumy-brain",
-      telegramUserId: LINKED_TG,
-      memberId: MEMBER,
+    expect(runAction.mock.calls[2]![2].actor).toMatchObject({
+      memberId: HOUSEMATE,
+      initiatorMemberId: MEMBER,
     });
   });
 
