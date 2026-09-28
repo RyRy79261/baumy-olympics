@@ -2,7 +2,10 @@ import "server-only";
 
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { findActiveMemberByTelegramUserId } from "@baumy/db/members";
+import {
+  findActiveMember,
+  findActiveMemberByTelegramUserId,
+} from "@baumy/db/members";
 import { findLiveServiceToken } from "@baumy/db/service-tokens";
 import { actionKind, runAction } from "@/lib/actions/registry";
 import { toolSpecs } from "@/lib/actions/tool-specs";
@@ -24,6 +27,7 @@ export function brainEndpointDeps(): BrainEndpointDeps {
     verifyToken: (token) => findLiveServiceToken(db(), token),
     findMember: (telegramUserId) =>
       findActiveMemberByTelegramUserId(db(), HOUSEHOLD_ID, telegramUserId),
+    findHousemate: (memberId) => findActiveMember(db(), HOUSEHOLD_ID, memberId),
     specs: () => (specs ??= toolSpecs("brain")),
     isAction: (name) => actionKind(name) !== undefined,
     runAction: (name, input, ctx) => runAction(name, input, ctx),

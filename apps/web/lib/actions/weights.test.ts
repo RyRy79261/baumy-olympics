@@ -231,12 +231,18 @@ describe("get_weights", () => {
     });
   });
 
-  it("is only in the UI", async () => {
+  it("is in the UI and brain only", async () => {
+    await expect(
+      runAction(
+        "get_weights",
+        { scheduledOnly: true },
+        ctxFor(brain(partner), { source: "brain" }),
+      ),
+    ).resolves.toMatchObject({ ok: true, data: { chores: [], scheduled: [] } });
     for (const [actor, source] of [
       [kiosk(partner), "kiosk"],
       [sessionActor(partner), "ai"],
       [mcp(partner), "mcp"],
-      [brain(partner), "brain"],
     ] as [Actor, RequestCtx["source"]][]) {
       await expect(
         runAction("get_weights", {}, ctxFor(actor, { source })),
@@ -618,25 +624,61 @@ describe("applying a scheduled change", () => {
 });
 
 describe("the weight writes' surfaces and gates", () => {
-  it("schedule and dismiss are an admin's, veto any member's, all UI only", async () => {
+  it("schedule and dismiss are an admin's in the UI only; veto any member's, in the UI or brain", async () => {
     const id = await e7Suggestion();
     for (const name of ["schedule_weight", "dismiss_weight"]) {
       await expect(
         runAction(name, { suggestionId: id }, as(partner)),
       ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
     }
-    for (const name of ["schedule_weight", "dismiss_weight", "veto_weight"]) {
-      for (const [actor, source] of [
-        [kiosk(adminB), "kiosk"],
-        [sessionActor(adminB, "admin"), "ai"],
-        [mcp(adminB), "mcp"],
-        [brain(adminB), "brain"],
-      ] as [Actor, RequestCtx["source"]][]) {
+    const surfaces: [Actor, RequestCtx["source"]][] = [
+      [kiosk(adminB), "kiosk"],
+      [sessionActor(adminB, "admin"), "ai"],
+      [mcp(adminB), "mcp"],
+      [brain(adminB), "brain"],
+    ];
+    for (const name of ["schedule_weight", "dismiss_weight"]) {
+      for (const [actor, source] of surfaces) {
         await expect(
           runAction(name, { suggestionId: id }, ctxFor(actor, { source })),
         ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
       }
     }
+    for (const [actor, source] of surfaces.slice(0, 3)) {
+      await expect(
+        runAction(
+          "veto_weight",
+          { suggestionId: id },
+          ctxFor(actor, { source }),
+        ),
+      ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
+    }
     expect((await suggestionRow(id)).status).toBe("open");
+    // Brain reaches the action: an open suggestion is not scheduled yet.
+    await expect(
+      runAction(
+        "veto_weight",
+        { suggestionId: id },
+        ctxFor(brain(adminB), { source: "brain" }),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "INVALID_STATE" });
+  });
+
+  it("brain vetoes a scheduled change for another member", async () => {
+    const id = await e7Suggestion();
+    const scheduled = ok(
+      await runAction("schedule_weight", { suggestionId: id }, asAdmin(adminA)),
+    );
+    const data = ok(
+      await runAction(
+        "veto_weight",
+        { suggestionId: id },
+        ctxFor(brain(partner), {
+          source: "brain",
+          now: new Date(new Date(scheduled.appliesAt!).getTime() - HOUR),
+        }),
+      ),
+    );
+    expect(data).toMatchObject({ suggestionId: id, status: "vetoed" });
   });
 });

@@ -29,8 +29,9 @@ import { fail } from "./result";
 // suggestion per chore each week (packages/db weights.ts); here an admin
 // schedules it (as suggested, or edited) or dismisses it, and any other
 // member may veto a scheduled change until it applies, at the next Monday
-// 00:00 Berlin at least 48h ahead. Weights change only in the UI (SPEC §12
-// decision 10): every action here is `surfaces: ["ui"]`.
+// 00:00 Berlin at least 48h ahead. Scheduling and dismissing are admin
+// actions, so UI only (SPEC §12 decision 10); reading the weights and a
+// member's veto are also offered to brain (issue #70).
 
 const suggestionId = z.uuid("Pick a suggestion.");
 
@@ -115,7 +116,7 @@ export const getWeights = defineAction({
   consent: "See the chores' weights and suggested changes",
   kind: "read",
   risk: "safe",
-  surfaces: ["ui"],
+  surfaces: ["ui", "brain"],
   requires: "member",
   input: z.strictObject({
     scheduledOnly: z
@@ -327,7 +328,7 @@ export const vetoWeight = defineAction({
   consent: "Veto a scheduled weight change",
   kind: "write",
   risk: "confirm",
-  surfaces: ["ui"],
+  surfaces: ["ui", "brain"],
   requires: "member",
   input: z.strictObject({ suggestionId }),
   async execute(ctx, input) {

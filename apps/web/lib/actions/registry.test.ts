@@ -9,6 +9,7 @@ import {
   type AnyActionDef,
 } from "./define";
 import { REGISTRY } from "./registry";
+import { BRAIN_EXCLUDED } from "@/lib/brain/operations-spec-notes";
 
 // The registry's invariants (ADR 0002): every name is a valid Claude and MCP
 // tool name, every action has a consent line, and the list in define.ts and
@@ -43,11 +44,31 @@ describe("the registry", () => {
     }
   });
 
-  it("offers destructive actions only on ui, kiosk and ai", () => {
-    for (const [, def] of entries) {
-      if (def.risk !== "destructive") continue;
+  it("never offers a destructive action over MCP", () => {
+    const destructive = entries.filter(([, d]) => d.risk === "destructive");
+    expect(destructive.length).toBeGreaterThan(0);
+    for (const [, def] of destructive) {
       expect(def.surfaces).not.toContain("mcp");
-      expect(def.surfaces).not.toContain("brain");
+    }
+  });
+
+  it("offers brain every member action but the listed exceptions (issue #70)", () => {
+    const uiOnlyGates = ["admin", "session", "account"];
+    const member = entries.filter(
+      ([, d]) =>
+        typeof d.requires === "function" || !uiOnlyGates.includes(d.requires),
+    );
+    expect(member.map(([n]) => n)).toContain("delete_event");
+    for (const [name, def] of member) {
+      if (name in BRAIN_EXCLUDED) {
+        expect(def.surfaces, name).not.toContain("brain");
+      } else {
+        expect(def.surfaces, name).toContain("brain");
+      }
+    }
+    // Every exception names a registered action.
+    for (const name of Object.keys(BRAIN_EXCLUDED)) {
+      expect(ACTION_NAMES).toContain(name);
     }
   });
 
