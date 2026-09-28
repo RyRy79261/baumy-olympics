@@ -22,8 +22,10 @@ vi.mock("next/headers", () => ({
 
 const {
   BRAIN_DOWN_COOKIE,
+  clearMemoryLoginApprovals,
   clearMemoryShopping,
   downWhenAsked,
+  memoryLoginApproval,
   memoryAdd,
   memoryBrain,
   memoryCheckOff,
@@ -31,8 +33,17 @@ const {
   normalizeItem,
 } = await import("./brain-memory");
 
+const DM = {
+  requestId: "0b0e6c1a-3a7e-4c38-9a53-6f1f3f0d2a11",
+  telegramUserId: 42,
+  device: "Chrome on macOS",
+  choices: [12, 47, 83],
+  expiresAt: "2026-09-28T10:02:00.000Z",
+};
+
 beforeEach(() => {
   clearMemoryShopping();
+  clearMemoryLoginApprovals();
   jar.value = undefined;
   jar.throws = false;
 });
@@ -85,10 +96,38 @@ describe("the fake brain", () => {
     expect(await brain.listShopping()).toEqual(down);
     expect(await brain.addShopping(["eggs"])).toEqual(down);
     expect(await brain.checkOffShopping(["milk"])).toEqual(down);
+    expect(await brain.requestLoginApproval(DM)).toEqual(down);
+    expect(memoryLoginApproval(DM.telegramUserId)).toBeNull();
     expect(memoryShopping().map((i) => i.item)).toEqual(["milk"]);
     jar.value = "up";
     expect((await brain.listShopping()).ok).toBe(true);
     jar.throws = true;
     expect((await brain.listShopping()).ok).toBe(true);
+  });
+});
+
+describe("the fake approval DMs", () => {
+  it("keeps what brain would send, newest per Telegram user", async () => {
+    const brain = memoryBrain();
+    expect(memoryLoginApproval(42)).toBeNull();
+    expect(await brain.requestLoginApproval(DM)).toEqual({
+      ok: true,
+      data: { sent: true },
+    });
+    const newer = { ...DM, requestId: "second", choices: [20, 30, 40] };
+    await brain.requestLoginApproval(newer);
+    await brain.requestLoginApproval({ ...DM, telegramUserId: 7 });
+    expect(memoryLoginApproval(42)).toEqual(newer);
+    expect(memoryLoginApproval(99)).toBeNull();
+  });
+
+  it("keeps only the last 200", async () => {
+    const brain = memoryBrain();
+    await brain.requestLoginApproval(DM);
+    for (let i = 0; i < 200; i++) {
+      await brain.requestLoginApproval({ ...DM, telegramUserId: 1000 + i });
+    }
+    expect(memoryLoginApproval(42)).toBeNull();
+    expect(memoryLoginApproval(1199)).not.toBeNull();
   });
 });
