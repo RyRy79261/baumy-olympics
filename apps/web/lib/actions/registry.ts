@@ -39,6 +39,12 @@ import {
 import { pairKiosk } from "./pair-kiosk";
 import { createProposer } from "./propose";
 import { redeemInvite } from "./redeem-invite";
+import {
+  acknowledgeReminder,
+  createReminder,
+  dismissReminder,
+  listReminders,
+} from "./reminders";
 import { revokeInvite } from "./revoke-invite";
 import { revokeKiosk } from "./revoke-kiosk";
 import { createRunner } from "./run";
@@ -50,6 +56,7 @@ import {
   listShopping,
 } from "./shopping";
 import { setPrizeMode } from "./set-prize-mode";
+import { updateAvatar } from "./update-avatar";
 import { updateMyProfile } from "./update-my-profile";
 import {
   dismissWeight,
@@ -65,6 +72,7 @@ import { whoami } from "./whoami";
 export const REGISTRY = {
   whoami,
   update_my_profile: updateMyProfile,
+  update_avatar: updateAvatar,
   redeem_invite: redeemInvite,
   join_as_founder: joinAsFounder,
   mint_invite: mintInvite,
@@ -112,6 +120,10 @@ export const REGISTRY = {
   list_shopping: listShopping,
   add_shopping_items: addShoppingItems,
   check_off_shopping_items: checkOffShoppingItems,
+  list_reminders: listReminders,
+  create_reminder: createReminder,
+  acknowledge_reminder: acknowledgeReminder,
+  dismiss_reminder: dismissReminder,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =
