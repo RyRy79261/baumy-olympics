@@ -231,7 +231,7 @@ export const bountyActionClass =
  * and whose streak you would steal, when it is due, its points, and the
  * action (a link to log it).
  */
-export function BountyRow({
+export function ModuleBountyRow({
   glyph,
   name,
   kind,
@@ -281,19 +281,24 @@ export function BountyRow({
             </span>
           ) : null}
         </div>
-        <div className="mt-2 flex items-center gap-2 overflow-hidden font-label text-[13px] whitespace-nowrap uppercase">
-          <span style={{ color: kc }}>{k.label}</span>
-          <span className="text-bm-dim">·</span>
+        {/* Two phrases that each stay whole: when the row is narrow (the
+            scrollbar beside it) the streak drops to its own line rather
+            than being cut off. */}
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-label text-[13px] uppercase">
+          <span className="whitespace-nowrap" style={{ color: kc }}>
+            {k.label}
+            <span className="text-bm-dim"> ·</span>
+          </span>
           {streak ? (
             <span
               data-streak
-              className="truncate"
+              className="whitespace-nowrap"
               style={{ color: streak.colour }}
             >
               steal {streak.name}&apos;s {streak.length}× streak
             </span>
           ) : (
-            <span className="text-bm-dim">no streak yet</span>
+            <span className="whitespace-nowrap text-bm-dim">no streak yet</span>
           )}
         </div>
       </div>

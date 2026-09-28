@@ -62,7 +62,11 @@ export default async function KioskHomePage({
         fresh={bounties(isNewBounty)}
         messages={
           data.notes.ok
-            ? { ok: true, rows: recentMessages(data.notes.data, ctx.now) }
+            ? {
+                ok: true,
+                rows: recentMessages(data.notes.data.notes, ctx.now),
+                count: data.notes.data.recentCount,
+              }
             : data.notes
         }
         members={data.members}

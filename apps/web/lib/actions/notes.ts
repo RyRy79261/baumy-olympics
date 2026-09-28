@@ -44,6 +44,8 @@ export interface NoteView {
   authorName: string;
   createdAt: string;
   updatedAt: string;
+  /** When its words last changed (pinning is not an edit). */
+  editedAt: string;
 }
 
 export function noteView(n: NoteRow): NoteView {
@@ -57,6 +59,7 @@ export function noteView(n: NoteRow): NoteView {
     authorName: n.authorName,
     createdAt: n.createdAt.toISOString(),
     updatedAt: n.updatedAt.toISOString(),
+    editedAt: n.editedAt.toISOString(),
   };
 }
 
@@ -86,7 +89,7 @@ export const listNotes = defineAction({
   name: "list_notes",
   title: "Notes",
   description:
-    "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created and last changed (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets.",
+    "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets.",
   consent: "Read the household's notes",
   kind: "read",
   risk: "safe",

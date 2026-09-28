@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { defaultAvatar } from "@baumy/types";
 import { SHIRT_COLOURS } from "@baumy/ui";
 import type { ChoreView } from "@/lib/actions/list-chores";
-import type { NoteView } from "@/lib/actions/notes";
+import { NOTE_RECENT_MS, type NoteView } from "@/lib/actions/notes";
 import { eventView } from "@/lib/calendar/view";
 import {
   CELL_HEAD,
@@ -299,18 +299,26 @@ describe("recentMessages", () => {
       authorName: "Jo",
       createdAt: at(-1),
       updatedAt: at(-1),
+      editedAt: over.createdAt ?? at(-1),
       ...over,
     };
   }
 
-  it("keeps the last day's notes, newest change first", () => {
+  it("keeps the notes added or edited in the last day, newest first", () => {
     const window = MESSAGES_WINDOW_MS / HOUR;
     const rows = recentMessages(
       [
-        note({ title: "Old", createdAt: at(-30), updatedAt: at(-window) }),
-        note({ title: "Pasta", createdAt: at(-0.2), updatedAt: at(-0.2) }),
-        note({ title: "Wifi", createdAt: at(-40), updatedAt: at(-3) }),
-        note({ title: "Now", createdAt: at(0), updatedAt: at(0) }),
+        note({ title: "Old", createdAt: at(-30), editedAt: at(-window) }),
+        note({ title: "Pasta", createdAt: at(-0.2) }),
+        note({ title: "Wifi", createdAt: at(-40), editedAt: at(-3) }),
+        note({ title: "Now", createdAt: at(0) }),
+        // Pinned an hour ago: a change, but not an edit, so not a message.
+        note({
+          title: "Pinned",
+          createdAt: at(-40),
+          updatedAt: at(-1),
+          pinned: true,
+        }),
       ],
       NOW,
     );
@@ -319,6 +327,10 @@ describe("recentMessages", () => {
       ["Pasta", "12m ago"],
       ["Wifi", "changed 3h ago"],
     ]);
+  });
+
+  it("looks back as far as list_notes' recentCount does", () => {
+    expect(MESSAGES_WINDOW_MS).toBe(NOTE_RECENT_MS);
   });
 
   it("says how long ago", () => {

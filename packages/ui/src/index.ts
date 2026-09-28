@@ -89,7 +89,7 @@ export {
 } from "./kiosk-shell";
 export {
   ActingChip,
-  BountyRow,
+  ModuleBountyRow,
   DayEventRow,
   EventChip,
   KIOSK_FOOTER_H,

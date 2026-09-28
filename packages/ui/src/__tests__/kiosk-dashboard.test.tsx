@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ActingChip,
   actingDoneClass,
-  BountyRow,
+  ModuleBountyRow,
   DayEventRow,
   EventChip,
   KIOSK_FOOTER_H,
@@ -163,10 +163,10 @@ describe("ModulePanel and SheetTabs", () => {
   });
 });
 
-describe("BountyRow", () => {
+describe("ModuleBountyRow", () => {
   it("shows the kind, whose streak you steal, the deadline and the points", () => {
     const out = html(
-      <BountyRow
+      <ModuleBountyRow
         glyph="bin"
         name="Bins out"
         kind="maintenance"
@@ -180,7 +180,7 @@ describe("BountyRow", () => {
     expect(out).toContain("Maintenance");
     expect(out).toContain("color:var(--color-bm-teal)");
     expect(out).toMatch(
-      /data-streak[^>]*color:#4ff5e6[^>]*>steal Ryan&#x27;s 6× streak/,
+      /data-streak[^>]*whitespace-nowrap[^>]*color:#4ff5e6[^>]*>steal Ryan&#x27;s 6× streak/,
     );
     expect(out).toMatch(
       /data-due="soon"[^>]*color:var\(--color-bm-amber\)[^>]*>in 2h/,
@@ -193,7 +193,7 @@ describe("BountyRow", () => {
 
   it("says new and no streak yet, in the consumable's amber", () => {
     const out = html(
-      <BountyRow
+      <ModuleBountyRow
         glyph="catfood"
         name="Cat food"
         kind="consumable"

@@ -28,7 +28,10 @@ export interface DashboardData {
   chores: { ok: true; data: ChoreView[] } | { ok: false; message: string };
   events:
     { ok: true; data: CalendarEventView[] } | { ok: false; message: string };
-  notes: { ok: true; data: NoteView[] } | { ok: false; message: string };
+  /** The notes, and list_notes' recentCount (the Messages count). */
+  notes:
+    | { ok: true; data: { notes: NoteView[]; recentCount: number } }
+    | { ok: false; message: string };
 }
 
 const DOWN = "This could not be loaded just now. It will try again.";
@@ -66,7 +69,7 @@ export async function loadDashboard(
     ),
     read(
       () => runAction("list_notes", {}, ctx),
-      (d) => d.notes,
+      (d) => ({ notes: d.notes, recentCount: d.recentCount }),
     ),
     listActiveMembers(db, ctx.householdId),
   ]);
