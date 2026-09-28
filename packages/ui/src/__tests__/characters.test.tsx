@@ -260,6 +260,9 @@ describe("choreGlyph", () => {
     expect(out).toContain('data-sprite="trash"');
     expect(out).toContain('data-glyph="bin"');
     expect(out).toContain("20 pts");
+    // The text column takes no width of its own, so long names and streak
+    // lines truncate instead of widening the page on a phone.
+    expect(out).toMatch(/data-tile-text="true" class="[^"]*\bw-0\b/);
   });
 });
 
