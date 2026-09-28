@@ -15,6 +15,7 @@ import {
   BRAIN_SCOPE,
   generateServiceToken,
   insertServiceToken,
+  listServiceTokens,
   revokeServiceToken,
 } from "@baumy/db/service-tokens";
 import { insertTelegramLinkCode } from "@baumy/db/telegram-link-codes";
@@ -285,6 +286,20 @@ describe("the brain endpoint on PGlite", () => {
     const res = await call("whoami", {}, { "x-baumy-actor": `tg:${TG}` });
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ code: "UNAUTHENTICATED" });
+  });
+
+  it("records when the token was last used (issue #104)", async () => {
+    await seedMember(db(), { telegramUserId: TG });
+    const [before] = await listServiceTokens(db());
+    expect(before).toMatchObject({ name: "baumy-brain", lastUsedAt: null });
+    const start = now().getTime();
+    expect(
+      (await call("whoami", {}, { "x-baumy-actor": `tg:${TG}` })).status,
+    ).toBe(200);
+    const [after] = await listServiceTokens(db());
+    expect(after?.lastUsedAt).toBeInstanceOf(Date);
+    expect(after!.lastUsedAt!.getTime()).toBeGreaterThanOrEqual(start);
+    expect(after!.lastUsedAt!.getTime()).toBeLessThanOrEqual(now().getTime());
   });
 
   it("acts for a housemate on the asker's behalf, audited with both", async () => {

@@ -109,7 +109,9 @@ export type DomainErrorCode =
   /** `link_telegram`: the code is wrong, used or expired. */
   | "LINK_CODE_INVALID"
   /** That Telegram user id is already linked to another member. */
-  | "TELEGRAM_ALREADY_LINKED";
+  | "TELEGRAM_ALREADY_LINKED"
+  /** `create_service_token` for a name that already has a live token. */
+  | "SERVICE_TOKEN_EXISTS";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 

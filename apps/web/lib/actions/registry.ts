@@ -57,6 +57,11 @@ import {
 } from "./reminders";
 import { revokeInvite } from "./revoke-invite";
 import { revokeKiosk } from "./revoke-kiosk";
+import {
+  createServiceToken,
+  revokeServiceTokenAction,
+  rotateServiceToken,
+} from "./service-tokens";
 import { createRunner } from "./run";
 import { getPot, getStandings, getStreaks } from "./scoreboard";
 import { setKioskPin } from "./set-kiosk-pin";
@@ -105,6 +110,9 @@ export const REGISTRY = {
   set_first_password: setFirstPassword,
   pair_kiosk: pairKiosk,
   revoke_kiosk: revokeKiosk,
+  create_service_token: createServiceToken,
+  rotate_service_token: rotateServiceToken,
+  revoke_service_token: revokeServiceTokenAction,
   check_kiosk_pin: checkKioskPin,
   list_chores: listChores,
   log_completion: logCompletionAction,
