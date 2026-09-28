@@ -410,7 +410,7 @@ export function BaumySheet({
             data-state={r.state}
             className={r.state === "rejected" ? "line-through opacity-50" : ""}
           >
-            {r.state === "saved" ? "\u2714" : "\u2022"} {r.proposal.preview}
+            {"\u2714"} {r.proposal.preview}
             {r.message ? (
               <span className="block text-[16px] text-[#4a3a66]">
                 {r.message}

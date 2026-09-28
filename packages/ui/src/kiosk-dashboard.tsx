@@ -297,7 +297,7 @@ export function BountyRow({
           )}
         </div>
       </div>
-      <div className="w-[120px] shrink-0 text-right">
+      <div className="w-[136px] shrink-0 text-right">
         <div
           data-due={due.tone}
           className="font-body text-[24px] leading-none"
