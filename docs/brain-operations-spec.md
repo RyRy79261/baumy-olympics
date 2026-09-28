@@ -12,8 +12,10 @@ they are exactly what the endpoint enforces. The short contract is
 **Owner rulings (2026-09-28, baumy-olympics issue #70).**
 
 1. Baumy gets **every member action**, the destructive ones included
-   (`delete_event`, `delete_note`), always behind its inline confirm button.
-   Admin actions stay in the Olympics app only (SPEC §12 decision 10).
+   (`delete_event`, `delete_note`). A `confirm` or `destructive` action always
+   waits for the asker's inline confirm button; a read, or a `safe` write for
+   the asker, does not (section 3). Admin actions stay in the Olympics app only
+   (SPEC §12 decision 10).
 2. **Baumy can act on behalf of housemates.** With `X-Baumy-On-Behalf-Of` the
    action runs as that housemate; the audit trail records both the housemate
    and the linked member who asked. Any write on someone's behalf needs the
@@ -31,7 +33,7 @@ they are exactly what the endpoint enforces. The short contract is
 | Header                              | When          | Meaning                                                                                                                       |
 | ----------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `Authorization: Bearer <token>`     | always        | `BRAIN_SERVICE_TOKEN`. Olympics stores only its sha256. Missing, unknown or revoked: 401.                                     |
-| `X-Baumy-Actor: tg:<telegram id>`   | every `POST`  | The authenticated sender (`from.id`), never text. Mapped to an active member on every call.                                   |
+| `X-Baumy-Actor: tg:<telegram id>`   | every `POST`  | The authenticated sender (`from.id`), never text. Mapped to an active member on every call except `link_telegram`.            |
 | `X-Baumy-On-Behalf-Of: <member id>` | optional      | Run the action as this housemate (section 4).                                                                                 |
 | `X-Baumy-Confirmed: 1`              | see section 3 | Send it only from the confirm-tap handler, after the asker tapped. Any other value counts as not confirmed.                   |
 | `Idempotency-Key: <key>`            | every write   | 8 to 128 of `A-Z a-z 0-9 . _ : -`, minted once per intended action (when the card is proposed). A retry resends the same key. |
