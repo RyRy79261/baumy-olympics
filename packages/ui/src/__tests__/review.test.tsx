@@ -12,7 +12,8 @@ import { CalendarDayCell, CalendarEventButton } from "../calendar";
 import { Card } from "../card";
 import { ChoiceGroup, ChoreTile } from "../chores";
 import { Input } from "../field";
-import { AvatarButton, KioskShell } from "../kiosk-shell";
+import { KioskFooter } from "../kiosk-dashboard";
+import { AvatarButton, KioskShell, KioskTopBar } from "../kiosk-shell";
 import { BAUMY_COLOURS, BAUMY_FRAMES } from "../pixel/baumy-cat";
 import { ToastItem, ToastList, toastDismissClass } from "../toast";
 
@@ -165,12 +166,9 @@ describe("header tokens and calendar cells", () => {
         </AppShell>,
       ),
     ).toContain("bg-bm-chrome");
+    expect(html(<KioskTopBar avatars={null} />)).toContain("bg-bm-chrome");
     expect(
-      html(
-        <KioskShell brand="B" avatars={null}>
-          x
-        </KioskShell>,
-      ),
+      html(<KioskShell footer={<KioskFooter>x</KioskFooter>}>x</KioskShell>),
     ).toContain("bg-bm-chrome");
   });
 

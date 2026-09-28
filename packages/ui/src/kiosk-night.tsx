@@ -81,10 +81,10 @@ export function KioskNotice({
 
 /**
  * A small tag for something the household should know about the device
- * itself ("Screen may sleep"). A polite live region, pinned to the bottom
- * left corner so it never moves the avatar bar when it comes and goes (a
- * shift under a finger would turn a tap into a miss), and it never catches a
- * touch.
+ * itself ("Screen may sleep"). A polite live region, pinned bottom left just
+ * above the footer nav (ADR 0005), so it never covers a nav label or moves
+ * anything when it comes and goes (a shift under a finger would turn a tap
+ * into a miss), and it never catches a touch.
  */
 export function KioskIndicator({
   children,
@@ -97,7 +97,7 @@ export function KioskIndicator({
     <span
       role="status"
       data-testid={testId}
-      className="pixel-frame pointer-events-none fixed bottom-4 left-4 z-40 bg-bm-amber/15 px-3 py-1 font-label text-sm font-bold text-bm-amber uppercase [--pf:var(--color-bm-amber)]"
+      className="pixel-frame pointer-events-none fixed bottom-[100px] left-6 z-40 bg-bm-amber/15 px-3 py-1 font-label text-sm font-bold text-bm-amber uppercase [--pf:var(--color-bm-amber)]"
     >
       {children}
     </span>

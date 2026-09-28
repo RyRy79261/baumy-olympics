@@ -3,9 +3,9 @@ import { APP_BACKGROUND } from "@/components/app-icon";
 
 // The web app manifest (SPEC §8, issue #29; camp-404's app/manifest.ts),
 // served at /manifest.webmanifest. Installed from /kiosk, the iPad opens the
-// kitchen screen full screen and in landscape. iPadOS ignores `orientation`
-// (Guided Access and the rotation lock hold it: docs/kiosk-setup.md);
-// Chrome honours it.
+// kitchen screen full screen and in portrait (ADR 0005). iPadOS ignores
+// `orientation` (Guided Access and the rotation lock hold it:
+// docs/kiosk-setup.md); Chrome honours it.
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/kiosk",
     scope: "/",
     display: "standalone",
-    orientation: "landscape",
+    orientation: "portrait",
     background_color: APP_BACKGROUND,
     theme_color: APP_BACKGROUND,
     icons: [

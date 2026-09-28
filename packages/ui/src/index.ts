@@ -65,8 +65,39 @@ export { KioskIndicator, KioskNotice, NightScreen } from "./kiosk-night";
 export {
   AvatarButton,
   KioskShell,
+  KioskTopBar,
   type AvatarButtonProps,
 } from "./kiosk-shell";
+export {
+  BountyRow,
+  DayEventRow,
+  EventChip,
+  KIOSK_FOOTER_H,
+  KioskFooter,
+  KioskNavItem,
+  MessageRow,
+  ModuleEmpty,
+  ModulePanel,
+  MonthDayCell,
+  NotificationIcon,
+  SheetTabs,
+  WeekdayRow,
+  WhoLine,
+  bountyActionClass,
+  kioskArrowClass,
+  kioskNavItemClass,
+  tint,
+  todayButtonClass,
+  toneColour,
+  type DashboardTone,
+} from "./kiosk-dashboard";
+export { KioskModal } from "./kiosk-modal";
+export {
+  PixelScroll,
+  seekTo,
+  thumbFor,
+  type ScrollMetrics,
+} from "./pixel-scroll";
 export {
   MarkdownBody,
   NOTE_SANITIZE_SCHEMA,
