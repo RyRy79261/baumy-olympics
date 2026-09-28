@@ -7,6 +7,7 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
+import { uniqueAddress } from "./household";
 
 /** The kitchen iPad, in portrait (ADR 0005). */
 export const KIOSK_VIEWPORT = { width: 820, height: 1180 };
@@ -43,12 +44,6 @@ export async function pairCode(
     "Waiting for its code",
   );
   return code;
-}
-
-/** A made-up private address, one per kiosk context. */
-function uniqueAddress(): string {
-  const byte = () => Math.floor(Math.random() * 254) + 1;
-  return `10.${byte()}.${byte()}.${byte()}`;
 }
 
 /** A new iPad-sized context, paired with a fresh code from `admin`. */
