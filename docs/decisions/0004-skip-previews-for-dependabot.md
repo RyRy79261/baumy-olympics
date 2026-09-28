@@ -4,6 +4,8 @@
 
 [CORRECTION 2026-09-29] Owner: the Vercel Neon integration manages preview branches in every other repository. Here our own workflow duplicated it, the integration's `preview/<branch>` branches were never deleted, the Neon branch quota filled, and previews failed with "Resource provisioning failed". The integration now owns preview branches (preview branching on), as in camp-404: `neon-pr-preview.yml`, `scripts/neon-preview-env.sh` and the `NEON_PREVIEW_READY` build gate are removed, and `neon-pr-cleanup.yml` is camp-404's (`.github/workflows/neon-pr-cleanup.yml`) as-is, deleting `preview/<head branch>` by prefix on close. The Dependabot build skip (3, 4), the migrate guard (6, without the readiness gate) and `dependabot.yml` (7) stand. The superseded items are marked below; `docs/deploy.md` describes the current flow.
 
+[CORRECTION 2026-09-29] Owner: the Hobby account (100 deployments a day, shared by about seven projects) is near its limit, and this project used 27 in a day. **Vercel preview deployments are off** (issue #101): `apps/web/vercel.json` sets `git.deploymentEnabled` to `{"**": false, "main": true}`, so only `main` deploys (to production) and no other branch creates a deployment. With no preview deployments the Neon integration creates no preview branches. GitHub CI (with e2e on Docker Postgres) still tests every PR. The Dependabot skip (3), the migrate guard (6) and `neon-pr-cleanup.yml` stay as a harmless safety net, and apply again if the key is removed.
+
 ## Context
 
 The owner remembered AfrikaBurn having "a trick to stop Dependabot creating Neon previews", and he was right. afrikaburn origin/main (added in ef65a4e, #65; still there at 46f0ed2) has:
