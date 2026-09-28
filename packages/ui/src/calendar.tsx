@@ -1,8 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cx } from "./cx";
 
-// NEUTRAL PLACEHOLDERS for the house calendar (SPEC §3.3; issue #7 restyles
-// them here): a grid of days for the Day, Week and Month views, one day's
+// The house calendar in the pixel kit (SPEC §3.3; ADR 0005, the prototype's
+// month grid): a grid of days for the Day, Week and Month views, one day's
 // cell, and an event button that opens it. They take plain props and know
 // nothing about Google or the actions. Every tap target is at least 44px,
 // 56px with `kiosk`.
@@ -31,7 +31,7 @@ export function CalendarGrid({
       {weekdays ? (
         <div
           aria-hidden="true"
-          className="hidden grid-cols-7 gap-1 text-center text-xs uppercase tracking-widest text-neutral-600 sm:grid"
+          className="hidden grid-cols-7 gap-1.5 text-center font-label text-sm font-bold text-bm-muted uppercase sm:grid"
         >
           {WEEKDAY_NAMES.map((d) => (
             <span key={d}>{d}</span>
@@ -40,7 +40,7 @@ export function CalendarGrid({
       ) : null}
       <ol
         className={cx(
-          "grid gap-1",
+          "grid gap-1.5",
           columns === 7 ? "grid-cols-1 sm:grid-cols-7" : "grid-cols-1",
         )}
       >
@@ -74,14 +74,24 @@ export function CalendarDayCell({
     <li
       aria-current={today ? "date" : undefined}
       className={cx(
-        "flex min-w-0 flex-col gap-1 rounded border bg-white p-2",
+        "pixel-frame flex min-w-0 flex-col gap-1 p-1.5",
         tall ? "min-h-40" : "min-h-24",
-        today ? "border-neutral-900" : "border-neutral-300",
-        muted && "bg-neutral-50 text-neutral-600",
+        today
+          ? "pixel-frame-4 bg-[#2a1c4a] [--pf:var(--color-bm-violet)]"
+          : muted
+            ? "opacity-40 [--pf:var(--color-bm-line)]"
+            : "bg-bm-surface [--pf:transparent]",
       )}
       {...props}
     >
-      <span className={cx("text-sm", today && "font-semibold")}>{label}</span>
+      <span
+        className={cx(
+          "w-fit px-1 font-display text-xs leading-6",
+          today ? "bg-bm-violet text-bm-ink" : "text-bm-text",
+        )}
+      >
+        {label}
+      </span>
       {children}
     </li>
   );
@@ -107,14 +117,13 @@ export function CalendarEventButton({
     <button
       type={type}
       className={cx(
-        "flex w-full min-w-0 flex-col items-start rounded border border-neutral-300 bg-neutral-50 px-2 text-left",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900",
-        kiosk ? "min-h-14 py-2 text-base" : "min-h-11 py-1 text-sm",
+        "pixel-frame flex w-full min-w-0 flex-col items-start border-l-[5px] border-bm-violet bg-bm-violet/20 px-2 text-left text-bm-text [--pf:transparent]",
+        kiosk ? "min-h-14 py-2 text-lg" : "min-h-11 py-1 text-base",
         className,
       )}
       {...props}
     >
-      <span className="text-xs text-neutral-600">{time}</span>
+      <span className="font-label text-xs text-bm-muted uppercase">{time}</span>
       <span className="w-full truncate font-medium">{title}</span>
     </button>
   );

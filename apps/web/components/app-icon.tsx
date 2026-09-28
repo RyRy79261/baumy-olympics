@@ -7,8 +7,8 @@ import { ImageResponse } from "next/og";
 // app/manifest.ts only ask for a size.
 
 /** The theme colour the manifest and the status bar use. */
-export const APP_BACKGROUND = "#171717";
-const INK = "#fafafa";
+export const APP_BACKGROUND = "#140c1f";
+const INK = "#f7ecff";
 
 // 7 × 9 cells; "#" is a lit pixel.
 const GLYPH = [

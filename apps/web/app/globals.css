@@ -4,13 +4,142 @@
    package, so its classes are added here (camp-404's pattern). */
 @source "../../../packages/ui/src";
 
-/* Focus rings everywhere (issue #29's accessibility pass): anything a
-   keyboard or switch control can reach shows a ring when focused that way,
-   including plain links and elements without a focus-visible utility. In the
-   base layer, so a component's own focus-visible: classes still win. */
+/* The pixel UI kit's tokens (ADR 0005 §7, issue #7). The palette is the
+   approved prototype's (proto/kiosk-home-pixel), taken from
+   design/baumy-reference.png: a near-black plum, violet, teal, pink, amber
+   and yellow accents, and the green of Baumy's eye. On the kitchen screen
+   one accent has one meaning (ADR 0005 §8): red is urgent, yellow is new or
+   points, pink is messages, amber is consumable, teal is maintenance.
+   Components use these through `bg-bm-*`, `text-bm-*`, `border-bm-*`. */
+@theme {
+  --color-bm-bg: #140c1f;
+  --color-bm-surface: #1c1229;
+  --color-bm-raised: #251838;
+  --color-bm-line: #2e2145;
+  --color-bm-ink: #0b0712;
+  --color-bm-text: #f7ecff;
+  --color-bm-muted: #a898c4;
+  --color-bm-dim: #6a5b8a;
+  --color-bm-red: #ff4d5e;
+  --color-bm-yellow: #ffe46b;
+  --color-bm-amber: #ffb347;
+  --color-bm-teal: #4ff5e6;
+  --color-bm-pink: #ff8fc7;
+  --color-bm-violet: #8f7dff;
+  --color-bm-green: #43f0a0;
+  --color-bm-bubble: #f6ecff;
+  --color-bm-bubble-ink: #1a1026;
+
+  --animate-pixel-bob: pixel-bob 1.2s steps(2) infinite;
+  --animate-pixel-hop: pixel-hop 0.6s steps(3) infinite;
+  --animate-pixel-in: pixel-in 0.2s steps(4) both;
+
+  @keyframes sprite-strip {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes pixel-bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+  @keyframes pixel-hop {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    33% {
+      transform: translateY(-6px);
+    }
+    66% {
+      transform: translateY(-2px);
+    }
+  }
+  @keyframes pixel-in {
+    from {
+      transform: translateY(24px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+/* The pixel fonts (loaded with next/font in app/layout.tsx): Press Start 2P
+   for display text, Silkscreen for labels, Pixelify Sans for reading text. */
+@theme inline {
+  --font-display: var(--font-press), ui-monospace, monospace;
+  --font-label: var(--font-silk), ui-monospace, monospace;
+  --font-body: var(--font-pixelify), ui-sans-serif, system-ui, sans-serif;
+
+  /* Sprites (packages/ui SpriteStrip): the strip of frames slides one frame
+     per step, and the component sets how many and how long on the element.
+     Inline, so those variables are read on the sprite, not on :root. */
+  --animate-sprite-strip: sprite-strip var(--sprite-duration, 1s)
+    steps(var(--sprite-steps, 1)) infinite;
+}
+
+/* A stepped pixel frame: the corners notched out square and an inset
+   border, `--pf` its colour (the line colour by default) and `pixel-frame-4`
+   a 4px one. A clip-path would hide an outline, so a focused frame shows
+   its ring inside: yellow, then ink. */
+@utility pixel-frame {
+  clip-path: polygon(
+    var(--pf-w, 3px) 0,
+    calc(100% - var(--pf-w, 3px)) 0,
+    calc(100% - var(--pf-w, 3px)) var(--pf-w, 3px),
+    100% var(--pf-w, 3px),
+    100% calc(100% - var(--pf-w, 3px)),
+    calc(100% - var(--pf-w, 3px)) calc(100% - var(--pf-w, 3px)),
+    calc(100% - var(--pf-w, 3px)) 100%,
+    var(--pf-w, 3px) 100%,
+    var(--pf-w, 3px) calc(100% - var(--pf-w, 3px)),
+    0 calc(100% - var(--pf-w, 3px)),
+    0 var(--pf-w, 3px),
+    var(--pf-w, 3px) var(--pf-w, 3px)
+  );
+  box-shadow: inset 0 0 0 var(--pf-w, 3px) var(--pf, var(--color-bm-line));
+
+  &:focus-visible,
+  &:has(:focus-visible) {
+    outline: none;
+    box-shadow:
+      inset 0 0 0 var(--pf-w, 3px) var(--color-bm-yellow),
+      inset 0 0 0 calc(var(--pf-w, 3px) + 2px) var(--color-bm-ink);
+  }
+}
+
+@utility pixel-frame-4 {
+  --pf-w: 4px;
+}
+
 @layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-bm-bg);
+    color: var(--color-bm-text);
+    font-family: var(--font-body);
+  }
+
+  /* Focus rings everywhere (issue #29's accessibility pass): anything a
+     keyboard or switch control can reach shows a ring when focused that way,
+     including plain links and elements without a focus-visible utility. In
+     the base layer, so a component's own focus-visible: classes still win. */
   :focus-visible {
-    outline: 2px solid currentColor;
+    outline: 2px solid var(--color-bm-yellow);
     outline-offset: 2px;
   }
 }
@@ -20,7 +149,8 @@
    less motion gets it everywhere, including motion added later without a
    motion-safe: prefix: animations and transitions finish at once. Outside
    every layer, with !important, so it wins over utilities and inline styles.
-   Baumy's sprite also uses motion-safe:, so it stands still in its state. */
+   Every sprite's motion is motion-safe: too, so Baumy stands still in its
+   state and a sprite strip shows its first frame. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

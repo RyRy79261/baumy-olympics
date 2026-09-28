@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 
 // Every page starts with this (AGENTS.md "UI"), shape from camp-404
 // `packages/ui/src/components/page-heading.tsx`: an optional eyebrow, the one
-// h1, an optional description and right-aligned actions.
+// h1, an optional description and right-aligned actions. The h1 is in the
+// display font, the eyebrow a Silkscreen label.
 
 export function PageHeading({
   eyebrow,
@@ -17,15 +18,17 @@ export function PageHeading({
 }) {
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-2">
         {eyebrow ? (
-          <p className="text-xs uppercase tracking-widest text-neutral-600">
+          <p className="font-label text-sm font-bold tracking-wider text-bm-muted uppercase">
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="text-2xl font-semibold text-neutral-900">{title}</h1>
+        <h1 className="font-display text-xl leading-snug text-bm-text sm:text-2xl">
+          {title}
+        </h1>
         {description ? (
-          <p className="max-w-2xl text-sm text-neutral-600">{description}</p>
+          <p className="max-w-2xl text-lg text-bm-muted">{description}</p>
         ) : null}
       </div>
       {actions ? (

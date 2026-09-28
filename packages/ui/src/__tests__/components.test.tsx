@@ -34,10 +34,14 @@ describe("Button", () => {
 
   it("has a variant and a kiosk size", () => {
     expect(buttonClass("danger", "kiosk", "extra")).toMatch(
-      /bg-red-700.*min-h-14.*extra/,
+      /bg-bm-red.*min-h-14.*extra/,
     );
-    expect(html(<Button variant="secondary">x</Button>)).toContain("border");
+    expect(buttonClass("primary")).toContain("bg-bm-green");
+    expect(html(<Button variant="secondary">x</Button>)).toContain(
+      "pixel-frame",
+    );
     expect(buttonClass("ghost")).toContain("underline-offset-4");
+    expect(buttonClass("ghost")).not.toContain("pixel-frame");
   });
 });
 
@@ -181,8 +185,8 @@ describe("AppShell", () => {
     expect(out).toContain('aria-label="Main"');
     expect(out).toContain("<main");
     expect(out).toContain("Ryan");
-    expect(navItemClass(true)).toContain("font-semibold");
-    expect(navItemClass(false)).not.toContain("font-semibold");
+    expect(navItemClass(true)).toContain("pixel-frame");
+    expect(navItemClass(false)).not.toContain("pixel-frame");
     expect(
       html(
         <AppShell brand="B" nav={null}>
@@ -193,7 +197,7 @@ describe("AppShell", () => {
   });
 });
 
-describe("Sprite (placeholder)", () => {
+describe("Sprite", () => {
   it("exposes the sprite name, state and scale", () => {
     const out = html(
       <Sprite name="fox" state="happy" size={3} color="#ff0000" label="Ryan" />,
@@ -233,7 +237,7 @@ describe("Sprite (placeholder)", () => {
         expect(out).toContain('data-motion="animated"');
       } else {
         expect(out).toContain('data-motion="still"');
-        expect(out).not.toMatch(/animate-/);
+        expect(out).not.toMatch(/animate-pixel-/);
       }
       // No animation class outside motion-safe.
       expect(out.replace(/motion-safe:animate-\w+/g, "")).not.toMatch(
