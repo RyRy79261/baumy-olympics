@@ -345,7 +345,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(button("Start talking")).toBeDefined();
   });
 
-  it("listens, shows what it understood, and does it on Yes", async () => {
+  it("listens, shows what it understood, and does it on Confirm all", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
     await act(async () => cat().click());
@@ -364,7 +364,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(bubble()!.dataset.mode).toBe("answer");
     expect(bubble()!.textContent).toContain("Got it! I'll do this:");
     expect(bubble()!.textContent).toContain("Log Bins for Ryan: +10");
-    await act(async () => button("Yes, do it").click());
+    await act(async () => button("Confirm all").click());
     await settle(10);
     expect(fetchMock.mock.calls.at(-1)![0]).toBe("/api/actions/run");
     expect(refresh).toHaveBeenCalled();
@@ -466,7 +466,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(document.body.textContent).not.toContain("I did the bins");
   });
 
-  it("does nothing on No, and Type instead opens the sheet", async () => {
+  it("does nothing on Cancel, and Type instead opens the sheet", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
     await act(async () => cat().click());
@@ -474,7 +474,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     await act(async () => button("Done talking").click());
     await settle();
     await settle();
-    await act(async () => button("No").click());
+    await act(async () => button("Cancel").click());
     expect(bubble()).toBeNull();
     expect(fetchMock.mock.calls.map((c) => c[0])).not.toContain(
       "/api/actions/run",
@@ -503,6 +503,76 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(bubble()!.textContent).toContain("Ryan is winning.");
     await act(async () => button("OK").click());
     expect(bubble()).toBeNull();
+  });
+
+  it("confirms every valid card in order, with the PIN only where needed, never the invalid one (issue #107)", async () => {
+    const pinned = {
+      ...proposal,
+      proposalId: "p2",
+      preview: "Log Bins for Sam: +10",
+      needsPin: true,
+    };
+    const invalid = {
+      ...proposal,
+      proposalId: "p3",
+      name: "create_bounty",
+      preview: "New bounty: Recycling · maintenance · 15 pts",
+      valid: false,
+      error: "This can only be done signed in on your own phone or computer.",
+    };
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/actions/run"
+        ? json({ ok: true, data: { totalPts: 10 } })
+        : json({
+            ok: true,
+            data: {
+              reply: "Lined up.",
+              proposals: [proposal, pinned, invalid],
+              choices: { members: [], chores: [] },
+            },
+          }),
+    );
+    mountCat({ actingName: "Ryan", voice: false });
+    act(() => cat().click());
+    const input = document.querySelector<HTMLInputElement>("#baumy-text")!;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      set.call(input, "bins for me and Sam, and a bounty");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => button("Send").click());
+    await settle();
+    expect(document.body.textContent).toContain(invalid.error);
+    await act(async () => button("Confirm all").click());
+    // One PIN for the acting member, before anything runs.
+    expect(fetchMock.mock.calls.map((c) => c[0])).not.toContain(
+      "/api/actions/run",
+    );
+    for (const d of ["4", "3", "2", "1"]) {
+      await act(async () => button(d).click());
+    }
+    const pad = document.querySelector<HTMLFormElement>(
+      'form[aria-label="Ryan\'s PIN"]',
+    )!;
+    await act(async () => pad.requestSubmit());
+    await settle(10);
+    const runs = fetchMock.mock.calls
+      .filter((c) => c[0] === "/api/actions/run")
+      .map((c) => JSON.parse((c[1] as RequestInit).body as string));
+    expect(runs).toEqual([
+      expect.objectContaining({ requestId: "p1", surface: "kiosk" }),
+      expect.objectContaining({ requestId: "p2", pin: "4321" }),
+    ]);
+    expect(runs[0]).not.toHaveProperty("pin");
+    expect(
+      [...document.querySelectorAll("li[data-testid^=suggestion-]")].map((li) =>
+        li.getAttribute("data-state"),
+      ),
+    ).toEqual(["saved", "saved", "pending"]);
+    expect(document.body.textContent).toContain("Saved: +10 points.");
   });
 
   it("opens the sheet at once without a microphone, and always asks who", async () => {
@@ -539,12 +609,12 @@ describe("BaumySheet on the kitchen dashboard", () => {
     });
     await act(async () => button("Send").click());
     await settle();
-    await act(async () => button("Approve").click());
+    await act(async () => button("Confirm all").click());
     await settle();
     expect(refresh).toHaveBeenCalled();
     // Nothing is said while the sheet is open.
     expect(bubble()).toBeNull();
-    await act(async () => button("Close").click());
+    await act(async () => button("Done").click());
     expect(bubble()!.textContent).toBe("Purrfect. +10 for Ryan ✦");
     // Opening it again clears it.
     act(() => cat().click());

@@ -26,9 +26,9 @@ import {
 import type { HistoryTurn } from "@/lib/ai/command";
 import type { Proposal } from "@/lib/ai/proposal";
 import {
-  approveAllSkips,
-  approveAllTargets,
   asksForPin,
+  cancelAll,
+  confirmAllTargets,
   nextHistory,
   rowsFor,
   savedMessage,
@@ -42,18 +42,19 @@ import {
 } from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
 import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
-import { ProposalRow } from "./proposal-row";
+import { SuggestionCards } from "./suggestion-cards";
 import { useBaumyMood } from "./use-mood";
 import { useRecorder } from "./use-recorder";
 import { VoiceRecorder } from "./voice-recorder";
 
 // The Baumy sheet (SPEC §3.6), after intake-tracker's
 // `components/voice/voice-panel.tsx`: type to Baumy, read the answer in its
-// speech bubble, and review what it proposes. Nothing is written until a row
-// is approved; each approved row runs through POST /api/actions/run with its
-// proposal id as the idempotency key, so a partial "Approve all" keeps what
-// saved and a retry never saves a row twice. After a save the page re-reads
-// itself, so the scoreboard and the widgets show it.
+// speech bubble, and review what it suggests: one card per write, with
+// "Confirm all" and "Cancel" (suggestion-cards.tsx, owner ruling 2026-09-29).
+// Nothing is written until Confirm all; each card then runs through POST
+// /api/actions/run with its proposal id as the idempotency key, so a partial
+// save keeps what saved and a retry never saves a card twice. After a save
+// the page re-reads itself, so the scoreboard and the widgets show it.
 //
 // Or hold to speak (issue #22): the clip is transcribed by Groq Whisper
 // (POST /api/ai/transcribe) and the words are sent as if typed. The
@@ -69,8 +70,8 @@ import { VoiceRecorder } from "./voice-recorder";
 // baumy-cat.tsx) the cat itself is the button and the talking happens in
 // its speech bubble: a tap starts listening ("Mrrp? I'm listening…", level
 // bars, "Done talking"), then what Baumy understood shows as "Got it! I'll
-// do this:" with "Yes, do it" and "No", through the same transcribe,
-// command and approve calls as the sheet. "Type instead" opens the sheet
+// do this:" with the same suggestion cards, "Confirm all" and "Cancel",
+// through the same transcribe, command and run calls as the sheet. "Type instead" opens the sheet
 // with the same conversation. With nobody tapped in, the bubble first asks
 // who is talking; without a microphone, a tap opens the sheet.
 
@@ -236,16 +237,21 @@ export function BaumySheet({
     return false;
   }
 
-  async function approveAll() {
+  /** Run every valid card, in order; the PIN goes with those that need it. */
+  async function confirmAll(pin?: string) {
     setBulk(true);
     try {
-      // One at a time, so the rows that saved stay saved if one fails.
-      for (const row of approveAllTargets(rowsRef.current, kiosk)) {
-        await approve(row);
+      // One at a time, so the cards that saved stay saved if one fails.
+      for (const row of confirmAllTargets(rowsRef.current)) {
+        await approve(row, row.needsPin ? pin : undefined);
       }
     } finally {
       setBulk(false);
     }
+  }
+
+  function drop(row: ReviewRow) {
+    update(row.proposal.proposalId, { state: "rejected", message: undefined });
   }
 
   async function edit(row: ReviewRow, input: Record<string, unknown>) {
@@ -394,9 +400,9 @@ export function BaumySheet({
     else setOpen(true);
   }
 
-  async function yesDoIt() {
-    await approveAll();
-    // Let the rows' last states render before reading them.
+  async function catConfirmAll(pin?: string) {
+    await confirmAll(pin);
+    // Let the cards' last states render before reading them.
     await new Promise((r) => setTimeout(r, 0));
     // Everything is done and scored: the cat says so instead.
     const unsettled = rowsRef.current.some(
@@ -405,15 +411,14 @@ export function BaumySheet({
     if (!unsettled && earned.current > 0) hideBubble();
   }
 
-  function noThanks() {
-    setRows((rs) =>
-      rs.map((r) =>
-        r.state === "pending" || r.state === "failed"
-          ? { ...r, state: "rejected", message: undefined }
-          : r,
-      ),
-    );
+  function catCancel() {
+    setRows(cancelAll);
     hideBubble();
+  }
+
+  function sheetCancel() {
+    setRows(cancelAll);
+    close();
   }
 
   // A bubble left open closes after a minute untouched.
@@ -430,35 +435,37 @@ export function BaumySheet({
     return () => window.removeEventListener(KIOSK_COVER_EVENT, onCover);
   }, [bubbleOpen]);
 
-  const targets = approveAllTargets(rows, kiosk);
-  const skips = approveAllSkips(rows, kiosk);
+  const pinLabel = actingName ? `${actingName}'s PIN` : "Your PIN";
 
   const answer = reply?.error ? (
-    <CatText tone="error">{reply.text}</CatText>
+    <>
+      <CatText tone="error">{reply.text}</CatText>
+      <div className="mt-4 flex gap-3">
+        <CatButton onClick={hideBubble}>OK</CatButton>
+      </div>
+    </>
   ) : rows.length > 0 ? (
     <>
       <CatSays size="sm">Got it! I&apos;ll do this:</CatSays>
-      <ul className="mt-3 flex flex-col gap-1 font-body text-[22px] leading-snug">
-        {rows.map((r) => (
-          <li
-            key={r.proposal.proposalId}
-            data-testid={`cat-row-${r.proposal.name}`}
-            data-state={r.state}
-            className={r.state === "rejected" ? "line-through opacity-50" : ""}
-          >
-            {"\u2714"} {r.proposal.preview}
-            {r.message ? (
-              <span className="block text-[16px] text-[#4a3a66]">
-                {r.message}
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-      {skips ? <CatText tone="muted">{skips}</CatText> : null}
+      <SuggestionCards
+        rows={rows}
+        kiosk={kiosk}
+        bubble
+        pinLabel={pinLabel}
+        busy={bulk}
+        onConfirmAll={(pin) => void catConfirmAll(pin)}
+        onCancel={catCancel}
+        onDone={hideBubble}
+        onDrop={drop}
+      />
     </>
   ) : (
-    <CatText>{reply?.text ?? ""}</CatText>
+    <>
+      <CatText>{reply?.text ?? ""}</CatText>
+      <div className="mt-4 flex gap-3">
+        <CatButton onClick={hideBubble}>OK</CatButton>
+      </div>
+    </>
   );
 
   const catBubble =
@@ -518,27 +525,7 @@ export function BaumySheet({
             {transcribing ? "Listening back\u2026" : "Hmm, let me think\u2026"}
           </CatSays>
         ) : (
-          <>
-            {answer}
-            <div className="mt-4 flex gap-3">
-              {targets.length > 0 ? (
-                <>
-                  <CatButton
-                    variant="go"
-                    disabled={bulk}
-                    onClick={() => void yesDoIt()}
-                  >
-                    {bulk ? "Saving\u2026" : "Yes, do it"}
-                  </CatButton>
-                  <CatButton variant="soft" disabled={bulk} onClick={noThanks}>
-                    No
-                  </CatButton>
-                </>
-              ) : (
-                <CatButton onClick={hideBubble}>OK</CatButton>
-              )}
-            </div>
-          </>
+          answer
         )}
         <CatLink onClick={typeInstead}>Type instead</CatLink>
       </CatBubble>
@@ -640,44 +627,22 @@ export function BaumySheet({
           </form>
 
           {rows.length > 0 ? (
-            <section
-              aria-label="Baumy's proposals"
-              className="flex flex-col gap-3"
-            >
-              <ul className="flex flex-col gap-3">
-                {rows.map((row) => (
-                  <ProposalRow
-                    key={row.proposal.proposalId}
-                    row={row}
-                    kiosk={kiosk}
-                    pinLabel={actingName ? `${actingName}'s PIN` : "Your PIN"}
-                    onApprove={(pin) => void approve(row, pin)}
-                    onReject={() =>
-                      update(row.proposal.proposalId, {
-                        state: "rejected",
-                        message: undefined,
-                      })
-                    }
-                    onEdit={(input) => edit(row, input)}
-                  />
-                ))}
-              </ul>
-              {rows.length > 1 && targets.length > 0 ? (
-                <Button
-                  size={size}
-                  disabled={bulk}
-                  onClick={() => void approveAll()}
-                >
-                  {bulk ? "Saving…" : `Approve all (${targets.length})`}
-                </Button>
-              ) : null}
-              {skips ? <p className="text-sm text-bm-muted">{skips}</p> : null}
-            </section>
-          ) : null}
-
-          <Button variant="secondary" size={size} onClick={close}>
-            Close
-          </Button>
+            <SuggestionCards
+              rows={rows}
+              kiosk={kiosk}
+              pinLabel={pinLabel}
+              busy={bulk}
+              onConfirmAll={(pin) => void confirmAll(pin)}
+              onCancel={sheetCancel}
+              onDone={close}
+              onDrop={drop}
+              onEdit={edit}
+            />
+          ) : (
+            <Button variant="secondary" size={size} onClick={close}>
+              Close
+            </Button>
+          )}
         </div>
       </Dialog>
     </>
