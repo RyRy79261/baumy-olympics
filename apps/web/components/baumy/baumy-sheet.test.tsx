@@ -375,6 +375,44 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("never reopens with a late answer after a reminder closed it mid-flight", async () => {
+    // Baumy answers slowly: the reminder comes up while it is thinking.
+    let answer: (r: Response) => void = () => undefined;
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/ai/transcribe"
+        ? json({ ok: true, data: { text: "I did the bins" } })
+        : new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+    );
+    mountCat({ actingName: "Ryan" });
+    await act(async () => cat().click());
+    await settle(300);
+    await act(async () => button("Done talking").click());
+    await settle();
+    expect(bubble()!.dataset.mode).toBe("thinking");
+    expect(fetchMock.mock.calls.map((c) => c[0])).toContain("/api/ai/command");
+    await act(async () => closeOpenDialogs(document));
+    expect(bubble()).toBeNull();
+    // The answer, with the last person's proposal, lands after that.
+    await act(async () =>
+      answer(
+        json({
+          ok: true,
+          data: {
+            reply: "Bins it is.",
+            proposals: [proposal],
+            choices: { members: [], chores: [] },
+          },
+        }),
+      ),
+    );
+    await settle();
+    await settle();
+    expect(bubble()).toBeNull();
+    expect(document.body.textContent).not.toContain("Log Bins for Ryan");
+  });
+
   it("does nothing on No, and Type instead opens the sheet", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
