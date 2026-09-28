@@ -1,11 +1,11 @@
 "use client";
 
-// PROTOTYPE (issue #7), throwaway. Variant A's calendar area: a calm
-// Week | Month toggle, a continuous scrolling agenda (today pinned above it)
-// with a chunky pixel scrollbar, and a month grid whose days open a sheet.
+// PROTOTYPE (issue #7), throwaway. Variant A's calendar area: one full-month
+// grid (the only home view) with a slim month title row. Tapping a day opens
+// a calm day sheet that steps day by day without closing.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { eventsOn, MONTH_EVENTS, TODAY_ISO, type CalEvent } from "./data";
+import { eventsOn, TODAY_ISO, type CalEvent } from "./data";
 import { F, framed, HM, K, notch, whoColor, whoName } from "./calm-kit";
 import { Person } from "./pixels";
 
@@ -30,7 +30,6 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 const WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const WD_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const monName = (iso: string) => MONTHS[Number(iso.slice(5, 7)) - 1]!;
-const shortMon = (iso: string) => monName(iso).slice(0, 3);
 
 const snap = (n: number) => Math.round(n / 4) * 4;
 
@@ -41,163 +40,17 @@ const A2_CSS = `
 .a2-bob { animation: a2-bob 1.6s steps(2) infinite; display: inline-block; }
 `;
 
-// ---------------------------------------------------------------- toggle
-type View = "week" | "month";
-
-function ListIcon({ c }: { c: string }) {
-  return (
-    <span className="flex flex-col gap-[3px]">
-      {[0, 1, 2].map((i) => (
-        <span key={i} className="flex gap-[3px]">
-          <span className="block size-[4px]" style={{ background: c }} />
-          <span className="block h-[4px] w-[14px]" style={{ background: c }} />
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function GridIcon({ c }: { c: string }) {
-  return (
-    <span className="grid grid-cols-3 gap-[3px]">
-      {Array.from({ length: 9 }, (_, i) => (
-        <span key={i} className="block size-[5px]" style={{ background: c }} />
-      ))}
-    </span>
-  );
-}
-
-function ViewToggle({ view, onPick }: { view: View; onPick: (v: View) => void }) {
-  const opts: { k: View; l: string }[] = [
-    { k: "week", l: "Week" },
-    { k: "month", l: "Month" },
-  ];
-  return (
-    <div className="flex p-[6px]" style={framed(K.line, "#0f0918", 3)} role="tablist" aria-label="Calendar view">
-      {opts.map((o) => {
-        const on = o.k === view;
-        const c = on ? K.text : K.muted;
-        return (
-          <button
-            key={o.k}
-            type="button"
-            role="tab"
-            aria-selected={on}
-            data-view={o.k}
-            onClick={() => onPick(o.k)}
-            className={`${F.silk} flex h-[56px] w-[138px] items-center justify-center gap-3 text-[17px] font-bold uppercase`}
-            style={on ? { ...framed(K.violet, `${K.violet}33`, 3), color: c } : { color: c }}
-          >
-            {o.k === "week" ? <ListIcon c={on ? K.violet : K.dim} /> : <GridIcon c={on ? K.violet : K.dim} />}
-            {o.l}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ArrowBtn({ dir, onClick, label }: { dir: -1 | 1; onClick: () => void; label: string }) {
+function ArrowBtn({ dir, onClick, label, size = 56 }: { dir: -1 | 1; onClick: () => void; label: string; size?: number }) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className={`${F.press} grid size-[56px] shrink-0 place-items-center text-[18px]`}
-      style={{ ...framed(K.line, K.raised, 3), color: K.muted }}
+      className={`${F.press} grid shrink-0 place-items-center text-[18px]`}
+      style={{ ...framed(K.line, K.raised, 3), color: K.muted, width: size, height: size }}
     >
       {dir < 0 ? "◀" : "▶"}
     </button>
-  );
-}
-
-// ---------------------------------------------------------------- shared bits
-function WhoTag({ who, size = 13 }: { who: string; size?: number }) {
-  return (
-    <span className={`${F.silk} uppercase`} style={{ color: whoColor(who), fontSize: size }}>
-      {whoName(who)}
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------- agenda
-const AGENDA_DAYS = 21;
-
-function weekLabel(monday: string) {
-  const sun = addDays(monday, 6);
-  const range =
-    monthOf(monday) === monthOf(sun)
-      ? `${dom(monday)}–${dom(sun)} ${shortMon(monday)}`
-      : `${dom(monday)} ${shortMon(monday)} – ${dom(sun)} ${shortMon(sun)}`;
-  const weeksOut = Math.round((parse(monday) - parse(TODAY_ISO)) / (7 * DAY_MS));
-  // TODAY_ISO is a Monday, so the next Monday is exactly one week out.
-  const name = weeksOut === 1 ? "Next week" : `In ${weeksOut} weeks`;
-  return { name, range };
-}
-
-function AgendaDay({ iso }: { iso: string }) {
-  const evs = eventsOn(iso);
-  const d = dow(iso);
-  const tomorrow = iso === addDays(TODAY_ISO, 1);
-  const weekend = d >= 5;
-  const first = dom(iso) === 1;
-  return (
-    <div
-      data-day={iso}
-      className={`flex gap-5 px-2 ${evs.length ? "py-4" : "py-3"}`}
-      style={{ borderTop: `2px solid ${K.line}` }}
-    >
-      <div className="w-[118px] shrink-0 pt-[2px]">
-        <div className={`${F.silk} text-[15px] font-bold uppercase`} style={{ color: tomorrow ? K.text : K.muted }}>
-          {tomorrow ? "Tomorrow" : WD[d]}
-        </div>
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className={`${F.press} text-[22px]`} style={{ color: weekend ? K.muted : K.text }}>
-            {dom(iso)}
-          </span>
-          {first && (
-            <span className={`${F.silk} text-[13px] font-bold uppercase`} style={{ color: K.violet }}>
-              {shortMon(iso)}
-            </span>
-          )}
-        </div>
-      </div>
-      {evs.length === 0 ? (
-        <div className={`${F.pix} flex items-center text-[22px]`} style={{ color: K.dim }}>
-          Nothing planned
-        </div>
-      ) : (
-        <ul className="flex min-w-0 flex-1 flex-col gap-3">
-          {evs.map((e) => (
-            <li key={e.start + e.title} className="flex items-stretch gap-3">
-              <span className="block w-[6px] shrink-0" style={{ background: whoColor(e.who) }} />
-              <div className="min-w-0">
-                <div className={`${F.pix} text-[27px] leading-[1.1]`}>{e.title}</div>
-                <div className={`${F.silk} mt-[6px] text-[13px] uppercase`} style={{ color: K.muted }}>
-                  {e.start}
-                  {e.end !== "23:59" ? `–${e.end}` : " till late"} · <WhoTag who={e.who} />
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function WeekDivider({ monday }: { monday: string }) {
-  const { name, range } = weekLabel(monday);
-  return (
-    <div className="flex items-center gap-4 px-2 pb-3 pt-7" data-week={monday}>
-      <span className={`${F.press} text-[15px]`} style={{ color: K.violet }}>
-        {name.toUpperCase()}
-      </span>
-      <span className={`${F.silk} text-[14px] font-bold uppercase`} style={{ color: K.muted }}>
-        {range}
-      </span>
-      <span className="h-[2px] flex-1" style={{ background: `repeating-linear-gradient(90deg, ${K.line} 0 6px, transparent 6px 12px)` }} />
-    </div>
   );
 }
 
@@ -287,7 +140,7 @@ function PixelScroll({ children, endLabel, tone = K.bg }: { children: ReactNode;
         ref={track}
         data-track
         className="relative w-[24px] shrink-0 touch-none"
-        style={{ ...framed(K.line, "#0f0918", 3), opacity: scrollable ? 1 : 0.3 }}
+        style={{ ...framed(K.line, "#0f0918", 3), opacity: scrollable ? 1 : 0 }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           seek(e.clientY);
@@ -313,22 +166,7 @@ function PixelScroll({ children, endLabel, tone = K.bg }: { children: ReactNode;
   );
 }
 
-function Agenda() {
-  const days = Array.from({ length: AGENDA_DAYS }, (_, i) => addDays(TODAY_ISO, i + 1));
-  const last = days[days.length - 1]!;
-  return (
-    <PixelScroll endLabel={`That's everything to ${WD[dow(last)]} ${dom(last)} ${shortMon(last)}`}>
-      {days.map((iso) => (
-        <div key={iso}>
-          {dow(iso) === 0 && <WeekDivider monday={iso} />}
-          <AgendaDay iso={iso} />
-        </div>
-      ))}
-    </PixelScroll>
-  );
-}
-
-// ---------------------------------------------------------------- month
+// ---------------------------------------------------------------- month grid
 function gridFor(ym: string) {
   const first = `${ym}-01`;
   const start = addDays(first, -dow(first));
@@ -338,12 +176,19 @@ function gridFor(ym: string) {
   return Array.from({ length: rows * 7 }, (_, i) => addDays(start, i));
 }
 
+// Cell geometry (px), shared by the render and the "how many chips fit" maths.
+const CELL_PAD = 6;
+const CELL_HEAD = 30;
+const CHIP_H = 28;
+const CHIP_GAP = 4;
+const GRID_GAP = 6;
+
 function Chip({ e, dim }: { e: CalEvent; dim: boolean }) {
   const c = whoColor(e.who);
   return (
     <div
-      className={`${F.pix} flex h-[27px] shrink-0 items-center gap-[6px] overflow-hidden pr-1 text-[17px] leading-none`}
-      style={{ background: `${c}2e`, color: K.text, opacity: dim ? 0.45 : 1 }}
+      className={`${F.pix} flex shrink-0 items-center gap-[5px] overflow-hidden pr-1 text-[18px] leading-none`}
+      style={{ height: CHIP_H, background: `${c}38`, color: K.text, opacity: dim ? 0.5 : 1 }}
     >
       <span className="block h-full w-[5px] shrink-0" style={{ background: c }} />
       <span className="truncate">{e.title}</span>
@@ -351,121 +196,71 @@ function Chip({ e, dim }: { e: CalEvent; dim: boolean }) {
   );
 }
 
-function DaySheet({ iso, top, onClose }: { iso: string; top: boolean; onClose: () => void }) {
-  const evs = eventsOn(iso);
-  const past = iso < TODAY_ISO;
-  const isToday = iso === TODAY_ISO;
-  return (
-    <div className="cm-fade absolute inset-0 z-10 flex flex-col" style={{ background: "rgba(8,4,14,0.6)" }} onClick={onClose}>
-      {!top && <div className="flex-1" />}
-      <section
-        data-sheet={iso}
-        className="cm-in flex h-[72%] flex-col"
-        style={framed(K.violet, "#1e1432", 4)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-center gap-4 px-7 pb-3 pt-6">
-          <div className="flex-1">
-            <div className={`${F.press} text-[22px]`} style={{ color: isToday ? K.violet : K.text }}>
-              {isToday ? "TODAY" : `${WD_LONG[dow(iso)]} ${dom(iso)} ${monName(iso)}`.toUpperCase()}
-            </div>
-            <div className={`${F.silk} mt-2 text-[14px] uppercase`} style={{ color: K.muted }}>
-              {isToday ? `${WD_LONG[dow(iso)]} ${dom(iso)} ${monName(iso)} · ` : ""}
-              {evs.length === 0 ? "nothing planned" : `${evs.length} ${evs.length === 1 ? "thing" : "things"} planned${past ? " · past" : ""}`}
-            </div>
-          </div>
-          <button
-            type="button"
-            data-close-day
-            onClick={onClose}
-            aria-label="Close day"
-            className={`${F.press} grid size-[64px] place-items-center text-[26px]`}
-            style={{ ...framed(K.line, K.raised, 4), color: K.text }}
-          >
-            ×
-          </button>
-        </header>
-        <div className="flex min-h-0 flex-1 flex-col pb-5 pl-7 pr-4">
-          <PixelScroll tone="#1e1432">
-          {evs.length === 0 ? (
-            <div className={`${F.pix} py-10 text-center text-[28px]`} style={{ color: K.muted }}>
-              A free day. Baumy suggests a nap.
-            </div>
-          ) : (
-            evs.map((e, i) => {
-              const h = HM[e.who];
-              return (
-                <div
-                  key={e.start + e.title}
-                  className="flex items-center gap-4 py-4"
-                  style={{ borderTop: i === 0 ? undefined : `2px solid ${K.line}`, opacity: past ? 0.6 : 1 }}
-                >
-                  <div className="w-[130px] shrink-0">
-                    <div className={`${F.press} text-[24px] leading-none`}>{e.start}</div>
-                    <div className={`${F.silk} mt-2 text-[13px] uppercase`} style={{ color: K.muted }}>
-                      {e.end === "23:59" ? "till late" : `to ${e.end}`}
-                    </div>
-                  </div>
-                  <span className="block h-[64px] w-[8px] shrink-0" style={{ background: whoColor(e.who) }} />
-                  <div className="min-w-0 flex-1">
-                    <div className={`${F.pix} text-[34px] font-semibold leading-[1.05]`}>{e.title}</div>
-                    <div className="mt-2 flex items-center gap-2">
-                      {h && <Person id={h.id} hair={h.hair} shirt={h.shirt} scale={2} />}
-                      <WhoTag who={e.who} size={15} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-          </PixelScroll>
-        </div>
-      </section>
-      {top && <div className="flex-1" />}
-    </div>
-  );
+/** How many chip rows fit in one cell, measured from the grid's real height. */
+function useChipRows(rows: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Same first value on server and client; the effect refines it after mount.
+  const [fit, setFit] = useState(3);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const cellH = (el.clientHeight - GRID_GAP * (rows - 1)) / rows;
+      const room = cellH - CELL_PAD * 2 - CELL_HEAD;
+      setFit(Math.max(1, Math.floor((room + CHIP_GAP) / (CHIP_H + CHIP_GAP))));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rows]);
+  return [ref, fit] as const;
 }
 
-function Month({ ym, picked, onPick }: { ym: string; picked: string | null; onPick: (iso: string | null) => void }) {
+function MonthGrid({ ym, onPick }: { ym: string; onPick: (iso: string) => void }) {
   const cells = gridFor(ym);
   const rows = cells.length / 7;
-  const maxChips = rows > 5 ? 2 : 3;
-  const pickedRow = picked ? Math.floor(cells.indexOf(picked) / 7) : -1;
+  const [ref, fit] = useChipRows(rows);
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="grid grid-cols-7 gap-[6px] pb-2">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="grid shrink-0 grid-cols-7 pb-2" style={{ gap: GRID_GAP }}>
         {WD.map((w, i) => (
-          <div key={w} className={`${F.silk} text-center text-[14px] font-bold uppercase`} style={{ color: i >= 5 ? K.dim : K.muted }}>
+          <div key={w} className={`${F.silk} text-center text-[15px] font-bold uppercase`} style={{ color: i >= 5 ? K.dim : K.muted }}>
             {w}
           </div>
         ))}
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-7 gap-[6px]" style={{ gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}>
+      <div
+        ref={ref}
+        data-month={ym}
+        className="grid min-h-0 flex-1 grid-cols-7"
+        style={{ gap: GRID_GAP, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}
+      >
         {cells.map((iso) => {
           const inMonth = monthOf(iso) === ym;
           const isToday = iso === TODAY_ISO;
           const past = iso < TODAY_ISO;
           const evs = eventsOn(iso);
-          const shown = evs.slice(0, evs.length > maxChips ? maxChips - 1 : maxChips);
+          // If they don't all fit, the last row becomes "+N more".
+          const shown = evs.length > fit ? evs.slice(0, fit - 1) : evs;
           const extra = evs.length - shown.length;
-          const on = picked === iso;
           const frame: CSSProperties = isToday
-            ? framed(K.violet, "#241741", 3)
-            : on
-              ? framed(K.text, K.raised, 3)
-              : { background: inMonth ? K.surface : "transparent", ...notch(3), boxShadow: inMonth ? undefined : `inset 0 0 0 2px ${K.line}` };
+            ? framed(K.violet, "#2a1c4a", 4)
+            : inMonth
+              ? { background: K.surface, ...notch(3) }
+              : { background: "transparent", ...notch(3), boxShadow: `inset 0 0 0 2px ${K.line}` };
           return (
             <button
               key={iso}
               type="button"
               data-date={iso}
               onClick={() => onPick(iso)}
-              className="flex min-h-0 flex-col gap-[4px] overflow-hidden p-[7px] text-left"
-              style={{ ...frame, opacity: inMonth || isToday ? 1 : 0.55 }}
+              className="flex min-h-0 flex-col overflow-hidden text-left"
+              style={{ ...frame, padding: CELL_PAD, gap: CHIP_GAP, opacity: inMonth || isToday ? 1 : 0.4 }}
             >
-              <div className="flex h-[26px] shrink-0 items-center justify-between">
+              <div className="flex shrink-0 items-center justify-between" style={{ height: CELL_HEAD }}>
                 <span
-                  className={`${F.press} px-[4px] text-[17px] leading-[24px]`}
+                  className={`${F.press} px-[5px] text-[20px] leading-[28px]`}
                   style={
                     isToday
                       ? { background: K.violet, color: K.ink }
@@ -474,87 +269,160 @@ function Month({ ym, picked, onPick }: { ym: string; picked: string | null; onPi
                 >
                   {dom(iso)}
                 </span>
-                {isToday && (
-                  <span className={`${F.silk} text-[11px] font-bold uppercase`} style={{ color: K.violet }}>
-                    today
-                  </span>
-                )}
               </div>
               {shown.map((e) => (
-                <Chip key={e.start + e.title} e={e} dim={past} />
+                <Chip key={e.start + e.title} e={e} dim={past && !isToday} />
               ))}
               {extra > 0 && (
-                <div className={`${F.press} pl-[2px] text-[14px] leading-[22px]`} style={{ color: past ? K.dim : K.muted }}>
-                  +{extra}
+                <div className={`${F.silk} shrink-0 pl-[4px] text-[14px] font-bold uppercase leading-[22px]`} style={{ color: past ? K.dim : K.muted }}>
+                  +{extra} more
                 </div>
               )}
             </button>
           );
         })}
       </div>
-      {picked && <DaySheet iso={picked} top={pickedRow >= rows / 2} onClose={() => onPick(null)} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- day sheet
+function dayTitle(iso: string) {
+  const rel = iso === TODAY_ISO ? "Today" : iso === addDays(TODAY_ISO, 1) ? "Tomorrow" : iso === addDays(TODAY_ISO, -1) ? "Yesterday" : null;
+  return { rel, full: `${WD_LONG[dow(iso)]} ${dom(iso)} ${monName(iso)}` };
+}
+
+function WhoLine({ who }: { who: string }) {
+  const h = HM[who];
+  const c = whoColor(who);
+  return (
+    <span className={`${F.silk} flex items-center gap-3 text-[16px] font-bold uppercase`} style={{ color: c }}>
+      {h ? (
+        <Person id={h.id} hair={h.hair} shirt={h.shirt} scale={2} />
+      ) : (
+        <span className="block size-[14px]" style={{ background: c, ...notch(2) }} />
+      )}
+      {whoName(who)}
+    </span>
+  );
+}
+
+function DaySheet({ iso, onStep, onClose }: { iso: string; onStep: (n: -1 | 1) => void; onClose: () => void }) {
+  const evs = eventsOn(iso);
+  const past = iso < TODAY_ISO;
+  const isToday = iso === TODAY_ISO;
+  const { rel, full } = dayTitle(iso);
+  return (
+    <div className="cm-fade absolute inset-0 z-10 flex flex-col px-2 pb-2 pt-[76px]" style={{ background: "rgba(8,4,14,0.7)" }} onClick={onClose}>
+      <section
+        data-sheet={iso}
+        className="cm-in flex min-h-0 flex-1 flex-col"
+        style={framed(isToday ? K.violet : K.line, "#1e1432", 4)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center gap-4 px-6 pb-4 pt-6">
+          <ArrowBtn dir={-1} label="Previous day" onClick={() => onStep(-1)} size={64} />
+          <div className="min-w-0 flex-1 text-center">
+            <div className={`${F.silk} text-[15px] font-bold uppercase`} style={{ color: isToday ? K.violet : K.muted }}>
+              {rel ?? WD_LONG[dow(iso)]}
+            </div>
+            <div className={`${F.press} mt-3 text-[26px] leading-none`} style={{ color: K.text }}>
+              {(rel ? full : `${dom(iso)} ${monName(iso)}`).toUpperCase()}
+            </div>
+          </div>
+          <ArrowBtn dir={1} label="Next day" onClick={() => onStep(1)} size={64} />
+        </header>
+        <div className={`${F.silk} px-6 pb-3 text-center text-[14px] uppercase`} style={{ color: K.dim }}>
+          {evs.length === 0 ? " " : `${evs.length} ${evs.length === 1 ? "thing" : "things"} planned${past ? " · done and dusted" : ""}`}
+        </div>
+        <div className="mx-6 h-[3px] shrink-0" style={{ background: K.line }} />
+        <div className="flex min-h-0 flex-1 flex-col pl-6 pr-4 pt-2">
+          {evs.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 pb-10">
+              <div className={`${F.press} text-[22px]`} style={{ color: K.muted }}>
+                NOTHING PLANNED
+              </div>
+              <div className={`${F.pix} text-[28px]`} style={{ color: K.dim }}>
+                A free day. Baumy suggests a nap.
+              </div>
+            </div>
+          ) : (
+            <PixelScroll tone="#1e1432">
+              {evs.map((e, i) => (
+                <div
+                  key={e.start + e.title}
+                  data-event
+                  className="flex items-center gap-5 py-5"
+                  style={{ borderTop: i === 0 ? undefined : `2px solid ${K.line}`, opacity: past ? 0.6 : 1 }}
+                >
+                  <div className="w-[150px] shrink-0">
+                    <div className={`${F.press} text-[26px] leading-none`}>{e.start}</div>
+                    <div className={`${F.silk} mt-3 text-[15px] uppercase`} style={{ color: K.muted }}>
+                      {e.end === "23:59" ? "till late" : `to ${e.end}`}
+                    </div>
+                  </div>
+                  <span className="block h-[80px] w-[8px] shrink-0" style={{ background: whoColor(e.who) }} />
+                  <div className="min-w-0 flex-1">
+                    <div className={`${F.pix} text-[36px] font-semibold leading-[1.05]`}>{e.title}</div>
+                    <div className="mt-3">
+                      <WhoLine who={e.who} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </PixelScroll>
+          )}
+        </div>
+        <div className="flex shrink-0 justify-center px-6 pb-6 pt-3">
+          <button
+            type="button"
+            data-close-day
+            onClick={onClose}
+            className={`${F.press} flex h-[72px] w-full items-center justify-center gap-4 text-[18px]`}
+            style={{ ...framed(K.line, K.raised, 4), color: K.text }}
+          >
+            <span style={{ color: K.muted }}>×</span> CLOSE
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- area
-export function CalendarArea({ today }: { today: ReactNode }) {
-  const [view, setView] = useState<View>("week");
+export function CalendarArea() {
   const [ym, setYm] = useState(monthOf(TODAY_ISO));
   const [picked, setPicked] = useState<string | null>(null);
-  const firstYm = monthOf(MONTH_EVENTS[0]!.date);
-  const lastYm = monthOf(MONTH_EVENTS[MONTH_EVENTS.length - 1]!.date);
-  const pick = (v: View) => {
-    setView(v);
-    setPicked(null);
-    if (v === "month") setYm(monthOf(TODAY_ISO));
+  const onThisMonth = ym === monthOf(TODAY_ISO);
+  const step = (n: -1 | 1) => {
+    if (!picked) return;
+    const d = addDays(picked, n);
+    setPicked(d);
+    setYm(monthOf(d));
   };
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="relative flex h-full flex-col gap-3">
       <style>{A2_CSS}</style>
-      <div className="flex h-[68px] shrink-0 items-center justify-between gap-4">
-        {view === "week" ? (
-          <div className="flex items-baseline gap-4 pl-1">
-            <span className={`${F.press} text-[22px]`} style={{ color: K.text }}>
-              AGENDA
-            </span>
-            <span className={`${F.silk} text-[15px] font-bold uppercase`} style={{ color: K.muted }}>
-              next 3 weeks
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <ArrowBtn
-              dir={-1}
-              label="Previous month"
-              onClick={() => {
-                setPicked(null);
-                setYm((y) => (y > firstYm ? addMonths(y, -1) : y));
-              }}
-            />
-            <span className={`${F.press} w-[252px] text-center text-[20px] leading-none`} style={{ color: K.text }}>
-              {monName(`${ym}-01`).toUpperCase()}
-            </span>
-            <ArrowBtn
-              dir={1}
-              label="Next month"
-              onClick={() => {
-                setPicked(null);
-                setYm((y) => (y < lastYm ? addMonths(y, 1) : y));
-              }}
-            />
-          </div>
-        )}
-        <ViewToggle view={view} onPick={pick} />
+      <div className="flex h-[64px] shrink-0 items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <ArrowBtn dir={-1} label="Previous month" onClick={() => setYm((y) => addMonths(y, -1))} />
+          <span className={`${F.press} w-[330px] text-center text-[20px] leading-none`} style={{ color: K.text }}>
+            {`${monName(`${ym}-01`)} ${ym.slice(0, 4)}`.toUpperCase()}
+          </span>
+          <ArrowBtn dir={1} label="Next month" onClick={() => setYm((y) => addMonths(y, 1))} />
+        </div>
+        <button
+          type="button"
+          data-today
+          onClick={() => setYm(monthOf(TODAY_ISO))}
+          className={`${F.silk} h-[56px] px-5 text-[16px] font-bold uppercase`}
+          style={{ ...framed(onThisMonth ? K.line : K.violet, onThisMonth ? "transparent" : `${K.violet}22`, 3), color: onThisMonth ? K.dim : K.text }}
+        >
+          Today
+        </button>
       </div>
-      {view === "week" ? (
-        <>
-          {today}
-          <Agenda />
-        </>
-      ) : (
-        <Month ym={ym} picked={picked} onPick={setPicked} />
-      )}
+      <MonthGrid ym={ym} onPick={setPicked} />
+      {picked && <DaySheet iso={picked} onStep={step} onClose={() => setPicked(null)} />}
     </div>
   );
 }

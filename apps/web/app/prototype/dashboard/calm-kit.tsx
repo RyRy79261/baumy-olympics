@@ -133,13 +133,13 @@ const NAV: { l: string; g: GlyphName }[] = [
 export const FOOTER_H = 84;
 export const HEADER_H = 156;
 /** The calendar slot: below the header, above the footer and the raised voice button. */
-export const BODY_STYLE: CSSProperties = { top: HEADER_H, bottom: FOOTER_H + 40, left: 24, right: 24 };
+export const BODY_STYLE: CSSProperties = { top: HEADER_H, bottom: FOOTER_H + 64, left: 24, right: 24 };
 
 function Footer() {
   return (
     <>
       <nav
-        className="absolute bottom-0 left-0 right-0 flex items-stretch pl-3 pr-[150px]"
+        className="absolute bottom-0 left-0 right-0 flex items-stretch pl-3 pr-[160px]"
         style={{ height: FOOTER_H, background: "#0f0918", borderTop: `2px solid ${K.line}` }}
       >
         {NAV.map((n, i) => {
@@ -154,7 +154,7 @@ function Footer() {
           );
         })}
       </nav>
-      <BaumyCat scale={7} />
+      <BaumyCat scale={3} />
     </>
   );
 }

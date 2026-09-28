@@ -5,7 +5,7 @@
 // calm variant. Their look is unchanged.
 
 import { useState } from "react";
-import { BaumySprite, BlinkingBaumy } from "./baumy-sprite";
+import { BaumyArt } from "./baumy-cat";
 import { HOUSEMATES, REMINDER } from "./data";
 import { bevel, C, font, Win } from "./overlay-chrome";
 import { Glyph, Person, Px, Raccoon } from "./pixels";
@@ -112,7 +112,7 @@ export function Reminder({ onClose }: { onClose: () => void }) {
         <div className={`${font.vt} relative mb-16 px-2 py-1 text-[20px]`} style={{ background: C.text, color: C.ink, ...bevel() }}>
           everyone tap your face pls
         </div>
-        <BlinkingBaumy scale={4} />
+        <BaumyArt scale={3} />
       </div>
     </div>
   );
@@ -204,7 +204,7 @@ export function Screensaver({ now, onWake }: { now: Date; onWake: () => void }) 
               z
             </span>
           </span>
-          <BaumySprite scale={4} blink />
+          <BaumyArt scale={3} sleeping />
         </div>
         <div className="h-[12px] w-[200px] -translate-x-[40px]" style={{ background: "#3a2518", boxShadow: "0 4px 0 #1a0f0a" }} />
       </div>

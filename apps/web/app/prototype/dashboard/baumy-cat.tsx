@@ -1,39 +1,23 @@
 "use client";
 
-// PROTOTYPE (issue #7), throwaway. Baumy is Camp 404's INKBLOT cat, as it is
-// (baumy-cat-frames.ts, same colours): a small black cat seen from the side,
-// sitting on a cushion in the corner. It just sits there; tap it and it
-// listens, then shows what it understood as changes to approve.
+// PROTOTYPE (issue #7), throwaway. Baumy sits on the right, just being a cat
+// (breathing fairy lights, blinks, ear twitches, a tail flick), and the
+// speech bubbles come from it. Tap it to talk: it listens, then shows what it
+// understood as changes to approve. The art is baumy-draw.ts.
 
-import { useEffect, useState, type ReactNode } from "react";
-import { CAT_FRAMES, CAT_H, CAT_W } from "./baumy-cat-frames";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { BAUMY_H, BAUMY_PAL, BAUMY_W, drawBaumy } from "./baumy-draw";
 
-// The idle frames leave their top 4 rows empty; crop them so the cat fills its spot.
-const CROP = 4;
-const IDLE = CAT_FRAMES.idle.map((f) => f.slice(CROP));
-const H = CAT_H - CROP;
+export function BaumyArt({ scale = 3, sleeping = false }: { scale?: number; sleeping?: boolean }) {
+  return <Sprite rows={frame({ blink: sleeping, twinkle: 0, tail: 0, ear: 0, talk: false })} scale={scale} />;
+}
 
-// camp-404 apps/join/components/os/inkblot-sprites.ts COLOURS.
-const COL: Record<string, string> = {
-  K: "oklch(0.13 0.02 295)",
-  D: "oklch(0.3 0.06 295)",
-  O: "oklch(0.05 0.01 295)",
-  E: "oklch(0.75 0.24 340)",
-};
-
-function Sprite({ rows, scale, flip }: { rows: readonly string[]; scale: number; flip?: boolean }) {
+function Sprite({ rows, scale }: { rows: string[]; scale: number }) {
   return (
-    <svg
-      viewBox={`0 0 ${CAT_W} ${H}`}
-      width={CAT_W * scale}
-      height={H * scale}
-      shapeRendering="crispEdges"
-      aria-hidden
-      style={flip ? { transform: "scaleX(-1)" } : undefined}
-    >
+    <svg viewBox={`0 0 ${BAUMY_W} ${BAUMY_H}`} width={BAUMY_W * scale} height={BAUMY_H * scale} shapeRendering="crispEdges" aria-hidden>
       {rows.flatMap((row, y) =>
         [...row].map((ch, x) =>
-          COL[ch] ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={COL[ch]} /> : null,
+          BAUMY_PAL[ch] ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={BAUMY_PAL[ch]} /> : null,
         ),
       )}
     </svg>
@@ -50,7 +34,7 @@ const font = {
 
 function Bubble({ children }: { children: ReactNode }) {
   return (
-    <div className="absolute bottom-[calc(100%+14px)] right-[10px] w-[440px]">
+    <div className="absolute bottom-[calc(100%+6px)] right-0 w-[440px]">
       <div
         className="relative p-5"
         style={{
@@ -61,33 +45,51 @@ function Bubble({ children }: { children: ReactNode }) {
       >
         {children}
         <span
-          className="absolute -bottom-[16px] right-[60px] block h-[12px] w-[20px]"
-          style={{ background: "#f6ecff", boxShadow: "4px 0 0 #1a1026, -4px 0 0 #1a1026, 0 4px 0 #1a1026" }}
+          className="absolute -bottom-[16px] block h-[12px] w-[20px]"
+          style={{ right: 70, background: "#f6ecff", boxShadow: "4px 0 0 #1a1026, -4px 0 0 #1a1026, 0 4px 0 #1a1026" }}
         />
       </div>
     </div>
   );
 }
 
-export function BaumyCat({ scale = 5 }: { scale?: number }) {
-  const [mode, setMode] = useState<Mode>("idle");
-  const [tick, setTick] = useState(0);
+const frameCache = new Map<string, string[]>();
+function frame(o: { blink: boolean; twinkle: number; tail: number; ear: number; talk: boolean }) {
+  const k = JSON.stringify(o);
+  let f = frameCache.get(k);
+  if (!f) frameCache.set(k, (f = drawBaumy(o)));
+  return f;
+}
 
+export function BaumyCat({ scale = 3 }: { scale?: number }) {
+  const [mode, setMode] = useState<Mode>("idle");
+  // One tick = 150 ms. The first render is tick 0 on server and client alike.
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    const t = window.setInterval(() => setTick((n) => n + 1), 200);
+    const t = window.setInterval(() => setTick((n) => n + 1), 150);
     return () => window.clearInterval(t);
   }, []);
-
   useEffect(() => {
     if (mode !== "done") return;
     const t = window.setTimeout(() => setMode("idle"), 3500);
     return () => window.clearTimeout(t);
   }, [mode]);
 
-  const rows = IDLE[Math.floor(tick / 3) % IDLE.length]!;
+  const talking = mode === "listening" || mode === "done";
+  const rows = useMemo(
+    () =>
+      frame({
+        blink: !talking && tick % 30 === 29, // blinks every 4.5 s
+        twinkle: Math.floor(tick / 5) % 4, // the lights step every 0.75 s
+        tail: Math.floor(tick / 12) % 5 === 0 ? 1 : 0, // a tail flick now and then
+        ear: tick % 70 >= 66 ? 1 : 0, // an ear twitch
+        talk: talking && tick % 4 < 2,
+      }),
+    [tick, talking],
+  );
 
   return (
-    <div className="absolute bottom-[0px] right-[28px] z-30" data-voice-cat>
+    <div className="absolute bottom-[4px] right-[14px] z-30" data-voice-cat>
       {mode === "listening" && (
         <Bubble>
           <div className="flex items-center gap-4">
@@ -147,19 +149,10 @@ export function BaumyCat({ scale = 5 }: { scale?: number }) {
         type="button"
         onClick={() => setMode((m) => (m === "idle" || m === "done" ? "listening" : m))}
         aria-label="Talk to Baumy"
-        className="relative block"
+        className="block"
         style={{ touchAction: "manipulation" }}
       >
-        {/* a soft lit patch of wall, so the black cat reads on the dark screen */}
-        <span
-          className="absolute inset-x-[-14px] bottom-0 top-[-8px] block"
-          style={{ background: "oklch(0.32 0.08 295)", clipPath: "polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% 100%,0 100%,0 8px)" }}
-        />
-        <span className="relative block">
-          <Sprite rows={rows} scale={scale} flip />
-        </span>
-        {/* the cushion */}
-        <span className="absolute inset-x-[-14px] bottom-0 block h-[10px]" style={{ background: "oklch(0.52 0.22 340)", boxShadow: "inset 0 -4px 0 oklch(0.38 0.17 340)" }} />
+        <Sprite rows={rows} scale={scale} />
       </button>
     </div>
   );
