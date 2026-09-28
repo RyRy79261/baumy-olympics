@@ -133,11 +133,9 @@ export default function PrivacyPage() {
             time), are not tied to one region.
           </li>
           <li>
-            Proof photos are stored in Vercel Blob, in the region of the
-            house&apos;s store (Frankfurt when it is set up as the setup guide
-            says; a store&apos;s region is chosen when it is created). The store
-            is private: a photo is only shown through the app, to household
-            members and the paired kitchen screen.
+            Proof photos are stored in Vercel Blob in Frankfurt (fra1). The
+            store is private: a photo is only shown through the app, to
+            household members and the paired kitchen screen.
           </li>
           <li>
             Calendar events live in the house&apos;s Google Calendar; the app
