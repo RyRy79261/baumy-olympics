@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AUTH_COOKIE_PREFIX, AUTH_SESSION } from "@baumy/auth/env";
+import {
+  AUTH_COOKIE_PREFIX,
+  AUTH_SESSION,
+  LAST_LOGIN_METHOD_COOKIE,
+  SECURITY_COOKIES,
+} from "@baumy/auth/env";
 import { PHOTO_RETENTION_DAYS } from "@baumy/core";
 import { RATE_LIMIT_ROW_HORIZON_MS } from "@baumy/db/rate-limit";
 import { linkClass } from "@baumy/ui";
@@ -28,6 +33,11 @@ const SESSION_CACHE_MIN = AUTH_SESSION.cookieCacheMaxAgeSeconds / 60;
 const KIOSK_YEARS = Math.round(KIOSK_COOKIE_MAX_AGE_S / (365 * DAY_S));
 const KIOSK_MEMBER_MIN = KIOSK_MEMBER_MAX_AGE_S / 60;
 const RATE_LIMIT_DAYS = RATE_LIMIT_ROW_HORIZON_MS / (DAY_S * 1000);
+const LAST_LOGIN_DAYS = SECURITY_COOKIES.lastLoginMethodMaxAgeSeconds / DAY_S;
+const TWO_FACTOR_MIN = SECURITY_COOKIES.twoFactorChallengeMaxAgeSeconds / 60;
+const TRUST_DAYS = SECURITY_COOKIES.trustDeviceMaxAgeSeconds / DAY_S;
+const PASSKEY_CHALLENGE_MIN =
+  SECURITY_COOKIES.passkeyChallengeMaxAgeSeconds / 60;
 
 export const metadata: Metadata = { title: "Privacy - Baumy Olympics" };
 
@@ -61,16 +71,26 @@ export default function PrivacyPage() {
             tokens Google returns.
           </li>
           <li>
-            <strong>
-              Passkeys and two-factor sign-in, once they are added:
-            </strong>{" "}
-            a passkey&apos;s public key and name (never a private key), and your
-            two-factor secret and backup codes. This page will say more when
-            they arrive.
+            <strong>Passkeys, if you add one:</strong> its public key (the
+            private key never leaves your device), the name you gave it, its
+            credential id, whether it lives on one device or is synced, whether
+            it is backed up, how the browser reaches it (its transports), the
+            authenticator&apos;s model id (AAGUID) and when you added it.
+          </li>
+          <li>
+            <strong>Two-factor, if you turn it on:</strong> your authenticator
+            secret and your backup codes, both stored encrypted; a count of
+            wrong codes, and a temporary lock after too many; and, for each
+            browser where you ticked &quot;Trust this device&quot;, a record
+            that lets it skip the code for {TRUST_DAYS} days.
           </li>
           <li>
             <strong>Sessions:</strong> one per signed-in device, with its IP
-            address, its browser name (user agent) and when it was used.
+            address, its browser name (user agent), when it signed in and when
+            it was last used. Settings, Security lists your devices by a name
+            worked out from the browser (for example &quot;Chrome on
+            macOS&quot;) and when each was used; it does not show the IP address
+            or a place.
           </li>
           <li>
             <strong>Your member profile:</strong> display name, colour, your
@@ -177,8 +197,8 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Resend:</strong> sends the account emails (confirm your
-            address, reset your password, password changed). It receives your
-            email address and that email.
+            address, reset your password, password changed, a password was added
+            to your account). It receives your email address and that email.
           </li>
           <li>
             <strong>baumy-brain and Telegram:</strong> baumy-brain
@@ -231,6 +251,33 @@ export default function PrivacyPage() {
             minutes.
           </li>
           <li>
+            <code>{LAST_LOGIN_METHOD_COOKIE}</code>: how this browser last
+            signed in (email, Google or passkey), so the sign-in page can say
+            &quot;Last used&quot;, for {LAST_LOGIN_DAYS} days. Not a secret.
+          </li>
+          <li>
+            <code>
+              {AUTH_COOKIE_PREFIX}.{SECURITY_COOKIES.twoFactorChallenge}
+            </code>
+            : between your password and your two-factor code, for at most{" "}
+            {TWO_FACTOR_MIN} minutes.
+          </li>
+          <li>
+            <code>
+              {AUTH_COOKIE_PREFIX}.{SECURITY_COOKIES.trustDevice}
+            </code>
+            : only if you tick &quot;Trust this device&quot;; it lets this
+            browser skip the two-factor code for {TRUST_DAYS} days, renewed each
+            time you sign in with it.
+          </li>
+          <li>
+            <code>
+              {AUTH_COOKIE_PREFIX}.{SECURITY_COOKIES.passkeyChallenge}
+            </code>
+            : the one-time challenge while you use or add a passkey, for{" "}
+            {PASSKEY_CHALLENGE_MIN} minutes.
+          </li>
+          <li>
             Short-lived helper cookies during a sign-in, for example the Google
             round trip.
           </li>
@@ -260,7 +307,12 @@ export default function PrivacyPage() {
         <ul>
           <li>
             Sessions end when you sign out, or {SESSION_DAYS} days after you
-            last used the app on that device.
+            last used the app on that device. When you sign a device out in
+            Settings, Security, its session ends at once, but a page it already
+            has open can keep working for up to {SESSION_CACHE_MIN} minutes. It
+            cannot change your sign-in settings in that time: those check the
+            session in the database each time. Signing devices out, or changing
+            your password, also forgets every device you trusted for two-factor.
           </li>
           <li>
             Proof photos are deleted {PHOTO_RETENTION_DAYS} days after their
@@ -292,8 +344,10 @@ export default function PrivacyPage() {
           </li>
           <li>
             There is no delete-account button yet. On request, the owner deletes
-            your sign-in account (email, password hash, Google link and
-            sessions) directly in the database.
+            your sign-in account (email, password hash, Google link, passkeys,
+            two-factor secret and backup codes, and sessions) directly in the
+            database; the passkeys, two-factor and sessions go with the account.
+            A trusted-device record expires by itself within {TRUST_DAYS} days.
           </li>
           <li>
             Your member entry stays, because the household&apos;s history points
