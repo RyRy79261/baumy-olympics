@@ -61,7 +61,7 @@ export {
   WidgetList,
   type WidgetStatus,
 } from "./hub";
-export { KioskIndicator, KioskNotice, NightScreen } from "./kiosk-night";
+export { KioskIndicator, KioskNotice } from "./kiosk-night";
 export {
   AvatarButton,
   KioskShell,
@@ -98,6 +98,8 @@ export {
 export { scale2x } from "./pixel/scale2x";
 export { ProofPhoto } from "./proof-photo";
 export { RACCOON_FRAMES, RACCOON_PALETTE, Raccoon } from "./raccoon";
+export { ReminderScreen, type ReminderFace } from "./reminder-screen";
+export { SCREENSAVER_ART, Screensaver } from "./screensaver";
 export { Points, Stat, StreakFlame, Table, Td, Th } from "./scores";
 export { PIN_MAX_LENGTH, PIN_MIN_LENGTH, PinPad } from "./pin-pad";
 export { Sparkline, type SparklineProps } from "./sparkline";
