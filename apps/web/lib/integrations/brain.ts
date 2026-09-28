@@ -18,7 +18,7 @@ import { downWhenAsked, memoryBrain } from "./brain-memory";
 //
 // all with `Authorization: Bearer $KITCHEN_API_TOKEN`. The last one (issue
 // #80) asks brain to DM a member "Sign in on <device>? Tap the number on the
-// screen" with the three numbers and Deny as buttons; the tap comes back
+// screen" with the five numbers (the right one and four decoys) and Deny as buttons; the tap comes back
 // through `/api/v1/actions` (`approve_login`, `deny_login`). Brain scopes the house
 // itself; nothing here names it. Its 503 `not_configured` means the bot is
 // not in the house group yet.
@@ -83,7 +83,7 @@ export interface LoginApprovalMessage {
   telegramUserId: number;
   /** "Chrome on macOS". */
   device: string;
-  /** The number on the screen and two decoys, in button order. */
+  /** The number on the screen and four decoys, in button order. */
   choices: number[];
   /** When the request stops being answerable, ISO 8601. */
   expiresAt: string;
