@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { PageHeading } from "@baumy/ui";
 import { HubDashboard } from "@/components/hub/hub-dashboard";
+import { PostReminderForm } from "@/components/hub/post-reminder-form";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { loadHub } from "@/lib/hub/load";
 import { voiceConfigured } from "@/lib/integrations/groq";
+import { createReminderAction } from "./reminder-actions";
 import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
 
 // The hub home (SPEC §3.1, issue #20): the clock, today's events, the chores
@@ -40,6 +42,10 @@ export default async function HubPage() {
           actions: { add: addShoppingAction, checkOff: checkOffShoppingAction },
         }}
       />
+      {/* Issue #66: a reminder for the kitchen screen. */}
+      <div className="mt-6 max-w-xl">
+        <PostReminderForm action={createReminderAction} />
+      </div>
     </>
   );
 }
