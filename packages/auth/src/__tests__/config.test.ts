@@ -44,8 +44,11 @@ describe("buildAuthOptions", () => {
     expect(options.rateLimit.modelName).toBe("rateLimit");
   });
 
-  it("turns the bearer plugin on, and only it", () => {
-    expect(options.plugins.map((p) => p.id)).toEqual(["bearer"]);
+  it("turns on the bearer plugin and the Sign in with Baumy endpoint, and only them", () => {
+    expect(options.plugins.map((p) => p.id)).toEqual([
+      "bearer",
+      "baumy-approval-sign-in",
+    ]);
     expect(options.plugins[0]?.options).toEqual({ requireSignature: true });
   });
 
