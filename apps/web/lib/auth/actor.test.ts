@@ -102,6 +102,7 @@ describe("getActor", () => {
       householdId: "h_1",
       role: "admin",
       displayName: "Ryan",
+      avatar: { hairStyle: "bob" },
     });
     await expect(getActor()).resolves.toEqual({
       kind: "member",
@@ -113,6 +114,7 @@ describe("getActor", () => {
       memberId: "m_1",
       role: "admin",
       displayName: "Ryan",
+      avatar: { hairStyle: "bob" },
     });
     expect(findMember).toHaveBeenCalledWith("u_1");
   });
