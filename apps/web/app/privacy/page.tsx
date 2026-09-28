@@ -40,9 +40,9 @@ export default function PrivacyPage() {
     >
       <LegalSection title="Who runs this">
         <p>
-          Baumy Olympics (baumy.tech) is a private app for the people who live
-          in one house. The house&apos;s owner runs it for the household. It is
-          not a commercial service: nobody pays for it, and there are no
+          Baumy Olympics (www.baumy.tech) is a private app for the people who
+          live in one house. The house&apos;s owner runs it for the household.
+          It is not a commercial service: nobody pays for it, and there are no
           customers.
         </p>
       </LegalSection>
@@ -181,16 +181,17 @@ export default function PrivacyPage() {
             email address and that email.
           </li>
           <li>
-            <strong>baumy-brain and Telegram:</strong> baumy-brain is the
-            house&apos;s Telegram bot, which the same owner runs. The shopping
-            list belongs to it, so items you add or tick off here are sent to
-            it. It can also read the chores, scores, notes, reminders, the
-            calendar, claims waiting for confirmation and the chore weights, and
-            may post them in the house&apos;s Telegram group. It runs messages
-            through its own calls to Anthropic. If you link your Telegram
-            account, we keep your Telegram user id, and the bot can do things in
-            this app for you when you ask it, or for another housemate after a
-            confirm button. Everything in Telegram also passes through Telegram.
+            <strong>baumy-brain and Telegram:</strong> baumy-brain
+            (brain.baumy.tech) is the house&apos;s Telegram bot, which the same
+            owner runs. The shopping list belongs to it, so items you add or
+            tick off here are sent to it. It can also read the chores, scores,
+            notes, reminders, the calendar, claims waiting for confirmation and
+            the chore weights, and may post them in the house&apos;s Telegram
+            group. It runs messages through its own calls to Anthropic. If you
+            link your Telegram account, we keep your Telegram user id, and the
+            bot can do things in this app for you when you ask it, or for
+            another housemate after a confirm button. Everything in Telegram
+            also passes through Telegram.
           </li>
           <li>
             <strong>Chatbots you connect:</strong> a chatbot you connect (for
