@@ -647,7 +647,7 @@ export interface ActionDef<I extends z.ZodType, O> {
 ### 6.6 baumy-brain integration (ADR 0003)
 
 - **Olympics → brain:**
-  - `POST /api/kitchen/login-approval` (issue #80, ADR 0006; same `KITCHEN_API_TOKEN`): `{requestId, telegramUserId, device, choices, expiresAt}` → `{ok, sent}`. Brain DMs that member (an active roster member only) the sign-in approval with the three numbers and Deny as buttons, and sends the tap back as `approve_login` / `deny_login`.
+  - `POST /api/kitchen/login-approval` (issue #80, ADR 0006; same `KITCHEN_API_TOKEN`): `{requestId, telegramUserId, device, choices, expiresAt}` → `{ok, sent}`. Brain DMs that member (an active roster member only) the sign-in approval with the five numbers (the right one and four decoys) and Deny as buttons, and sends the tap back as `approve_login` / `deny_login`.
   - `GET /api/kitchen/shopping` and `POST /api/kitchen/shopping/{add,checkoff}` are added to baumy-brain. Brain scopes the house itself with `getHouseChatId(db)` from `lib/identity/house.ts` (the scope id, which honours the `BAUMY_HOUSE_CHAT_ID` override) and reuses `lib/lists/store.ts`. If it returns `''` (bot not in a group yet), the API answers 503 `not_configured`.
   - Auth is `KITCHEN_API_TOKEN`, compared in constant time as in brain's `lib/telegram/verify.ts`.
   - Olympics caches the list for 30s and invalidates the cache on its own writes. The kiosk's periodic refresh bypasses the cache. Built in issue #26 (§3.4).

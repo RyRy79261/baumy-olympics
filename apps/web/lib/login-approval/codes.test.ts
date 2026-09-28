@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { LOGIN_CODE_MAX, LOGIN_CODE_MIN } from "@baumy/types";
 import { LOGIN_CHOICE_COUNT, pickLoginCodes, type RandomInt } from "./codes";
 
-// The number on the screen and its two decoys (issue #80).
+// The number on the screen and its four decoys (issue #80).
 
 describe("pickLoginCodes", () => {
   it("gives five distinct two-digit numbers, one of them the code", () => {
