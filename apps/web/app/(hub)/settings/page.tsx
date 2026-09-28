@@ -4,10 +4,13 @@ import { eq } from "drizzle-orm";
 import { createHttpDb } from "@baumy/db";
 import { members } from "@baumy/db/schema";
 import { Card, FormMessage, PageHeading } from "@baumy/ui";
+import { avatarFor } from "@baumy/types";
 import { requireMemberPage } from "@/lib/auth";
+import { AvatarForm } from "./avatar-form";
 import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
 
-// /settings (SPEC §6.2): the member's own kiosk PIN and Telegram link. Every
+// /settings (SPEC §6.2): the member's own character (ADR 0005 §5), kiosk
+// PIN and Telegram link. Every
 // action here needs the member's own session (requireSession), never the
 // kiosk.
 
@@ -29,7 +32,7 @@ export default async function SettingsPage() {
     <>
       <PageHeading
         title="Settings"
-        description="Your kiosk PIN, your Telegram link and your connected apps."
+        description="Your character, your kiosk PIN, your Telegram link and your connected apps."
       />
       <div className="flex max-w-xl flex-col gap-6">
         {row?.kioskPinLockedAt ? (
@@ -38,6 +41,10 @@ export default async function SettingsPage() {
             below to unlock it.
           </FormMessage>
         ) : null}
+        <AvatarForm
+          memberId={me.memberId}
+          initial={avatarFor({ id: me.memberId, avatar: me.avatar ?? null })}
+        />
         <KioskPinForm hasPin={Boolean(row?.kioskPinHash)} />
         <TelegramLinkForm linked={row?.telegramUserId != null} />
         <Card
