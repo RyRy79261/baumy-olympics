@@ -101,4 +101,13 @@ test("the hub shell: Baumy by the brand, the page you are on framed", async ({
   expect(await other.evaluate((el) => getComputedStyle(el).clipPath)).toBe(
     "none",
   );
+
+  // The wide pixel fonts never push the page wider than the screen (a
+  // phone would zoom out, and taps would miss).
+  await expect(page.getByRole("list", { name: "Chores" })).toBeVisible();
+  const width = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(width.scroll).toBeLessThanOrEqual(width.client);
 });

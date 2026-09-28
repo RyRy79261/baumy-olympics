@@ -87,7 +87,9 @@ export function ChoreTile({
           accent="var(--color-bm-text)"
         />
       </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      {/* w-0 + flex-1: the truncated lines never widen the tile (or the
+          grid it sits in) past a phone's screen. */}
+      <span data-tile-text className="flex w-0 min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-baseline justify-between gap-2">
           <span className="truncate text-xl leading-tight font-semibold text-bm-text">
             {name}
