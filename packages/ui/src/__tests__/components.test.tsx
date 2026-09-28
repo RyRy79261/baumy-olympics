@@ -12,7 +12,7 @@ import {
   Select,
   Textarea,
 } from "../field";
-import { PageHeading } from "../page-heading";
+import { PageHeading, SectionHeading } from "../page-heading";
 import { ProofPhoto } from "../proof-photo";
 import { BAUMY_STATES, SPRITE_MOTION, Sprite } from "../sprite";
 
@@ -168,6 +168,13 @@ describe("PageHeading", () => {
     const bare = html(<PageHeading title="Hub" />);
     expect(bare).toContain("Hub");
     expect(bare).not.toContain("<p");
+  });
+
+  it("has a quieter h2 for a section inside a page", () => {
+    const out = html(<SectionHeading id="yours">Your claims</SectionHeading>);
+    expect(out).toMatch(/^<h2 id="yours"/);
+    expect(out).toContain("font-label");
+    expect(out).toContain("Your claims");
   });
 });
 

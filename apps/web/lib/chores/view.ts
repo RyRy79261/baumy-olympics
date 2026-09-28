@@ -64,3 +64,74 @@ export function previewFor(
         : null,
   };
 }
+
+// Bounties (ADR 0005 §2): the board shows every chore as a bounty, and one
+// row of tabs narrows it to the urgent ones, the new ones, or one kind. The
+// hub's Urgent and New tiles link straight to their tab (`?show=`).
+
+/** What the bounty board can narrow itself to. */
+export const BOUNTY_FILTERS = [
+  "all",
+  "urgent",
+  "new",
+  "consumable",
+  "maintenance",
+] as const;
+export type BountyFilter = (typeof BOUNTY_FILTERS)[number];
+
+/** The `?show=` value as a filter; anything else is "all". */
+export function parseBountyFilter(value: unknown): BountyFilter {
+  return (BOUNTY_FILTERS as readonly unknown[]).includes(value)
+    ? (value as BountyFilter)
+    : "all";
+}
+
+type BountyFields = Pick<ChoreView, "kind" | "urgent" | "isNew">;
+
+function matches(c: BountyFields, filter: BountyFilter): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "urgent":
+      return c.urgent;
+    case "new":
+      return c.isNew;
+    default:
+      return c.kind === filter;
+  }
+}
+
+/** The bounties a filter keeps, in the order given. */
+export function filterBounties<C extends BountyFields>(
+  chores: readonly C[],
+  filter: BountyFilter,
+): C[] {
+  return chores.filter((c) => matches(c, filter));
+}
+
+/** How many bounties each filter keeps, for the tabs' counts. */
+export function bountyCounts(
+  chores: readonly BountyFields[],
+): Record<BountyFilter, number> {
+  return Object.fromEntries(
+    BOUNTY_FILTERS.map((f) => [f, filterBounties(chores, f).length]),
+  ) as Record<BountyFilter, number>;
+}
+
+/**
+ * The board's order: urgent first, the longest-waiting at the top (never
+ * done before anything with a date); then the rest by when they fall due;
+ * chores that cannot be scored last; ties by name.
+ */
+export function sortBounties<
+  C extends Pick<ChoreView, "urgent" | "state" | "dueAt" | "name">,
+>(chores: readonly C[]): C[] {
+  const rank = (c: C) => (c.urgent ? 0 : c.state === "unavailable" ? 2 : 1);
+  const due = (c: C) => (c.dueAt === null ? -Infinity : Date.parse(c.dueAt));
+  return [...chores].sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      (due(a) === due(b) ? 0 : due(a) < due(b) ? -1 : 1) ||
+      a.name.localeCompare(b.name),
+  );
+}

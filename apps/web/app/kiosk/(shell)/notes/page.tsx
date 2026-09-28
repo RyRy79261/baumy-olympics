@@ -18,7 +18,7 @@ import {
 // one, and every change asks for their PIN in that request (SPEC §6.2).
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Notes - Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Board - Kiosk - Baumy" };
 
 export default async function KioskNotesPage() {
   const kiosk = await getKioskActor();
@@ -30,7 +30,7 @@ export default async function KioskNotesPage() {
     <>
       <PageHeading
         eyebrow={kiosk.deviceName ?? "Kiosk"}
-        title="Notes"
+        title="Board"
         description={
           acting
             ? "Changing a note asks for your PIN."

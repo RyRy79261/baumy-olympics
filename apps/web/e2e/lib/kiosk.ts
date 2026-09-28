@@ -85,6 +85,6 @@ export async function openKioskChores(kiosk: Page) {
     .getByRole("link", { name: "Chores" })
     .click();
   await expect(
-    kiosk.getByRole("heading", { name: "Chores", level: 1 }),
+    kiosk.getByRole("heading", { name: "Bounties", level: 1 }),
   ).toBeVisible();
 }

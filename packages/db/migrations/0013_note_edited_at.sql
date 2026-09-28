@@ -1,0 +1,1 @@
+ALTER TABLE "notes" ADD COLUMN "edited_at" timestamp with time zone;

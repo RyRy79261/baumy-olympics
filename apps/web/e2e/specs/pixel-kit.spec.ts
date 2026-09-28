@@ -93,7 +93,7 @@ test("the hub shell: Baumy by the brand, the page you are on framed", async ({
   await expect(header.locator('[data-sprite="baumy"]')).toHaveCount(1);
   const nav = page.getByRole("navigation", { name: "Main" });
   const current = nav.locator('[aria-current="page"]');
-  await expect(current).toHaveText("Chores");
+  await expect(current).toHaveText("Bounties");
   expect(await current.evaluate((el) => getComputedStyle(el).clipPath)).toMatch(
     /^polygon/,
   );
@@ -105,7 +105,7 @@ test("the hub shell: Baumy by the brand, the page you are on framed", async ({
 
   // The wide pixel fonts never push the page wider than the screen (a
   // phone would zoom out, and taps would miss).
-  await expect(page.getByRole("list", { name: "Chores" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Bounties" })).toBeVisible();
   const width = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
@@ -164,4 +164,64 @@ test("on a laptop the whole header is one row", async ({ page }, testInfo) => {
   expect(await nav.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
     true,
   );
+});
+
+// Issue #67: every hub page in the kit, as the approved prototype lays it
+// out: the page title in the display font, nothing wider than the screen,
+// and a screenshot of each attached to the report for a look.
+const PAGES: { path: string; title: string }[] = [
+  { path: "/", title: "Hub" },
+  { path: "/chores", title: "Bounties" },
+  { path: "/calendar?view=month", title: "Calendar" },
+  { path: "/notes", title: "Board" },
+  { path: "/shopping", title: "Shopping list" },
+  { path: "/scores", title: "Scores" },
+  { path: "/pot", title: "Pot" },
+  { path: "/inbox", title: "Needs your OK" },
+  { path: "/settings", title: "Settings" },
+  { path: "/admin/chores", title: "Edit chores" },
+  { path: "/admin/members", title: "Members" },
+  { path: "/admin/weights", title: "Weights" },
+];
+
+test("every hub page is in the kit and fits the screen", async ({
+  page,
+}, testInfo) => {
+  await founderAdmin(page, testInfo.project.name);
+
+  // The hub's top row: the clock and the three status tiles, each a
+  // 16-bit icon; a tile with nothing to show is dim and has no badge.
+  await expect(page.getByTestId("clock-time")).toHaveText(/^\d\d:\d\d$/);
+  for (const key of ["urgent", "new", "messages"]) {
+    const tile = page.getByTestId(`hub-tile-${key}`);
+    await expect(tile).toBeVisible();
+    await expect(tile.locator("svg").first()).toBeVisible();
+    // Every read works here, so each tile has a real count.
+    const name = (await tile.getAttribute("aria-label"))!;
+    expect(name).toMatch(/: \d+$/);
+    const count = Number(name.split(": ")[1]);
+    await expect(tile.locator("[data-count]")).toHaveCount(count > 0 ? 1 : 0);
+    await expect(tile.locator("[data-unavailable]")).toHaveCount(0);
+  }
+
+  for (const { path, title } of PAGES) {
+    await page.goto(path);
+    const h1 = page.getByRole("heading", { name: title, level: 1 });
+    await expect(h1).toBeVisible();
+    expect(await h1.evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(
+      /Press Start 2P/,
+    );
+    const width = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    expect(
+      width.scroll,
+      `${path} is no wider than the screen`,
+    ).toBeLessThanOrEqual(width.client);
+    await testInfo.attach(`${testInfo.project.name}${path}`, {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: "image/png",
+    });
+  }
 });
