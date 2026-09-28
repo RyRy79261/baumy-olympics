@@ -18,6 +18,8 @@ import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthEndpoint } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import * as z from "zod";
+import { createHttpDb, type Queryable } from "@baumy/db";
+import { userHasTwoFactor } from "@baumy/db/login-requests";
 
 export const APPROVAL_SIGN_IN_PATH = "/sign-in/baumy-approval";
 
@@ -41,6 +43,17 @@ export function approvalSignIn() {
             ctx.body.userId,
           );
           if (!found) throw new APIError("UNAUTHORIZED");
+          // No TOTP step here, so an account with two-factor on is refused
+          // until the owner rules (ADR 0006, [UNRESOLVED]). The web app's
+          // start route already sends it no DM; this is the second belt.
+          if (
+            await userHasTwoFactor(
+              createHttpDb() as unknown as Queryable,
+              found.id,
+            )
+          ) {
+            throw new APIError("FORBIDDEN");
+          }
           const session = await ctx.context.internalAdapter.createSession(
             found.id,
             DONT_REMEMBER,

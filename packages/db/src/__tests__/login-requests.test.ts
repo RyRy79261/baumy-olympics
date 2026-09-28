@@ -16,6 +16,7 @@ import {
   lockLoginRequest,
   loginRequestState,
   pruneLoginRequests,
+  userHasTwoFactor,
 } from "../login-requests";
 import { loginRequests, members, user } from "../schema";
 import { useTestDb } from "./_harness";
@@ -116,6 +117,33 @@ describe("findLoginCandidate", () => {
     expect(
       await findLoginCandidate(db(), HOUSEHOLD_ID, "  RYAN@Example.com "),
     ).toEqual({ memberId: m.id, authUserId: m.authUserId, telegramUserId: 42 });
+  });
+
+  it("finds nobody with two-factor on, and works before that column exists", async () => {
+    const m = await member({ email: "tfa@example.com", telegramUserId: 77 });
+    expect(await userHasTwoFactor(db(), m.authUserId!)).toBe(false);
+    expect(
+      await findLoginCandidate(db(), HOUSEHOLD_ID, "tfa@example.com"),
+    ).not.toBeNull();
+    // What Better Auth's two-factor plugin (issue #79) will add.
+    await t
+      .client()
+      .query(
+        'alter table "user" add column two_factor_enabled boolean not null default false',
+      );
+    expect(
+      await findLoginCandidate(db(), HOUSEHOLD_ID, "tfa@example.com"),
+    ).not.toBeNull();
+    await t
+      .client()
+      .query('update "user" set two_factor_enabled = true where id = $1', [
+        m.authUserId,
+      ]);
+    expect(await userHasTwoFactor(db(), m.authUserId!)).toBe(true);
+    expect(
+      await findLoginCandidate(db(), HOUSEHOLD_ID, "tfa@example.com"),
+    ).toBeNull();
+    await t.client().query('alter table "user" drop column two_factor_enabled');
   });
 
   it("finds nobody unlinked, deactivated, unknown or without a member", async () => {
