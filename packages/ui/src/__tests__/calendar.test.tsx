@@ -41,7 +41,9 @@ describe("CalendarDayCell", () => {
     expect(today).toContain('data-testid="d"');
     const other = html(<CalendarDayCell label="31" muted />);
     expect(other).not.toContain("aria-current");
-    expect(other).toContain("text-neutral-600");
+    expect(today).toContain("bg-bm-violet");
+    expect(other).toContain("opacity-40");
+    expect(other).not.toContain("bg-bm-violet");
   });
 });
 

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
+import { openAccountMenu } from "../lib/nav";
 
 // Issue #9 end to end, against Docker Postgres: only household members see
 // the hub. A founder (FOUNDER_EMAILS, set per project by e2e-local.sh)
@@ -46,10 +47,10 @@ test("a founder mints a code and a new account redeems it to reach the hub", asy
   ).toBeVisible();
   await expect(newbie.page.getByTestId("signed-in-as")).toHaveText(name);
 
-  // A member is not an admin: /admin/* is a 404, and the nav has no link.
-  await expect(
-    newbie.page.getByRole("link", { name: "Settings" }),
-  ).toBeVisible();
+  // A member is not an admin: /admin/* is a 404, and the header has no
+  // Admin menu (the account menu is there, with Settings).
+  await openAccountMenu(newbie.page);
+  await expect(newbie.page.getByTestId("admin-menu")).toHaveCount(0);
   await expect(newbie.page.getByRole("link", { name: "Members" })).toHaveCount(
     0,
   );
@@ -107,6 +108,7 @@ test("a member sets a kiosk PIN and creates a Telegram link code", async ({
   await expect(member.page).toHaveURL(/\/$/);
 
   const p = member.page;
+  await openAccountMenu(p);
   await p.getByRole("link", { name: "Settings" }).click();
   await expect(
     p.getByRole("heading", { name: "Settings", level: 1 }),

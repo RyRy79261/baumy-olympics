@@ -1,8 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cx } from "./cx";
 
-// NEUTRAL PLACEHOLDERS for speaking to Baumy (SPEC §3.6, issue #22; issue #7
-// restyles them here): the hold-to-speak button and the microphone's level
+// Speaking to Baumy in the pixel kit (SPEC §3.6, issue #22; ADR 0005): the hold-to-speak button and the microphone's level
 // meter. The recording itself is the app's (components/baumy).
 
 export type MicState = "idle" | "starting" | "recording" | "sending";
@@ -45,13 +44,12 @@ export function MicButton({
       // control gets no pointer events in some browsers).
       disabled={state === "sending" || disabled}
       className={cx(
-        "inline-flex shrink-0 touch-none items-center justify-center gap-2 rounded border px-4 font-medium select-none [-webkit-touch-callout:none]",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900",
+        "pixel-frame inline-flex shrink-0 touch-none items-center justify-center gap-2 px-4 font-label font-bold uppercase select-none [-webkit-touch-callout:none]",
         "disabled:cursor-not-allowed disabled:opacity-50",
         kiosk ? "min-h-14 min-w-14 text-base" : "min-h-11 min-w-11 text-sm",
         recording
-          ? "border-red-700 bg-red-700 text-white"
-          : "border-neutral-400 bg-white text-neutral-900",
+          ? "bg-bm-red text-bm-ink [--pf:var(--color-bm-ink)]"
+          : "bg-bm-raised text-bm-text [--pf:var(--color-bm-text)]",
         className,
       )}
       {...props}
@@ -84,11 +82,11 @@ export function LevelMeter({
       aria-valuenow={pct}
       data-testid="mic-level"
       className={cx(
-        "h-3 w-full overflow-hidden rounded border border-neutral-400 bg-white",
+        "pixel-frame h-4 w-full overflow-hidden bg-bm-ink p-[3px]",
         className,
       )}
     >
-      <div className="h-full bg-neutral-900" style={{ width: `${pct}%` }} />
+      <div className="h-full bg-bm-green" style={{ width: `${pct}%` }} />
     </div>
   );
 }

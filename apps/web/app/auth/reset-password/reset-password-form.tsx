@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import {
+  Button,
+  Field,
+  FormMessage,
+  Input,
+  PageHeading,
+  linkClass,
+} from "@baumy/ui";
 import { PASSWORD_MIN_LENGTH } from "@baumy/auth/password";
 import { authClient } from "@/lib/auth-client";
 import { SOMETHING_WENT_WRONG } from "../messages";
@@ -12,14 +20,16 @@ import { SOMETHING_WENT_WRONG } from "../messages";
 export function ResetPasswordForm({ token }: { token: string | null }) {
   if (!token) {
     return (
-      <div>
-        <h1>This link can&rsquo;t be used</h1>
+      <div className="flex flex-col gap-4">
+        <PageHeading title="This link can’t be used" />
         <p>
           Reset links work once and expire after an hour. This one has been
           used, has expired, or lost its code on the way.
         </p>
         <p>
-          <Link href="/auth/forgot-password">Send a new link</Link>
+          <Link href="/auth/forgot-password" className={linkClass}>
+            Send a new link
+          </Link>
         </p>
       </div>
     );
@@ -64,44 +74,46 @@ function ResetForm({ token }: { token: string }) {
 
   if (done) {
     return (
-      <div>
-        <h1>Password changed</h1>
-        <p role="status">
+      <div className="flex flex-col gap-4">
+        <PageHeading title="Password changed" />
+        <FormMessage tone="success">
           Every device has been signed out. Sign in with the new password.
-        </p>
+        </FormMessage>
         <p>
-          <Link href="/auth/sign-in">Sign in</Link>
+          <Link href="/auth/sign-in" className={linkClass}>
+            Sign in
+          </Link>
         </p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={submit}>
-      <h1>Choose a new password</h1>
-      <p>
-        <label htmlFor="reset-password">New password</label>
-        <br />
-        <input
-          id="reset-password"
-          type="password"
-          autoComplete="new-password"
-          minLength={PASSWORD_MIN_LENGTH}
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={pending}
-        />
-        <br />
-        <small>At least {PASSWORD_MIN_LENGTH} characters.</small>
-      </p>
-      {error ? <p role="alert">{error}</p> : null}
-      <p>
-        <button type="submit" disabled={pending}>
-          {pending ? "Resetting..." : "Reset password"}
-        </button>
-      </p>
-      <p>This signs you out everywhere.</p>
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <PageHeading title="Choose a new password" />
+      <Field
+        id="reset-password"
+        label="New password"
+        hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}
+      >
+        {(control) => (
+          <Input
+            {...control}
+            type="password"
+            autoComplete="new-password"
+            minLength={PASSWORD_MIN_LENGTH}
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={pending}
+          />
+        )}
+      </Field>
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      <Button type="submit" disabled={pending}>
+        {pending ? "Resetting..." : "Reset password"}
+      </Button>
+      <p className="text-bm-muted">This signs you out everywhere.</p>
     </form>
   );
 }

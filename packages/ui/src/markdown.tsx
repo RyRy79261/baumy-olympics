@@ -149,16 +149,16 @@ function noteUrl(value: string, key: string): string {
 }
 
 const PROSE =
-  "text-sm leading-relaxed [overflow-wrap:anywhere] " +
+  "text-lg leading-snug [overflow-wrap:anywhere] " +
   "[&>*:first-child]:mt-0 [&>*:last-child]:mb-0 " +
   "[&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 " +
   "[&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 " +
-  "[&_a]:underline [&_a]:underline-offset-2 " +
+  "[&_a]:text-bm-teal [&_a]:underline [&_a]:underline-offset-2 " +
   "[&_strong]:font-semibold [&_em]:italic " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-400 [&_blockquote]:pl-3 " +
-  "[&_code]:rounded [&_code]:bg-neutral-100 [&_code]:px-1 " +
-  "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-neutral-100 [&_pre]:p-2 " +
-  "[&_hr]:my-3 [&_hr]:border-neutral-300";
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-bm-line [&_blockquote]:pl-3 [&_blockquote]:text-bm-muted " +
+  "[&_code]:bg-bm-ink [&_code]:px-1 [&_code]:font-label " +
+  "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:bg-bm-ink [&_pre]:p-2 " +
+  "[&_hr]:my-3 [&_hr]:border-t-2 [&_hr]:border-bm-line";
 
 function Heading({ children }: { children?: React.ReactNode }) {
   return <p className="font-semibold">{children}</p>;

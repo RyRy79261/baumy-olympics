@@ -5,11 +5,12 @@ import type {
   ThHTMLAttributes,
 } from "react";
 import { cx } from "./cx";
+import { Glyph } from "./pixel/glyph";
 
-// NEUTRAL PLACEHOLDERS for the scoreboard and the pot (SPEC §3.2, §7; issue
-// #7 restyles them here): a plain table, a points figure whose provisional
-// part is dimmed, the streak flame counter and a big stat. They take plain
-// props and hold no game logic.
+// The scoreboard and the pot in the pixel kit (SPEC §3.2, §7; ADR 0005): a
+// table with Silkscreen headers, a points figure (yellow, ADR 0005 §8) whose
+// provisional part is dimmed, the streak flame counter and a big stat. They
+// take plain props and hold no game logic.
 
 /** A table that scrolls sideways on a narrow screen instead of squashing. */
 export function Table({
@@ -21,7 +22,10 @@ export function Table({
   return (
     <div className="overflow-x-auto">
       <table
-        className={cx("w-full border-collapse text-left text-sm", className)}
+        className={cx(
+          "w-full border-collapse text-left text-lg text-bm-text",
+          className,
+        )}
         {...props}
       >
         {caption ? <caption className="sr-only">{caption}</caption> : null}
@@ -40,7 +44,7 @@ export function Th({
     <th
       scope="col"
       className={cx(
-        "border-b border-neutral-300 px-2 py-2 font-medium text-neutral-600",
+        "border-b-2 border-bm-line px-2 py-2 font-label text-sm font-bold text-bm-muted uppercase",
         numeric && "text-right",
         className,
       )}
@@ -57,8 +61,8 @@ export function Td({
   return (
     <td
       className={cx(
-        "border-b border-neutral-200 px-2 py-2 text-neutral-900",
-        numeric && "text-right font-mono",
+        "border-b-2 border-bm-line/60 px-2 py-2 text-bm-text",
+        numeric && "text-right font-label tabular-nums",
         className,
       )}
       {...props}
@@ -82,13 +86,10 @@ export function Points({
   className?: string;
 }) {
   return (
-    <span className={cx("font-mono", className)}>
+    <span className={cx("font-label font-bold text-bm-yellow", className)}>
       <span data-testid="points">{points}</span>
       {provisional !== 0 ? (
-        <span
-          data-provisional
-          className="ml-1 text-xs text-neutral-900 opacity-50"
-        >
+        <span data-provisional className="ml-1 text-xs font-normal text-bm-dim">
           ({provisional} pending)
         </span>
       ) : null}
@@ -97,9 +98,8 @@ export function Points({
 }
 
 /**
- * The streak flame counter (SPEC §7 "Juice"). PLACEHOLDER: a bordered
- * counter; the pixel flame sprite replaces the box, keeping `length` and
- * `current` (a run still going burns, a broken one is shown out).
+ * The streak flame counter (SPEC §7 "Juice"): the pixel flame and the
+ * length. A run still going burns amber; a broken one is shown out, grey.
  */
 export function StreakFlame({
   length,
@@ -113,13 +113,11 @@ export function StreakFlame({
       data-streak={length}
       data-state={current ? "burning" : "out"}
       className={cx(
-        "inline-flex min-w-11 items-center justify-center gap-1 rounded border px-2 font-mono text-sm",
-        current
-          ? "border-neutral-900 font-semibold"
-          : "border-neutral-300 text-neutral-600",
+        "inline-flex min-w-11 items-center justify-center gap-1 px-1 font-display text-xs",
+        current ? "text-bm-amber" : "text-bm-dim",
       )}
     >
-      <span aria-hidden>x</span>
+      <Glyph name="flame" size={16} accent="var(--color-bm-yellow)" />
       {length}
       <span className="sr-only">
         {current ? " in a row, still going" : " in a row"}
@@ -140,13 +138,11 @@ export function Stat({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-widest text-neutral-600">
+      <span className="font-label text-sm font-bold tracking-wider text-bm-muted uppercase">
         {label}
       </span>
-      <span className="font-mono text-3xl font-semibold text-neutral-900">
-        {value}
-      </span>
-      {hint ? <span className="text-sm text-neutral-600">{hint}</span> : null}
+      <span className="font-display text-2xl text-bm-yellow">{value}</span>
+      {hint ? <span className="text-base text-bm-muted">{hint}</span> : null}
     </div>
   );
 }

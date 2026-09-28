@@ -92,12 +92,24 @@ describe("WidgetList", () => {
 });
 
 describe("BaumyButton", () => {
-  it("is a named 64px button with the sprite in its state", () => {
+  it("is a named button: the cat at 3x on a framed plinth, in its state", () => {
     const out = html(<BaumyButton state="listening" />);
     expect(out).toContain('aria-label="Ask Baumy"');
     expect(out).toContain('type="button"');
-    expect(out).toContain("min-h-16");
+    expect(out).toContain("pixel-frame");
+    expect(out).toContain("bg-bm-raised");
+    // 34 x 32 art pixels at scale 3: a target far past 64px.
+    expect(out).toContain("width:102px;height:96px");
+    // 2x on a phone: 68 x 64, the 3x cat hidden there and vice versa.
+    expect(out).toContain("width:68px;height:64px");
+    expect(out).toMatch(/data-sprite="baumy"[^>]*class="[^"]*sm:hidden/);
+    expect(out).toMatch(/data-sprite="baumy"[^>]*class="[^"]*max-sm:hidden/);
     expect(out).toContain('data-state="listening"');
+  });
+
+  it("keeps the kiosk grid clear of the corner Baumy sits in", () => {
+    expect(html(<HubGrid kiosk />)).toContain("pb-32");
+    expect(html(<HubGrid />)).not.toContain("pb-32");
   });
 });
 

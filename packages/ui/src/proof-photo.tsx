@@ -1,6 +1,6 @@
 import { cx } from "./cx";
 
-// NEUTRAL PLACEHOLDER for a completion's proof photo (issue #7 restyles it).
+// A completion's proof photo, in a square ink frame (ADR 0005).
 // `src` is always the app's own /api/blob proxy link, never a raw Blob URL.
 
 export function ProofPhoto({
@@ -20,7 +20,7 @@ export function ProofPhoto({
       alt={alt}
       loading="lazy"
       className={cx(
-        "max-h-60 w-auto rounded border border-neutral-300 object-contain",
+        "max-h-60 w-auto border-4 border-bm-line bg-bm-ink object-contain",
         className,
       )}
     />

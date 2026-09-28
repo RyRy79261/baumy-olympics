@@ -46,7 +46,7 @@ export default async function ConnectionsPage() {
         <FormMessage tone="error">{result.message}</FormMessage>
       ) : result.data.length === 0 ? (
         <Card>
-          <p className="text-sm text-neutral-700" data-testid="no-connections">
+          <p className="text-sm text-bm-muted" data-testid="no-connections">
             No apps are connected. To connect Claude, add a custom connector in
             Claude with this site&apos;s <code>/api/mcp/mcp</code> address.
           </p>
@@ -60,11 +60,11 @@ export default async function ConnectionsPage() {
             <li key={c.grantId} data-testid={`connection-${c.grantId}`}>
               <Card title={c.clientName}>
                 <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                  <dt className="text-neutral-600">May</dt>
+                  <dt className="text-bm-muted">May</dt>
                   <dd>{describeScopes(c.scopes)}</dd>
-                  <dt className="text-neutral-600">Connected</dt>
+                  <dt className="text-bm-muted">Connected</dt>
                   <dd>{when(c.grantedAt)}</dd>
-                  <dt className="text-neutral-600">Last used</dt>
+                  <dt className="text-bm-muted">Last used</dt>
                   <dd>{c.lastUsedAt ? when(c.lastUsedAt) : "Not yet"}</dd>
                 </dl>
                 <DisconnectForm grantId={c.grantId} clientName={c.clientName} />

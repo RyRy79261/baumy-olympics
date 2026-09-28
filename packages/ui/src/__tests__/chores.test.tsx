@@ -42,7 +42,8 @@ describe("ChoreTile", () => {
         kiosk
       />,
     );
-    expect(out).toContain("min-h-20");
+    expect(out).toContain("min-h-24");
+    expect(out).toContain("text-2xl");
     expect(out).not.toContain("pts");
   });
 });

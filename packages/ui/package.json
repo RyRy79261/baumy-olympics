@@ -34,6 +34,7 @@
     "vitest": "^5.0.2"
   },
   "dependencies": {
+    "@baumy/types": "workspace:*",
     "react-markdown": "^10.1.0",
     "rehype-sanitize": "^6.0.0"
   }

@@ -118,7 +118,7 @@ export function ChoreGrid({
 
   if (chores.length === 0) {
     return (
-      <p className="text-sm text-neutral-600">
+      <p className="text-sm text-bm-muted">
         No chores yet. An admin can add them under Edit chores.
       </p>
     );
@@ -140,7 +140,7 @@ export function ChoreGrid({
       <ul
         className={
           kiosk
-            ? "grid grid-cols-3 gap-3 xl:grid-cols-4"
+            ? "grid grid-cols-2 gap-3"
             : "grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
         }
         aria-label="Chores"
@@ -192,12 +192,12 @@ export function ChoreGrid({
                 <p className="text-3xl font-bold">{preview.headline}</p>
                 {preview.breaks ? <p>{preview.breaks}</p> : null}
                 {preview.pending ? (
-                  <p className="text-sm text-neutral-600">{preview.pending}</p>
+                  <p className="text-sm text-bm-muted">{preview.pending}</p>
                 ) : null}
               </div>
             ) : null}
             {doneBy !== actorId ? (
-              <p className="text-sm text-neutral-700">
+              <p className="text-sm text-bm-muted">
                 {kiosk
                   ? `You are vouching that ${nameOf(doneBy)} did it, so your PIN is needed.`
                   : `You are vouching that ${nameOf(doneBy)} did it.`}
@@ -216,7 +216,7 @@ export function ChoreGrid({
                   onPhoto={choosePhoto}
                 />
                 {open.proofMode === "required" && !hasPhoto ? (
-                  <p className="text-sm text-neutral-700">
+                  <p className="text-sm text-bm-muted">
                     {open.name} needs a photo as proof.
                   </p>
                 ) : null}

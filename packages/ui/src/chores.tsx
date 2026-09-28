@@ -4,12 +4,32 @@ import type {
   ReactNode,
 } from "react";
 import { cx } from "./cx";
-import { Sprite } from "./sprite";
+import { Glyph } from "./pixel/glyph";
+import { GLYPHS, type GlyphName } from "./pixel/glyphs";
 
-// NEUTRAL PLACEHOLDERS for the chores game (SPEC §3.2, §7; issue #7 restyles
-// them here): the chore tile, the floating "+N", the "STREAK BROKEN" banner
-// and a radio group big enough to tap on the kiosk. They take plain props
-// and hold no game logic.
+// The chores game in the pixel kit (SPEC §3.2, §7; ADR 0005): the chore
+// tile, the floating "+N", the "STREAK BROKEN" banner and a radio group big
+// enough to tap on the kiosk. They take plain props and hold no game logic.
+// Points are yellow everywhere (ADR 0005 §8: one accent, one meaning).
+
+/**
+ * The glyph a chore's `chores.sprite` shows: the glyph of that name, the
+ * nearest one for the starter chores (SPEC §4.7), and the wrench for any
+ * other chore until it gets a glyph of its own.
+ */
+const CHORE_GLYPHS: Readonly<Record<string, GlyphName>> = {
+  trash: "bin",
+  recycling: "bin",
+  dishes: "soap",
+  dishwasher: "soap",
+  bathroom: "tp",
+  plants: "plant",
+};
+
+export function choreGlyph(sprite: string): GlyphName {
+  if (sprite in GLYPHS) return sprite as GlyphName;
+  return CHORE_GLYPHS[sprite] ?? "wrench";
+}
 
 export type ChoreTileState = "due" | "cooldown" | "done" | "unavailable";
 
@@ -41,34 +61,65 @@ export function ChoreTile({
   type = "button",
   ...props
 }: ChoreTileProps) {
+  const due = state === "due";
   return (
     <button
       type={type}
       data-state={state}
       className={cx(
-        "flex w-full items-center gap-3 rounded border bg-white p-3 text-left",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900",
-        "disabled:cursor-not-allowed disabled:opacity-50",
-        state === "due" ? "border-neutral-900" : "border-neutral-300",
-        kiosk ? "min-h-20 text-base" : "min-h-16 text-sm",
+        // Calm (ADR 0005 §8): every tile keeps the dim line frame; "due" is
+        // said once, by the status line in red.
+        "pixel-frame flex w-full items-center gap-3 bg-bm-surface p-3 text-left text-bm-text",
+        "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50",
+        kiosk ? "min-h-24 gap-4 p-4 text-lg" : "min-h-16 text-base",
         className,
       )}
       {...props}
     >
-      <Sprite name={sprite} size={kiosk ? 3 : 2} />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-baseline justify-between gap-2">
-          <span className="truncate font-semibold">{name}</span>
+      <span
+        data-sprite={sprite}
+        className={cx(
+          "pixel-frame grid shrink-0 place-items-center bg-bm-teal/10 text-bm-teal [--pf:rgb(79_245_230/0.35)]",
+          kiosk ? "size-16" : "size-12",
+        )}
+      >
+        <Glyph
+          name={choreGlyph(sprite)}
+          size={kiosk ? 40 : 30}
+          accent="var(--color-bm-text)"
+        />
+      </span>
+      {/* w-0 + flex-1: the text never widens the tile (or the grid it sits
+          in) past the screen; long names wrap to two lines instead. */}
+      <span data-tile-text className="flex w-0 min-w-0 flex-1 flex-col gap-1">
+        <span className="flex items-start justify-between gap-2">
+          <span
+            data-tile-name
+            className={cx(
+              "line-clamp-2 leading-tight font-semibold [overflow-wrap:anywhere] text-bm-text",
+              kiosk ? "text-2xl" : "text-xl",
+            )}
+          >
+            {name}
+          </span>
           {points !== null ? (
-            <span className="shrink-0 font-mono">{points} pts</span>
+            <span
+              data-tile-points
+              className={cx(
+                "shrink-0 font-display text-bm-yellow",
+                kiosk ? "pt-1 text-base" : "pt-0.5 text-xs",
+              )}
+            >
+              {points} pts
+            </span>
           ) : null}
         </span>
-        <span className="truncate text-neutral-700">{streak}</span>
+        <span className="truncate font-label text-sm text-bm-muted uppercase">
+          {streak}
+        </span>
         <span
-          className={cx(
-            "truncate",
-            state === "due" ? "font-semibold" : "text-neutral-600",
-          )}
+          data-tile-status
+          className={cx("truncate", due ? "text-bm-red" : "text-bm-dim")}
         >
           {status}
         </span>
@@ -87,7 +138,7 @@ export function ScorePop({ points }: { points: number }) {
     <p
       role="status"
       data-testid="score-pop"
-      className="pointer-events-none fixed inset-x-0 top-1/3 z-50 text-center text-5xl font-bold text-neutral-900 motion-safe:animate-bounce"
+      className="pointer-events-none fixed inset-x-0 top-1/3 z-50 text-center font-display text-5xl text-bm-yellow [text-shadow:4px_4px_0_var(--color-bm-ink)] motion-safe:animate-pixel-hop"
     >
       +{points}
     </p>
@@ -108,9 +159,11 @@ export function StreakBrokenBanner({
     <div
       role="status"
       data-testid="streak-broken"
-      className="flex flex-col items-center gap-1 rounded border-2 border-neutral-900 bg-white p-4 text-center"
+      className="pixel-frame pixel-frame-4 flex flex-col items-center gap-2 bg-bm-surface p-4 text-center text-lg [--pf:var(--color-bm-red)]"
     >
-      <strong className="text-2xl tracking-widest">STREAK BROKEN</strong>
+      <strong className="font-display text-xl font-normal text-bm-red">
+        STREAK BROKEN
+      </strong>
       <span>
         {holderName}&apos;s streak of {length} is over: +{bonus} bonus.
       </span>
@@ -145,7 +198,7 @@ export function ChoiceGroup({
 } & Pick<InputHTMLAttributes<HTMLInputElement>, "disabled">) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-sm font-medium text-neutral-900">
+      <legend className="mb-1 font-label text-sm font-bold tracking-wide text-bm-text uppercase">
         {legend}
       </legend>
       <div className="flex flex-wrap gap-2">
@@ -153,11 +206,10 @@ export function ChoiceGroup({
           <label
             key={o.value}
             className={cx(
-              "inline-flex cursor-pointer items-center gap-2 rounded border px-3",
-              "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-neutral-900",
+              "pixel-frame pixel-frame-within inline-flex cursor-pointer items-center gap-2 px-3 font-label font-bold uppercase",
               o.value === value
-                ? "border-neutral-900 bg-neutral-900 text-white"
-                : "border-neutral-400 bg-white text-neutral-900",
+                ? "bg-bm-violet/15 text-bm-text [--pf:var(--color-bm-violet)]"
+                : "text-bm-muted",
               kiosk
                 ? "min-h-14 min-w-14 text-base"
                 : "min-h-11 min-w-11 text-sm",
