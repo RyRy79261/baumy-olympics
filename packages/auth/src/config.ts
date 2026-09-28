@@ -15,6 +15,7 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins/bearer";
 import { createHttpDb, schema } from "@baumy/db";
+import { approvalSignIn } from "./approval-sign-in";
 import { sendAuthEmail } from "./email";
 import {
   AUTH_COOKIE_PREFIX,
@@ -159,6 +160,9 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
       // token: Better Auth stores `session.token` in plaintext, so without it
       // anyone who can read the table could present a row as a bearer token.
       bearer({ requireSignature: true }),
+      // "Sign in with Baumy" (issue #80): a server-only endpoint that makes
+      // the session once the member approved it in Telegram.
+      approvalSignIn(),
     ],
 
     advanced: {
