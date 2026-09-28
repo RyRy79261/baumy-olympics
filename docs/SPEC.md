@@ -30,6 +30,8 @@ The kitchen iPad is the house's shared screen. It shows what's on today, what ne
 
 ### 3.1 Hub (home and kiosk home)
 
+[CORRECTION 2026-09-28] ADR 0005 replaces the landscape kiosk home with a portrait dashboard (820×1180): notification icons for urgent and new bounties and for messages, a full-width month calendar, a small footer nav, Baumy on the right, full-screen reminders and a raccoon screensaver. The text below describes the landscape version it replaces.
+
 This is a single screen with no scrolling at 1180×820 (iPad Air, landscape):
 
 - a clock and date (Europe/Berlin);
@@ -48,6 +50,8 @@ Details settled while building it (added 2026-09-27, issue #20):
 - The chore grid, "Needs your OK" and "Check my PIN" moved from `/kiosk` to `/kiosk/chores`; notes are at `/notes` and `/kiosk/notes`.
 
 ### 3.2 Chores game
+
+[CORRECTION 2026-09-28] ADR 0005: the UI presents chores as **bounties**. Each chore has a `kind`, `consumable` or `maintenance`. "Urgent" means due and overdue, or due before midnight. "New" means created in the last 3 days. The scoring does not change.
 
 This covers:
 
@@ -661,6 +665,8 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
 
 ## 7. UI direction: 16-bit on the camp-404 shell
 
+[CORRECTION 2026-09-28] ADR 0005 settles the look after an owner-approved prototype (branch `proto/kiosk-home-pixel`). It is dark and calm, with the palette from the reference photo. The fonts are Press Start 2P, Silkscreen and Pixelify Sans. The icons are 16×16 grid glyphs. Baumy is Camp 404's INKBLOT cat at twice the pixels in Baumy's colours, not AI-generated art. Every member has a 16-bit character they choose in Settings.
+
 - **Structure from camp-404:**
   - a sticky blurred header with a brand tile, a mono eyebrow, the user and a sign-out button (`apps/web/components/console/console-header.tsx`);
   - pill nav that folds into a sheet on small screens (`console-nav.tsx`);
@@ -685,6 +691,8 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
 - **Base:** components start from shadcn/ui (Radix) in `packages/ui` with a restyled cva, as in camp-404 `packages/ui/components.json`.
 
 ## 8. Kiosk mode
+
+[CORRECTION 2026-09-28] ADR 0005: the kiosk is **portrait** (820×1180). The night-mode look becomes the raccoon screensaver, shown at night and after 5 minutes idle.
 
 - **Route:** `/kiosk`, a landscape layout with no page scrolling on the hub.
 - **Touch targets:** at least **56px** (with 64px for primary actions), no interaction that depends on hover, and `touch-action: manipulation`.
@@ -763,10 +771,16 @@ Decided 2026-09-27:
 5. **Weight changes:** one member schedules, the other has 48h to veto. The manual effort factor stays.
 6. **Starting chores:** the seed list and values in section 4.7.
 7. **Speech input:** Groq Whisper (`GROQ_API_KEY`).
-8. **Sprites:** AI-generated pixel art from `design/baumy-reference.png`, cleaned up and approved by the owner (section 7).
+8. **Sprites:** AI-generated pixel art from `design/baumy-reference.png`, cleaned up and approved by the owner (section 7). [CORRECTION 2026-09-28] Superseded by ADR 0005: Baumy is Camp 404's INKBLOT cat, Scale2x, recoloured.
 9. **Calendar service account:** a new one just for this house, not camp-404's.
 10. **Admin actions** (chores, weights, adjustments, pot, prize mode, members, kiosk pairing) are UI only, never exposed to the AI command, MCP or brain.
 11. **No streak cap:** `multiplierPct = 100 + 25·(n−1)` forever. The break bonus cap (`breakLenCap = 10`) stays.
+
+Decided 2026-09-28 (ADR 0005):
+
+12. **Portrait kitchen dashboard:** at most 3 notification icons, a full-width month calendar, Baumy on the right, full-screen reminders with a "Seen" button for each member, and a raccoon screensaver.
+13. **Bounties:** chores have a kind, consumables or maintenance.
+14. **People are data:** each member picks their own 16-bit character in Settings; nothing about a person is hard-coded.
 
 Still open:
 
