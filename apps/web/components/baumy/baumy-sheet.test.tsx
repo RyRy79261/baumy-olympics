@@ -17,8 +17,10 @@ import {
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+vi.mock("@/app/kiosk/actions", () => ({ clearPickAction: vi.fn() }));
 
 const { BaumySheet } = await import("./baumy-sheet");
+const { closeOpenDialogs } = await import("@/components/kiosk/idle-reset");
 
 beforeAll(() => {
   (
@@ -357,6 +359,20 @@ describe("BaumySheet on the kitchen dashboard", () => {
     // Done and scored: the cat says so instead.
     expect(bubble()!.dataset.mode).toBe("says");
     expect(bubble()!.textContent).toBe("Purrfect. +10 for Ryan ✦");
+  });
+
+  it("stops listening and closes when a reminder or the screensaver covers the screen", async () => {
+    heardAndAnswered("Bins it is.", [proposal]);
+    mountCat({ actingName: "Ryan" });
+    await act(async () => cat().click());
+    await settle(300);
+    expect(bubble()!.dataset.mode).toBe("listening");
+    // What the reminder and the screensaver do when they come up.
+    await act(async () => closeOpenDialogs(document));
+    expect(bubble()).toBeNull();
+    await settle(300);
+    // The recording was dropped, not sent.
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("does nothing on No, and Type instead opens the sheet", async () => {
