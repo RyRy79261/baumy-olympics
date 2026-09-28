@@ -79,7 +79,8 @@ brain sends `X-Baumy-On-Behalf-Of: <Sam's member id>` with Ryan in
   `initiated_by_member_id` = Ryan, `source=brain`.
 - A write on Sam's behalf needs `X-Baumy-Confirmed: 1` (Ryan's tap), even a
   `safe` one. A read does not.
-- Sam's id equal to Ryan's own counts as no header.
+- Sam's id equal to Ryan's own counts as no header, for every action:
+  the refusals below apply only to someone else's id.
 - Refused with 400 for `link_telegram` (always the sender) and for an action
   with a `member_field`: "Jo did the dishes" is `log_completion` with
   `doneBy: <Jo's id>`, which Ryan logs and vouches for. On-behalf would
