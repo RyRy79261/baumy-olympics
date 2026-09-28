@@ -3,21 +3,22 @@
 // PROTOTYPE (issue #7), throwaway. Baumy sits on the right, just being a cat
 // (breathing fairy lights, blinks, ear twitches, a tail flick), and the
 // speech bubbles come from it. Tap it to talk: it listens, then shows what it
-// understood as changes to approve. The art is baumy-draw.ts.
+// understood as changes to approve. The art is Camp 404's cat at twice the
+// pixels, in Baumy's colours (baumy-cat-2x.ts).
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { BAUMY_H, BAUMY_PAL, BAUMY_W, drawBaumy } from "./baumy-draw";
+import { useEffect, useState, type ReactNode } from "react";
+import { BAUMY_COLOURS, BAUMY_FRAMES, BAUMY_H, BAUMY_W } from "./baumy-cat-2x";
 
-export function BaumyArt({ scale = 3, sleeping = false }: { scale?: number; sleeping?: boolean }) {
-  return <Sprite rows={frame({ blink: sleeping, twinkle: 0, tail: 0, ear: 0, talk: false })} scale={scale} />;
+export function BaumyArt({ scale = 3 }: { scale?: number; sleeping?: boolean }) {
+  return <Sprite rows={BAUMY_FRAMES.idle[0]!} scale={scale} flip />;
 }
 
-function Sprite({ rows, scale }: { rows: string[]; scale: number }) {
+function Sprite({ rows, scale, flip }: { rows: string[]; scale: number; flip?: boolean }) {
   return (
-    <svg viewBox={`0 0 ${BAUMY_W} ${BAUMY_H}`} width={BAUMY_W * scale} height={BAUMY_H * scale} shapeRendering="crispEdges" aria-hidden>
+    <svg viewBox={`0 0 ${BAUMY_W} ${BAUMY_H}`} width={BAUMY_W * scale} height={BAUMY_H * scale} shapeRendering="crispEdges" aria-hidden style={flip ? { transform: "scaleX(-1)" } : undefined}>
       {rows.flatMap((row, y) =>
         [...row].map((ch, x) =>
-          BAUMY_PAL[ch] ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={BAUMY_PAL[ch]} /> : null,
+          BAUMY_COLOURS[ch] ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={BAUMY_COLOURS[ch]} /> : null,
         ),
       )}
     </svg>
@@ -53,14 +54,6 @@ function Bubble({ children }: { children: ReactNode }) {
   );
 }
 
-const frameCache = new Map<string, string[]>();
-function frame(o: { blink: boolean; twinkle: number; tail: number; ear: number; talk: boolean }) {
-  const k = JSON.stringify(o);
-  let f = frameCache.get(k);
-  if (!f) frameCache.set(k, (f = drawBaumy(o)));
-  return f;
-}
-
 export function BaumyCat({ scale = 3 }: { scale?: number }) {
   const [mode, setMode] = useState<Mode>("idle");
   // One tick = 150 ms. The first render is tick 0 on server and client alike.
@@ -75,18 +68,9 @@ export function BaumyCat({ scale = 3 }: { scale?: number }) {
     return () => window.clearTimeout(t);
   }, [mode]);
 
-  const talking = mode === "listening" || mode === "done";
-  const rows = useMemo(
-    () =>
-      frame({
-        blink: !talking && tick % 30 === 29, // blinks every 4.5 s
-        twinkle: Math.floor(tick / 5) % 4, // the lights step every 0.75 s
-        tail: Math.floor(tick / 12) % 5 === 0 ? 1 : 0, // a tail flick now and then
-        ear: tick % 70 >= 66 ? 1 : 0, // an ear twitch
-        talk: talking && tick % 4 < 2,
-      }),
-    [tick, talking],
-  );
+  const [pounce, setPounce] = useState(false);
+  // Idle breathing loop; a quick paw swipe right after a tap.
+  const rows = pounce ? BAUMY_FRAMES.swipe[0]! : BAUMY_FRAMES.idle[Math.floor(tick / 3) % BAUMY_FRAMES.idle.length]!;
 
   return (
     <div className="absolute bottom-[4px] right-[14px] z-30" data-voice-cat>
@@ -147,12 +131,16 @@ export function BaumyCat({ scale = 3 }: { scale?: number }) {
       )}
       <button
         type="button"
-        onClick={() => setMode((m) => (m === "idle" || m === "done" ? "listening" : m))}
+        onClick={() => {
+          setPounce(true);
+          window.setTimeout(() => setPounce(false), 400);
+          setMode((m) => (m === "idle" || m === "done" ? "listening" : m));
+        }}
         aria-label="Talk to Baumy"
         className="block"
         style={{ touchAction: "manipulation" }}
       >
-        <Sprite rows={rows} scale={scale} />
+        <Sprite rows={rows} scale={scale} flip />
       </button>
     </div>
   );
