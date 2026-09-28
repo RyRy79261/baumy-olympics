@@ -33,9 +33,32 @@ async function confirmedMember(
   // The link sent on sign-up, read from the e2e capture file.
   await page.goto(await waitForAuthMail(email, "verify"));
   await page.goto("/join");
-  await redeem(page, code, `${label} ${project}`);
-  await expect(page).toHaveURL(/\/$/);
+  await joinWith(page, code, `${label} ${project}`);
   return { context, page, email };
+}
+
+/**
+ * Redeem an invite, waiting out redeem_invite's per-IP limit: every spec in
+ * the suite joins from the same address, so late in a run the bucket can be
+ * empty for a few seconds ("Too many tries. Wait 2s and try again.").
+ */
+async function joinWith(page: Page, code: string, name: string) {
+  const limited = page
+    .getByRole("alert")
+    .filter({ hasText: /Too many tries\. Wait \d+s/ });
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await redeem(page, code, name);
+    const outcome = await Promise.race([
+      page.waitForURL((url) => url.pathname === "/").then(() => "in" as const),
+      limited.waitFor().then(() => "limited" as const),
+    ]);
+    if (outcome === "in") return;
+    const text = (await limited.textContent()) ?? "";
+    const seconds = Number(/Wait (\d+)s/.exec(text)?.[1] ?? 5);
+    await page.waitForTimeout((seconds + 1) * 1000);
+    await page.goto("/join");
+  }
+  await expect(page).toHaveURL(/\/$/);
 }
 
 async function openSecurity(page: Page) {
@@ -119,7 +142,9 @@ test("two-factor: turn it on, then sign in with a code and with a backup code", 
     .click();
   await p.getByLabel("Backup code").fill(backup.trim());
   await p.getByRole("button", { name: "Verify" }).click();
-  await expect(p.getByRole("alert")).toContainText("used already");
+  await expect(
+    p.getByRole("alert").filter({ hasText: "used already" }),
+  ).toBeVisible();
   expect((await p.request.get("/api/me")).status()).toBe(401);
 });
 
@@ -265,7 +290,7 @@ test("an unconfirmed email cannot add a passkey or two-factor", async ({
   const p = await context.newPage();
   await signUp(p, freshEmail(`unconfirmed-${project}`));
   await p.waitForURL(/\/join$/);
-  await redeem(p, code, `Unconfirmed ${project}`);
+  await joinWith(p, code, `Unconfirmed ${project}`);
   await expect(p).toHaveURL(/\/$/);
 
   await openSecurity(p);
