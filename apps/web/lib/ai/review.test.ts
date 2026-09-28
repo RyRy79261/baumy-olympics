@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Proposal } from "./proposal";
 import {
-  approveAllSkips,
-  approveAllTargets,
   asksForPin,
   canApprove,
+  cancelAll,
+  cardTone,
+  confirmAllTargets,
+  confirmNeedsPin,
+  visibleRows,
   nextHistory,
   rowsFor,
   savedMessage,
@@ -34,8 +37,8 @@ const row = (p: Proposal, over: Partial<ReviewRow> = {}): ReviewRow => ({
   ...over,
 });
 
-describe("approve all", () => {
-  it("skips destructive, invalid and settled rows, and on the kiosk rows that need a PIN", () => {
+describe("confirm all", () => {
+  it("runs every valid open card in order, destructive and PIN ones included", () => {
     const ok = row(proposal());
     const failed = row(proposal(), { state: "failed" });
     const saved = row(proposal(), { state: "saved" });
@@ -55,18 +58,36 @@ describe("approve all", () => {
       pin,
     ];
 
-    expect(approveAllTargets(rows, true)).toEqual([ok, failed]);
-    expect(approveAllTargets(rows, false)).toEqual([ok, failed, pin]);
-    expect(approveAllSkips(rows, true)).toBe(
-      "Approve all skips 1 that deletes something, 1 that isn't valid, 1 that needs your PIN: approve or reject those one by one.",
-    );
+    expect(confirmAllTargets(rows)).toEqual([ok, failed, destructive, pin]);
+    expect(confirmNeedsPin(rows, true)).toBe(true);
+    expect(confirmNeedsPin(rows, false)).toBe(false);
     expect(
-      approveAllSkips([destructive, destructive, invalid, invalid], false),
-    ).toBe(
-      "Approve all skips 2 that delete something, 2 that aren't valid: approve or reject those one by one.",
+      confirmNeedsPin(
+        [ok, row(proposal({ needsPin: true }), { state: "saved" })],
+        true,
+      ),
+    ).toBe(false);
+    expect(visibleRows(rows)).not.toContain(rejected);
+    expect(visibleRows(rows)).toContain(ok);
+    expect(cardTone(destructive)).toBe("destructive");
+    expect(cardTone(invalid)).toBe("invalid");
+    expect(cardTone(row(proposal({ valid: false, risk: "destructive" })))).toBe(
+      "invalid",
     );
-    expect(approveAllSkips([pin, pin], true)).toContain("2 that need your PIN");
-    expect(approveAllSkips([ok, saved], true)).toBeNull();
+    expect(cardTone(ok)).toBe("normal");
+  });
+
+  it("cancel rejects every open card and keeps the saved ones", () => {
+    const ok = row(proposal());
+    const failed = row(proposal(), { state: "failed", message: "Nope." });
+    const saved = row(proposal(), { state: "saved", message: "Saved." });
+    expect(
+      cancelAll([ok, failed, saved]).map((r) => [r.state, r.message]),
+    ).toEqual([
+      ["rejected", undefined],
+      ["rejected", undefined],
+      ["saved", "Saved."],
+    ]);
   });
 
   it("lets a row be approved while it waits or after it failed, if valid", () => {

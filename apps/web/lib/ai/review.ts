@@ -1,13 +1,15 @@
 // The review list's rules (SPEC §3.6), pure and client-safe, so the sheet
 // (components/baumy) stays a thin view over them.
 //
-// - Each row is approved or rejected on its own. "Approve all" approves the
-//   rows still waiting (or that failed) except those marked destructive,
-//   those that are not valid, and on the kiosk those that need a PIN (each
-//   of those asks for it on its own).
-// - A row that saved stays saved: approving again, or "Approve all" after a
-//   partial save, never sends it twice, and even if it did, its proposal id
-//   is the idempotency key, so the server would replay the stored result.
+// - Every write Baumy wants to do is a suggestion card with two buttons for
+//   all of them: "Confirm all" and "Cancel" (owner ruling 2026-09-29, issue
+//   #107). Confirm all runs every valid card still waiting (or that failed),
+//   in order, destructive ones included; an invalid card never runs. On the
+//   kiosk it asks the acting member's PIN once, for the cards that need it.
+//   A card's × drops just that one first; Cancel rejects them all.
+// - A card that saved stays saved: Confirm all again after a partial save
+//   never sends it twice, and even if it did, its proposal id is the
+//   idempotency key, so the server would replay the stored result.
 
 import type { ActionResult } from "@/lib/actions/result";
 import type { HistoryTurn } from "./command";
@@ -46,49 +48,41 @@ export function canApprove(row: ReviewRow): boolean {
   );
 }
 
-/** The rows "Approve all" sends, in order. */
-export function approveAllTargets(
-  rows: readonly ReviewRow[],
-  kiosk: boolean,
-): ReviewRow[] {
-  return rows.filter(
-    (r) =>
-      canApprove(r) &&
-      r.proposal.risk !== "destructive" &&
-      !(kiosk && r.needsPin),
-  );
+/**
+ * The rows "Confirm all" runs, in order: every valid suggestion still
+ * waiting (or that failed), the destructive ones and those that need a PIN
+ * included. Invalid, dropped and saved rows never run.
+ */
+export function confirmAllTargets(rows: readonly ReviewRow[]): ReviewRow[] {
+  return rows.filter(canApprove);
 }
 
-/** What "Approve all" leaves for the member to do one by one. */
-export function approveAllSkips(
+/** Whether "Confirm all" must ask the acting member's PIN first (kiosk). */
+export function confirmNeedsPin(
   rows: readonly ReviewRow[],
   kiosk: boolean,
-): string | null {
-  const open = rows.filter(
-    (r) => r.state === "pending" || r.state === "failed",
+): boolean {
+  return kiosk && confirmAllTargets(rows).some((r) => r.needsPin);
+}
+
+/** The cards on screen: every suggestion but those dropped with ×. */
+export function visibleRows(rows: readonly ReviewRow[]): ReviewRow[] {
+  return rows.filter((r) => r.state !== "rejected");
+}
+
+/** How a card looks: red when it deletes, greyed when it cannot run. */
+export function cardTone(row: ReviewRow): "destructive" | "invalid" | "normal" {
+  if (!row.proposal.valid) return "invalid";
+  return row.proposal.risk === "destructive" ? "destructive" : "normal";
+}
+
+/** Every suggestion, open or not, rejected: what Cancel does. */
+export function cancelAll(rows: readonly ReviewRow[]): ReviewRow[] {
+  return rows.map((r) =>
+    r.state === "pending" || r.state === "failed"
+      ? { ...r, state: "rejected", message: undefined }
+      : r,
   );
-  const destructive = open.filter(
-    (r) => r.proposal.valid && r.proposal.risk === "destructive",
-  ).length;
-  const invalid = open.filter((r) => !r.proposal.valid).length;
-  const pin = open.filter(
-    (r) =>
-      r.proposal.valid &&
-      r.proposal.risk !== "destructive" &&
-      kiosk &&
-      r.needsPin,
-  ).length;
-  const parts: string[] = [];
-  if (destructive)
-    parts.push(
-      `${destructive} that delete${destructive === 1 ? "s" : ""} something`,
-    );
-  if (invalid)
-    parts.push(`${invalid} that ${invalid === 1 ? "isn't" : "aren't"} valid`);
-  if (pin) parts.push(`${pin} that need${pin === 1 ? "s" : ""} your PIN`);
-  return parts.length > 0
-    ? `Approve all skips ${parts.join(", ")}: approve or reject those one by one.`
-    : null;
 }
 
 /** A short line for a saved row, from the action's result. */
