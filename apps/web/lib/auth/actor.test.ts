@@ -90,6 +90,7 @@ describe("getActor", () => {
       name: "Ryan",
       emailVerified: true,
       sessionCreatedAt: "2026-09-27T09:55:00.000Z",
+      sessionId: "s_1",
     });
     const passed = getSession.mock.calls[0]?.[0] as { headers: Headers };
     expect(passed.headers.get("cookie")).toBe("x=y");
@@ -111,6 +112,7 @@ describe("getActor", () => {
       name: "Ryan",
       emailVerified: true,
       sessionCreatedAt: "2026-09-27T09:55:00.000Z",
+      sessionId: "s_1",
       memberId: "m_1",
       role: "admin",
       displayName: "Ryan",

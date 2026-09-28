@@ -60,6 +60,12 @@ export interface MemberActor {
    */
   sessionCreatedAt: string;
   /**
+   * Better Auth's `session.id` for this request, so Settings, Security can
+   * mark "this device" and sign out every OTHER one (issue #79). An id, not
+   * the token: it signs nobody in.
+   */
+  sessionId?: string;
+  /**
    * The active `members` row linked to this account, if there is one. A
    * session without one is only proof of an account, not of a housemate, and
    * every action gate refuses it (joining is issue #9).
@@ -149,6 +155,7 @@ export const getActor = cache(async (): Promise<Actor | null> => {
         name: session.user.name,
         emailVerified: session.user.emailVerified,
         sessionCreatedAt: new Date(session.session.createdAt).toISOString(),
+        sessionId: session.session.id,
         ...(member
           ? {
               memberId: member.id,

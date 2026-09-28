@@ -64,6 +64,12 @@ export type DomainErrorCode =
   | "LAST_ADMIN"
   /** Needs the current password or a session under 10 minutes old. */
   | "REAUTH_REQUIRED"
+  /** Settings, Security: the change would leave the account no way in. */
+  | "LAST_SIGN_IN_METHOD"
+  /** `set_first_password` on an account that already has one. */
+  | "PASSWORD_ALREADY_SET"
+  /** Ending the session the request came in on (use Sign out instead). */
+  | "CURRENT_SESSION"
   /** The chore was done too recently; `retryAt` says when it may be logged. */
   | "COOLDOWN"
   /** A completion more than 2 minutes in the future. */
