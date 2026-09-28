@@ -242,6 +242,8 @@ succeeds and any real query fails loudly.
 - [ ] **Create the Neon project** (region `aws-eu-central-1`, Frankfurt, next
       to the household). Note both connection strings from its dashboard: the
       pooled one (host contains `-pooler`) and the direct one.
+      The functions run next to it: `apps/web/vercel.json` pins them to
+      `fra1` (Frankfurt), and the privacy page says processing is in the EU.
 - [ ] **Set the database env vars in Vercel** (Production scope):
       `DATABASE_URL` = the pooled string, `DATABASE_URL_UNPOOLED` = the direct
       string. Never set `NEON_LOCAL_PROXY` on Vercel. Preview-scope values and
