@@ -11,6 +11,8 @@ export interface ActiveMember {
   householdId: string;
   role: "admin" | "member";
   displayName: string;
+  /** `members.avatar` as stored (null until chosen): `avatarFor` reads it. */
+  avatar: unknown;
 }
 
 /**
@@ -26,6 +28,7 @@ export async function findActiveMemberByAuthUserId(
       householdId: members.householdId,
       role: members.role,
       displayName: members.displayName,
+      avatar: members.avatar,
     })
     .from(members)
     .where(
@@ -242,6 +245,12 @@ export interface KioskMember {
   displayName: string;
   avatarSprite: string;
   color: string;
+  /**
+   * Their 16-bit character (`members.avatar`, ADR 0005 §5) as stored: null
+   * until they choose one. `avatarFor` (packages/types) reads it, and the
+   * Housemate draws their default character for null.
+   */
+  avatar: unknown;
 }
 
 /** An active member with their 16-bit character (`members.avatar`). */
@@ -282,6 +291,7 @@ export async function findActiveMember(
       displayName: members.displayName,
       avatarSprite: members.avatarSprite,
       color: members.color,
+      avatar: members.avatar,
     })
     .from(members)
     .where(

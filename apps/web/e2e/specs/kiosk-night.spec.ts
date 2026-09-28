@@ -4,9 +4,10 @@ import { advanceClock, resetClock, serverClock } from "../lib/clock";
 import { founderAdmin } from "../lib/household";
 import { pairedKiosk } from "../lib/kiosk";
 
-// Issue #29, night mode on the kitchen iPad: at 23:10 Berlin the kiosk dims
-// to a sleeping Baumy and a clock; a tap wakes it, a minute untouched puts
-// it back to sleep, and 06:30 wakes it for good.
+// Issue #29, night mode on the kitchen iPad (the raccoon screensaver since
+// issue #66): at 23:10 Berlin the kiosk dims to a sleeping Baumy and a
+// clock; a tap wakes it, a minute untouched puts it back to sleep, and 06:30
+// wakes it (the day's 5-minute idle wait starts then).
 //
 // It moves the shared SERVER clock (the night is the server's), so it runs
 // in the server-clock project, one test at a time (playwright.config.ts
@@ -43,7 +44,7 @@ test("night mode sleeps, wakes on a touch, and ends in the morning", async ({
     },
   ]);
   const shell = kiosk.locator("[data-kiosk]");
-  const night = kiosk.getByTestId("night-screen");
+  const night = kiosk.getByTestId("screensaver");
 
   // By day (whatever the real time, 12:00 Berlin): no night screen.
   const { now } = await serverClock(page);
@@ -63,7 +64,7 @@ test("night mode sleeps, wakes on a touch, and ends in the morning", async ({
   await advanceClock(page, at(23, 10).getTime() - at(12, 0).getTime());
   await kiosk.goto("/kiosk");
   await expect(night).toBeVisible();
-  await expect(kiosk.getByTestId("night-time")).toHaveText(/^23:1\d$/);
+  await expect(kiosk.getByTestId("screensaver-time")).toHaveText(/^23:1\d$/);
   await expect(night.locator('[data-state="sleeping"]')).toHaveCount(1);
   await expect(shell).toHaveAttribute("data-skin", "night");
 

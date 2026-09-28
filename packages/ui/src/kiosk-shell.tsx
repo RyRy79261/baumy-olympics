@@ -20,7 +20,7 @@ export function KioskShell({
   /**
    * The time-of-day skin (SPEC §7, §8): "day" from 06:30 to 23:00, "night"
    * otherwise. The kit is dark all day (ADR 0005 §7), so it is only a hook
-   * on `[data-skin]`; night itself is the NightScreen over everything.
+   * on `[data-skin]`; night itself is the Screensaver over everything.
    */
   skin?: "day" | "night";
   /** The footer nav (KioskFooter). */

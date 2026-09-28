@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { NightScreen } from "@baumy/ui";
+import { Screensaver } from "@baumy/ui";
 import { clockLines } from "@/lib/hub/view";
-import { KIOSK_IDLE_MS } from "@/lib/kiosk/constants";
+import { KIOSK_IDLE_MS, SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import {
   NIGHT_EVENT,
   isNightAt,
@@ -12,24 +12,36 @@ import {
 } from "@/lib/kiosk/night";
 import { closeOpenDialogs } from "./idle-reset";
 
-// Night mode (SPEC §8, issue #29). Inside the window (23:00-06:30 Berlin by
-// default, `KIOSK_NIGHT_HOURS`) the kitchen screen dims to a sleeping Baumy
-// and a clock. A touch wakes it; a minute untouched puts it back to sleep;
-// the morning wakes it for good. It keeps the server's time the way the hub
-// clock does (the server's `now` at render, plus how far this device's
-// clock has moved since), so e2e's moved server clock moves it too.
+// The kitchen screen's raccoon screensaver (ADR 0005 §6; SPEC §8, issues #29
+// and #66). It shows:
+//
+// - at night: inside the window (23:00-06:30 Berlin by default,
+//   `KIOSK_NIGHT_HOURS`, lib/kiosk/night.ts) at once, and again after a
+//   minute untouched once someone has woken it; the morning wakes it;
+// - by day: after 5 minutes untouched, unless a reminder is up (the
+//   reminder is what the room should see).
+//
+// A tap wakes it (the Screensaver is one big button, so the tap never lands
+// on the page). It keeps the server's time the way the hub clock does (the
+// server's `now` at render, plus how far this device's clock has moved
+// since), so e2e's moved server clock moves it too.
 //
 // Its memory (asleep, the last touch, whether it was night at the last
 // tick) lives in refs, so the kiosk home's 60-second refresh, which hands it
 // a new `serverNow`, never puts a screen someone is using back to sleep.
 
-export function NightMode({
+/** A full-screen reminder is showing (components/kiosk/reminders.tsx). */
+function reminderShowing(): boolean {
+  return document.querySelector("[data-reminder]") !== null;
+}
+
+export function KioskScreensaver({
   serverNow,
   window: nightWindow,
 }: {
   /** The instant the shell was rendered at, ISO 8601. */
   serverNow: string;
-  /** null: night mode is off. */
+  /** null: no night hours (the idle screensaver still runs). */
   window: NightWindow | null;
 }) {
   const [asleep, setAsleep] = useState(false);
@@ -62,12 +74,15 @@ export function NightMode({
     const tick = () => {
       const at = new Date(Date.now() + offset);
       const night = isNightAt(at, win);
+      const idle = Date.now() - lastTouch.current;
       setNow(at);
-      if (!night) show(false);
-      else if (
-        !wasNight.current ||
-        Date.now() - lastTouch.current >= KIOSK_IDLE_MS
-      ) {
+      if (night) {
+        if (!wasNight.current || idle >= KIOSK_IDLE_MS) show(true);
+      } else if (wasNight.current) {
+        // The morning wakes it, and starts the day's idle wait afresh.
+        lastTouch.current = Date.now();
+        show(false);
+      } else if (idle >= SCREENSAVER_IDLE_MS && !reminderShowing()) {
         show(true);
       }
       wasNight.current = night;
@@ -96,5 +111,5 @@ export function NightMode({
 
   if (!asleep) return null;
   const { time, date } = clockLines(now);
-  return <NightScreen time={time} date={date} onWake={wake} />;
+  return <Screensaver time={time} date={date} onWake={wake} />;
 }

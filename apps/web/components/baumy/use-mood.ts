@@ -8,7 +8,7 @@ import { NIGHT_EVENT, type NightEventDetail } from "@/lib/kiosk/night";
 /**
  * Baumy's state (lib/ai/mood.ts) for the sheet and its button: talking,
  * happy and sad settle back to idle after their time, and the kiosk's night
- * screen (components/kiosk/night-mode.tsx) sends `sleep` and `wake`.
+ * screensaver (components/kiosk/screensaver.tsx) sends `sleep` and `wake`.
  */
 export function useBaumyMood(): [SpriteState, (e: MoodEvent) => void] {
   const [mood, dispatch] = useReducer(nextMood, "idle" as SpriteState);
