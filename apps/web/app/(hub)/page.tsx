@@ -8,7 +8,11 @@ import { PageHeading } from "@baumy/ui";
 import { HubHome } from "@/components/hub/hub-home";
 import { PostReminderForm } from "@/components/hub/post-reminder-form";
 import { uiRequestCtx } from "@/lib/actions/ui";
-import { requireMemberPage } from "@/lib/auth";
+import { memberOrVisitorPage } from "@/lib/auth";
+import {
+  LANDING_DESCRIPTION,
+  LandingPage,
+} from "@/components/landing/landing-page";
 import { loadHub } from "@/lib/hub/load";
 import { voiceConfigured } from "@/lib/integrations/groq";
 import { createReminderAction } from "./reminder-actions";
@@ -18,13 +22,18 @@ import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
 // New and Messages tiles, the urgent bounties, today's events, the
 // standings and the pot, the pinned notes, brain's shopping list and the
 // Baumy button, in the kitchen screen's calm look on a scrolling page. The
-// kitchen screen has its own home at /kiosk.
+// kitchen screen has its own home at /kiosk. Nobody signed in gets the
+// public landing page instead (issue #96), never a redirect.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Baumy Olympics" };
+export const metadata: Metadata = {
+  title: "Baumy Olympics",
+  description: LANDING_DESCRIPTION,
+};
 
 export default async function HubPage() {
-  const me = await requireMemberPage();
+  const me = await memberOrVisitorPage();
+  if (!me) return <LandingPage />;
   const [hub, people] = await Promise.all([
     uiRequestCtx(undefined).then((ctx) => loadHub(ctx!)),
     listActiveMembers(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID),

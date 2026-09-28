@@ -15,8 +15,13 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { pageGate, requireAdminPage, requireJoiningPage, requireMemberPage } =
-  await import("./page-gate");
+const {
+  memberOrVisitorPage,
+  pageGate,
+  requireAdminPage,
+  requireJoiningPage,
+  requireMemberPage,
+} = await import("./page-gate");
 
 const base = {
   kind: "member" as const,
@@ -85,10 +90,24 @@ describe("pageGate", () => {
 
   it("never shows these pages to MCP or brain", () => {
     for (const a of [mcp, brain]) {
-      for (const need of ["member", "admin", "joining"] as const) {
+      for (const need of ["member", "admin", "joining", "home"] as const) {
         expect(pageGate(a, need)).toEqual({ kind: "not_found" });
       }
     }
+  });
+
+  it("shows home publicly to nobody, and runs the member ladder for everyone else (issue #96)", () => {
+    expect(pageGate(member, "home")).toEqual({ kind: "ok" });
+    expect(pageGate(admin, "home")).toEqual({ kind: "ok" });
+    expect(pageGate(null, "home")).toEqual({ kind: "public" });
+    expect(pageGate(account, "home")).toEqual({
+      kind: "redirect",
+      to: "/join",
+    });
+    expect(pageGate(kiosk, "home")).toEqual({
+      kind: "redirect",
+      to: "/kiosk",
+    });
   });
 });
 
@@ -113,6 +132,19 @@ describe("the page wrappers", () => {
     getActor.mockResolvedValue(member);
     await expect(requireAdminPage()).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(requireJoiningPage()).rejects.toThrow("NEXT_REDIRECT /");
+  });
+
+  it("give home the member, or null for nobody, and redirect the rest", async () => {
+    getActor.mockResolvedValue(member);
+    await expect(memberOrVisitorPage()).resolves.toBe(member);
+    getActor.mockResolvedValue(null);
+    await expect(memberOrVisitorPage()).resolves.toBeNull();
+    getActor.mockResolvedValue(account);
+    await expect(memberOrVisitorPage()).rejects.toThrow("NEXT_REDIRECT /join");
+    getActor.mockResolvedValue(kiosk);
+    await expect(memberOrVisitorPage()).rejects.toThrow("NEXT_REDIRECT /kiosk");
+    getActor.mockResolvedValue(mcp);
+    await expect(memberOrVisitorPage()).rejects.toThrow("NEXT_NOT_FOUND");
   });
 
   it("sends a visitor who is not signed in back to returnTo after sign-in", async () => {
