@@ -1,6 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { Button, Card, Field, FormMessage, Input } from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
 import type { ServiceTokenData } from "@/lib/actions/service-tokens";
@@ -13,7 +20,8 @@ import {
 } from "./actions";
 
 // /admin/connections' forms (issue #104). Creating and rotating show the new
-// token once, with a copy button and where it goes; both ask for the
+// token once, in the page's one OneTimeTokenArea, with a copy button and
+// where it goes; both ask for the
 // password unless the admin signed in under 10 minutes ago. Rotating and
 // revoking cut brain off, so each asks first (the Security page's confirm
 // step).
@@ -94,21 +102,48 @@ function OneTimeToken({ data }: { data: ServiceTokenData }) {
   );
 }
 
-/** create_service_token: shows the new token once. */
-export function CreateTokenForm({ defaultName }: { defaultName: string }) {
-  const { state, formAction, pending, requestId, errors } = useActionForm(
-    createServiceTokenAction,
+interface Shown {
+  shown: ServiceTokenData | null;
+  setShown: Dispatch<SetStateAction<ServiceTokenData | null>>;
+}
+
+const ShownToken = createContext<Shown>({ shown: null, setShown: () => {} });
+
+/**
+ * The page's ONE one-time token: the latest one created or rotated. A new
+ * one replaces it, and revoking its name clears it, so the page never shows
+ * a token that no longer works, or two at once.
+ */
+export function OneTimeTokenArea({ children }: { children: ReactNode }) {
+  const [shown, setShown] = useState<ServiceTokenData | null>(null);
+  return (
+    <ShownToken.Provider value={{ shown, setShown }}>
+      {shown ? (
+        <Card title="Your new token">
+          {/* Keyed by the token, so "Copied" never carries over. */}
+          <OneTimeToken key={shown.token ?? shown.name} data={shown} />
+        </Card>
+      ) : null}
+      {children}
+    </ShownToken.Provider>
   );
+}
+
+/** create_service_token: the new token shows in OneTimeTokenArea. */
+export function CreateTokenForm({ defaultName }: { defaultName: string }) {
+  const { setShown } = useContext(ShownToken);
+  const { state, formAction, pending, requestId, errors } = useActionForm<
+    Out<"create_service_token">
+  >(async (prev, form) => {
+    const result = await createServiceTokenAction(prev, form);
+    if (result.ok) setShown(result.data);
+    return result;
+  });
   return (
     <Card
       title="Create a token"
       description="baumy-brain, the Telegram bot, calls Baumy Olympics with a service token. Create one here and give it to brain."
     >
-      {state?.ok ? (
-        <div className="mb-4">
-          <OneTimeToken data={state.data} />
-        </div>
-      ) : null}
       <form action={formAction} className="flex flex-col gap-4">
         <input type="hidden" name="requestId" value={requestId} />
         <Field id="service-token-name" label="Name" errors={errors.name}>
@@ -137,27 +172,32 @@ export function CreateTokenForm({ defaultName }: { defaultName: string }) {
 /** rotate_service_token and revoke_service_token, each behind a confirm. */
 export function LiveTokenControls({ name }: { name: string }) {
   const [asking, setAsking] = useState<"rotate" | "revoke" | null>(null);
+  const { setShown } = useContext(ShownToken);
   const rotate = useActionForm<Out<"rotate_service_token">>(
     async (prev, form) => {
       const result = await rotateServiceTokenAction(prev, form);
-      if (result.ok) setAsking(null);
+      if (result.ok) {
+        setShown(result.data);
+        setAsking(null);
+      }
       return result;
     },
   );
   const revoke = useActionForm<Out<"revoke_service_token">>(
     async (prev, form) => {
       const result = await revokeServiceTokenAction(prev, form);
-      if (result.ok) toast.success(`${name} is revoked.`);
-      else toast.error(result.message);
+      if (result.ok) {
+        // The token on show stops working: take it off the page.
+        setShown((s) => (s?.name === name ? null : s));
+        toast.success(`${name} is revoked.`);
+      } else toast.error(result.message);
       setAsking(null);
       return result;
     },
   );
-  const shown = rotate.state?.ok ? rotate.state.data : null;
 
   return (
     <div className="flex flex-col gap-3">
-      {shown ? <OneTimeToken data={shown} /> : null}
       {asking === "rotate" ? (
         <form action={rotate.formAction} className="flex flex-col gap-3">
           <input type="hidden" name="requestId" value={rotate.requestId} />

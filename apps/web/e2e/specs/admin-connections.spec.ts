@@ -61,24 +61,22 @@ test("an admin creates, rotates and revokes a service token, each shown once", a
   await expect(live).toContainText("brain");
   await expect(live).toContainText("Not yet");
 
-  // Brain can call with it, and the list says so.
+  // Brain can call with it.
   expect(await brainStatus(request, first)).toBe(200);
-  await page.reload();
-  await expect(live).toBeVisible();
-  await expect(live).not.toContainText("Not yet");
-  // Shown once: after a reload the token is nowhere on the page.
-  await expect(page.getByTestId("service-token-shown")).toHaveCount(0);
-  expect(await page.content()).not.toContain(first);
 
-  // Rotate, after the confirm step.
+  // Rotate, after the confirm step, with no reload in between: the page
+  // shows exactly one token, the new one, never the dead one beside it.
   await live.getByRole("button", { name: `Rotate ${name}` }).click();
   await expect(live.getByText(`Rotate ${name}?`)).toBeVisible();
   await live.getByLabel("Your password").fill(PASSWORD);
   await live.getByRole("button", { name: "Yes, rotate" }).click();
-  const rotated = live.getByTestId("service-token-plaintext");
-  await expect(rotated).toHaveText(/^baumy_st_/);
-  const second = (await rotated.textContent())!.trim();
+  await expect(shown).not.toHaveText(first);
+  await expect(shown).toHaveCount(1);
+  await expect(shown).toHaveText(/^baumy_st_/);
+  const second = (await shown.textContent())!.trim();
   expect(second).not.toBe(first);
+  // A fresh token: the copy button starts over.
+  await expect(page.getByRole("button", { name: "Copy token" })).toBeVisible();
   await expect(page.getByTestId(`service-token-${name}-revoked`)).toHaveCount(
     1,
   );
@@ -95,11 +93,25 @@ test("an admin creates, rotates and revokes a service token, each shown once", a
   await live.getByRole("button", { name: `Revoke ${name}` }).click();
   await live.getByRole("button", { name: "Yes, revoke" }).click();
   await expect(toast(page, `${name} is revoked.`)).toBeVisible();
-  await expect(page.getByTestId(`service-token-${name}-revoked`)).toHaveCount(
-    2,
-  );
+  const revoked = page.getByTestId(`service-token-${name}-revoked`);
+  await expect(revoked).toHaveCount(2);
   await expect(live).toHaveCount(0);
+  // The revoked token is taken off the page: no plaintext is left.
+  await expect(shown).toHaveCount(0);
+  await expect(page.getByTestId("service-token-shown")).toHaveCount(0);
   expect(await brainStatus(request, second)).toBe(401);
+
+  // After a reload both are listed as used, and neither token is anywhere
+  // on the page.
+  await page.reload();
+  await expect(revoked).toHaveCount(2);
+  for (const row of await revoked.all()) {
+    await expect(row).toContainText("Last used");
+    await expect(row).not.toContainText("Not yet");
+  }
+  const html = await page.content();
+  expect(html).not.toContain(first);
+  expect(html).not.toContain(second);
 });
 
 test("a member who is not an admin gets a 404", async ({
