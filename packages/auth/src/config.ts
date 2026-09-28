@@ -30,7 +30,10 @@ import {
   type AuthEnv,
 } from "./env";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
-import { accountSecurityPlugins } from "./security";
+import {
+  ACCOUNT_SECURITY_DISABLED_PATHS,
+  accountSecurityPlugins,
+} from "./security";
 
 /**
  * Placeholder secret (at least 32 characters) so the instance constructs
@@ -57,6 +60,8 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
     trustedOrigins: resolveTrustedOrigins(env),
     // No outbound telemetry from an auth stack that holds household data.
     telemetry: { enabled: false },
+    // Endpoints an audited action replaces (issue #79, security.ts).
+    disabledPaths: [...ACCOUNT_SECURITY_DISABLED_PATHS],
 
     // The HTTP driver has no transactions, so `transaction` stays at its
     // default (false): operations run one after another, the documented
@@ -123,14 +128,18 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
       },
     },
 
-    // Google may link to an existing account with the same email. Linking
-    // still refuses when the LOCAL account has not confirmed its email
-    // (`requireLocalEmailVerified`, left at its default, true). Never relax
-    // it (ADR 0001 "Traps"): otherwise someone could sign up with a member's
-    // address and a password first, and the member's later Google sign-in
-    // would join that account.
+    // Google joins an existing account ONLY when its owner presses "Link
+    // Google" on Settings, Security (issue #79, `linkSocial`): a Google
+    // sign-in never links itself (`disableImplicitLinking`), so "Unlink
+    // Google" really stops Google signing in. A Google address with no
+    // account still signs up as before. `requireLocalEmailVerified` stays at
+    // its default, true; never relax it (ADR 0001 "Traps").
     account: {
-      accountLinking: { enabled: true, trustedProviders: ["google"] },
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ["google"],
+        disableImplicitLinking: true,
+      },
     },
 
     // An OAuth callback failure lands on our sign-in form with `?error=`,

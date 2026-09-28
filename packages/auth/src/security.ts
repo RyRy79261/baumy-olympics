@@ -8,7 +8,7 @@
 // is never a dead end (recovery: the password plus a backup code).
 
 import type { BetterAuthPlugin } from "better-auth";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { lastLoginMethod } from "better-auth/plugins";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { passkey } from "@better-auth/passkey";
@@ -42,6 +42,62 @@ export function passkeysOff() {
             throw new APIError("SERVICE_UNAVAILABLE", {
               code: "PASSKEYS_NOT_CONFIGURED",
               message: PASSKEYS_OFF,
+            });
+          }),
+        },
+      ],
+    },
+  } satisfies BetterAuthPlugin;
+}
+
+/**
+ * Better Auth endpoints switched off (config.ts `disabledPaths`) because an
+ * audited action does the same job with a guard the endpoint lacks
+ * (apps/web/lib/actions/account-security.ts): removing or renaming a passkey
+ * and unlinking a provider (the last-way-in check), and signing sessions out
+ * (the signed-out-device check and forgetting trusted devices). They answer
+ * 404.
+ */
+export const ACCOUNT_SECURITY_DISABLED_PATHS = [
+  "/passkey/delete-passkey",
+  "/passkey/update-passkey",
+  "/unlink-account",
+  "/revoke-session",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
+] as const;
+
+/** The `verification` rows the twoFactor plugin keeps for trusted devices. */
+export const TRUSTED_DEVICE_PREFIX = "trust-device-";
+
+/**
+ * A changed password forgets every device trusted for two-factor (Better
+ * Auth 1.6.25 keeps that trust for 30 days, and a trusted browser skips the
+ * code with just the password). Changing the password also signs the other
+ * devices out (the Security page asks for that), so a stolen laptop needs
+ * the new password AND a code.
+ */
+export function forgetTrustOnPasswordChange() {
+  return {
+    id: "baumy-trusted-devices",
+    hooks: {
+      after: [
+        {
+          matcher: (ctx) => ctx.path === "/change-password",
+          handler: createAuthMiddleware(async (ctx) => {
+            if (isAPIError(ctx.context.returned)) return;
+            const userId = ctx.context.session?.user.id;
+            if (!userId) return;
+            await ctx.context.adapter.deleteMany({
+              model: "verification",
+              where: [
+                { field: "value", value: userId },
+                {
+                  field: "identifier",
+                  operator: "starts_with",
+                  value: TRUSTED_DEVICE_PREFIX,
+                },
+              ],
             });
           }),
         },
@@ -90,5 +146,6 @@ export function accountSecurityPlugins(env: AuthEnv) {
     // What an unconfirmed account may not do: enrol a passkey or two-factor,
     // keep them once the owner resets, or skip two-factor through a link.
     emailProofGuards(),
+    forgetTrustOnPasswordChange(),
   ];
 }

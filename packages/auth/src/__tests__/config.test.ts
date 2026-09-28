@@ -51,6 +51,7 @@ describe("buildAuthOptions", () => {
       "passkey",
       "last-login-method",
       "baumy-email-proof",
+      "baumy-trusted-devices",
     ]);
     expect(options.plugins[0]?.options).toEqual({ requireSignature: true });
   });
@@ -115,6 +116,21 @@ describe("buildAuthOptions", () => {
     expect(
       "socialProviders" in buildAuthOptions({ GOOGLE_CLIENT_ID: "id" }),
     ).toBe(false);
+  });
+
+  it("switches off the endpoints an audited action replaces", () => {
+    expect(options.disabledPaths).toEqual([
+      "/passkey/delete-passkey",
+      "/passkey/update-passkey",
+      "/unlink-account",
+      "/revoke-session",
+      "/revoke-sessions",
+      "/revoke-other-sessions",
+    ]);
+  });
+
+  it("links Google only when the member asks, never on sign-in", () => {
+    expect(options.account.accountLinking.disableImplicitLinking).toBe(true);
   });
 
   it("never links Google to an account whose email is unconfirmed", () => {
