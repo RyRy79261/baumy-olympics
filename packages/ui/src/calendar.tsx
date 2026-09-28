@@ -74,13 +74,15 @@ export function CalendarDayCell({
     <li
       aria-current={today ? "date" : undefined}
       className={cx(
-        "pixel-frame flex min-w-0 flex-col gap-1 p-1.5",
+        // Square pixel cells (no notched corners, which read as rounded at
+        // this size): a 2px line frame, today a 4px violet one.
+        "flex min-w-0 flex-col gap-1 p-1.5",
         tall ? "min-h-40" : "min-h-24",
         today
-          ? "pixel-frame-4 bg-[#2a1c4a] [--pf:var(--color-bm-violet)]"
+          ? "border-4 border-bm-violet bg-bm-raised"
           : muted
-            ? "opacity-40 [--pf:var(--color-bm-line)]"
-            : "bg-bm-surface [--pf:transparent]",
+            ? "border-2 border-bm-line opacity-40"
+            : "border-2 border-bm-line bg-bm-surface",
       )}
       {...props}
     >
@@ -117,7 +119,7 @@ export function CalendarEventButton({
     <button
       type={type}
       className={cx(
-        "pixel-frame flex w-full min-w-0 flex-col items-start border-l-[5px] border-bm-violet bg-bm-violet/20 px-2 text-left text-bm-text [--pf:transparent]",
+        "flex w-full min-w-0 flex-col items-start border-l-[5px] border-bm-violet bg-bm-violet/20 px-2 text-left text-bm-text",
         kiosk ? "min-h-14 py-2 text-lg" : "min-h-11 py-1 text-base",
         className,
       )}

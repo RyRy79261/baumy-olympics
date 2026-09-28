@@ -33,10 +33,10 @@ export const SPRITE_MOTION: Readonly<Record<SpriteState, string | null>> = {
 /** A second cue per state that is not motion, so reduced motion still reads. */
 export const STATE_MARK: Readonly<Record<SpriteState, string | null>> = {
   idle: null,
-  listening: "…",
+  listening: "...",
   thinking: "?",
   talking: "!",
   happy: "+",
-  sad: "×",
+  sad: "x",
   sleeping: "z",
 };

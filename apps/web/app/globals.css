@@ -27,6 +27,7 @@
   --color-bm-pink: #ff8fc7;
   --color-bm-violet: #8f7dff;
   --color-bm-green: #43f0a0;
+  --color-bm-chrome: #0f0918; /* the header and footer bars */
   --color-bm-bubble: #f6ecff;
   --color-bm-bubble-ink: #1a1026;
 
@@ -110,7 +111,18 @@
   );
   box-shadow: inset 0 0 0 var(--pf-w, 3px) var(--pf, var(--color-bm-line));
 
-  &:focus-visible,
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      inset 0 0 0 var(--pf-w, 3px) var(--color-bm-yellow),
+      inset 0 0 0 calc(var(--pf-w, 3px) + 2px) var(--color-bm-ink);
+  }
+}
+
+/* The same ring for a frame that wraps a visually hidden control (the
+   ChoiceGroup's labels around a radio). Only these opt in: a card that
+   merely contains an input keeps its own frame while the input is focused. */
+@utility pixel-frame-within {
   &:has(:focus-visible) {
     outline: none;
     box-shadow:

@@ -34,7 +34,7 @@ export function KioskShell({
       data-skin={skin}
       className="flex h-dvh touch-manipulation flex-col overflow-hidden bg-bm-bg text-bm-text select-none"
     >
-      <header className="flex items-center gap-4 border-b-2 border-bm-line bg-[#0f0918] px-4 py-2">
+      <header className="flex items-center gap-4 border-b-2 border-bm-line bg-bm-chrome px-4 py-2">
         <div className="font-display text-lg">{brand}</div>
         <nav
           aria-label="Who is here"
@@ -84,7 +84,9 @@ export function AvatarButton({
       type={type}
       aria-pressed={selected}
       className={cx(
-        "pixel-frame inline-flex min-h-16 min-w-16 shrink-0 items-center gap-2 px-3 font-label text-base font-bold uppercase",
+        // Character over a one-line name, so four housemates fit the
+        // portrait screen's 820px next to the brand and the status.
+        "pixel-frame inline-flex min-h-16 min-w-16 max-w-32 shrink-0 flex-col items-center justify-center gap-1 px-2 py-1.5 font-label text-xs font-bold uppercase",
         selected ? "bg-bm-raised text-bm-text" : "text-bm-muted",
         className,
       )}
@@ -92,11 +94,13 @@ export function AvatarButton({
       {...props}
     >
       {memberId ? (
-        <Housemate avatar={avatar} memberId={memberId} scale={3} />
+        <Housemate avatar={avatar} memberId={memberId} scale={2} />
       ) : (
         <Sprite name={sprite} color={color} size={2} />
       )}
-      <span>{displayName}</span>
+      <span className="max-w-full truncate whitespace-nowrap">
+        {displayName}
+      </span>
     </button>
   );
 }
