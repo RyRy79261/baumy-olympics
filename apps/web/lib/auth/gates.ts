@@ -114,8 +114,7 @@ export function requireAdmin(ctx: RequestCtx): GateResult {
 
 /**
  * The member vouches for this request themself. A session, MCP token or brain
- * actor IS that member, so it passes as a member, except brain acting on a
- * housemate's behalf, which is refused. The kiosk is shared, so it
+ * actor IS that member, so it passes as a member. The kiosk is shared, so it
  * must send the acting member's PIN, which is verified now and never stored
  * (lib/auth/pin.ts counts the attempt and may lock the PIN).
  */
@@ -127,16 +126,6 @@ export async function requireAttested(
   const member = requireMember(ctx, action);
   if (!member.ok) return member;
   const { actor } = ctx;
-  // Brain acting on a housemate's behalf (X-Baumy-On-Behalf-Of, issue #70)
-  // is someone else speaking for them: never an attestation. So claim
-  // events (confirm, dispute, undo, withdraw, concede) and note edits are
-  // never done on someone's behalf.
-  if (actor.kind === "service" && actor.initiatorMemberId) {
-    return fail(
-      "FORBIDDEN",
-      "Only that housemate can do this themself. Ask them to do it in the app or in Telegram.",
-    );
-  }
   if (actor.kind !== "kiosk") return OK;
   if (!ctx.pin) {
     return fail("ATTESTATION_REQUIRED", "Enter your PIN to do this.");
