@@ -48,10 +48,15 @@ async function joinWith(page: Page, code: string, name: string) {
     .filter({ hasText: /Too many tries\. Wait \d+s/ });
   for (let attempt = 0; attempt < 5; attempt++) {
     await redeem(page, code, name);
-    const outcome = await Promise.race([
-      page.waitForURL((url) => url.pathname === "/").then(() => "in" as const),
-      limited.waitFor().then(() => "limited" as const),
-    ]);
+    const joined = page
+      .waitForURL((url) => url.pathname === "/")
+      .then(() => "in" as const);
+    const refused = limited.waitFor().then(() => "limited" as const);
+    // The loser keeps waiting and rejects later (at its timeout, or when the
+    // page closes); give it a handler so that is not an unhandled rejection.
+    joined.catch(() => {});
+    refused.catch(() => {});
+    const outcome = await Promise.race([joined, refused]);
     if (outcome === "in") return;
     const text = (await limited.textContent()) ?? "";
     const seconds = Number(/Wait (\d+)s/.exec(text)?.[1] ?? 5);
@@ -209,6 +214,11 @@ test("passkeys: add, rename, sign in with one, and remove it", async ({
   await expect(p).toHaveURL(/\/$/);
   await openSecurity(p);
   await card.getByRole("button", { name: "Remove Kitchen laptop" }).click();
+  // A destructive change asks first; keeping it changes nothing.
+  await card.getByRole("button", { name: "Keep it" }).click();
+  await expect(card.getByTestId("passkey-row")).toContainText("Kitchen laptop");
+  await card.getByRole("button", { name: "Remove Kitchen laptop" }).click();
+  await card.getByRole("button", { name: "Yes, remove it" }).click();
   await expect(
     p.getByRole("status").filter({ hasText: "Passkey removed." }),
   ).toBeVisible();

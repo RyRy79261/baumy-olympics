@@ -9,6 +9,7 @@ import {
 import { LegalLinks } from "@/components/legal/legal-page";
 import { redirectIfSignedIn } from "@/lib/auth";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
+import { oauthErrorSentence } from "../messages";
 import { SignInForm, type LastLoginMethod } from "./sign-in-form";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export default async function SignInPage({
         googleEnabled={isGoogleConfigured(process.env)}
         passkeysEnabled={resolvePasskeyScope(process.env) !== null}
         lastMethod={lastMethod(jar.get(LAST_LOGIN_METHOD_COOKIE)?.value)}
-        oauthFailed={Boolean(error)}
+        oauthError={oauthErrorSentence(error)}
         callbackURL={next}
       />
       <LegalLinks />

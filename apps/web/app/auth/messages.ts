@@ -45,6 +45,21 @@ export const OAUTH_FAILED =
   "Signing in with Google didn't finish. Try again, or use your email and password.";
 
 /**
+ * A Google sign-in for an address that already has an account which has not
+ * linked Google (issue #79: Google never links itself on sign-in). Saying so
+ * tells whoever holds that Google account that the address has an account,
+ * which they could learn from sign-up anyway; they still cannot get in.
+ */
+export const GOOGLE_NOT_LINKED =
+  "That Google account isn't linked yet. Sign in with your email and password, then link Google on Settings, Security.";
+
+/** The sentence for `?error=<code>` on sign-in; null when there is none. */
+export function oauthErrorSentence(code: string | undefined): string | null {
+  if (!code) return null;
+  return code === "account_not_linked" ? GOOGLE_NOT_LINKED : OAUTH_FAILED;
+}
+
+/**
  * What a refused sign-up says. An address that already has an account says so,
  * with the way in. That does tell anyone which addresses are registered: a cost
  * accepted with open sign-up and automatic sign-in, as camp-404 does
