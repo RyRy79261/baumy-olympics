@@ -122,7 +122,7 @@ describe("loadDashboard", () => {
     });
     expect(data.notes).toMatchObject({
       ok: true,
-      data: [{ title: "Pasta", authorId: ryan }],
+      data: { notes: [{ title: "Pasta", authorId: ryan }], recentCount: 1 },
     });
     expect(data.members).toEqual([
       { id: ryan, displayName: "Ryan", avatar: character },

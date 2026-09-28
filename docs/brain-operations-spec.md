@@ -1221,7 +1221,7 @@ The household message board.
 
 **When to use it.** For "what's on the board?", and to find a `noteId` before changing, pinning or deleting a note.
 
-**Tool description** (the registry's, verbatim): Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created and last changed (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets.
+**Tool description** (the registry's, verbatim): Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets.
 
 **Examples.**
 

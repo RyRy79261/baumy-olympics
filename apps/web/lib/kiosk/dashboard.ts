@@ -225,7 +225,7 @@ export function kindLabel(kind: ChoreKind): string {
 
 // ---------------------------------------------------------------- messages
 
-/** How far back the Messages icon looks (ADR 0005 §3). */
+/** How far back the Messages icon looks (ADR 0005 §3): list_notes' NOTE_RECENT_MS. */
 export const MESSAGES_WINDOW_MS = 24 * HOUR;
 
 /** "now", "12m", "3h": how long ago, for a message's byline. */
@@ -248,9 +248,9 @@ export interface MessageView {
 }
 
 /**
- * The notes created or changed in the last 24 hours (ADR 0005 §3), the most
- * recently changed first. The Messages icon counts them. (PR #75 moves this
- * rule to list_notes' `recentCount`, where pinning does not count.)
+ * The notes added, or whose words were edited, in the last 24 hours (ADR
+ * 0005 §3), the newest first: the notes list_notes' `recentCount` counts,
+ * so the icon's number and the module's list agree. Pinning is not an edit.
  */
 export function recentMessages(
   notes: readonly NoteView[],
@@ -258,11 +258,11 @@ export function recentMessages(
 ): MessageView[] {
   const since = now.getTime() - MESSAGES_WINDOW_MS;
   return notes
-    .filter((n) => Date.parse(n.updatedAt) > since)
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .filter((n) => Date.parse(n.editedAt) > since)
+    .sort((a, b) => Date.parse(b.editedAt) - Date.parse(a.editedAt))
     .map((n) => {
-      const edited = n.updatedAt !== n.createdAt;
-      const ago = agoLabel(n.updatedAt, now);
+      const edited = n.editedAt !== n.createdAt;
+      const ago = agoLabel(n.editedAt, now);
       const when = ago === "now" ? "just now" : `${ago} ago`;
       return {
         id: n.id,

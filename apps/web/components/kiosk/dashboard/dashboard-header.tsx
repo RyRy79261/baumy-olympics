@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import {
-  BountyRow,
+  ModuleBountyRow,
   Housemate,
   KioskModal,
   MarkdownBody,
@@ -37,7 +37,9 @@ import { useIdle } from "../use-idle";
 // Maintenance) with "I'll do it" leading to the log flow, or the notes
 // board's last day.
 
-type Listed<T> = { ok: true; rows: T[] } | { ok: false; message: string };
+/** A list, or why it could not be read; `count` overrides its length. */
+type Listed<T> =
+  { ok: true; rows: T[]; count?: number } | { ok: false; message: string };
 
 type ModuleKey = "urgent" | "new" | "messages";
 
@@ -89,7 +91,7 @@ function BountyList({ rows }: { rows: BountyRowView[] }) {
   return (
     <ul className="flex flex-col">
       {rows.map((b) => (
-        <BountyRow
+        <ModuleBountyRow
           key={b.id}
           data-testid={`bounty-${b.name}`}
           glyph={choreGlyph(b.sprite)}
@@ -199,7 +201,7 @@ function MessagesModule({
       tone="pink"
       subtitle={
         listed.ok
-          ? `${listed.rows.length} on the board in the last day`
+          ? `${listed.count ?? listed.rows.length} on the board in the last day`
           : "The notes board"
       }
       onClose={onClose}
@@ -257,7 +259,8 @@ export function DashboardHeader({
   const close = () => setOpen(null);
   // A module left open closes after a minute untouched.
   useIdle(open !== null, KIOSK_IDLE_MS, close);
-  const count = (l: Listed<unknown>) => (l.ok ? l.rows.length : null);
+  const count = (l: Listed<unknown>) =>
+    l.ok ? (l.count ?? l.rows.length) : null;
   const titleId = `${id}-module`;
 
   return (
