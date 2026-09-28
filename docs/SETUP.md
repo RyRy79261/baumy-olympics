@@ -23,7 +23,8 @@ secrets from earlier ones.
       General → Delete Project (or at least Settings → Git → Disconnect).
       Then check `baumy-olympics-web` uses Root Directory `apps/web`, framework
       Next.js, no build command override, and that the Vercel–Neon
-      integration's preview branching is off.
+      integration's preview branching is **on** ([CORRECTION 2026-09-29]
+      this said "off" while our own workflow made the branches; issue #99).
       Details: [Vercel and Neon previews](#vercel-and-neon-previews-issue-5).
 - [ ] **Add the custom domain** to `baumy-olympics-web` (Settings → Domains).
       Several settings below need it (`BETTER_AUTH_URL`, `MCP_PUBLIC_URL`,
@@ -37,15 +38,16 @@ secrets from earlier ones.
 - [ ] **On Vercel, Production:** `DATABASE_URL` = pooled,
       `DATABASE_URL_UNPOOLED` = direct.
 - [ ] **On Vercel, Preview:** `PROD_DB_HOST` = the production direct host;
-      leave the preview `DATABASE_URL*` unset.
+      leave the unscoped preview `DATABASE_URL*` unset (the Neon integration
+      writes each preview's own).
       Details: [Database](#database-issue-3).
 
 ### 3. GitHub repository secrets
 
-- [ ] **Settings → Secrets and variables → Actions:** `NEON_API_KEY`,
-      `NEON_PROJECT_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID` (`team_…`) and
-      `VERCEL_PROJECT_IDS` = the `prj_…` id of **`baumy-olympics-web` only**
-      (not the deleted `web`).
+- [ ] **Settings → Secrets and variables → Actions:** `NEON_API_KEY` and
+      `NEON_PROJECT_ID`, for the cleanup workflow that deletes each closed
+      PR's Neon branch. `VERCEL_TOKEN`, `VERCEL_ORG_ID` and
+      `VERCEL_PROJECT_IDS` are no longer used (issue #99) and can be deleted.
 - [ ] **Dependabot:** check its config parsed (Insights → Dependency graph →
       Dependabot) and that alerts and security updates are on; subscribe to
       better-auth's releases by hand.
@@ -292,44 +294,54 @@ E2E_RESET_DB=1 E2E_SERVE=build ./scripts/e2e-local.sh
 
 ## Vercel and Neon previews (issue #5)
 
-What each piece does, and why, is in [deploy.md](deploy.md). Until these are
-done, both Neon workflows exit 0 with a notice, previews are skipped
-("Ignored") because nothing marks them ready, and CI is unaffected.
+What each piece does, and why, is in [deploy.md](deploy.md).
+[CORRECTION 2026-09-29] Previews used to get their Neon branch from our own
+workflow, with the integration's branching off; the Vercel Neon integration
+now makes them, as in camp-404 (issue #99).
 
 - [ ] **Create the Vercel project** from this repository: Root Directory
       `apps/web`, framework Next.js. `apps/web/vercel.json` sets the build
       command (`pnpm run vercel-build`) and the ignored-build step; leave both
-      unset in the dashboard. Turn **off** the Vercel–Neon integration's
-      preview branching if the integration is installed.
+      unset in the dashboard.
+- [ ] **Vercel Neon integration:** installed and connected to this project,
+      with preview branching **on** and its default env var names
+      (`DATABASE_URL` pooled, `DATABASE_URL_UNPOOLED` direct). It makes
+      `preview/<branch>` from the primary branch before each preview build
+      and writes both as branch-scoped Preview env.
 - [ ] **Production env** (Production scope): `DATABASE_URL` and
       `DATABASE_URL_UNPOOLED` as in "Database" above.
 - [ ] **Preview env** (Preview scope, no git branch):
   - `PROD_DB_HOST` = the production **direct** host, for example
     `ep-xxx.eu-central-1.aws.neon.tech`. Without it every preview's
     `db:migrate` fails closed.
-  - `DATABASE_URL` / `DATABASE_URL_UNPOOLED`: leave **unset**, or point them
-    at a throwaway Neon branch named `preview-default`. Never production.
-  - Never `NEON_PREVIEW_READY`, `NEON_LOCAL_PROXY` or `E2E_TEST_MODE`.
+  - `DATABASE_URL` / `DATABASE_URL_UNPOOLED`: leave the unscoped ones
+    **unset**, or point them at a throwaway Neon branch named
+    `preview-default`. Never production.
+  - Never `NEON_LOCAL_PROXY` or `E2E_TEST_MODE`.
 - [ ] **Repository secrets** (Settings → Secrets and variables → Actions):
-      `NEON_API_KEY`, `NEON_PROJECT_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`
-      (`team_…`), `VERCEL_PROJECT_IDS` (the project's `prj_…` id).
-- [ ] **Verify a normal PR.** Open a throwaway PR. Expect: the first Vercel
-      deployment Ignored; the `Neon preview branch for PR` run creates
-      `preview/<branch>` and logs only hosts; a new deployment whose build log
-      shows `[migrate] VERCEL_ENV=preview, target host: ep-…` with a host that
-      is **not** `PROD_DB_HOST`. Close it and check the cleanup run
-      removes the branch and the three env rows.
+      `NEON_API_KEY` and `NEON_PROJECT_ID`. Without them every closed PR's
+      cleanup run fails red (camp-404's behaviour), so a leak is never silent.
+      Delete `VERCEL_TOKEN`, `VERCEL_ORG_ID` and `VERCEL_PROJECT_IDS` if they
+      are still set; nothing reads them.
+- [ ] **Clear the backlog once.** Nothing deleted the integration's branches
+      before issue #99, so the quota filled. Delete the leftover `preview/*`
+      branches of closed PRs (deploy.md, "the branch quota").
+- [ ] **Verify a normal PR.** Open a throwaway PR. Expect: Neon shows
+      `preview/<branch>`, and the Vercel build log shows
+      `[migrate] VERCEL_ENV=preview, target host: ep-…` with a host that is
+      **not** `PROD_DB_HOST`. Close it and check the cleanup run ("Delete
+      Neon branch for closed PR") removes the branch.
 - [ ] **Verify the Dependabot skip.** Push a branch named
-      `dependabot/test-guard` and open a PR from it. Expect: the preview job is
-      skipped, no `preview/dependabot/*` branch in Neon, and the Vercel
-      deployment shows as "Ignored". Screenshot both for issue #5, then close
-      the PR and delete the branch.
+      `dependabot/test-guard` and open a PR from it. Expect: the Vercel
+      deployment shows as "Ignored". Note whether a `preview/dependabot/*`
+      branch appears in Neon anyway (the integration may provision before the
+      ignored-build step runs); either way, closing the PR must leave none.
+      Close the PR and delete the branch.
 - [ ] **Verify the guard on Vercel** (optional; CI already proves it against
-      Docker Postgres): temporarily set a branch-scoped Preview
-      `DATABASE_URL_UNPOOLED` equal to the production string on a throwaway
-      branch that already has `NEON_PREVIEW_READY`, redeploy, and check the
-      build fails with `points at the production host`. Delete the row
-      afterwards.
+      Docker Postgres): on a throwaway branch, set a branch-scoped Preview
+      `DATABASE_URL_UNPOOLED` equal to the production string, redeploy, and
+      check the build fails with `points at the production host`. Delete the
+      row afterwards.
 
 ## Auth (issue #6)
 

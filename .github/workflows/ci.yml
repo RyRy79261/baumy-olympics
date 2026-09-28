@@ -129,13 +129,11 @@ jobs:
       - name: CI gate
         run: pnpm turbo run format:check lint typecheck test build
 
-      # The deploy scripts (ADR 0004): the Vercel ignored-build step and the
-      # Neon preview provisioning, the latter against a fake curl. shellcheck
-      # ships on the ubuntu runner.
+      # The deploy scripts (ADR 0004): the Vercel ignored-build step.
+      # shellcheck ships on the ubuntu runner.
       - name: Test the deploy shell scripts
         run: |
-          shellcheck scripts/vercel-ignore-build.sh scripts/neon-preview-env.sh \
-            scripts/tests/*.sh scripts/tests/fake-bin/curl
+          shellcheck scripts/vercel-ignore-build.sh scripts/tests/*.sh
           for t in scripts/tests/*.test.sh; do
             echo "::group::$t"
             bash "$t"
