@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, notExists } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, notExists } from "drizzle-orm";
 import type { Queryable } from "./index";
 import { members, reminderAcks, reminders } from "./schema";
 
@@ -10,7 +10,8 @@ import { members, reminderAcks, reminders } from "./schema";
 // for everyone, or it is COMPLETED: the acknowledgement that leaves no
 // active member waiting sets `completed_at` in the same transaction, so it
 // stays closed when someone joins or comes back later. Who must see it is
-// worked out when it is read: the members active then.
+// worked out when it is read: the members active then who had joined by the
+// time it was posted (`mustSee`).
 
 /** An active member as the reminder screen draws them. */
 export interface ReminderMember {
@@ -19,6 +20,20 @@ export interface ReminderMember {
   color: string;
   /** `members.avatar` as stored: `avatarFor` (packages/types) reads it. */
   avatar: unknown;
+  /** When they joined: only reminders posted since then wait for them. */
+  createdAt: Date;
+}
+
+/**
+ * Whether a reminder waits for this member: an active member who had joined
+ * by the time it was posted. Someone who joins later never brings back a
+ * reminder that was left behind.
+ */
+export function mustSee(
+  member: { createdAt: Date },
+  reminder: { createdAt: Date },
+): boolean {
+  return member.createdAt.getTime() <= reminder.createdAt.getTime();
 }
 
 export interface ReminderRow {
@@ -32,8 +47,16 @@ export interface ReminderRow {
   acks: { memberId: string; ackedAt: Date }[];
 }
 
-/** Whether the reminder is still waiting for any active member. */
-function waitingForAnyone(db: Queryable, householdId: string, id: string) {
+/**
+ * Whether the reminder is still waiting for any active member who had
+ * joined by the time it was posted.
+ */
+function waitingForAnyone(
+  db: Queryable,
+  householdId: string,
+  reminder: { id: string; createdAt: Date },
+) {
+  const id = reminder.id;
   return db
     .select({ id: members.id })
     .from(members)
@@ -41,6 +64,7 @@ function waitingForAnyone(db: Queryable, householdId: string, id: string) {
       and(
         eq(members.householdId, householdId),
         isNull(members.deactivatedAt),
+        lte(members.createdAt, reminder.createdAt),
         notExists(
           db
             .select({ one: reminderAcks.memberId })
@@ -148,8 +172,8 @@ export async function findOpenReminder(
 
 /**
  * What the kitchen screen shows: the active members, and every reminder
- * that is neither dismissed nor completed and that at least one of them has
- * not acknowledged yet.
+ * that is neither dismissed nor completed and that at least one of them who
+ * must see it (`mustSee`) has not acknowledged yet.
  */
 export async function listActiveReminders(
   db: Queryable,
@@ -161,6 +185,7 @@ export async function listActiveReminders(
       displayName: members.displayName,
       color: members.color,
       avatar: members.avatar,
+      createdAt: members.createdAt,
     })
     .from(members)
     .where(
@@ -184,7 +209,7 @@ export async function listActiveReminders(
   );
   const active = open.filter((r) => {
     const seen = new Set(r.acks.map((a) => a.memberId));
-    return people.some((p) => !seen.has(p.id));
+    return people.some((p) => !seen.has(p.id) && mustSee(p, r));
   });
   return { members: people, reminders: active };
 }
@@ -209,7 +234,10 @@ export async function acknowledgeReminder(
   },
 ): Promise<{ seenByEveryone: boolean } | null> {
   const [row] = await db
-    .select({ completedAt: reminders.completedAt })
+    .select({
+      completedAt: reminders.completedAt,
+      createdAt: reminders.createdAt,
+    })
     .from(reminders)
     .where(
       and(
@@ -229,11 +257,10 @@ export async function acknowledgeReminder(
     })
     .onConflictDoNothing();
   if (row.completedAt) return { seenByEveryone: true };
-  const [waiting] = await waitingForAnyone(
-    db,
-    input.householdId,
-    input.reminderId,
-  );
+  const [waiting] = await waitingForAnyone(db, input.householdId, {
+    id: input.reminderId,
+    createdAt: row.createdAt,
+  });
   if (waiting) return { seenByEveryone: false };
   await db
     .update(reminders)

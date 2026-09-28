@@ -4,6 +4,7 @@ import {
   findOpenReminder,
   insertReminder,
   listActiveReminders,
+  mustSee,
   type ReminderMember,
   type ReminderRow,
 } from "@baumy/db/reminders";
@@ -40,7 +41,10 @@ export interface ReminderView {
   createdAt: string;
   /** The active members who have acknowledged it, the earliest first. */
   seenBy: string[];
-  /** The active members who have not acknowledged it yet. */
+  /**
+   * The active members who have not acknowledged it yet and must: those who
+   * had joined by the time it was posted (`mustSee`).
+   */
   waitingFor: string[];
 }
 
@@ -53,9 +57,9 @@ export interface ReminderMemberView {
   avatar: MemberAvatar;
 }
 
-function reminderView(r: ReminderRow, activeIds: string[]): ReminderView {
+function reminderView(r: ReminderRow, people: ReminderMember[]): ReminderView {
   // Only faces the screen can draw: someone who has left is neither.
-  const active = new Set(activeIds);
+  const active = new Set(people.map((p) => p.id));
   const seenBy = r.acks.map((a) => a.memberId).filter((id) => active.has(id));
   const seen = new Set(seenBy);
   return {
@@ -65,7 +69,9 @@ function reminderView(r: ReminderRow, activeIds: string[]): ReminderView {
     createdBy: { id: r.createdBy, name: r.createdByName },
     createdAt: r.createdAt.toISOString(),
     seenBy,
-    waitingFor: activeIds.filter((id) => !seen.has(id)),
+    waitingFor: people
+      .filter((p) => !seen.has(p.id) && mustSee(p, r))
+      .map((p) => p.id),
   };
 }
 
@@ -102,10 +108,9 @@ export const listReminders = defineAction({
       ctx.db,
       ctx.householdId,
     );
-    const ids = members.map((m) => m.id);
     const data: ListRemindersData = {
       members: members.map(memberView),
-      reminders: reminders.map((r) => reminderView(r, ids)),
+      reminders: reminders.map((r) => reminderView(r, members)),
     };
     return { ok: true, data };
   },
