@@ -12,6 +12,7 @@
     "test:coverage": "turbo run test:coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "brain:spec": "pnpm --filter @baumy/web brain:spec",
     "db:local:up": "docker compose -f docker-compose.local.yml up -d --wait",
     "db:local:migrate": "NEON_LOCAL_PROXY=1 DATABASE_URL=postgres://postgres:postgres@localhost:54329/baumy pnpm --filter @baumy/db exec tsx scripts/migrate-local.ts",
     "db:local:seed": "NEON_LOCAL_PROXY=1 DATABASE_URL=postgres://postgres:postgres@localhost:54329/baumy DATABASE_URL_UNPOOLED=postgres://postgres:postgres@localhost:54329/baumy pnpm --filter @baumy/db db:seed",
