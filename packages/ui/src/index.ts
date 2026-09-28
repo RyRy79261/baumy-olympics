@@ -23,8 +23,10 @@ export {
   type ButtonVariant,
 } from "./button";
 export {
+  CalendarChip,
   CalendarDayCell,
   CalendarEventButton,
+  CalendarMore,
   CalendarGrid,
   type CalendarEventButtonProps,
 } from "./calendar";

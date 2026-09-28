@@ -83,7 +83,7 @@ export function CalendarDayCell({
       className={cx(
         // Square pixel cells (no notched corners, which read as rounded at
         // this size): a 2px line frame, today a 4px violet one.
-        "flex min-w-0 flex-col gap-1 p-1.5",
+        "relative flex min-w-0 flex-col gap-1 p-1.5",
         tall ? "min-h-40" : "min-h-24 sm:min-h-32",
         today
           ? "border-4 border-bm-violet bg-bm-raised"
@@ -154,5 +154,42 @@ export function CalendarEventButton({
       <span className="font-label text-xs text-bm-muted uppercase">{time}</span>
       <span className="w-full truncate font-medium">{title}</span>
     </button>
+  );
+}
+
+/**
+ * An event in a kitchen-screen month cell (the prototype's month grid): one
+ * line, a bar in its colour, not a button of its own. The day it sits in is
+ * the target; it opens that day, where each event is a full button.
+ */
+export function CalendarChip({
+  title,
+  accent,
+  kiosk = false,
+}: {
+  title: string;
+  /** A CSS colour; violet without one. */
+  accent?: string;
+  kiosk?: boolean;
+}) {
+  return (
+    <span
+      style={accent ? { ["--chip" as string]: accent } : undefined}
+      className={cx(
+        "block w-full min-w-0 truncate border-l-4 border-(--chip) bg-(--chip)/15 px-1.5 leading-7 text-bm-text [--chip:var(--color-bm-violet)]",
+        kiosk ? "text-base" : "text-sm",
+      )}
+    >
+      {title}
+    </span>
+  );
+}
+
+/** "+2 more" under a month cell's chips. */
+export function CalendarMore({ count }: { count: number }) {
+  return (
+    <span className="px-1 font-label text-xs font-bold text-bm-muted uppercase">
+      +{count} more
+    </span>
   );
 }

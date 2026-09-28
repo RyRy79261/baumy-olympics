@@ -6,8 +6,9 @@ import type { PixelIconName } from "./pixel/icons";
 
 // Chores presented as bounties (ADR 0005 §2), in the approved prototype's
 // calm rows (proto/kiosk-home-pixel, calm-kit.tsx `BountyRows`): the kind's
-// glyph in its colour, the name with its New and Urgent marks, the kind and
-// the streak, then when it is due and its points. Also the filter tabs above
+// glyph in its colour, the name with its New mark, the kind and the streak,
+// then when it is due (red when urgent: that is the one urgent signal) and
+// its points. Also the filter tabs above
 // a list and the status tiles (Urgent, New, Messages) of the hub's top row.
 // One accent, one meaning (ADR 0005 §8): amber is consumable, teal is
 // maintenance, red is urgent, yellow is new or points, pink is messages.
@@ -77,7 +78,10 @@ export interface BountyFields {
   streak: ReactNode;
   /** E.g. "Due since Wed 30 Sep, 08:00", or "Again from …". */
   status: ReactNode;
-  /** Due now or before Berlin midnight: the status reads red. */
+  /**
+   * Due now or before Berlin midnight: the status line reads red, the one
+   * urgent signal (no separate mark, ADR 0005 §8).
+   */
   urgent?: boolean;
   /** Added in the last 3 days. */
   isNew?: boolean;
@@ -94,8 +98,7 @@ function BountyFace({
   urgent = false,
   isNew = false,
   kiosk,
-  urgentTag,
-}: BountyFields & { kiosk: boolean; urgentTag: boolean }) {
+}: BountyFields & { kiosk: boolean }) {
   return (
     <>
       <BountyGlyph
@@ -119,16 +122,17 @@ function BountyFace({
               New
             </span>
           ) : null}
-          {urgent && urgentTag ? (
-            <span className="font-label text-xs font-bold text-bm-red uppercase">
-              Urgent
-            </span>
-          ) : null}
         </span>
-        <span className="line-clamp-2 font-label text-xs [overflow-wrap:anywhere] uppercase sm:line-clamp-1 sm:text-sm">
-          <span className={KIND_TEXT[kind]}>{BOUNTY_KIND_LABEL[kind]}</span>
-          <span className="text-bm-dim"> · </span>
-          <span className="text-bm-muted">{streak}</span>
+        {/* Two phrases that each stay whole: on a phone the streak drops to
+            its own line rather than breaking mid-phrase. */}
+        <span className="flex min-w-0 flex-wrap gap-x-2 font-label text-xs uppercase sm:flex-nowrap sm:text-sm">
+          <span className={cx("whitespace-nowrap", KIND_TEXT[kind])}>
+            {BOUNTY_KIND_LABEL[kind]}
+          </span>
+          <span className="max-w-full min-w-0 truncate text-bm-muted">
+            <span className="text-bm-dim max-sm:hidden">· </span>
+            {streak}
+          </span>
         </span>
         <span
           data-bounty-status
@@ -198,7 +202,6 @@ export function BountyRow({
       <BountyFace
         {...{ name, sprite, kind, points, streak, status, urgent, isNew }}
         kiosk={kiosk}
-        urgentTag
       />
       {/* Only for the eye: the row itself is the button. */}
       <span
@@ -218,7 +221,7 @@ export function BountyRow({
 
 /**
  * One bounty as a line in a widget, not a button: the hub's urgent list,
- * which needs no Urgent mark (`urgent` reddens the status line only).
+ * where `urgent` reddens the status line as it does on the board.
  */
 export function BountySummary({
   name,
@@ -242,7 +245,6 @@ export function BountySummary({
       <BountyFace
         {...{ name, sprite, kind, points, streak, status, urgent, isNew }}
         kiosk={false}
-        urgentTag={false}
       />
     </li>
   );
@@ -347,6 +349,8 @@ export function statusTileClass(active: boolean): string {
 /**
  * What a status tile shows (ADR 0005 §1): its 16-bit icon, its label and a
  * count badge in its accent; at zero the icon goes dim and the badge goes.
+ * A null count is one that could not be read: no badge, and a quiet
+ * "Unavailable" instead of a zero that would look like a real one.
  */
 export function StatusTileFace({
   icon,
@@ -356,10 +360,10 @@ export function StatusTileFace({
 }: {
   icon: PixelIconName;
   label: string;
-  count: number;
+  count: number | null;
   accent: TabAccent;
 }) {
-  const active = count > 0;
+  const active = count !== null && count > 0;
   return (
     <>
       <PixelIcon name={icon} scale={3} dim={!active} />
@@ -371,6 +375,11 @@ export function StatusTileFace({
       >
         {label}
       </span>
+      {count === null ? (
+        <span data-unavailable className="font-label text-xs text-bm-dim">
+          Unavailable
+        </span>
+      ) : null}
       {active ? (
         <span
           data-count

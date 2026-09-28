@@ -1,9 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  CalendarChip,
   CalendarDayCell,
   CalendarEventButton,
   CalendarGrid,
+  CalendarMore,
 } from "../calendar";
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
@@ -86,5 +88,21 @@ describe("CalendarEventButton", () => {
     );
     expect(ryan).toContain("--chip:#3b82c4");
     expect(ryan).toContain("width:10px");
+  });
+});
+
+describe("CalendarChip and CalendarMore", () => {
+  it("is one line in the event's colour, not a button", () => {
+    const out = html(
+      <CalendarChip title="Recycling pickup" accent="#3b82c4" />,
+    );
+    expect(out).not.toContain("<button");
+    expect(out).toContain("truncate");
+    expect(out).toContain("--chip:#3b82c4");
+    expect(out).toContain("text-sm");
+    const kiosk = html(<CalendarChip title="Yoga" kiosk />);
+    expect(kiosk).toContain("text-base");
+    expect(kiosk).not.toContain("style=");
+    expect(html(<CalendarMore count={2} />)).toContain("+2 more");
   });
 });
