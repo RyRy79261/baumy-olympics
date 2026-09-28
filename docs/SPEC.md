@@ -48,6 +48,7 @@ Details settled while building it (added 2026-09-27, issue #20):
 - The shopping list is an empty slot until issue #26. [CORRECTION 2026-09-27] issue #26: the widget is brain's list (§3.4), read with `list_shopping` (a `display` read). [CORRECTION 2026-09-27] issue #21: the Baumy button opens the Baumy sheet (§3.6); speech is issue #22.
 - The kiosk home reads as the paired device whether or not anyone has tapped their avatar: a new gate, `display` (`requireDisplay`), lets a kiosk actor with no member picked run **reads offered on the kiosk**; everyone else is held to `requireMember`, and writes always need a member. `list_events`, `list_chores` (its `next` preview is null then), `get_standings`, `get_pot` and `list_notes` use it.
 - The chore grid, "Needs your OK" and "Check my PIN" moved from `/kiosk` to `/kiosk/chores`; notes are at `/notes` and `/kiosk/notes`.
+- [CORRECTION 2026-09-28] issue #67: `/` has its own layout (`components/hub/hub-home.tsx`), a scrolling page in the kitchen screen's look. On top are the clock and three status tiles, Urgent, New and Messages. Each tile has a count, goes dim at zero and links to its slice: `/chores?show=urgent`, `/chores?show=new` and `/notes`. A tile whose read failed shows no badge and says "Unavailable", never a zero. Under them, the urgent bounties (at most 6, then "+N more urgent") and today's agenda sit in the wide column; the standings with the pot, the pinned notes ("Board") and the shopping list sit in the narrow one. Messages counts the live notes that were added, or had their title, body or colour edited, in the last 24 hours, across all notes. Pinning and unpinning do not count. `list_notes` returns this count as `recentCount` (the new `notes.edited_at` column, migration 0013; older notes count from `created_at`). `loadHub` returns the three counts as `counts`, and a count is null when its read failed. From `lg` up, the page keeps clear of the corner where Baumy's button sits. The hub nav calls chores **Bounties** and notes the **Board**, and so do those pages' titles, on the hub and on the kiosk. The routes stay `/chores` and `/notes`.
 
 ### 3.2 Chores game
 
@@ -62,9 +63,13 @@ This covers:
 
 Section 4 has the full rules.
 
+[CORRECTION 2026-09-28] issue #67: the board at `/chores` and `/kiosk/chores` lists bounties as rows, as in the approved prototype. Each row shows the kind's glyph in the kind's colour (amber for consumable, teal for maintenance), a New mark, the kind, the streak holder, when the bounty falls due and its points. Urgency is shown once, by the status line turning red; there is no separate Urgent mark. Starter chores show New for their first 3 days (owner ruling). Urgent bounties come first. One row of tabs narrows the board to All, Urgent, New, Consumables or Maintenance, and each tab shows its count. `?show=` picks the starting tab, and choosing a tab updates `?show=` with `replaceState` (`sortBounties`, `filterBounties`, `parseBountyFilter` in `lib/chores/view.ts`).
+
 ### 3.3 Shared calendar
 
 This is a house Google Calendar (which one is still open, section 12), shared with a **new service account created just for this house** (not camp-404's) that has "Make changes to events" access. You can list events for a day, week or month, create events (all-day or timed), edit them and delete them. The house's calendar data lives only in Google, and we store no local copy.
+
+[CORRECTION 2026-09-28] issue #67: the board follows the prototype's month grid. The title sits between the ◀ and ▶ buttons, with Today at the end. From `sm` up, a month cell shows only the day's number. Each event chip, and each bar in the hub's agenda, takes the colour of the member who added the event. Everything else (added in Google, or by a former member) is the house's neutral grey, because amber means consumable (`eventAccent`). Only a `#rrggbb` colour is ever written into a style. On a phone, the month view is an agenda instead of a grid (`agendaDays`): today comes first, then only the later days that have events. Another month lists every day of it that has events. On the kitchen screen, a month cell shows one-line chips, up to 3, then "+N more". The whole cell is a single 56px link that opens that day, where each event is a button.
 
 ### 3.4 Shopping list
 

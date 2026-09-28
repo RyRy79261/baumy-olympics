@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  HOUSE_EVENT_ACCENT,
+  agendaDays,
+  eventAccent,
   eventView,
   eventsOnDay,
   isOnDay,
@@ -178,6 +181,87 @@ describe("parseViewParams", () => {
       "Day",
       "Week",
       "Month",
+    ]);
+  });
+});
+
+describe("eventAccent", () => {
+  const colors = { ryan: "#3b82c4", odd: "red; background: url(x)" };
+  it("is the adding member's colour, else the house's", () => {
+    expect(eventAccent({ addedBy: "ryan" }, colors)).toBe("#3b82c4");
+    expect(eventAccent({ addedBy: null }, colors)).toBe(HOUSE_EVENT_ACCENT);
+    expect(eventAccent({ addedBy: "gone" }, colors)).toBe(HOUSE_EVENT_ACCENT);
+  });
+  it("never puts anything but #rrggbb into a style", () => {
+    expect(eventAccent({ addedBy: "odd" }, colors)).toBe(HOUSE_EVENT_ACCENT);
+  });
+});
+
+describe("agendaDays", () => {
+  const jan = viewRange("month", "2027-01-10");
+  // Fri 15 Jan (19:00) and an all-day Thu 28 Jan; one on 28 Dec, outside
+  // the month but on the grid's first row.
+  const events = [
+    eventView(timed),
+    eventView({
+      ...timed,
+      id: "e2",
+      allDay: true,
+      start: "2027-01-28",
+      end: "2027-01-29",
+    }),
+    eventView({
+      ...timed,
+      id: "e3",
+      allDay: true,
+      start: "2026-12-28",
+      end: "2026-12-29",
+    }),
+  ];
+
+  it("puts today first, then only the later days with events", () => {
+    expect(agendaDays(jan, events, "2027-01-10")).toEqual([
+      "2027-01-10",
+      "2027-01-15",
+      "2027-01-28",
+    ]);
+    // A day with events before today is gone; today stays even when empty.
+    expect(agendaDays(jan, events, "2027-01-20")).toEqual([
+      "2027-01-20",
+      "2027-01-28",
+    ]);
+  });
+
+  it("lists every day with events for another month, and nothing when there are none", () => {
+    expect(agendaDays(jan, events, "2026-12-01")).toEqual([
+      "2027-01-15",
+      "2027-01-28",
+    ]);
+    expect(agendaDays(jan, [], "2026-12-01")).toEqual([]);
+  });
+
+  it("takes in the next month's days that close the grid, not the last month's", () => {
+    // September 2026's grid runs Mon 31 Aug to Sun 4 Oct.
+    const sep = viewRange("month", "2026-09-10");
+    const on = (id: string, day: string, next: string) =>
+      eventView({ ...timed, id, allDay: true, start: day, end: next });
+    const around = [
+      on("aug", "2026-08-31", "2026-09-01"),
+      on("oct", "2026-10-02", "2026-10-03"),
+      on("late", "2026-10-06", "2026-10-07"),
+    ];
+    expect(agendaDays(sep, around, "2026-09-28")).toEqual([
+      "2026-09-28",
+      "2026-10-02",
+    ]);
+    expect(agendaDays(sep, around, "2026-01-01")).toEqual(["2026-10-02"]);
+  });
+
+  it("keeps a week's days when there is no month", () => {
+    const week = viewRange("week", "2027-01-15");
+    expect(agendaDays(week, events, "2027-01-11")).toEqual([
+      "2027-01-11",
+      "2027-01-15",
     ]);
   });
 });

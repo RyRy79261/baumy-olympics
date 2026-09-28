@@ -67,6 +67,17 @@ test("add, edit and delete an event on /calendar", async ({
   await page.getByRole("link", { name: "Month" }).click();
   await expect(page.getByTestId("calendar-title")).toHaveText("Jan 2027");
   await expect(eventButton(page, title)).toBeVisible();
+  if (project === "mobile-360") {
+    // On a phone the month is an agenda of the days with events, not 35
+    // stacked boxes.
+    const agenda = page.getByTestId("month-agenda");
+    await expect(agenda.getByTestId("agenda-2027-01-15")).toBeVisible();
+    await expect(eventButton(agenda, title)).toBeVisible();
+    await expect(page.getByTestId("day-2027-01-15")).toBeHidden();
+  } else {
+    await expect(page.getByTestId("day-2027-01-15")).toBeVisible();
+    await expect(page.getByTestId("month-agenda")).toBeHidden();
+  }
 
   // Edit: a new title and a later start.
   await eventButton(page, title).click();
@@ -138,6 +149,22 @@ test("on the kiosk, 19:00 in January and in July both stay 19:00", async ({
     await sheet.getByLabel("Ends").fill("20:00");
     await sheet.getByRole("button", { name: "Add event" }).click();
     await expect(sheet).toBeHidden();
+    await expect(eventButton(kiosk, title)).toContainText("19:00");
+
+    // The kiosk's month (the prototype's): each day is one big target that
+    // opens it, and its events are one-line chips, not buttons.
+    await kiosk.goto(`/kiosk/calendar?view=month&date=${date}`);
+    const cell = kiosk.getByTestId(`day-${date}`);
+    const open = cell.getByRole("link", {
+      name: new RegExp(`^${label}: \\d+ events?$`),
+    });
+    await expect(open).toBeVisible();
+    const box = (await open.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(56);
+    expect(box.height).toBeGreaterThanOrEqual(56);
+    await expect(eventButton(cell, title)).toHaveCount(0);
+    await open.click();
+    await expect(kiosk).toHaveURL(new RegExp(`view=day&date=${date}$`));
     await expect(eventButton(kiosk, title)).toContainText("19:00");
 
     // The phone reads it back from the calendar at 19:00 too, added by the

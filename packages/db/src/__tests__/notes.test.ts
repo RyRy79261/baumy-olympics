@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import {
+  countNotesEditedSince,
   findNote,
   insertNote,
   listNotes,
@@ -204,5 +205,53 @@ describe("softDeleteNote", () => {
     expect(
       await softDeleteNote(db(), { householdId: HOUSEHOLD_ID, id, now: at(2) }),
     ).toBeNull();
+  });
+});
+
+describe("countNotesEditedSince", () => {
+  const since = (min: number) =>
+    countNotesEditedSince(db(), { householdId: HOUSEHOLD_ID, since: at(min) });
+
+  it("counts notes added or edited after the moment, not pinned ones", async () => {
+    const old = await add("Old", { now: at(-60) });
+    const pinnedLater = await add("Pinned later", { now: at(-60) });
+    await add("New", { now: at(5) });
+    expect(await since(0)).toBe(1);
+
+    // Pinning (or unpinning) is not an edit.
+    await setNotePinned(db(), {
+      householdId: HOUSEHOLD_ID,
+      id: pinnedLater,
+      pinned: true,
+      now: at(10),
+    });
+    expect(await since(0)).toBe(1);
+
+    // Editing its words is.
+    await updateNote(db(), {
+      householdId: HOUSEHOLD_ID,
+      id: old,
+      title: "Old, edited",
+      bodyMd: "",
+      color: null,
+      now: at(10),
+    });
+    expect(await since(0)).toBe(2);
+
+    // A deleted note never counts.
+    await softDeleteNote(db(), {
+      householdId: HOUSEHOLD_ID,
+      id: old,
+      now: at(11),
+    });
+    expect(await since(0)).toBe(1);
+    expect(await since(-120)).toBe(2);
+  });
+
+  it("counts a note from before edited_at from when it was created", async () => {
+    const id = await add("Legacy", { now: at(5) });
+    await t.db().update(notes).set({ editedAt: null }).where(eq(notes.id, id));
+    expect(await since(0)).toBe(1);
+    expect(await since(10)).toBe(0);
   });
 });
