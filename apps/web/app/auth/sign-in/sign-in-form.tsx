@@ -16,14 +16,21 @@ import {
   signInErrorSentence,
   SOMETHING_WENT_WRONG,
 } from "../messages";
+import { BaumyApproval } from "./baumy-approval";
 
-/** Email and password sign-in, plus Google when this deployment has its keys. */
+/**
+ * Email and password sign-in, plus Google when this deployment has its keys,
+ * and "Sign in with Baumy" (a Telegram tap, issue #80) when brain is set up.
+ */
 export function SignInForm({
   googleEnabled,
+  baumyEnabled = false,
   oauthFailed = false,
   callbackURL = "/",
 }: {
   googleEnabled: boolean;
+  /** Brain can DM an approval here (lib/integrations/brain.ts). */
+  baumyEnabled?: boolean;
   /** Landed here from a failed Google round trip (`?error=`). */
   oauthFailed?: boolean;
   /** Where to go once signed in: a path on this site (safeCallbackUrl). */
@@ -35,6 +42,7 @@ export function SignInForm({
     oauthFailed ? OAUTH_FAILED : null,
   );
   const [pending, setPending] = useState(false);
+  const [withBaumy, setWithBaumy] = useState(false);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -67,6 +75,19 @@ export function SignInForm({
       setError(SOMETHING_WENT_WRONG);
       setPending(false);
     }
+  }
+
+  if (withBaumy) {
+    return (
+      <div className="flex flex-col gap-4">
+        <PageHeading title="Sign in with Baumy" />
+        <BaumyApproval
+          initialEmail={email}
+          callbackURL={callbackURL}
+          onCancel={() => setWithBaumy(false)}
+        />
+      </div>
+    );
   }
 
   return (
@@ -105,6 +126,18 @@ export function SignInForm({
       {googleEnabled ? (
         <Button variant="secondary" onClick={google} disabled={pending}>
           Continue with Google
+        </Button>
+      ) : null}
+      {baumyEnabled ? (
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setError(null);
+            setWithBaumy(true);
+          }}
+          disabled={pending}
+        >
+          Sign in with Baumy
         </Button>
       ) : null}
       <p>
