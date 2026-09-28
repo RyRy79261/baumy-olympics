@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AUTH_COOKIE_PREFIX } from "@baumy/auth/env";
@@ -61,6 +63,26 @@ describe("PrivacyPage", () => {
     }
     expect(out).toContain(`${PHOTO_RETENTION_DAYS} days after their`);
     expect(out).toContain("no analytics");
+  });
+
+  it("says what the audit log keeps and where the code runs", () => {
+    expect(out).toContain("a copy of what was entered");
+    expect(out).toContain("including the audit log");
+    expect(out).toContain("title, times, place, description");
+    expect(out).toContain("server code runs in Frankfurt (fra1)");
+    expect(out).toContain("Vercel Blob in Frankfurt (fra1)");
+    expect(out).not.toContain("processed in the EU");
+    expect(out).toContain("the calendar, the pot");
+    expect(out).toContain("change its colour and avatar");
+    expect(out).toContain("US");
+    // The page's Frankfurt claim holds only while Vercel pins the functions.
+    const vercel = JSON.parse(
+      readFileSync(
+        path.resolve(import.meta.dirname, "../../vercel.json"),
+        "utf8",
+      ),
+    ) as { regions?: string[] };
+    expect(vercel.regions).toEqual(["fra1"]);
   });
 
   it("gives no email address to write to", () => {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AUTH_COOKIE_PREFIX, AUTH_SESSION } from "@baumy/auth/env";
 import { PHOTO_RETENTION_DAYS } from "@baumy/core";
+import { RATE_LIMIT_ROW_HORIZON_MS } from "@baumy/db/rate-limit";
 import { linkClass } from "@baumy/ui";
 import {
   LegalPage,
@@ -18,7 +19,7 @@ import {
 
 // Public (issue #82): outside the (hub) gate, no session read. Every sentence
 // here describes what the code does; change the words in the same PR as the
-// behaviour, and move PRIVACY_UPDATED with them. The cookie names and the
+// behaviour, and move PRIVACY_UPDATED with them (issue #87 corrected it). The cookie names and the
 // numbers come from the constants the code uses, so they cannot drift.
 
 const DAY_S = 24 * 60 * 60;
@@ -26,6 +27,7 @@ const SESSION_DAYS = AUTH_SESSION.expiresInSeconds / DAY_S;
 const SESSION_CACHE_MIN = AUTH_SESSION.cookieCacheMaxAgeSeconds / 60;
 const KIOSK_YEARS = Math.round(KIOSK_COOKIE_MAX_AGE_S / (365 * DAY_S));
 const KIOSK_MEMBER_MIN = KIOSK_MEMBER_MAX_AGE_S / 60;
+const RATE_LIMIT_DAYS = RATE_LIMIT_ROW_HORIZON_MS / (DAY_S * 1000);
 
 export const metadata: Metadata = { title: "Privacy - Baumy Olympics" };
 
@@ -38,9 +40,9 @@ export default function PrivacyPage() {
     >
       <LegalSection title="Who runs this">
         <p>
-          Baumy Olympics (baumy.tech) is a private app for the people who live
-          in one house. The house&apos;s owner runs it for the household. It is
-          not a commercial service: nobody pays for it, and there are no
+          Baumy Olympics (www.baumy.tech) is a private app for the people who
+          live in one house. The house&apos;s owner runs it for the household.
+          It is not a commercial service: nobody pays for it, and there are no
           customers.
         </p>
       </LegalSection>
@@ -91,8 +93,15 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>The audit log:</strong> who changed what, when, from which
-            screen, with the details of the change. Retried requests are
-            remembered so they do not run twice.
+            screen, and a copy of what was entered: for example a note&apos;s
+            text (also after the note is deleted), shopping items, a calendar
+            event&apos;s title, times, place and description, and earlier
+            display names. Passwords and PINs are never in it. Retried requests
+            are remembered, with their result, so they do not run twice.
+          </li>
+          <li>
+            <strong>Rate-limit counters:</strong> to slow down password guessing
+            and abuse, short-lived counters keyed by IP address (and by member).
           </li>
           <li>
             <strong>AI usage counts:</strong> how many Baumy commands and voice
@@ -118,17 +127,25 @@ export default function PrivacyPage() {
             the EU.
           </li>
           <li>
-            The app runs on Vercel. Vercel may handle a request on servers
-            outside the EU.
+            The app runs on Vercel. Its server code runs in Frankfurt (fra1).
+            Vercel&apos;s network in front of it, and its request logs (for
+            example the IP address and page of each request, kept for a short
+            time), are not tied to one region.
           </li>
           <li>
-            Proof photos are stored in Vercel Blob. The store is private: a
-            photo is only shown through the app, to household members and the
-            paired kitchen screen.
+            Proof photos are stored in Vercel Blob in Frankfurt (fra1). The
+            store is private: a photo is only shown through the app, to
+            household members and the paired kitchen screen.
           </li>
           <li>
-            Calendar events live only in the house&apos;s Google Calendar; we
-            keep no copy. The shopping list lives in baumy-brain (below).
+            Calendar events live in the house&apos;s Google Calendar; the app
+            has no calendar of its own, but the audit log keeps what was entered
+            when an event is added or changed through the app. The shopping list
+            lives in baumy-brain (below).
+          </li>
+          <li>
+            Some services below (Google, Anthropic, Groq, Resend) are US
+            companies, so what they receive leaves the EU.
           </li>
         </ul>
       </LegalSection>
@@ -142,8 +159,8 @@ export default function PrivacyPage() {
           <li>
             <strong>Google Calendar:</strong> the house calendar is shared with
             a Google service account made for this house. Events you add or
-            change (title, times, description) go to Google, tagged with your
-            member id so the app can show your colour.
+            change (title, times, place, description) go to Google, tagged with
+            your member id so the app can show your colour.
           </li>
           <li>
             <strong>Anthropic (Claude):</strong> when you ask Baumy something,
@@ -164,12 +181,17 @@ export default function PrivacyPage() {
             email address and that email.
           </li>
           <li>
-            <strong>baumy-brain and Telegram:</strong> the shopping list belongs
-            to baumy-brain, the house&apos;s Telegram bot, which the same owner
-            runs. Items you add or tick off here are sent to it. If you link
-            your Telegram account, we keep your Telegram user id, and the bot
-            can do things in this app for you when you ask it in Telegram.
-            Messages in Telegram also pass through Telegram.
+            <strong>baumy-brain and Telegram:</strong> baumy-brain
+            (brain.baumy.tech) is the house&apos;s Telegram bot, which the same
+            owner runs. The shopping list belongs to it, so items you add or
+            tick off here are sent to it. It can also read the chores, scores,
+            notes, reminders, the calendar, the pot, claims waiting for
+            confirmation and the chore weights, and may post them in the
+            house&apos;s Telegram group. It runs messages through its own calls
+            to Anthropic. If you link your Telegram account, we keep your
+            Telegram user id, and the bot can do things in this app for you when
+            you ask it, or for another housemate after a confirm button.
+            Everything in Telegram also passes through Telegram.
           </li>
           <li>
             <strong>Chatbots you connect:</strong> a chatbot you connect (for
@@ -246,9 +268,14 @@ export default function PrivacyPage() {
           </li>
           <li>Password-reset and confirmation links expire.</li>
           <li>
-            Everything else stays while the household uses the app; nothing else
-            is deleted automatically. A deleted note is hidden everywhere but
-            stays in the database.
+            Rate-limit counters are deleted automatically: the sign-in library
+            clears its own after they expire, and the app&apos;s own go at the
+            latest {RATE_LIMIT_DAYS} days after their last use.
+          </li>
+          <li>
+            Everything else stays while the household uses the app and is not
+            deleted automatically, including the audit log. A deleted note is
+            hidden everywhere but stays in the database.
           </li>
         </ul>
       </LegalSection>
@@ -269,9 +296,13 @@ export default function PrivacyPage() {
             sessions) directly in the database.
           </li>
           <li>
-            Your past chores stay in the season&apos;s score history, because
-            everyone&apos;s scores are rebuilt from it. The admin can rename
-            your member entry so it no longer shows your name.
+            Your member entry stays, because the household&apos;s history points
+            at it: your past chores stay in the season&apos;s score history
+            (everyone&apos;s scores are rebuilt from it), and the audit log
+            keeps its copies, including your earlier names. The admin can rename
+            the entry, change its colour and avatar, and unlink your Telegram
+            account in the app; your PIN hash and your chosen 16-bit character
+            stay on it unless the owner clears them in the database.
           </li>
           <li>
             For a copy of what we hold about you, or anything else removed, ask
