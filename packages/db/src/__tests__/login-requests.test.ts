@@ -5,7 +5,7 @@ import {
   LOGIN_EXCHANGE_GRACE_MS,
   LOGIN_REQUEST_RETENTION_MS,
   LOGIN_REQUEST_TTL_MS,
-  LOGIN_WRONG_CODE_LOCK_MS,
+  LOGIN_DENIAL_LOCK_MS,
   claimApprovedLoginRequest,
   decideLoginRequest,
   findLoginCandidate,
@@ -214,28 +214,30 @@ describe("lockLoginRequest and decideLoginRequest", () => {
 });
 
 describe("isLoginLocked", () => {
-  it("locks for 15 minutes after a wrong number, not after a plain deny", async () => {
+  it("locks for 15 minutes after a Deny or a wrong number, not after an approval", async () => {
     const m = await member();
     const { id } = await request(m.id);
-    await decideLoginRequest(db(), id, {
-      status: "denied",
-      reason: "denied",
-      now: NOW,
-    });
-    expect(await isLoginLocked(db(), m.id, NOW)).toBe(false);
+    await decideLoginRequest(db(), id, { status: "approved", now: NOW });
+    expect(await isLoginLocked(db(), m.id, at(1000))).toBe(false);
 
-    const second = await request(m.id, "second-secret-0123456789abcdefghij");
-    await decideLoginRequest(db(), second.id, {
-      status: "denied",
-      reason: "wrong_code",
-      now: NOW,
-    });
-    expect(await isLoginLocked(db(), m.id, at(1000))).toBe(true);
-    expect(await isLoginLocked(db(), m.id, at(LOGIN_WRONG_CODE_LOCK_MS))).toBe(
-      false,
-    );
-    const other = await member();
-    expect(await isLoginLocked(db(), other.id, at(1000))).toBe(false);
+    for (const reason of ["denied", "wrong_code"] as const) {
+      const other = await member();
+      const r = await request(
+        other.id,
+        `${reason}-secret-0123456789abcdefghij`,
+      );
+      await decideLoginRequest(db(), r.id, {
+        status: "denied",
+        reason,
+        now: NOW,
+      });
+      expect(await isLoginLocked(db(), other.id, at(1000))).toBe(true);
+      expect(
+        await isLoginLocked(db(), other.id, at(LOGIN_DENIAL_LOCK_MS)),
+      ).toBe(false);
+    }
+    const stranger = await member();
+    expect(await isLoginLocked(db(), stranger.id, at(1000))).toBe(false);
   });
 });
 
