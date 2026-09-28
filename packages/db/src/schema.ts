@@ -378,12 +378,12 @@ export const loginRequestStatus = pgEnum("login_request_status", [
  *   no member, no Telegram link, locked): the row is still written and the
  *   browser sees the same screen, so the answer never says which.
  * - Only the sha256 of the secret is stored.
- * - `code` is the number on the screen; `choices` is it plus two decoys, in
- *   the order the Telegram buttons show them.
+ * - `code` is the number on the screen; `choices` is it plus four decoys,
+ *   in the order the Telegram buttons show them.
  * - pending → approved → used, or pending → denied (`deny_reason`: `denied`
- *   when the member tapped Deny, `wrong_code` when they tapped a decoy, which
- *   also locks the method for that member for a while). Each step is a
- *   compare-and-set on the status.
+ *   when the member tapped Deny, `wrong_code` when they tapped a decoy).
+ *   Either denial locks the method for that member for 15 minutes. Each step
+ *   is a compare-and-set on the status.
  */
 export const loginRequests = pgTable(
   "login_requests",
@@ -1023,9 +1023,13 @@ export const auditEvents = pgTable(
   "audit_events",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    actorMemberId: uuid("actor_member_id")
-      .notNull()
-      .references(() => members.id),
+    /**
+     * Null only when nobody is signed in to be the actor: "Sign in with
+     * Baumy" asked for a member's approval (`request_login`, issue #80), where
+     * the member is the target (`entity` member) and the requester is
+     * anonymous (its IP and device are in `payload`).
+     */
+    actorMemberId: uuid("actor_member_id").references(() => members.id),
     initiatedByMemberId: uuid("initiated_by_member_id").references(
       () => members.id,
     ),

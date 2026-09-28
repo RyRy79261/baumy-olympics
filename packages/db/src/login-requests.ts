@@ -21,8 +21,11 @@ export const LOGIN_REQUEST_TTL_MS = 2 * 60_000;
  */
 export const LOGIN_EXCHANGE_GRACE_MS = 30_000;
 
-/** A tap on a decoy number switches the method off for that member this long. */
-export const LOGIN_WRONG_CODE_LOCK_MS = 15 * 60_000;
+/**
+ * A denial (Deny, or a decoy number) switches the method off for that member
+ * this long: someone may be pushing sign-ins at them (push fatigue).
+ */
+export const LOGIN_DENIAL_LOCK_MS = 15 * 60_000;
 
 /** How long rows are kept, for the audit trail and the lock above. */
 export const LOGIN_REQUEST_RETENTION_MS = 24 * 60 * 60_000;
@@ -98,8 +101,8 @@ export async function findLoginCandidate(
 }
 
 /**
- * Whether the member tapped a decoy number in the last
- * `LOGIN_WRONG_CODE_LOCK_MS`: someone may be pushing sign-ins at them, so the
+ * Whether the member denied a request (Deny or a decoy number) in the last
+ * `LOGIN_DENIAL_LOCK_MS`: someone may be pushing sign-ins at them, so the
  * method stays off for a while (the password still works).
  */
 export async function isLoginLocked(
@@ -107,7 +110,7 @@ export async function isLoginLocked(
   memberId: string,
   now: Date,
 ): Promise<boolean> {
-  const since = new Date(now.getTime() - LOGIN_WRONG_CODE_LOCK_MS);
+  const since = new Date(now.getTime() - LOGIN_DENIAL_LOCK_MS);
   const [row] = await db
     .select({ id: loginRequests.id })
     .from(loginRequests)
@@ -115,7 +118,6 @@ export async function isLoginLocked(
       and(
         eq(loginRequests.memberId, memberId),
         eq(loginRequests.status, "denied"),
-        eq(loginRequests.denyReason, "wrong_code"),
         gt(loginRequests.decidedAt, since),
       ),
     )
