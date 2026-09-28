@@ -6,7 +6,7 @@ import { LOGIN_CHOICE_COUNT, pickLoginCodes, type RandomInt } from "./codes";
 // The number on the screen and its two decoys (issue #80).
 
 describe("pickLoginCodes", () => {
-  it("gives three distinct two-digit numbers, one of them the code", () => {
+  it("gives five distinct two-digit numbers, one of them the code", () => {
     for (let i = 0; i < 500; i++) {
       const { code, choices } = pickLoginCodes(randomInt);
       expect(choices).toHaveLength(LOGIN_CHOICE_COUNT);
@@ -21,12 +21,12 @@ describe("pickLoginCodes", () => {
   });
 
   it("draws again on a repeat, and lets the draw pick the code's place", () => {
-    const draws = [47, 47, 12, 83, 2];
+    const draws = [47, 47, 12, 83, 30, 65, 2];
     const scripted: RandomInt = () => draws.shift()!;
-    // 47 twice, then 12 and 83; index 2 of the sorted choices.
+    // 47 twice, then 12, 83, 30 and 65; the code is the third drawn (83).
     expect(pickLoginCodes(scripted)).toEqual({
       code: 83,
-      choices: [12, 47, 83],
+      choices: [12, 30, 47, 65, 83],
     });
   });
 

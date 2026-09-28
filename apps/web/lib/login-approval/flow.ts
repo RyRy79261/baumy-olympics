@@ -29,6 +29,7 @@ import { deviceLabel } from "./device";
 // - Browser-bound: the browser gets 32 random bytes in an httpOnly,
 //   SameSite=Strict cookie scoped to these routes; only its sha256 is
 //   stored. Nothing secret ever goes in a URL.
+// - Off unless SIGN_IN_WITH_BAUMY=on (flag.ts): every route is then a 404.
 // - Single use: the exchange claims the approved request with one
 //   `UPDATE … RETURNING`, then Better Auth makes the session.
 
@@ -62,18 +63,27 @@ export interface NewRequest {
   choices: number[];
   device: string;
   now: Date;
-  /** Only for a real candidate: the audit row written with the request. */
-  audit?: { ip: string };
+}
+
+/** The `request_login` audit row: the member is the target, the asker anonymous. */
+export interface RequestAudit {
+  memberId: string;
+  requestId: string;
+  device: string;
+  ip: string;
+  now: Date;
 }
 
 export interface LoginApprovalDeps {
+  /** `SIGN_IN_WITH_BAUMY=on` (flag.ts); off, every route is a 404. */
+  enabled: () => boolean;
   now: () => Date;
   rateLimiter: RateLimiter;
   randomInt: RandomInt;
   randomSecret: () => string;
   findCandidate: (email: string) => Promise<LoginCandidate | null>;
   isLocked: (memberId: string, now: Date) => Promise<boolean>;
-  /** Stores the request (and its audit row) in one transaction. */
+  /** Stores the request, the same way for every address. */
   createRequest: (
     input: NewRequest,
   ) => Promise<{ id: string; expiresAt: Date }>;
@@ -88,6 +98,8 @@ export interface LoginApprovalDeps {
   sendApproval: (
     message: LoginApprovalMessage,
   ) => Promise<BrainResult<{ sent: boolean }>>;
+  /** Writes the `request_login` audit row (after the response). */
+  auditRequest: (row: RequestAudit) => Promise<void>;
   /** Runs `fn` once the response has gone (Next's `after`). */
   afterResponse: (fn: () => Promise<void>) => void;
   /** Better Auth's session for this user: the `Set-Cookie` values. */
@@ -117,6 +129,8 @@ function refusal(
 ): Response {
   return json({ ok: false, code, message, ...extra }, status, headers);
 }
+
+const OFF = () => new Response(null, { status: 404, headers: NO_STORE });
 
 const CLOSED = () =>
   refusal(
@@ -177,6 +191,7 @@ export async function handleStart(
   req: Request,
   deps: LoginApprovalDeps,
 ): Promise<Response> {
+  if (!deps.enabled()) return OFF();
   const crossSite = rejectCrossSite(req);
   if (crossSite) return crossSite;
   if (!deps.authMayServe()) return CLOSED();
@@ -218,11 +233,24 @@ export async function handleStart(
       choices,
       device,
       now,
-      ...(candidate ? { audit: { ip } } : {}),
     });
 
     if (candidate) {
+      // Everything that only a real member costs happens after the response,
+      // so a known address takes no longer to answer than an unknown one.
       deps.afterResponse(async () => {
+        try {
+          await deps.auditRequest({
+            memberId: candidate.memberId,
+            requestId: request.id,
+            device,
+            ip,
+            now,
+          });
+        } catch (err) {
+          // The DM still goes: the member must not lose the sign-in to it.
+          deps.logError("[login-approval] could not audit the request", err);
+        }
         const sent = await deps.sendApproval({
           requestId: request.id,
           telegramUserId: candidate.telegramUserId,
@@ -260,6 +288,7 @@ export async function handleStatus(
   req: Request,
   deps: LoginApprovalDeps,
 ): Promise<Response> {
+  if (!deps.enabled()) return OFF();
   try {
     const secret = readLoginCookie(req);
     const found = secret ? await deps.findBySecret(secret, deps.now()) : null;
@@ -276,6 +305,7 @@ export async function handleExchange(
   req: Request,
   deps: LoginApprovalDeps,
 ): Promise<Response> {
+  if (!deps.enabled()) return OFF();
   const crossSite = rejectCrossSite(req);
   if (crossSite) return crossSite;
   if (!deps.authMayServe()) return CLOSED();

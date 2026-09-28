@@ -61,7 +61,7 @@ async function ryan() {
 }
 
 describe("loginApprovalDeps", () => {
-  it("stores a member's request with its audit row, and a stranger's without", async () => {
+  it("stores requests, and audits one with an anonymous actor and the member as target", async () => {
     const memberId = await ryan();
     const deps = loginApprovalDeps();
     const candidate = await deps.findCandidate("RYAN@example.com");
@@ -82,7 +82,6 @@ describe("loginApprovalDeps", () => {
       ...base,
       memberId,
       secret: SECRET,
-      audit: { ip: "203.0.113.7" },
     });
     await deps.createRequest({
       ...base,
@@ -90,15 +89,28 @@ describe("loginApprovalDeps", () => {
       secret: "D".repeat(43),
     });
     expect(await t.db().select().from(loginRequests)).toHaveLength(2);
+    expect(await t.db().select().from(auditEvents)).toEqual([]);
+    await deps.auditRequest({
+      memberId,
+      requestId: mine.id,
+      device: "Chrome on macOS",
+      ip: "203.0.113.7",
+      now: NOW,
+    });
     const audits = await t.db().select().from(auditEvents);
     expect(audits).toHaveLength(1);
     expect(audits[0]).toMatchObject({
-      actorMemberId: memberId,
+      actorMemberId: null,
       source: "ui",
       action: "request_login",
-      entity: "login_request",
-      entityId: mine.id,
-      payload: { device: "Chrome on macOS", ip: "203.0.113.7" },
+      entity: "member",
+      entityId: memberId,
+      payload: {
+        requestId: mine.id,
+        device: "Chrome on macOS",
+        ip: "203.0.113.7",
+      },
+      at: NOW,
     });
 
     expect(await deps.findBySecret(SECRET, NOW)).toEqual({
@@ -165,6 +177,11 @@ describe("loginApprovalDeps", () => {
       returnHeaders: true,
     });
     expect(deps.authMayServe()).toBe(true);
+    vi.stubEnv("SIGN_IN_WITH_BAUMY", "on");
+    expect(deps.enabled()).toBe(true);
+    vi.stubEnv("SIGN_IN_WITH_BAUMY", "");
+    expect(deps.enabled()).toBe(false);
+    vi.unstubAllEnvs();
     expect(deps.randomSecret()).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const n = deps.randomInt(10, 100);
     expect(n).toBeGreaterThanOrEqual(10);

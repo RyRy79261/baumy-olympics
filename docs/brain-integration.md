@@ -163,12 +163,12 @@ Issue #80, ADR 0006. Someone taps **Sign in with Baumy** on the sign-in page
 number, and Olympics asks brain to DM that member:
 
 ```http
-POST {BRAIN_BASE_URL}/api/kitchen/login-approval
+POST https://brain.baumy.tech/api/kitchen/login-approval
 Authorization: Bearer $KITCHEN_API_TOKEN
 Content-Type: application/json
 
 {"requestId": "<uuid>", "telegramUserId": 123456789, "device": "Safari on iPad",
- "choices": [12, 47, 83], "expiresAt": "2026-09-28T10:02:00.000Z"}
+ "choices": [12, 30, 47, 65, 83], "expiresAt": "2026-09-28T10:02:00.000Z"}
 ```
 
 Brain answers `{ok: true, sent: true}`, or `{ok: true, sent: false}` when
@@ -184,10 +184,12 @@ on anyone's behalf):
 - a number: `approve_login {"requestId": "<uuid>", "code": 47}` with
   `X-Baumy-Confirmed: 1` (the tap is the confirmation) and a fresh
   `Idempotency-Key` per tap. `data.outcome` is `approved` (the page signs
-  in) or `blocked` (a decoy: the request is denied and Sign in with Baumy is
-  off for that member for 15 minutes);
+  in) or `blocked` (a decoy: the request is denied);
 - **Deny**: `deny_login {"requestId": "<uuid>"}`; `data.outcome` is
   `denied`.
+
+After any denial, Sign in with Baumy is off for that member for 15 minutes
+(Olympics simply sends no DM), against push fatigue.
 
 Then edit the DM, dropping the buttons. `NOT_FOUND` (not this member's
 request) and `INVALID_STATE` (expired, or already answered) carry a

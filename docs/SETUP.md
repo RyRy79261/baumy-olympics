@@ -134,6 +134,7 @@ MCP_PUBLIC_URL=
 BRAIN_BASE_URL=
 KITCHEN_API_TOKEN=
 KIOSK_NIGHT_HOURS=
+SIGN_IN_WITH_BAUMY=
 ```
 
 In baumy-brain's `.env.example`, add `KITCHEN_API_TOKEN=`,
@@ -793,6 +794,43 @@ Telegram group. No migration.
   their Telegram id with kitchen writes is a follow-up.
 - [ ] **Look and feel is deferred to issue #7.** The tap-to-check rows are
       neutral placeholders in `packages/ui/src/check-list.tsx`.
+
+## Sign in with Baumy (issue #80)
+
+"Sign in with Baumy" signs a member in by tapping, in a Telegram DM from
+Baumy, the number the sign-in page shows (ADR 0006). It is **off** until you
+switch it on, because it needs the brain side deployed first. Migrations
+0014 and 0015 run on deploy either way.
+
+- [ ] **Merge and deploy the brain side first:** baumy-brain PR
+      RyRy79261/baumy-brain#10 (after #7 and #8). It adds
+      `POST /api/kitchen/login-approval` on the same `KITCHEN_API_TOKEN`, so
+      `BRAIN_BASE_URL` (for example `https://brain.baumy.tech`) and
+      `KITCHEN_API_TOKEN` must already be set here (Shopping list, above).
+- [ ] **Each member presses Start in a DM with Baumy once**, and has their
+      Telegram linked (`/link` or `/admin/members`). Telegram does not let a
+      bot DM someone who never started it; brain then answers `sent: false`
+      and the page simply waits and expires.
+- [ ] **Then switch it on** in this app's Vercel project (Production):
+      `SIGN_IN_WITH_BAUMY=on`, and redeploy. Anything else (unset, `off`,
+      `1`) keeps the button hidden and the three routes answering 404.
+- [ ] **Add this line to `.env.example`** by hand (it is in turbo
+      `globalEnv`):
+
+      ```
+      # "Sign in with Baumy" (issue #80): "on" shows the button and serves
+      # /api/login-approval/*. Turn it on only after baumy-brain PR #10 is
+      # deployed.
+      SIGN_IN_WITH_BAUMY=
+      ```
+
+- [ ] **Check it** on the kitchen iPad: Sign in with Baumy, your email, then
+      tap the same number in Telegram; the iPad signs in. Tap a different
+      number or Deny once: the page says it was denied, and the method is off
+      for you for 15 minutes (your password still works).
+- A session made this way is a browser session: its cookie goes when the
+  browser closes and the server ends it after 24 hours at most, unlike the
+  30 days of a password sign-in.
 
 ## Brain actions endpoint and Telegram linking (issue #27)
 
