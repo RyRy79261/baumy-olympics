@@ -368,6 +368,20 @@ describe("resolvePasskeyScope", () => {
     ).toEqual({ rpID: "baumy.example", origin: ["https://baumy.example"] });
   });
 
+  it("binds production to baumy.tech and accepts only https://www.baumy.tech", () => {
+    // The owner's setup (2026-09-28): the app is www.baumy.tech, the apex
+    // redirects to it, and passkeys belong to the registrable domain.
+    expect(
+      resolvePasskeyScope({
+        VERCEL_ENV: "production",
+        BETTER_AUTH_URL: "https://www.baumy.tech",
+        PASSKEY_RP_ID: "baumy.tech",
+        VERCEL_URL: "baumy-olympics-web-abc123.vercel.app",
+        VERCEL_PROJECT_PRODUCTION_URL: "baumy-olympics-web.vercel.app",
+      }),
+    ).toEqual({ rpID: "baumy.tech", origin: ["https://www.baumy.tech"] });
+  });
+
   it("fails closed on a PASSKEY_RP_ID that does not cover the site", () => {
     for (const rp of [
       "other.example",

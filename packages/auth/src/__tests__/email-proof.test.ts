@@ -517,3 +517,28 @@ describe("the guards' edges", () => {
     expect(db.session).toEqual([]);
   });
 });
+
+describe("passkeys on www.baumy.tech", () => {
+  it("offers baumy.tech as the relying party for both registering and signing in", async () => {
+    auth = makeAuth({
+      BETTER_AUTH_URL: "https://www.baumy.tech",
+      PASSKEY_RP_ID: "baumy.tech",
+    });
+    const { cookie, userId } = await signUp("owner@example.com");
+    userRow(userId).emailVerified = true;
+
+    const register = await call("/passkey/generate-register-options", {
+      cookie,
+    });
+    expect(register.status).toBe(200);
+    await expect(register.json()).resolves.toMatchObject({
+      rp: { id: "baumy.tech", name: "Baumy Olympics" },
+    });
+
+    const signIn = await call("/passkey/generate-authenticate-options");
+    expect(signIn.status).toBe(200);
+    await expect(signIn.json()).resolves.toMatchObject({
+      rpId: "baumy.tech",
+    });
+  });
+});
