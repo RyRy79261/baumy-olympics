@@ -13,3 +13,14 @@ export const PIN_PROMPT_CODES: ReadonlySet<string> = new Set([
   "ATTESTATION_FAILED",
   "RATE_LIMITED",
 ]);
+
+/** How long the screen waits, untouched, by day before the raccoon
+ * screensaver comes on (ADR 0005 §6). */
+export const SCREENSAVER_IDLE_MS = 5 * 60_000;
+
+/**
+ * How often the kitchen screen asks whether a reminder was posted, away from
+ * the home page (whose own 60-second refresh brings reminders with it) and
+ * while awake.
+ */
+export const REMINDER_POLL_MS = 60_000;

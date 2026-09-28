@@ -67,7 +67,11 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
           <HubMenu
             label={
               <>
-                <Housemate memberId={me.memberId} scale={1} />
+                <Housemate
+                  memberId={me.memberId}
+                  avatar={me.avatar}
+                  scale={1}
+                />
                 {/* On a phone only the character shows; the name is still
                     the button's accessible name. */}
                 <span
