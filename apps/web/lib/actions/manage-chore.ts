@@ -8,6 +8,7 @@ import {
 } from "@baumy/db/chores";
 import {
   BasePoints,
+  ChoreIcon,
   ChoreKind,
   ChoreName,
   ConfirmMode,
@@ -45,13 +46,16 @@ const input = z.discriminatedUnion(
       proofMode: ProofMode.default("none"),
       confirmMode: ConfirmMode.default("optimistic"),
       effortFactorPct: EffortFactorPct.default(100),
+      // Without one, the chore's sprite is its name's slug (spriteFor).
+      sprite: ChoreIcon.optional(),
     }),
-    // A kind left out is kept as it is.
+    // A kind or an icon left out is kept as it is.
     z.strictObject({
       op: z.literal("update"),
       choreId,
       ...settings,
       kind: ChoreKind.optional(),
+      sprite: ChoreIcon.optional(),
     }),
     z.strictObject({ op: z.literal("archive"), choreId }),
     z.strictObject({ op: z.literal("restore"), choreId }),
@@ -87,7 +91,7 @@ export const manageChore = defineAction({
   name: "manage_chore",
   title: "Manage chores",
   description:
-    "Creates a household chore, edits its name, kind (consumable or maintenance), points, cooldown, proof mode, confirm mode and effort factor, or archives or restores it.",
+    "Creates a household chore, edits its name, kind (consumable or maintenance), icon, points, cooldown, proof mode, confirm mode and effort factor, or archives or restores it.",
   consent: "Manage the household's chores",
   kind: "write",
   risk: "confirm",
@@ -109,7 +113,7 @@ export const manageChore = defineAction({
         householdId: ctx.householdId,
         name: change.name,
         kind: change.kind,
-        sprite: spriteFor(change.name),
+        sprite: change.sprite ?? spriteFor(change.name),
         proofMode: change.proofMode,
         confirmMode: change.confirmMode,
         effortFactorPct: change.effortFactorPct,
@@ -151,6 +155,7 @@ export const manageChore = defineAction({
         settings: {
           name: change.name,
           ...(change.kind ? { kind: change.kind } : {}),
+          ...(change.sprite ? { sprite: change.sprite } : {}),
           proofMode: change.proofMode,
           confirmMode: change.confirmMode,
           effortFactorPct: change.effortFactorPct,
