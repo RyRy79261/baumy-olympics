@@ -800,6 +800,52 @@ describe("Google sign-in never links itself", () => {
     expect(userRow(userId).emailVerified).toBe(false);
   });
 
+  it("confirms nothing when the verified Google address is not the account's own", async () => {
+    // Better Auth refuses such a link itself (email_doesn't_match), so the
+    // hook is called directly: it is the second lock.
+    const updateUser = vi.fn(async () => null);
+    const ctx = {
+      internalAdapter: {
+        findUserById: async () => ({
+          id: "u1",
+          email: "owner@example.com",
+          emailVerified: false,
+        }),
+        updateUser,
+      },
+    };
+    const after = (
+      newWayInNotices({}).init(ctx as never) as {
+        options: {
+          databaseHooks: {
+            account: {
+              create: { after: (a: Record<string, unknown>) => Promise<void> };
+            };
+          };
+        };
+      }
+    ).options.databaseHooks.account.create.after;
+    const b64 = (v: unknown) =>
+      Buffer.from(JSON.stringify(v)).toString("base64url");
+    const token = (email: string) =>
+      `${b64({ alg: "RS256" })}.${b64({ email, email_verified: true })}.sig`;
+
+    await after({
+      providerId: "google",
+      userId: "u1",
+      idToken: token("someone-else@example.com"),
+    });
+    expect(updateUser).not.toHaveBeenCalled();
+
+    // The control: the account's own address is confirmed.
+    await after({
+      providerId: "google",
+      userId: "u1",
+      idToken: token("Owner@Example.com"),
+    });
+    expect(updateUser).toHaveBeenCalledWith("u1", { emailVerified: true });
+  });
+
   it("signs in once the owner has linked Google", async () => {
     auth = makeAuth(GOOGLE);
     const { userId } = await signUp("owner@example.com");

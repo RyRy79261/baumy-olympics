@@ -1,6 +1,8 @@
 // The sentences the auth forms show. Kept apart from the forms so they can be
 // tested without a browser.
 
+import { DEVICE_SIGNED_OUT } from "@baumy/auth/env";
+
 /**
  * The only thing a refused sign-in ever says, whatever Better Auth answered.
  * It never says which half was wrong, so the form cannot be used to find out
@@ -104,6 +106,11 @@ export function passkeyErrorSentence(error: AuthError & { message?: string }) {
   }
   if (error.code === "EMAIL_NOT_VERIFIED") {
     return "Confirm your email first. Passkeys and two-factor are for an address you've proven is yours.";
+  }
+  if (error.code === "SESSION_REVOKED") {
+    // This device was signed out elsewhere (the email-proof guard in
+    // @baumy/auth), so the passkey was not added.
+    return DEVICE_SIGNED_OUT;
   }
   if (error.code === "SESSION_NOT_FRESH") {
     return "For your safety, sign out and in again, then add the passkey within a day.";
