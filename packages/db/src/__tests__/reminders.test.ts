@@ -109,8 +109,20 @@ describe("listActiveReminders", () => {
       HOUSEHOLD_ID,
     );
     expect(people).toEqual([
-      { id: ryan, displayName: "Ryan", color: "#112233", avatar: null },
-      { id: jo, displayName: "Jo", color: "#112233", avatar },
+      {
+        id: ryan,
+        displayName: "Ryan",
+        color: "#112233",
+        avatar: null,
+        createdAt: at(-60),
+      },
+      {
+        id: jo,
+        displayName: "Jo",
+        color: "#112233",
+        avatar,
+        createdAt: at(-30),
+      },
     ]);
     expect(none).toEqual([]);
   });
@@ -142,13 +154,13 @@ describe("listActiveReminders", () => {
     expect(
       (await listActiveReminders(db(), HOUSEHOLD_ID)).reminders,
     ).toHaveLength(0);
-    const sam = await member("Sam");
+    const sam = await member("Sam", { createdAt: at(10) });
     // Sam is on the screen, but the finished reminder does not come back.
     const after = await listActiveReminders(db(), HOUSEHOLD_ID);
     expect(after.members.map((m) => m.id)).toContain(sam);
     expect(after.reminders).toEqual([]);
-    // A reminder posted now waits for Sam too.
-    const next = await add("Bins");
+    // A reminder posted after Sam joined waits for Sam too.
+    const next = await add("Bins", at(20));
     await ack(next, ryan);
     await ack(next, jo);
     expect(
@@ -189,6 +201,56 @@ describe("listActiveReminders", () => {
     ).toHaveLength(0);
   });
 
+  it("does not bring back a reminder left by someone who went, when someone new joins", async () => {
+    const id = await add("Boiler");
+    await ack(id, ryan);
+    // Jo leaves without seeing it: nobody is waiting, so it drops off.
+    await t
+      .db()
+      .update(members)
+      .set({ deactivatedAt: at(1) })
+      .where(eq(members.id, jo));
+    expect(
+      (await listActiveReminders(db(), HOUSEHOLD_ID)).reminders,
+    ).toHaveLength(0);
+    // Months later Sam joins: the stale reminder does not wait for Sam.
+    const sam = await member("Sam", { createdAt: at(60 * 24 * 90) });
+    const after = await listActiveReminders(db(), HOUSEHOLD_ID);
+    expect(after.members.map((m) => m.id)).toEqual([ryan, sam]);
+    expect(after.reminders).toEqual([]);
+  });
+
+  it("completes on the last ack of those who were there, not waiting for a newcomer", async () => {
+    const id = await add("Boiler");
+    await member("Sam", { createdAt: at(10) });
+    expect(await ack(id, ryan, at(11))).toEqual({ seenByEveryone: false });
+    expect(await ack(id, jo, at(12))).toEqual({ seenByEveryone: true });
+    const [row] = await t
+      .db()
+      .select({ completedAt: reminders.completedAt })
+      .from(reminders);
+    expect(row!.completedAt).toEqual(at(12));
+  });
+
+  it("brings a reminder back when a member who never saw it is reactivated", async () => {
+    const id = await add("Boiler");
+    await ack(id, ryan);
+    const leave = (deactivatedAt: Date | null) =>
+      t.db().update(members).set({ deactivatedAt }).where(eq(members.id, jo));
+    await leave(at(1));
+    expect(
+      (await listActiveReminders(db(), HOUSEHOLD_ID)).reminders,
+    ).toHaveLength(0);
+    // Jo had joined before it was posted and never saw it, and nobody
+    // completed it, so it is Jo's to see on coming back.
+    await leave(null);
+    expect(
+      (await listActiveReminders(db(), HOUSEHOLD_ID)).reminders.map(
+        (r) => r.id,
+      ),
+    ).toEqual([id]);
+  });
+
   it("leaves out dismissed reminders", async () => {
     const id = await add("Boiler");
     await add("Bins");
@@ -219,7 +281,7 @@ describe("acknowledgeReminder", () => {
     const id = await add("Boiler");
     await ack(id, ryan, at(1));
     await ack(id, jo, at(2));
-    const sam = await member("Sam");
+    const sam = await member("Sam", { createdAt: at(-1) });
     expect(await ack(id, sam, at(3))).toEqual({ seenByEveryone: true });
     const [row] = await t
       .db()

@@ -45,6 +45,8 @@ beforeAll(async () => {
         displayName,
         avatarSprite: "cat",
         color: "#112233",
+        // Joined before the reminder is posted, so it waits for both.
+        createdAt: new Date(NOW.getTime() - 60_000),
       })),
     )
     .returning({ id: schema.members.id });

@@ -258,6 +258,21 @@ describe("list_reminders", () => {
     });
   });
 
+  it("does not wait for someone who joined after it was posted", async () => {
+    const id = await post("Boiler");
+    const sam = await seedMember(db(), {
+      displayName: "Sam",
+      createdAt: at(5),
+    });
+    const listed = await list();
+    expect(listed.members.map((m) => m.id)).toEqual([ryan, jo, sam]);
+    expect(listed.reminders[0]).toMatchObject({
+      id,
+      seenBy: [],
+      waitingFor: [ryan, jo],
+    });
+  });
+
   it("does not bring back a reminder everyone saw when someone joins", async () => {
     const id = await post("Boiler");
     ok(await runAction("acknowledge_reminder", { reminderId: id }, as(ryan)));
