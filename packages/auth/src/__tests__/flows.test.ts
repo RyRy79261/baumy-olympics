@@ -15,6 +15,8 @@ import {
 import { createAuth, type Auth } from "../config";
 import type { CapturedAuthEmail } from "../email";
 import { PASSWORD_MIN_LENGTH } from "../password";
+import { hashAccountPassword } from "../index";
+import { totpFromUri } from "./_totp";
 
 // The real Better Auth instance, built by createAuth, against real Postgres
 // (PGlite, with the committed migrations replayed). Requests go through
@@ -213,5 +215,60 @@ describe("Better Auth against Postgres", () => {
       'select email from "user"',
     );
     expect(rows.rows.map((r) => r.email)).toEqual([email]);
+  });
+});
+
+describe("account security against Postgres (issue #79)", () => {
+  it("stores a two-factor enrolment in two_factor and turns it on", async () => {
+    const who = "twofa@example.com";
+    const up = await post("/sign-up/email", {
+      email: who,
+      password,
+      name: who,
+    });
+    const bearer = {
+      authorization: `Bearer ${up.headers.get("set-auth-token")}`,
+    };
+    await client.query(
+      'update "user" set email_verified = true where email = $1',
+      [who],
+    );
+    const enabled = await post("/two-factor/enable", { password }, bearer);
+    expect(enabled.status).toBe(200);
+    const { totpURI } = (await enabled.json()) as { totpURI: string };
+    const verified = await post(
+      "/two-factor/verify-totp",
+      { code: totpFromUri(totpURI) },
+      bearer,
+    );
+    expect(verified.status).toBe(200);
+    const rows = await client.query<{ on: boolean; n: number }>(
+      `select u.two_factor_enabled as on,
+              (select count(*)::int from two_factor t where t.user_id = u.id) as n
+         from "user" u where u.email = $1`,
+      [who],
+    );
+    expect(rows.rows[0]).toEqual({ on: true, n: 1 });
+  });
+
+  it("signs in with a first password written by hashAccountPassword", async () => {
+    // A Google-only account: a user row and no credential account.
+    const who = "google-only@example.com";
+    await client.query(
+      `insert into "user" (id, name, email, email_verified) values ('g1', $1, $1, true)`,
+      [who],
+    );
+    const first = "a-first-passphrase".padEnd(PASSWORD_MIN_LENGTH, "z");
+    expect(
+      (await post("/sign-in/email", { email: who, password: first })).status,
+    ).toBe(401);
+    await client.query(
+      `insert into account (id, account_id, provider_id, user_id, password)
+       values ('a1', 'g1', 'credential', 'g1', $1)`,
+      [await hashAccountPassword(first)],
+    );
+    expect(
+      (await post("/sign-in/email", { email: who, password: first })).status,
+    ).toBe(200);
   });
 });

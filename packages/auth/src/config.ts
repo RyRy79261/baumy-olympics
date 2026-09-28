@@ -1,10 +1,11 @@
 // THE Better Auth configuration for Baumy Olympics (ADR 0001), self-hosted in
 // the web app's own process against our own database.
 //
-// Ported from camp-404 `packages/auth/src/config.ts`, without two-factor,
-// passkeys, the email-proof guards and the preview OAuth proxy (SPEC §11
-// defers passkeys and 2FA), and with the `bearer()` plugin added so a future
-// native shell can authenticate without cookies.
+// Ported from camp-404 `packages/auth/src/config.ts`, without the preview
+// OAuth proxy, and with the `bearer()` plugin added so a future native shell
+// can authenticate without cookies. Two-factor, passkeys, the email-proof
+// guards and the last-used hint (issue #79) are `accountSecurityPlugins`
+// (security.ts).
 //
 // Boots with no env: it constructs with a placeholder secret and the database
 // placeholder URL, so `next build` and an env-less local start never throw.
@@ -29,6 +30,7 @@ import {
   type AuthEnv,
 } from "./env";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
+import { accountSecurityPlugins } from "./security";
 
 /**
  * Placeholder secret (at least 32 characters) so the instance constructs
@@ -67,6 +69,8 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
         account: schema.account,
         verification: schema.verification,
         rateLimit: schema.rateLimit,
+        twoFactor: schema.twoFactor,
+        passkey: schema.passkey,
       },
     }),
 
@@ -159,6 +163,9 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
       // token: Better Auth stores `session.token` in plaintext, so without it
       // anyone who can read the table could present a row as a bearer token.
       bearer({ requireSignature: true }),
+      // Two-factor, passkeys, the email-proof guards and the last-used
+      // sign-in hint (issue #79).
+      ...accountSecurityPlugins(env),
     ],
 
     advanced: {

@@ -1,9 +1,9 @@
 // Pure environment resolution for the Better Auth config (ADR 0001).
 //
 // Ported from camp-404 `packages/auth/src/env.ts`, which is itself adapted from
-// the AfrikaBurn contributors app. Baumy Olympics has no passkeys, no two-factor
-// and no apex domain, so the passkey scope, the apex rules and the preview
-// OAuth proxy are gone; the rest is kept.
+// the AfrikaBurn contributors app. Baumy Olympics has no apex domain, so the
+// apex rules and the preview OAuth proxy are gone. The passkey scope (issue
+// #79) is the base URL's own host, or PASSKEY_RP_ID when that covers it.
 //
 // PURITY CONTRACT: no I/O, no better-auth import, no side effects. Everything
 // here is a deterministic function of an env bag, so it is testable without a
@@ -17,6 +17,13 @@ export interface AuthEnv {
   BETTER_AUTH_SECRET?: string | undefined;
   /** The absolute origin people use in production, e.g. https://baumy.example. */
   BETTER_AUTH_URL?: string | undefined;
+  /**
+   * Optional: the domain passkeys are bound to, e.g. `baumy.example` for an
+   * app served on `olympics.baumy.example`. It must be the base URL's host or
+   * a parent of it; anything else turns passkeys OFF (resolvePasskeyScope).
+   * Unset, passkeys are bound to the base URL's own host.
+   */
+  PASSKEY_RP_ID?: string | undefined;
   /** Vercel's own hosts, without a protocol. */
   VERCEL_URL?: string | undefined;
   VERCEL_BRANCH_URL?: string | undefined;
@@ -167,12 +174,19 @@ export interface RateLimitTuning {
   customRules?: Record<string, { window: number; max: number }>;
 }
 
-/** The auth paths Better Auth gives its own, stricter, built-in limits. */
+/**
+ * The auth paths Better Auth (or a plugin) gives its own, stricter, built-in
+ * limits: 3 per 10 s for sign-in, change-password and every two-factor step
+ * (issue #79), 3 per minute for the emails.
+ */
 export const SENSITIVE_AUTH_PATHS = [
   "/sign-up/email",
   "/sign-in/email",
   "/request-password-reset",
   "/reset-password",
+  "/send-verification-email",
+  "/change-password",
+  "/two-factor/*",
 ] as const;
 
 /**
@@ -234,6 +248,64 @@ export function resolveTrustedOrigins(env: AuthEnv): string[] {
   return [...origins];
 }
 
+/** The name an authenticator app and a passkey prompt show for the account. */
+export const AUTH_RP_NAME = "Baumy Olympics";
+
+/**
+ * The cookie that remembers how this browser last signed in ("email",
+ * "google" or "passkey"), so the sign-in page can say "Last used" (issue
+ * #79). Not httpOnly (Better Auth's lastLoginMethod plugin sets it so a page
+ * may read it) and not a secret.
+ */
+export const LAST_LOGIN_METHOD_COOKIE = "baumy.last_login_method";
+
+function hostOf(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).hostname.toLowerCase() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isUnder(host: string, domain: string): boolean {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
+/**
+ * Where passkeys work, or null when they are OFF (issue #79).
+ *
+ * The relying-party id is THE near-irreversible passkey decision: a passkey
+ * is bound to it for life. It is PASSKEY_RP_ID when that is the base URL's
+ * host or a parent domain of it, otherwise the base URL's own host. The
+ * origins a ceremony is checked against are the trusted origins under that
+ * id, never the request's own Origin header.
+ *
+ * FAILS CLOSED: a PASSKEY_RP_ID that does not cover the base URL, or a
+ * deployment with no base URL at all, turns passkeys off rather than binding
+ * them to a host nobody chose. Locally, with no base URL, `{}` leaves the
+ * plugin's defaults (`localhost`, and the request's origin).
+ */
+export interface PasskeyScope {
+  rpID?: string;
+  origin?: string[];
+}
+
+export function resolvePasskeyScope(env: AuthEnv): PasskeyScope | null {
+  const explicit = trimmed(env.PASSKEY_RP_ID)?.toLowerCase();
+  const baseHost = hostOf(resolveBaseURL(env));
+  if (!baseHost) {
+    return explicit || trimmed(env.VERCEL_ENV) ? null : {};
+  }
+  if (explicit && !isUnder(baseHost, explicit)) return null;
+  const rpID = explicit ?? baseHost;
+  const origin = resolveTrustedOrigins(env).filter((o) => {
+    const host = hostOf(o);
+    return host !== undefined && isUnder(host, rpID);
+  });
+  return { rpID, origin };
+}
+
 /** Plain-words warnings for a misconfigured auth stack, printed at boot. */
 export function authConfigWarnings(env: AuthEnv): string[] {
   const warnings: string[] = [];
@@ -259,6 +331,14 @@ export function authConfigWarnings(env: AuthEnv): string[] {
     warnings.push(
       "BETTER_AUTH_URL is not set: auth links use Vercel's production host. " +
         "Set it to the address people actually visit.",
+    );
+  }
+  if (resolvePasskeyScope(env) === null) {
+    warnings.push(
+      trimmed(env.PASSKEY_RP_ID)
+        ? "PASSKEY_RP_ID is not the site's host or a parent domain of it: " +
+            "passkeys are OFF until it is."
+        : "No base URL to bind passkeys to: passkeys are OFF. Set BETTER_AUTH_URL.",
     );
   }
   return warnings;
