@@ -127,6 +127,11 @@ export function twoFactorErrorSentence(
   mode: "totp" | "backup",
 ): string {
   if (error.status === 429) return TOO_MANY_ATTEMPTS;
+  if (error.code === "SESSION_REVOKED") {
+    // Signed out elsewhere while turning two-factor on (the email-proof
+    // guard in @baumy/auth): the code was never checked.
+    return DEVICE_SIGNED_OUT;
+  }
   if (error.code === "ACCOUNT_TEMPORARILY_LOCKED") {
     return "Too many wrong codes. Wait 15 minutes, then try again.";
   }
