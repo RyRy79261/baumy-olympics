@@ -29,7 +29,7 @@ test("a signed-out visitor reads what the app is at /, without script", async ({
     page.getByRole("heading", { name: "How it works" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Why it uses Google" }),
+    page.getByRole("heading", { name: "Who can use it" }),
   ).toBeVisible();
   const legal = page.getByRole("navigation", { name: "Privacy and terms" });
   await expect(legal.getByRole("link", { name: "Privacy" })).toHaveAttribute(
@@ -40,6 +40,7 @@ test("a signed-out visitor reads what the app is at /, without script", async ({
     "href",
     "/terms",
   );
+  await expect(page.getByText(/google/i)).toHaveCount(0);
   await context.close();
 });
 
