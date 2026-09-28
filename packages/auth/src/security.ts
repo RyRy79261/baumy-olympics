@@ -16,6 +16,7 @@ import { emailProofGuards } from "./email-proof";
 import {
   AUTH_RP_NAME,
   LAST_LOGIN_METHOD_COOKIE,
+  SECURITY_COOKIES,
   resolvePasskeyScope,
   type AuthEnv,
 } from "./env";
@@ -122,6 +123,9 @@ export function accountSecurityPlugins(env: AuthEnv) {
       backupCodeOptions: { storeBackupCodes: "encrypted" },
       // A Google-only or passkey-only member may still add a second factor.
       allowPasswordless: true,
+      // The lifetimes the privacy page states (env.ts SECURITY_COOKIES).
+      twoFactorCookieMaxAge: SECURITY_COOKIES.twoFactorChallengeMaxAgeSeconds,
+      trustDeviceMaxAge: SECURITY_COOKIES.trustDeviceMaxAgeSeconds,
     }),
     passkey({
       rpName: AUTH_RP_NAME,
@@ -133,9 +137,12 @@ export function accountSecurityPlugins(env: AuthEnv) {
         residentKey: "preferred",
         userVerification: "preferred",
       },
+      // `baumy.passkey_challenge`, not the library's `better-auth-passkey`.
+      advanced: { webAuthnChallengeCookie: SECURITY_COOKIES.passkeyChallenge },
     }),
     lastLoginMethod({
       cookieName: LAST_LOGIN_METHOD_COOKIE,
+      maxAge: SECURITY_COOKIES.lastLoginMethodMaxAgeSeconds,
       // With two-factor on, the session is made by the code step, not by
       // /sign-in/email, so that step counts as the email sign-in it finishes.
       customResolveMethod: (ctx) =>
