@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { berlinDateKey } from "@baumy/core";
 import { createHttpDb, type Queryable } from "@baumy/db";
+import { ActingChip, Housemate, actingDoneClass } from "@baumy/ui";
 import { AutoRefresh } from "@/components/hub/auto-refresh";
 import { DashboardHeader } from "@/components/kiosk/dashboard/dashboard-header";
 import { MonthCalendar } from "@/components/kiosk/dashboard/month-calendar";
@@ -16,6 +17,7 @@ import {
   recentMessages,
 } from "@/lib/kiosk/dashboard";
 import { loadDashboard } from "@/lib/kiosk/dashboard-load";
+import { clearPickAction } from "../actions";
 
 // The kitchen screen's home (ADR 0005, issue #65): the portrait dashboard,
 // glanceable across the room with no taps. The header has the date, a big
@@ -36,7 +38,8 @@ export default async function KioskHomePage({
   if (!kiosk) redirect("/kiosk/pair");
   const ctx = (await kioskRequestCtx(undefined, undefined))!;
   const today = berlinDateKey(ctx.now);
-  const { month, day } = parseMonthParams(await searchParams, today);
+  const params = await searchParams;
+  const { month, day } = parseMonthParams(params, today);
   const data = await loadDashboard(
     ctx,
     month,
@@ -71,7 +74,32 @@ export default async function KioskHomePage({
         cells={monthCells(month, today, data.events.ok ? data.events.data : [])}
         members={data.members}
         initialDay={day}
+        dayInUrl={params.day !== undefined}
         status={data.events.ok ? null : data.events.message}
+        acting={
+          kiosk.memberId ? (
+            // Whose name a tap logs under, so the next person sees it.
+            <ActingChip
+              name={kiosk.displayName ?? ""}
+              who={
+                <Housemate
+                  avatar={
+                    data.members.find((m) => m.id === kiosk.memberId)?.avatar
+                  }
+                  memberId={kiosk.memberId}
+                  scale={2}
+                />
+              }
+              done={
+                <form action={clearPickAction}>
+                  <button type="submit" className={actingDoneClass}>
+                    Done
+                  </button>
+                </form>
+              }
+            />
+          ) : undefined
+        }
       />
       <AutoRefresh />
     </div>

@@ -118,6 +118,7 @@ function chore(over: Partial<ChoreView>): ChoreView {
     dueAt: null,
     urgent: false,
     isNew: false,
+    createdAt: "2026-09-01T10:00:00.000Z",
     next: null,
     ...over,
   };

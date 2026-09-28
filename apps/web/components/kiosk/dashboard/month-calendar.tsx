@@ -3,7 +3,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { addDaysToDateKey } from "@baumy/core";
 import {
   DayEventRow,
@@ -201,7 +201,9 @@ export function MonthCalendar({
   cells,
   members,
   initialDay,
+  dayInUrl = false,
   status,
+  acting,
 }: {
   /** "YYYY-MM". */
   month: string;
@@ -210,8 +212,12 @@ export function MonthCalendar({
   members: DashboardMember[];
   /** The day whose sheet is open on arrival (`?day=`). */
   initialDay: string | null;
+  /** The URL names a day (`?day=`), to be cleared when its sheet closes. */
+  dayInUrl?: boolean;
   /** Why the events could not be read, if they could not. */
   status: string | null;
+  /** Who is acting, and the way to stop (ActingChip), if anyone is. */
+  acting?: ReactNode;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState<string | null>(initialDay);
@@ -219,11 +225,22 @@ export function MonthCalendar({
   const [gridRef, fit] = useChipRows(rows);
   const onThisMonth = month === today.slice(0, 7);
   const cell = cells.find((c) => c.day === open) ?? null;
+
+  /** Close the sheet, and take its day out of the URL (a reload keeps it shut). */
+  const closeSheet = () => {
+    setOpen(null);
+    if (dayInUrl) {
+      router.replace(onThisMonth ? "/kiosk" : monthHref(month), {
+        scroll: false,
+      });
+    }
+  };
   // A minute untouched: the sheet closes and the home is back on this month,
   // so the next person finds the screen as it always is.
   useIdle(cell !== null || !onThisMonth, KIOSK_IDLE_MS, () => {
     setOpen(null);
     if (!onThisMonth) router.replace("/kiosk");
+    else if (dayInUrl) router.replace("/kiosk", { scroll: false });
   });
 
   const step = (n: -1 | 1) => {
@@ -247,7 +264,7 @@ export function MonthCalendar({
           </Link>
           <h2
             data-testid="month-title"
-            className="w-[330px] text-center font-display text-[20px] leading-none text-bm-text"
+            className="w-[300px] text-center font-display text-[20px] leading-none text-bm-text"
           >
             {monthTitle(month)}
           </h2>
@@ -259,6 +276,7 @@ export function MonthCalendar({
             ▶
           </Link>
         </div>
+        {acting}
         <Link href="/kiosk" className={todayButtonClass(onThisMonth)}>
           Today
         </Link>
@@ -317,7 +335,7 @@ export function MonthCalendar({
           today={today}
           members={members}
           onStep={step}
-          onClose={() => setOpen(null)}
+          onClose={closeSheet}
         />
       ) : null}
     </div>

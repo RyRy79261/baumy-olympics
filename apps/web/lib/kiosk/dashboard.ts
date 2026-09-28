@@ -5,7 +5,7 @@ import {
   dateKeyWeekday,
 } from "@baumy/core";
 import { avatarFor, isCalendarDate, type ChoreKind } from "@baumy/types";
-import { SHIRT_COLOURS } from "@baumy/ui";
+import { HOUSE_COLOUR, SHIRT_COLOURS } from "@baumy/ui";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import type { NoteView } from "@/lib/actions/notes";
 import {
@@ -24,12 +24,16 @@ import {
 export interface DashboardMember {
   id: string;
   displayName: string;
-  /** What `members.avatar` holds (null: their default character). */
+  /**
+   * Their character: chosen, or the roster's default (`rosterAvatars`), so
+   * no two active members wear the same shirt until there are more members
+   * than shirts.
+   */
   avatar: unknown;
 }
 
-/** The colour of events and messages nobody in particular added. */
-export const HOUSE_COLOUR = "#ffb347";
+/** The house's colour (the kit's `--color-bm-house`), which no shirt uses. */
+export { HOUSE_COLOUR };
 
 /**
  * A member's colour on the dashboard: their character's shirt (the
@@ -104,7 +108,12 @@ export function dueLabel(
   c: Pick<ChoreView, "state" | "dueAt">,
   now: Date,
 ): DueLabel {
-  const left = c.dueAt === null ? 0 : Date.parse(c.dueAt) - now.getTime();
+  // No weight yet: it cannot be logged, so it is not due either.
+  if (c.state === "unavailable")
+    return { text: "No points yet", tone: "later" };
+  // Never done: due since it was added, but "late" would be unfair.
+  if (c.dueAt === null) return { text: "Never done", tone: "late" };
+  const left = Date.parse(c.dueAt) - now.getTime();
   if (c.state === "due" || left <= 0) {
     const late = -left;
     if (late < HOUR) return { text: "Due now", tone: "late" };
@@ -142,18 +151,25 @@ export interface BountyRowView {
     length: number;
     colour: string;
   } | null;
-  /** Cooling down: it cannot be logged yet. */
-  coolingDown: boolean;
+  /** It cannot be logged now: cooling down, or no weight yet. */
+  loggable: boolean;
 }
 
-/** When a bounty falls due, for sorting: never done counts as long ago. */
-function dueAtMs(c: ChoreView): number {
-  return c.dueAt === null ? Number.NEGATIVE_INFINITY : Date.parse(c.dueAt);
+/**
+ * When a bounty fell or falls due, for sorting. A chore never done has been
+ * due since it was added, so an old one sorts with the truly late ones and
+ * a new one does not push real lateness down. No weight yet sorts last.
+ */
+export function dueAtMs(
+  c: Pick<ChoreView, "state" | "dueAt" | "createdAt">,
+): number {
+  if (c.state === "unavailable") return Number.POSITIVE_INFINITY;
+  return Date.parse(c.dueAt ?? c.createdAt);
 }
 
 /**
  * The chores a module lists as bounties, soonest due first. Archived chores
- * and those without a weight yet cannot be logged, so they are never listed.
+ * are never listed (list_chores leaves them out anyway).
  */
 export function bountyRows(
   chores: readonly ChoreView[],
@@ -162,7 +178,7 @@ export function bountyRows(
   now: Date,
 ): BountyRowView[] {
   return chores
-    .filter((c) => !c.archived && c.state !== "unavailable" && pick(c))
+    .filter((c) => !c.archived && pick(c))
     .sort((a, b) => dueAtMs(a) - dueAtMs(b) || a.name.localeCompare(b.name))
     .map((c) => ({
       id: c.id,
@@ -178,7 +194,7 @@ export function bountyRows(
             colour: whoOf(c.streak.holderId, members).colour,
           }
         : null,
-      coolingDown: c.state === "cooldown",
+      loggable: c.state === "due" || c.state === "done",
     }));
 }
 
@@ -233,7 +249,8 @@ export interface MessageView {
 
 /**
  * The notes created or changed in the last 24 hours (ADR 0005 §3), the most
- * recently changed first. The Messages icon counts them.
+ * recently changed first. The Messages icon counts them. (PR #75 moves this
+ * rule to list_notes' `recentCount`, where pinning does not count.)
  */
 export function recentMessages(
   notes: readonly NoteView[],

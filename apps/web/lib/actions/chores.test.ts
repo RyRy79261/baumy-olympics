@@ -157,6 +157,7 @@ describe("list_chores", () => {
       dueAt: at(96).toISOString(),
       urgent: false,
       isNew: false,
+      createdAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
       // Ryan would break the partner's 1-streak: 20 + 20% of 20.
       next: {
         totalPts: 24,
