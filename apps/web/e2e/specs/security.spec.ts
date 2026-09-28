@@ -16,6 +16,17 @@ import { totp } from "../lib/totp";
 // (CDP WebAuthn); two-factor codes are computed from the setup key the page
 // shows, as an authenticator app would.
 
+/**
+ * A browser with an address of its own (TEST-NET-3), as a housemate's phone
+ * has. Every e2e browser otherwise shares 127.0.0.1, and the whole suite's
+ * invite redemptions would then share redeem_invite's per-IP limit (30 per
+ * 15 minutes), which these specs alone would use up for the others.
+ */
+function ownAddress() {
+  const n = 1 + Math.floor(Math.random() * 254);
+  return { extraHTTPHeaders: { "x-forwarded-for": `203.0.113.${n}` } };
+}
+
 /** A new housemate with a confirmed email, signed in on their own browser. */
 async function confirmedMember(
   founder: Page,
@@ -26,7 +37,7 @@ async function confirmedMember(
   await founderAdmin(founder, project);
   const code = await mintCode(founder, 1);
   const email = freshEmail(`${label}-${project}`);
-  const context = await browser.newContext();
+  const context = await browser.newContext(ownAddress());
   const page = await context.newPage();
   await signUp(page, email);
   await page.waitForURL(/\/join$/);
@@ -298,7 +309,7 @@ test("an unconfirmed email cannot add a passkey or two-factor", async ({
   const project = testInfo.project.name;
   await founderAdmin(page, project);
   const code = await mintCode(page, 1);
-  const context = await browser.newContext();
+  const context = await browser.newContext(ownAddress());
   const p = await context.newPage();
   await signUp(p, freshEmail(`unconfirmed-${project}`));
   await p.waitForURL(/\/join$/);
