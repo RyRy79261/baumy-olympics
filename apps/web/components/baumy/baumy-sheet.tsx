@@ -151,12 +151,20 @@ export function BaumySheet({
       rs.map((r) => (r.proposal.proposalId === id ? { ...r, ...patch } : r)),
     );
 
-  /** Send what was typed or said; true when Baumy answered. */
-  async function send(said: string): Promise<boolean> {
+  /**
+   * Send what was typed or said; true when Baumy answered. `current` says
+   * whether the conversation that asked is still on screen: an answer that
+   * comes back after it was closed shows nowhere.
+   */
+  async function send(
+    said: string,
+    current: () => boolean = () => true,
+  ): Promise<boolean> {
     setAsking(true);
     feel({ type: "ask" });
     const result = await askBaumy(said, history, surface);
     setAsking(false);
+    if (!current()) return false;
     if (!result.ok) {
       setReply({ text: result.message, error: true });
       feel({ type: "error" });
@@ -286,6 +294,10 @@ export function BaumySheet({
   const [bubble, setBubble] = useState<CatMode | null>(null);
   // A recording stopped by closing the bubble is dropped, not sent.
   const dropClip = useRef(false);
+  // Which bubble a transcribe or an answer in flight belongs to: closing it
+  // (a tap, a reminder, the screensaver, idle) moves on, so a late answer
+  // never reopens it with the last person's proposals.
+  const generation = useRef(0);
   const recorder = useRecorder({
     onStart: () => feel({ type: "record_start" }),
     onClip: (clip, mime) => {
@@ -323,25 +335,34 @@ export function BaumySheet({
     void recorder.begin();
   }
 
+  /** Still thinking in the bubble: show the answer there (not after Type instead). */
+  const showAnswer = (b: CatMode | null): CatMode | null =>
+    b === "thinking" ? "answer" : b;
+
   async function catHeard(clip: Blob, mime: string) {
+    const mine = generation.current;
+    const current = () => generation.current === mine;
     setBubble("thinking");
     feel({ type: "record_stop" });
     setTranscribing(true);
     const result = await transcribeClip(clip, mime, surface);
     setTranscribing(false);
+    if (!current()) return;
     if (!result.ok) {
       setReply({ text: result.message, error: true });
       feel({ type: "error" });
       if (result.code === "NOT_CONFIGURED") setMicOff(result.message);
-      setBubble("answer");
+      setBubble(showAnswer);
       return;
     }
     setHeard(result.data.text);
-    await send(result.data.text);
-    setBubble("answer");
+    await send(result.data.text, current);
+    if (!current()) return;
+    setBubble(showAnswer);
   }
 
   function hideBubble() {
+    generation.current += 1;
     dropClip.current = true;
     if (recorder.state !== "idle") {
       recorder.finish();
