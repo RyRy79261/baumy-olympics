@@ -103,6 +103,13 @@ export const SHIRT_COLOURS: Readonly<
   green: "#43f0a0",
 };
 
+/**
+ * The house's colour: what nobody in particular added (a calendar event, a
+ * message) is drawn in. It is `--color-bm-house` in app/globals.css, and no
+ * shirt uses it, so the house is never mistaken for a housemate.
+ */
+export const HOUSE_COLOUR = "#9d90bf";
+
 /** The character's grid: head, neck, body. */
 export function housemateGrid(hairStyle: MemberAvatar["hairStyle"]): Sprite {
   return [...HAIR_STYLE_HEADS[hairStyle], NECK, ...BODY];

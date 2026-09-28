@@ -14,6 +14,7 @@ import { choreGlyph, ChoreTile } from "../chores";
 import {
   HAIR_COLOURS,
   HAIR_STYLE_HEADS,
+  HOUSE_COLOUR,
   Housemate,
   SHIRT_COLOURS,
   SKIN_TONES,
@@ -168,6 +169,15 @@ describe("Housemate", () => {
     for (const c of AVATAR_HAIR_COLORS) expect(HAIR_COLOURS[c]).toMatch(/^#/);
     for (const t of AVATAR_SKIN_TONES) expect(SKIN_TONES[t]).toMatch(/^#/);
     for (const c of AVATAR_SHIRT_COLORS) expect(SHIRT_COLOURS[c]).toMatch(/^#/);
+  });
+
+  it("keeps the house's colour off every shirt", () => {
+    expect(HOUSE_COLOUR).toBe("#9d90bf");
+    expect(Object.values(SHIRT_COLOURS)).not.toContain(HOUSE_COLOUR);
+    // The shirts are all different, so members never share a colour.
+    expect(new Set(Object.values(SHIRT_COLOURS)).size).toBe(
+      AVATAR_SHIRT_COLORS.length,
+    );
   });
 
   it("is a 12 × 17 person in every hair style, every pixel coloured", () => {

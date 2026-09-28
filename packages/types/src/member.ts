@@ -130,6 +130,45 @@ export function avatarFor(member: {
   return chosen.success ? chosen.data : defaultAvatar(member.id);
 }
 
+/**
+ * Every active member's character, the roster given in join order. A shirt
+ * is a member's colour on the kitchen screen, so members who have not
+ * chosen one get a shirt nobody else wears: their id's default if it is
+ * free, else the next free one in AVATAR_SHIRT_COLORS order, the earlier
+ * joiner first. Chosen characters are kept as they are (two members may
+ * choose the same shirt). Once every shirt is taken, the default stands.
+ */
+export function rosterAvatars(
+  roster: readonly { id: string; avatar: unknown }[],
+): Map<string, MemberAvatar> {
+  const out = new Map<string, MemberAvatar>();
+  const worn = new Set<MemberAvatar["shirtColor"]>();
+  for (const m of roster) {
+    const chosen = MemberAvatar.safeParse(m.avatar);
+    if (chosen.success) {
+      out.set(m.id, chosen.data);
+      worn.add(chosen.data.shirtColor);
+    }
+  }
+  for (const m of roster) {
+    if (out.has(m.id)) continue;
+    const base = defaultAvatar(m.id);
+    const start = AVATAR_SHIRT_COLORS.indexOf(base.shirtColor);
+    let shirt = base.shirtColor;
+    for (let i = 0; i < AVATAR_SHIRT_COLORS.length; i++) {
+      const next =
+        AVATAR_SHIRT_COLORS[(start + i) % AVATAR_SHIRT_COLORS.length]!;
+      if (!worn.has(next)) {
+        shirt = next;
+        break;
+      }
+    }
+    worn.add(shirt);
+    out.set(m.id, { ...base, shirtColor: shirt });
+  }
+  return out;
+}
+
 /** The same values as the `member_role` pg enum. */
 export const MemberRole = z.enum(["admin", "member"], {
   error: "Pick admin or member.",
