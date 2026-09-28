@@ -3,6 +3,7 @@ import { addChore } from "../lib/chores";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 import {
   expectKioskTargets,
+  openBaumySheet,
   openKioskChores,
   pairedKiosk,
   typePin,
@@ -15,12 +16,8 @@ import {
 
 const PIN = "2580";
 
-async function openBaumy(kiosk: Page): Promise<Locator> {
-  await kiosk.getByRole("button", { name: "Ask Baumy" }).click();
-  const sheet = kiosk.getByRole("dialog", { name: "Ask Baumy" });
-  await expect(sheet).toBeVisible();
-  return sheet;
-}
+/** The cat talks in its bubble; this spec types, in the sheet. */
+const openBaumy = (kiosk: Page): Promise<Locator> => openBaumySheet(kiosk);
 
 async function say(sheet: Locator, text: string) {
   await sheet.getByLabel("Message to Baumy").fill(text);
@@ -67,8 +64,11 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   const who = sheet.getByRole("region", { name: "Who's asking?" });
   await expect(who).toBeVisible();
   await expectKioskTargets(who);
-  await who.getByRole("button", { name: founder, exact: true }).click();
-  await expect(who).toHaveCount(0);
+  const me = who.getByRole("button", { name: founder, exact: true });
+  await expect(me).toHaveAttribute("aria-pressed", "false");
+  await me.click();
+  // It stays, with the one acting picked, so a wrong pick is easy to see.
+  await expect(me).toHaveAttribute("aria-pressed", "true");
   await say(sheet, `I cleaned the ${chore}`);
   const log = sheet.getByTestId("proposal-log_completion");
   await expect(log).toContainText(`Log ${chore} for ${founder}: +10`);
