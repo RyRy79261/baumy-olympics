@@ -259,6 +259,25 @@ export const AUTH_RP_NAME = "Baumy Olympics";
  */
 export const LAST_LOGIN_METHOD_COOKIE = "baumy.last_login_method";
 
+/**
+ * The cookies the account-security plugins set (issue #79), as Better Auth
+ * names them before the `baumy.` prefix, with the lifetimes security.ts
+ * configures. The privacy page names them from here.
+ */
+export const SECURITY_COOKIES = {
+  /** How this browser last signed in (lastLoginMethod). */
+  lastLoginMethodMaxAgeSeconds: 60 * 60 * 24 * 30,
+  /** Between a correct password and the two-factor code. */
+  twoFactorChallenge: "two_factor",
+  twoFactorChallengeMaxAgeSeconds: 60 * 10,
+  /** "Trust this device for 30 days" after a two-factor code. */
+  trustDevice: "trust_device",
+  trustDeviceMaxAgeSeconds: 60 * 60 * 24 * 30,
+  /** The one-time challenge of a passkey ceremony. */
+  passkeyChallenge: "passkey_challenge",
+  passkeyChallengeMaxAgeSeconds: 60 * 5,
+} as const;
+
 function hostOf(url: string | undefined): string | undefined {
   if (!url) return undefined;
   try {

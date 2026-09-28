@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { buildAuthOptions } from "../config";
 import { CONFIRM_EMAIL_FIRST } from "../email-proof";
-import type { AuthEnv } from "../env";
+import { SECURITY_COOKIES, type AuthEnv } from "../env";
 import { LAST_LOGIN_METHOD_COOKIE, PASSKEYS_OFF } from "../security";
 import { totpFromUri } from "./_totp";
 
@@ -760,5 +760,56 @@ describe("Google sign-in never links itself", () => {
     const res = await continueWithGoogle();
     expect(res.headers.get("location")).not.toContain("error=");
     expect(hasSessionCookie(res)).toBe(true);
+  });
+});
+
+describe("the cookies the privacy page names", () => {
+  /** `name -> Max-Age` for every cookie a response sets. */
+  function setCookies(res: Response): Record<string, number | null> {
+    return Object.fromEntries(
+      res.headers.getSetCookie().map((line) => {
+        const name = line.split("=")[0]!;
+        const age = /max-age=(\d+)/i.exec(line)?.[1];
+        return [name, age === undefined ? null : Number(age)];
+      }),
+    );
+  }
+
+  it("are the names and lifetimes in SECURITY_COOKIES", async () => {
+    const { cookie, userId } = await signUp("owner@example.com");
+    userRow(userId).emailVerified = true;
+    const started = await call("/two-factor/enable", {
+      body: { password: PASSWORD },
+      cookie,
+    });
+    const { totpURI } = (await started.json()) as { totpURI: string };
+    await call("/two-factor/verify-totp", {
+      body: { code: totpFromUri(totpURI) },
+      cookie,
+    });
+
+    const password = await call("/sign-in/email", {
+      body: { email: "owner@example.com", password: PASSWORD },
+    });
+    expect(setCookies(password)).toMatchObject({
+      [`baumy.${SECURITY_COOKIES.twoFactorChallenge}`]:
+        SECURITY_COOKIES.twoFactorChallengeMaxAgeSeconds,
+    });
+
+    const code = await call("/two-factor/verify-totp", {
+      body: { code: totpFromUri(totpURI), trustDevice: true },
+      cookie: cookiesFrom(password),
+    });
+    expect(setCookies(code)).toMatchObject({
+      [`baumy.${SECURITY_COOKIES.trustDevice}`]:
+        SECURITY_COOKIES.trustDeviceMaxAgeSeconds,
+      [LAST_LOGIN_METHOD_COOKIE]: SECURITY_COOKIES.lastLoginMethodMaxAgeSeconds,
+    });
+
+    const passkey = await call("/passkey/generate-authenticate-options");
+    expect(setCookies(passkey)).toMatchObject({
+      [`baumy.${SECURITY_COOKIES.passkeyChallenge}`]:
+        SECURITY_COOKIES.passkeyChallengeMaxAgeSeconds,
+    });
   });
 });

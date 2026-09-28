@@ -50,7 +50,12 @@ export {
   PASSKEYS_OFF,
   accountSecurityPlugins,
 } from "./security";
-export { AUTH_RP_NAME, resolvePasskeyScope, type PasskeyScope } from "./env";
+export {
+  AUTH_RP_NAME,
+  SECURITY_COOKIES,
+  resolvePasskeyScope,
+  type PasskeyScope,
+} from "./env";
 /**
  * Better Auth's own password hasher (scrypt), the one sign-in verifies
  * against. Only for writing a first password (`set_first_password`).
