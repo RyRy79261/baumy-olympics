@@ -137,15 +137,15 @@ export default function PrivacyPage() {
             the EU.
           </li>
           <li>
-            The app runs on Vercel, with its server code pinned to Frankfurt, so
-            your data is processed in the EU. Vercel keeps its own request logs
-            (for example the IP address and page of each request) for a short
-            time.
+            The app runs on Vercel. Its server code runs in Frankfurt (fra1).
+            Vercel&apos;s network in front of it, and its request logs (for
+            example the IP address and page of each request, kept for a short
+            time), are not tied to one region.
           </li>
           <li>
-            Proof photos are stored in Vercel Blob. The store is private: a
-            photo is only shown through the app, to household members and the
-            paired kitchen screen.
+            Proof photos are stored in Vercel Blob in Frankfurt (fra1). The
+            store is private: a photo is only shown through the app, to
+            household members and the paired kitchen screen.
           </li>
           <li>
             Calendar events live in the house&apos;s Google Calendar; the app
@@ -195,18 +195,19 @@ export default function PrivacyPage() {
             (brain.baumy.tech) is the house&apos;s Telegram bot, which the same
             owner runs. The shopping list belongs to it, so items you add or
             tick off here are sent to it. It can also read the chores, scores,
-            notes, reminders, the calendar, claims waiting for confirmation and
-            the chore weights, and may post them in the house&apos;s Telegram
-            group. It runs messages through its own calls to Anthropic. If you
-            link your Telegram account, we keep your Telegram user id, and the
-            bot can do things in this app for you when you ask it, or for
-            another housemate after a confirm button. Everything in Telegram
-            also passes through Telegram. If Sign in with Baumy is switched on
-            and you use it, the bot messages you the sign-in&apos;s device name
-            (for example &quot;Chrome on macOS&quot;) with the numbers to tap;
-            the request (device name, the numbers and what you answered) is kept
-            for {LOGIN_REQUEST_HOURS} hours, and a record that it was asked for,
-            with the asking device&apos;s IP address, stays in the audit log.
+            notes, reminders, the calendar, the pot, claims waiting for
+            confirmation and the chore weights, and may post them in the
+            house&apos;s Telegram group. It runs messages through its own calls
+            to Anthropic. If you link your Telegram account, we keep your
+            Telegram user id, and the bot can do things in this app for you when
+            you ask it, or for another housemate after a confirm button.
+            Everything in Telegram also passes through Telegram. If Sign in with
+            Baumy is switched on and you use it, the bot messages you the
+            sign-in&apos;s device name (for example &quot;Chrome on macOS&quot;)
+            with the numbers to tap; the request (device name, the numbers and
+            what you answered) is kept for {LOGIN_REQUEST_HOURS} hours, and a
+            record that it was asked for, with the asking device&apos;s IP
+            address, stays in the audit log.
           </li>
           <li>
             <strong>Chatbots you connect:</strong> a chatbot you connect (for
@@ -323,9 +324,9 @@ export default function PrivacyPage() {
             at it: your past chores stay in the season&apos;s score history
             (everyone&apos;s scores are rebuilt from it), and the audit log
             keeps its copies, including your earlier names. The admin can rename
-            the entry and unlink your Telegram account in the app; your PIN
-            hash, character and colour stay on it unless the owner clears them
-            in the database.
+            the entry, change its colour and avatar, and unlink your Telegram
+            account in the app; your PIN hash and your chosen 16-bit character
+            stay on it unless the owner clears them in the database.
           </li>
           <li>
             For a copy of what we hold about you, or anything else removed, ask
