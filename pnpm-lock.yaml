@@ -306,6 +306,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@baumy/types':
+        specifier: workspace:*
+        version: link:../types
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.3.0)(react@19.3.0)
