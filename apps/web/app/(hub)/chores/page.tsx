@@ -7,7 +7,6 @@ import { ChoreGrid } from "@/components/chores/chore-grid";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
-import { parseBountyFilter } from "@/lib/chores/view";
 import { logCompletionAction } from "./actions";
 
 // /chores, shown as "Bounties" (SPEC §3.2; ADR 0005 §2): the bounty board.
@@ -19,19 +18,13 @@ import { logCompletionAction } from "./actions";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Bounties - Baumy Olympics" };
 
-export default async function ChoresPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ show?: string | string[] }>;
-}) {
+export default async function ChoresPage() {
   const me = await requireMemberPage();
   const ctx = (await uiRequestCtx(undefined))!;
-  const [listed, people, params] = await Promise.all([
+  const [listed, people] = await Promise.all([
     runAction("list_chores", {}, ctx),
     listActiveMembers(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID),
-    searchParams,
   ]);
-  const show = parseBountyFilter(params.show);
   return (
     <>
       <PageHeading
@@ -41,14 +34,12 @@ export default async function ChoresPage({
       />
       {listed.ok ? (
         <ChoreGrid
-          key={show}
           chores={listed.data.chores}
           members={people.map((p) => ({
             id: p.id,
             displayName: p.displayName,
           }))}
           actorId={me.memberId}
-          initialFilter={show}
           action={logCompletionAction}
         />
       ) : (
