@@ -100,21 +100,53 @@ describe("/", () => {
 
 describe("every other hub page", () => {
   const root = import.meta.dirname;
-  function pages(dir: string): string[] {
+  function files(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {
       const full = path.join(dir, name);
-      if (statSync(full).isDirectory()) return pages(full);
-      return name === "page.tsx" ? [full] : [];
+      if (statSync(full).isDirectory()) return files(full);
+      return [full];
     });
   }
+  /** The source without comments, so a gate named in a comment is no gate. */
+  function code(file: string): string {
+    return readFileSync(file, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  }
+  const GATE = /await require(Member|Admin)Page\(/;
+
+  it("strips comments before looking for the gate", () => {
+    expect("// await requireMemberPage()").toMatch(GATE);
+    expect(
+      "// await requireMemberPage()\n/* await requireAdminPage() */"
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1"),
+    ).not.toMatch(GATE);
+  });
 
   it("runs its own page gate", () => {
-    const found = pages(root).filter((f) => f !== path.join(root, "page.tsx"));
-    expect(found.length).toBeGreaterThan(5);
-    for (const file of found) {
-      expect(readFileSync(file, "utf8"), path.relative(root, file)).toMatch(
-        /await require(Member|Admin)Page\(/,
-      );
+    const pages = files(root).filter(
+      (f) =>
+        path.basename(f) === "page.tsx" && f !== path.join(root, "page.tsx"),
+    );
+    expect(pages.length).toBeGreaterThan(5);
+    for (const file of pages) {
+      expect(code(file), path.relative(root, file)).toMatch(GATE);
     }
+  });
+
+  it("has no nested layout or route handler that could skip the gate", () => {
+    // The frame lets nobody through for the landing page, so a layout or a
+    // route under (hub) would render or answer for a signed-out visitor.
+    // Add one only with its own gate, and teach this test about it.
+    const extra = files(root).filter(
+      (f) =>
+        /^(layout|route)\.(t|j)sx?$/.test(path.basename(f)) &&
+        f !== path.join(root, "layout.tsx"),
+    );
+    for (const file of extra) {
+      expect(code(file), path.relative(root, file)).toMatch(GATE);
+    }
+    expect(files(root)).toContain(path.join(root, "layout.tsx"));
   });
 });
