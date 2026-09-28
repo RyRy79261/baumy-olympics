@@ -822,7 +822,7 @@ Decided 2026-09-28 (issue #70):
 Decided 2026-09-28 (issue #79):
 
 17. **Sign-in at camp-404's level:** "the same level of login refinement as on camp-404: passkeys, google auth, device management". Passkeys, two-factor (authenticator app and backup codes), Google linking, a first password for a Google-only account, and a device list with sign-out, on Settings → Security (§6.2).
-18. **Domain:** the app is served at `https://baumy.tech` (apex). It lives only in env (`BETTER_AUTH_URL`, `MCP_PUBLIC_URL`), never in code; passkeys bind to that host.
+18. **Domain:** the app is served at `https://www.baumy.tech`; the apex `baumy.tech` redirects to it. It lives only in env (`BETTER_AUTH_URL`, `MCP_PUBLIC_URL`, `PASSKEY_RP_ID=baumy.tech`), never in code; passkeys bind to `baumy.tech` and are accepted only from `https://www.baumy.tech`.
 
 Still open:
 
