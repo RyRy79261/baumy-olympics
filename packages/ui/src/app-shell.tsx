@@ -1,19 +1,20 @@
 import type { ReactNode } from "react";
-import { BaumyCat } from "./baumy-cat";
+import { BaumyBadge } from "./baumy-badge";
 import { cx } from "./cx";
 
 // The hub's frame (SPEC §7, ADR 0005 Consequences): the phone and laptop
 // hub keep a normal scrolling layout in the kitchen screen's kit. A dark
-// header with Baumy and the brand, the main pages as Silkscreen links (the
-// page you are on framed), and at the end the pinned and folded pieces (the
-// app passes the "Needs your OK" badge and the NavMenus for Admin and the
-// account); then one content column (max-w-6xl) that pages fill, starting
-// with PageHeading. From xl (1280) it is all one row. Narrower, the brand and
-// the menus share the top row and the page links wrap onto their own rows
-// under it: every link stays on screen, nothing scrolls sideways out of
-// sight. On a phone the brand shows only Baumy. Framework-free: the app
-// passes its own links (next/link) in, styled with `navItemClass`. The
-// bottom padding keeps the corner Baumy's button sits in clear of content.
+// header with the Baumy badge (the app icon's mark, issue #81) and the
+// brand, the main pages as Silkscreen links (the page you are on framed),
+// and at the end the pinned and folded pieces (the app passes the "Needs
+// your OK" badge and the NavMenus for Admin and the account); then one
+// content column (max-w-6xl) that pages fill, starting with PageHeading.
+// From xl (1280) it is all one row. Narrower, the brand and the menus share
+// the top row and the page links wrap onto their own rows under it: every
+// link stays on screen, nothing scrolls sideways out of sight. On a phone
+// the brand shows only the badge. Framework-free: the app passes its own
+// links (next/link) in, styled with `navItemClass`. The bottom padding keeps
+// the corner Baumy's button sits in clear of content.
 
 /** The classes a nav link gets; `current` marks the page you are on. */
 export function navItemClass(current: boolean): string {
@@ -57,8 +58,8 @@ export function AppShell({
     <div className="min-h-screen bg-bm-bg text-bm-text">
       <header className="border-b-2 border-bm-line bg-bm-chrome">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 sm:gap-x-4 xl:flex-nowrap">
-          <div className="flex shrink-0 items-end gap-2 font-display text-base">
-            <BaumyCat scale={1} facing="right" />
+          <div className="flex shrink-0 items-center gap-2 font-display text-base">
+            <BaumyBadge />
             <span className="max-sm:sr-only">{brand}</span>
           </div>
           {/* Below xl the page links take their own rows under the brand,
