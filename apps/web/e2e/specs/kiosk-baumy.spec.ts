@@ -70,28 +70,29 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   // It stays, with the one acting picked, so a wrong pick is easy to see.
   await expect(me).toHaveAttribute("aria-pressed", "true");
   await say(sheet, `I cleaned the ${chore}`);
-  const log = sheet.getByTestId("proposal-log_completion");
+  const log = sheet.getByTestId("suggestion-log_completion");
   await expect(log).toContainText(`Log ${chore} for ${founder}: +10`);
+  await expect(log).toContainText("Waiting for you");
   await expect(log).not.toContainText("Needs your PIN");
   await expectKioskTargets(sheet);
-  await log.getByRole("button", { name: "Approve" }).click();
+  await sheet.getByRole("button", { name: "Confirm all" }).click();
   await expect(log.getByTestId("proposal-state")).toHaveText("Done");
-  await sheet.getByRole("button", { name: "Close" }).click();
+  await sheet.getByRole("button", { name: "Done" }).click();
 
   // The partner asks Baumy to confirm it (tapping in on another page, where
-  // the avatar bar is): the row needs their PIN.
+  // the avatar bar is): the card needs their PIN, asked once by Confirm all.
   await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: partner, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(partner);
   sheet = await openBaumy(kiosk);
   await say(sheet, `confirm the ${chore}`);
-  const confirm = sheet.getByTestId("proposal-confirm_completion");
+  const confirm = sheet.getByTestId("suggestion-confirm_completion");
   await expect(confirm).toContainText(chore);
   await expect(confirm).toContainText("Needs your PIN");
-  await confirm.getByRole("button", { name: "Approve" }).click();
-  let pad = confirm.getByRole("group", { name: `${partner}'s PIN` });
+  await sheet.getByRole("button", { name: "Confirm all" }).click();
+  let pad = sheet.getByRole("group", { name: `${partner}'s PIN` });
   await expect(pad).toBeVisible();
-  await expectKioskTargets(confirm);
+  await expectKioskTargets(sheet);
 
   // A wrong PIN saves nothing.
   await typePin(pad, "1397");
@@ -101,8 +102,8 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   );
 
   // The right one confirms it.
-  await confirm.getByRole("button", { name: "Approve" }).click();
-  pad = confirm.getByRole("group", { name: `${partner}'s PIN` });
+  await sheet.getByRole("button", { name: "Confirm all" }).click();
+  pad = sheet.getByRole("group", { name: `${partner}'s PIN` });
   await typePin(pad, PIN);
   await expect(confirm.getByTestId("proposal-state")).toHaveText("Done");
 
