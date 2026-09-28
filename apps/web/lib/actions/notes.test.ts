@@ -15,7 +15,7 @@ import {
 import type { Actor } from "@/lib/auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { RequestCtx } from "./define";
-import type { NoteView } from "./notes";
+import { NOTE_RECENT_MS, type NoteView } from "./notes";
 import { REGISTRY, runAction } from "./registry";
 
 // The note actions through the real runAction on PGlite (issue #20):
@@ -214,6 +214,37 @@ describe("list_notes", () => {
     expect(onlyPinned.notes.map((n) => n.id)).toEqual([pinned.id]);
     const limited = ok(await runAction("list_notes", { limit: 2 }, as(ryan)));
     expect(limited.notes).toHaveLength(2);
+  });
+
+  it("counts the notes added or edited in the last 24 hours, not pins, past any limit", async () => {
+    const day = NOTE_RECENT_MS / MIN;
+    const old = await add("Old", {}, as(ryan, { now: at(-day - 1) }));
+    const pinLater = await add("Pin me", {}, as(ryan, { now: at(-day - 1) }));
+    await add("Fresh", {}, as(ryan, { now: at(-5) }));
+    await add("Fresher", {}, as(ryan, { now: at(-1) }));
+    const count = async (input = {}) =>
+      ok(await runAction("list_notes", input, as(ryan))).recentCount;
+    expect(await count()).toBe(2);
+    // Counted over every note, not only the ones listed.
+    expect(await count({ limit: 1, pinnedOnly: true })).toBe(2);
+    // Pinning is not an edit.
+    ok(
+      await runAction(
+        "pin_note",
+        { noteId: pinLater.id, pinned: true },
+        as(ryan, { now: at(-2) }),
+      ),
+    );
+    expect(await count()).toBe(2);
+    // Editing the words is.
+    ok(
+      await runAction(
+        "update_note",
+        { noteId: old.id, title: "Old, edited" },
+        as(ryan, { now: at(-2) }),
+      ),
+    );
+    expect(await count()).toBe(3);
   });
 
   it("is offered on every surface", async () => {

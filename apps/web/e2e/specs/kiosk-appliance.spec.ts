@@ -138,7 +138,7 @@ test("wake lock, idle reset and the offline page", async ({
   await context.clock.fastForward(50_000);
   await expect(countdown).toContainText("back to the start in 10 s");
   // A touch cancels the countdown and starts the minute again.
-  await kiosk.getByRole("heading", { name: "Chores", level: 1 }).click();
+  await kiosk.getByRole("heading", { name: "Bounties", level: 1 }).click();
   await expect(countdown).toHaveCount(0);
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
   await context.clock.fastForward(61_000);
@@ -154,7 +154,7 @@ test("wake lock, idle reset and the offline page", async ({
   // A page left open with nobody tapped in goes home too.
   await kiosk.goto("/kiosk/notes");
   await expect(
-    kiosk.getByRole("heading", { name: "Notes", level: 1 }),
+    kiosk.getByRole("heading", { name: "Board", level: 1 }),
   ).toBeVisible();
   await context.clock.fastForward(61_000);
   await expect(kiosk).toHaveURL(/\/kiosk$/);
@@ -176,7 +176,7 @@ test("wake lock, idle reset and the offline page", async ({
   await expect(kiosk.getByRole("button", { name: "Try again" })).toBeVisible();
   await context.setOffline(false);
   await expect(
-    kiosk.getByRole("heading", { name: "Notes", level: 1 }),
+    kiosk.getByRole("heading", { name: "Board", level: 1 }),
   ).toBeVisible();
   await expect(kiosk).toHaveURL(/\/kiosk\/notes$/);
 

@@ -53,6 +53,7 @@ export function CalendarGrid({
 /** One day in the grid: its label, then its events. */
 export function CalendarDayCell({
   label,
+  shortLabel,
   today = false,
   muted = false,
   tall = false,
@@ -61,6 +62,12 @@ export function CalendarDayCell({
 }: {
   /** "Fri 15 Jan" or, in the month view, "15". */
   label: string;
+  /**
+   * The month view's "15": shown instead of `label` from sm up, where the
+   * grid's weekday row says the rest. On a phone the days stack, so the
+   * full label shows there.
+   */
+  shortLabel?: string;
   /** Marks the current day (`aria-current="date"`). */
   today?: boolean;
   /** A day outside the month the month view shows. */
@@ -76,8 +83,8 @@ export function CalendarDayCell({
       className={cx(
         // Square pixel cells (no notched corners, which read as rounded at
         // this size): a 2px line frame, today a 4px violet one.
-        "flex min-w-0 flex-col gap-1 p-1.5",
-        tall ? "min-h-40" : "min-h-24",
+        "relative flex min-w-0 flex-col gap-1 p-1.5",
+        tall ? "min-h-40" : "min-h-24 sm:min-h-32",
         today
           ? "border-4 border-bm-violet bg-bm-raised"
           : muted
@@ -88,11 +95,22 @@ export function CalendarDayCell({
     >
       <span
         className={cx(
-          "w-fit px-1 font-display text-xs leading-6",
+          "w-fit px-1 font-display leading-6",
+          shortLabel ? "text-xs sm:text-base" : "text-xs",
           today ? "bg-bm-violet text-bm-ink" : "text-bm-text",
         )}
       >
-        {label}
+        {shortLabel ? (
+          <>
+            <span className="sm:hidden">{label}</span>
+            <span className="max-sm:hidden" aria-hidden="true">
+              {shortLabel}
+            </span>
+            <span className="max-sm:hidden sr-only">{label}</span>
+          </>
+        ) : (
+          label
+        )}
       </span>
       {children}
     </li>
@@ -103,6 +121,11 @@ export interface CalendarEventButtonProps extends ButtonHTMLAttributes<HTMLButto
   title: string;
   /** "19:00" or "All day". */
   time: string;
+  /**
+   * The chip's colour (a CSS colour): whose event it is, as in the
+   * prototype's month grid. Violet without one.
+   */
+  accent?: string;
   kiosk?: boolean;
 }
 
@@ -110,16 +133,19 @@ export interface CalendarEventButtonProps extends ButtonHTMLAttributes<HTMLButto
 export function CalendarEventButton({
   title,
   time,
+  accent,
   kiosk = false,
   className,
+  style,
   type = "button",
   ...props
 }: CalendarEventButtonProps) {
   return (
     <button
       type={type}
+      style={accent ? { ["--chip" as string]: accent, ...style } : style}
       className={cx(
-        "flex w-full min-w-0 flex-col items-start border-l-[5px] border-bm-violet bg-bm-violet/20 px-2 text-left text-bm-text",
+        "flex w-full min-w-0 flex-col items-start border-l-[5px] border-(--chip) bg-(--chip)/15 px-2 text-left text-bm-text [--chip:var(--color-bm-violet)]",
         kiosk ? "min-h-14 py-2 text-lg" : "min-h-11 py-1 text-base",
         className,
       )}
@@ -128,5 +154,42 @@ export function CalendarEventButton({
       <span className="font-label text-xs text-bm-muted uppercase">{time}</span>
       <span className="w-full truncate font-medium">{title}</span>
     </button>
+  );
+}
+
+/**
+ * An event in a kitchen-screen month cell (the prototype's month grid): one
+ * line, a bar in its colour, not a button of its own. The day it sits in is
+ * the target; it opens that day, where each event is a full button.
+ */
+export function CalendarChip({
+  title,
+  accent,
+  kiosk = false,
+}: {
+  title: string;
+  /** A CSS colour; violet without one. */
+  accent?: string;
+  kiosk?: boolean;
+}) {
+  return (
+    <span
+      style={accent ? { ["--chip" as string]: accent } : undefined}
+      className={cx(
+        "block w-full min-w-0 truncate border-l-4 border-(--chip) bg-(--chip)/15 px-1.5 leading-7 text-bm-text [--chip:var(--color-bm-violet)]",
+        kiosk ? "text-base" : "text-sm",
+      )}
+    >
+      {title}
+    </span>
+  );
+}
+
+/** "+2 more" under a month cell's chips. */
+export function CalendarMore({ count }: { count: number }) {
+  return (
+    <span className="px-1 font-label text-xs font-bold text-bm-muted uppercase">
+      +{count} more
+    </span>
   );
 }

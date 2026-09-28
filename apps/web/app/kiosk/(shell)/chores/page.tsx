@@ -21,8 +21,8 @@ import {
 } from "../../actions";
 import { CheckPinForm } from "./check-pin-form";
 
-// The kiosk's chores (SPEC §8): once someone taps their avatar, the chore
-// grid, acting as them. It moved here from the kiosk home when the home
+// The kiosk's bounties (SPEC §8; ADR 0005 §2): once someone taps their
+// avatar, the bounty board, acting as them. It moved here from the kiosk home when the home
 // became the hub's widgets (issue #20). "Check my PIN" stays, the smallest
 // attested request.
 //
@@ -31,7 +31,7 @@ import { CheckPinForm } from "./check-pin-form";
 // button there asks for their PIN.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Chores - Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Bounties - Kiosk - Baumy" };
 
 export default async function KioskChoresPage({
   searchParams,
@@ -62,10 +62,10 @@ export default async function KioskChoresPage({
     <>
       <PageHeading
         eyebrow={kiosk.deviceName ?? "Kiosk"}
-        title="Chores"
+        title="Bounties"
         description={
           acting
-            ? `Hi ${kiosk.displayName}. Tap a chore you just did. Anything that needs your PIN will ask for it.`
+            ? `Hi ${kiosk.displayName}. Tap a bounty you just did. Anything that needs your PIN will ask for it.`
             : "Tap your avatar at the top to start."
         }
         actions={
@@ -80,9 +80,12 @@ export default async function KioskChoresPage({
             <section
               aria-labelledby="needs-ok"
               data-testid="needs-ok-banner"
-              className="border-2 border-bm-line bg-bm-raised p-4"
+              className="pixel-frame pixel-frame-4 bg-bm-raised p-5"
             >
-              <h2 id="needs-ok" className="mb-3 text-xl font-semibold">
+              <h2
+                id="needs-ok"
+                className="mb-4 font-display text-base leading-relaxed text-bm-yellow"
+              >
                 {waiting > 0 ? needsOkLabel(waiting) : "Your open claims"}
               </h2>
               <ClaimList

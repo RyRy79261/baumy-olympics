@@ -53,6 +53,7 @@ export default async function CalendarPage({
           memberNames={Object.fromEntries(
             people.map((p) => [p.id, p.displayName]),
           )}
+          memberColors={Object.fromEntries(people.map((p) => [p.id, p.color]))}
           actions={{
             create: createEventAction,
             update: updateEventAction,

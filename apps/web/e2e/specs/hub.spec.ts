@@ -77,7 +77,7 @@ test("pin a note on the phone and see it on the kiosk home after a refresh", asy
   // On the phone: a long note whose body tries to inject HTML and script.
   await page.goto("/notes");
   await expect(
-    page.getByRole("heading", { name: "Notes", level: 1 }),
+    page.getByRole("heading", { name: "Board", level: 1 }),
   ).toBeVisible();
   await page.getByRole("button", { name: "New note" }).click();
   const sheet = page.getByRole("dialog", { name: "New note" });
@@ -168,7 +168,7 @@ test("on the kiosk, adding a note asks for the member's PIN", async ({
   // Nobody has tapped in: the notes can be read, not changed.
   await kioskNav(kiosk, "Board");
   await expect(
-    kiosk.getByRole("heading", { name: "Notes", level: 1 }),
+    kiosk.getByRole("heading", { name: "Board", level: 1 }),
   ).toBeVisible();
   await expect(kiosk.getByRole("button", { name: "New note" })).toHaveCount(0);
 

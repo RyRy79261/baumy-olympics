@@ -148,5 +148,7 @@ describe("StickyNote", () => {
 describe("NoteGrid", () => {
   it("lays notes out in columns", () => {
     expect(html(<NoteGrid />)).toContain("lg:grid-cols-3");
+    // Each note is as tall as its text, not as its row.
+    expect(html(<NoteGrid />)).toContain("items-start");
   });
 });

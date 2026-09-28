@@ -11,12 +11,13 @@ import {
   updateNoteAction,
 } from "./actions";
 
-// /notes (SPEC §3.5): the household's sticky notes. Pinned ones also show on
+// /notes, shown as the "Board" (SPEC §3.5; ADR 0005 §3): the household's
+// sticky notes, the messages the kitchen screen counts. Pinned ones also show on
 // the hub and the kitchen screen. Bodies are markdown, shown only through
 // the sanitising renderer.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Notes - Baumy Olympics" };
+export const metadata: Metadata = { title: "Board - Baumy Olympics" };
 
 export default async function NotesPage() {
   const me = await requireMemberPage();
@@ -28,7 +29,7 @@ export default async function NotesPage() {
   return (
     <>
       <PageHeading
-        title="Notes"
+        title="Board"
         description="Short notes for the house, like the plumber's visit or the guest wifi. Never passwords. Pin one to show it on the hub and the kitchen screen."
       />
       {listed.ok ? (

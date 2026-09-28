@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import type { Queryable } from "./index";
 import { members, notes } from "./schema";
 
@@ -58,6 +58,26 @@ export async function listNotes(
     .limit(input.limit);
 }
 
+/**
+ * How many live notes were added or had their words edited after `since`
+ * (the Messages count, ADR 0005 §3). Pinning and unpinning are not edits.
+ */
+export async function countNotesEditedSince(
+  db: Queryable,
+  input: { householdId: string; since: Date },
+): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(notes)
+    .where(
+      and(
+        live(input.householdId),
+        gt(sql`coalesce(${notes.editedAt}, ${notes.createdAt})`, input.since),
+      ),
+    );
+  return Number(row?.n ?? 0);
+}
+
 /** One live note of the household, or null (missing, deleted, elsewhere). */
 export async function findNote(
   db: Queryable,
@@ -100,6 +120,7 @@ export async function insertNote(
       pinned: input.pinned,
       createdAt: input.now,
       updatedAt: input.now,
+      editedAt: input.now,
     })
     .returning({ id: notes.id });
   return row!.id;
@@ -117,6 +138,7 @@ export async function updateNote(
       bodyMd: input.bodyMd,
       color: input.color,
       updatedAt: input.now,
+      editedAt: input.now,
     })
     .where(live(input.householdId, input.id))
     .returning({ id: notes.id });
