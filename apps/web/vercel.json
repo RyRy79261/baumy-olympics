@@ -4,6 +4,12 @@
   "regions": ["fra1"],
   "buildCommand": "pnpm run vercel-build",
   "ignoreCommand": "bash ../../scripts/vercel-ignore-build.sh",
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/daily",

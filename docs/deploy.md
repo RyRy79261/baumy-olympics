@@ -5,6 +5,22 @@ and what stops a preview from touching production. The decision is
 [ADR 0004](decisions/0004-skip-previews-for-dependabot.md). The one-off
 account steps are in [SETUP.md](SETUP.md).
 
+[CORRECTION 2026-09-29] **Preview deployments are off (issue #101).** The
+Hobby account's 100 deployments a day are shared by about seven projects,
+and this one used 27 in a day. `apps/web/vercel.json` sets
+`git.deploymentEnabled` to `{"**": false, "main": true}`: no branch but
+`main` creates a Vercel deployment at all, so a PR gets no preview URL, no
+Vercel check and no Neon branch. `main` still deploys to production. GitHub
+CI (the gate and e2e against Docker Postgres) still tests every PR. The
+preview machinery below (the integration's branching, the migrate guard, the
+ignored-build step, `neon-pr-cleanup.yml`) stays as a harmless safety net and
+works unchanged if previews are ever turned back on, by deleting that key.
+Why `**` and not `*`: Vercel matches the keys with minimatch, where `*` stops
+at `/` and so would not match `feat/x`; `**` matches every branch name. A
+branch matching both keys deploys, because Vercel deploys when any matching
+rule is `true`. (A branch whose name starts with a dot matches neither and
+would still deploy; we never use one.)
+
 [CORRECTION 2026-09-29] Until issue #99 our own workflow
 (`neon-pr-preview.yml` + `scripts/neon-preview-env.sh`) made the preview
 branches and a `NEON_PREVIEW_READY` gate held each preview's first build.
@@ -18,7 +34,7 @@ in camp-404, and a cleanup workflow copied from camp-404 deletes them.
 | File                                    | What it does                                                                                                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Vercel Neon integration (dashboard)     | On each preview deployment: creates Neon branch `preview/<branch>` from the primary branch and writes its branch-scoped `DATABASE_URL*` Preview env.          |
-| `apps/web/vercel.json`                  | Build command `pnpm run vercel-build`; ignored-build step `bash ../../scripts/vercel-ignore-build.sh`.                                                        |
+| `apps/web/vercel.json`                  | `git.deploymentEnabled` (only `main` deploys); build command `pnpm run vercel-build`; ignored-build step `bash ../../scripts/vercel-ignore-build.sh`.         |
 | `apps/web/package.json` `vercel-build`  | `pnpm --filter @baumy/db db:migrate && pnpm --filter @baumy/db db:seed && next build`. Migrations run on every deploy; the seed adds the starter chores once. |
 | `packages/db/scripts/seed.ts`           | `db:seed` (issue #14). Same guard as `db:migrate`; adds the SPEC §4.7 starter chores only while the household has no chores at all.                           |
 | `packages/db/scripts/migrate.ts`        | `db:migrate`. Asks the guard (`src/migrate-guard.ts`), logs the target **host** only, then applies the migrations to `DATABASE_URL_UNPOOLED`.                 |
@@ -31,6 +47,10 @@ and the flow matches camp-404's: the integration makes each preview's branch,
 `vercel-build` migrates it, the cleanup deletes it.
 
 ## What happens on a pull request
+
+With previews off (issue #101), nothing on Vercel or Neon: GitHub CI runs,
+and the steps below do not happen. They describe the flow if previews are
+turned back on.
 
 1. You push a branch and open a PR. Vercel starts a preview deployment; the
    Neon integration creates `preview/<branch>` (a copy of production's data)
@@ -145,6 +165,7 @@ DATABASE_URL_UNPOOLED='postgres://…' pnpm --filter @baumy/db db:migrate
 ```
 
 Tests: `packages/db/src/__tests__/migrate-guard.test.ts` (the guard),
-`scripts/tests/vercel-ignore-build.test.sh` (the ignored-build step), and the
+`scripts/tests/vercel-ignore-build.test.sh` (the ignored-build step),
+`scripts/tests/vercel-deployment-enabled.test.sh` (only `main` deploys), and the
 `db-local` CI job, which runs `vercel-build` on a "preview" pointed at
 `PROD_DB_HOST` and expects it to fail.
