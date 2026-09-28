@@ -1,7 +1,8 @@
+import { avatarFor } from "@baumy/types";
 import type { CSSProperties } from "react";
 import { BaumyCat } from "./baumy-cat";
 import { cx } from "./cx";
-import { Housemate } from "./housemate";
+import { Housemate, SHIRT_COLOURS } from "./housemate";
 import { Glyph } from "./pixel/glyph";
 
 // The kitchen screen's full-screen reminder (ADR 0005 §4), the approved
@@ -18,9 +19,10 @@ import { Glyph } from "./pixel/glyph";
 export interface ReminderFace {
   id: string;
   displayName: string;
-  /** Their colour (`members.color`), for the name and a seen card. */
-  color: string;
-  /** `members.avatar` as stored; null draws their default character. */
+  /**
+   * `members.avatar` as stored; null draws their default character. Their
+   * name, their seen card and their dismiss button take its shirt colour.
+   */
   avatar: unknown;
   seen: boolean;
 }
@@ -42,6 +44,13 @@ const C = {
 } as const;
 
 /** The prototype's raised (or pressed) bevel: light top-left, dark bottom-right. */
+/** A face's colour: their character's shirt. */
+export function faceColour(face: Pick<ReminderFace, "id" | "avatar">): string {
+  return SHIRT_COLOURS[
+    avatarFor({ id: face.id, avatar: face.avatar }).shirtColor
+  ];
+}
+
 function bevel(raised = true): CSSProperties {
   return {
     boxShadow: raised
@@ -213,7 +222,7 @@ export function ReminderScreen({
               data-seen={f.seen}
               className="flex flex-col items-center gap-3 p-3"
               style={{
-                background: f.seen ? `${f.color}26` : C.panel,
+                background: f.seen ? `${faceColour(f)}26` : C.panel,
                 ...bevel(),
               }}
             >
@@ -239,7 +248,7 @@ export function ReminderScreen({
               </span>
               <span
                 className="max-w-full truncate font-display text-[16px] uppercase"
-                style={{ color: f.color }}
+                style={{ color: faceColour(f) }}
               >
                 {f.displayName}
               </span>
@@ -295,8 +304,14 @@ export function ReminderScreen({
                   type="button"
                   disabled={busy}
                   onClick={() => onDismissAs?.(f.id)}
-                  className="h-[56px] min-w-[120px] px-4 font-display text-[14px] uppercase active:translate-y-px"
-                  style={{ background: C.chrome, color: f.color, ...bevel() }}
+                  aria-label={f.displayName}
+                  title={f.displayName}
+                  className="h-[56px] max-w-[240px] min-w-[120px] truncate px-4 font-display text-[14px] uppercase active:translate-y-px"
+                  style={{
+                    background: C.chrome,
+                    color: faceColour(f),
+                    ...bevel(),
+                  }}
                 >
                   {f.displayName}
                 </button>
