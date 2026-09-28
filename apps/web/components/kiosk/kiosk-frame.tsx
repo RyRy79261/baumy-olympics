@@ -25,7 +25,9 @@ export function KioskFrame({
   return (
     <>
       {top}
-      <main className="min-h-0 flex-1 overflow-auto p-4 pb-14">{children}</main>
+      <main className="flex min-h-0 flex-1 flex-col overflow-auto p-4 pb-14">
+        {children}
+      </main>
     </>
   );
 }
