@@ -1780,6 +1780,13 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `authorize_mcp_client`: The member's own account settings: only in the app, signed in.
 - `list_mcp_connections`: The member's own account settings: only in the app, signed in.
 - `revoke_mcp_connection`: The member's own account settings: only in the app, signed in.
+- `get_account_security`: The member's own account settings: only in the app, signed in.
+- `revoke_session`: The member's own account settings: only in the app, signed in.
+- `revoke_other_sessions`: The member's own account settings: only in the app, signed in.
+- `rename_passkey`: The member's own account settings: only in the app, signed in.
+- `remove_passkey`: The member's own account settings: only in the app, signed in.
+- `unlink_google`: The member's own account settings: only in the app, signed in.
+- `set_first_password`: The member's own account settings: only in the app, signed in.
 - `pair_kiosk`: An admin action: UI only (SPEC §12 decision 10).
 - `revoke_kiosk`: An admin action: UI only (SPEC §12 decision 10).
 - `check_kiosk_pin`: Checks a PIN typed on the kitchen screen; only the kiosk has one.
