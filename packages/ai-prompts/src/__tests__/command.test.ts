@@ -39,6 +39,18 @@ describe("commandContext", () => {
     );
   });
 
+  it("says whether the acting member is an admin (issue #107)", () => {
+    expect(
+      commandContext({ ...input, actor: { ...input.actor, admin: true } }),
+    ).toContain("The acting member is a household admin.");
+    expect(commandContext(input)).toContain(
+      "The acting member is not an admin.",
+    );
+    expect(commandContext({ ...input, device: "kiosk" })).toContain(
+      "Admin work (bounties, the pot) cannot be approved here.",
+    );
+  });
+
   it("says when the command comes from the kitchen iPad", () => {
     const text = commandContext({ ...input, device: "kiosk" });
     expect(text).toContain("shared kitchen iPad");
@@ -62,5 +74,17 @@ describe("commandSystemPrompt", () => {
     );
     expect(BAUMY_PERSONA).toContain("Never invent an id");
     expect(BAUMY_PERSONA).toContain("ONE add_shopping_items call");
+  });
+
+  it("offers admins the bounty and pot writes, and nothing else admin (issue #107)", () => {
+    for (const tool of [
+      "create_bounty",
+      "update_bounty",
+      "add_pot_contribution",
+    ]) {
+      expect(BAUMY_PERSONA).toContain(tool);
+    }
+    expect(BAUMY_PERSONA).toContain("only when the context below says");
+    expect(BAUMY_PERSONA).not.toContain("Admin work (chores");
   });
 });
