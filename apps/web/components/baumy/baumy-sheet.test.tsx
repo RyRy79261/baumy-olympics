@@ -20,6 +20,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("@/app/kiosk/actions", () => ({ clearPickAction: vi.fn() }));
 
 const { BaumySheet } = await import("./baumy-sheet");
+const { MIN_CLIP_MS } = await import("@/lib/ai/voice");
+const NOW = Date.parse("2026-09-28T10:00:00.000Z");
 const { closeOpenDialogs } = await import("@/components/kiosk/idle-reset");
 
 beforeAll(() => {
@@ -82,6 +84,7 @@ afterEach(() => {
   root = null;
   document.body.innerHTML = "";
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function mount(voice: boolean) {
@@ -214,9 +217,14 @@ describe("BaumySheet voice", () => {
   });
 
   it("drops a clip too short to hold words", async () => {
+    // Only Date is faked (the timers stay real for settle): the clip lasts
+    // exactly as long as we say, however slow the machine is.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     mount(true);
     await act(async () => mic()!.click());
     await settle();
+    vi.setSystemTime(NOW + MIN_CLIP_MS - 1);
     await act(async () => mic()!.click());
     await settle();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -411,6 +419,47 @@ describe("BaumySheet on the kitchen dashboard", () => {
     await settle();
     expect(bubble()).toBeNull();
     expect(document.body.textContent).not.toContain("Log Bins for Ryan");
+  });
+
+  it("asks Claude nothing when a reminder closed it while it was transcribing", async () => {
+    // The transcriber is slow: the reminder comes up before the words do.
+    let heard: (r: Response) => void = () => undefined;
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/ai/transcribe"
+        ? new Promise<Response>((resolve) => {
+            heard = resolve;
+          })
+        : json({
+            ok: true,
+            data: {
+              reply: "Bins it is.",
+              proposals: [proposal],
+              choices: { members: [], chores: [] },
+            },
+          }),
+    );
+    mountCat({ actingName: "Ryan" });
+    await act(async () => cat().click());
+    await settle(300);
+    await act(async () => button("Done talking").click());
+    await settle();
+    expect(bubble()!.dataset.mode).toBe("thinking");
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      "/api/ai/transcribe",
+    ]);
+    await act(async () => closeOpenDialogs(document));
+    expect(bubble()).toBeNull();
+    // The transcript lands after that: nobody is asking any more.
+    await act(async () =>
+      heard(json({ ok: true, data: { text: "I did the bins" } })),
+    );
+    await settle();
+    await settle();
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      "/api/ai/transcribe",
+    ]);
+    expect(bubble()).toBeNull();
+    expect(document.body.textContent).not.toContain("I did the bins");
   });
 
   it("does nothing on No, and Type instead opens the sheet", async () => {
