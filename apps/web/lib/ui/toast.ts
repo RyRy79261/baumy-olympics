@@ -3,8 +3,8 @@ import type { ActionResult } from "@/lib/actions/result";
 // Toasts: a module-level store, read by the one mounted <Toaster/>
 // (components/toaster.tsx). A one-tap action reports its outcome here; a form
 // shows its errors inline instead (AGENTS.md "UI"). The shape follows camp-404
-// `packages/ui/src/components/toast.tsx`; the styled version belongs to the
-// pixel UI kit (issue #7).
+// `packages/ui/src/components/toast.tsx`; the pixel kit draws it
+// (packages/ui toast.tsx).
 //
 // CLIENT-ONLY state: the server never reads it (the Toaster's server snapshot
 // is a constant empty list), so nothing leaks between requests.

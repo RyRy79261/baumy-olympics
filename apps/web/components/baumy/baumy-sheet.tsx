@@ -240,7 +240,7 @@ export function BaumySheet({
           </SpeechBubble>
 
           {heard ? (
-            <p className="text-sm text-neutral-700" data-testid="baumy-heard">
+            <p className="text-sm text-bm-muted" data-testid="baumy-heard">
               You said: “{heard}”
             </p>
           ) : null}
@@ -262,7 +262,7 @@ export function BaumySheet({
             />
           ) : null}
           {micHint || (voice && micOff) ? (
-            <p role="status" className="text-sm text-neutral-700">
+            <p role="status" className="text-sm text-bm-muted">
               {micHint ?? micOff}
             </p>
           ) : null}
@@ -323,9 +323,7 @@ export function BaumySheet({
                   {bulk ? "Saving…" : `Approve all (${targets.length})`}
                 </Button>
               ) : null}
-              {skips ? (
-                <p className="text-sm text-neutral-700">{skips}</p>
-              ) : null}
+              {skips ? <p className="text-sm text-bm-muted">{skips}</p> : null}
             </section>
           ) : null}
 

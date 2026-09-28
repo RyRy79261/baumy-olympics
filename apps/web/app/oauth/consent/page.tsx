@@ -18,7 +18,7 @@ import { MCP_SCOPES, defaultTicked, type McpScope } from "@/lib/mcp/scopes";
 //
 // The form posts to the authorize endpoint, not a server action: its answer
 // is a page that navigates back to the app (lib/mcp/http.ts `htmlRedirect`).
-// Neutral placeholder look until issue #7.
+// The look is the pixel kit's (packages/ui, issue #64).
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Connect an app - Baumy Olympics" };
@@ -113,7 +113,7 @@ function Consent({
                     hint={SCOPE_TEXT[scope].hint}
                   >
                     <ul
-                      className="list-disc pl-5 text-sm text-neutral-700"
+                      className="list-disc pl-5 text-sm text-bm-muted"
                       aria-label={`${scope} tools`}
                     >
                       {list.map((line) => (

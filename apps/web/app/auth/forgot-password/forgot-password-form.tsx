@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import {
+  Button,
+  Field,
+  FormMessage,
+  Input,
+  PageHeading,
+  linkClass,
+} from "@baumy/ui";
 import { authClient } from "@/lib/auth-client";
 import {
   forgotPasswordErrorSentence,
@@ -28,14 +36,16 @@ export function ForgotPasswordForm({
 
   if (!emailEnabled) {
     return (
-      <div>
-        <h1>Password reset is off</h1>
+      <div className="flex flex-col gap-4">
+        <PageHeading title="Password reset is off" />
         <p>
           Email is not set up here yet, so a reset link has no way to reach you.
           Ask the household admin for help getting back in.
         </p>
         <p>
-          <Link href="/auth/sign-in">Back to sign in</Link>
+          <Link href="/auth/sign-in" className={linkClass}>
+            Back to sign in
+          </Link>
         </p>
       </div>
     );
@@ -64,41 +74,43 @@ export function ForgotPasswordForm({
 
   if (sent) {
     return (
-      <div>
-        <h1>Reset link sent</h1>
-        <p role="status">{RESET_LINK_SENT}</p>
+      <div className="flex flex-col gap-4">
+        <PageHeading title="Reset link sent" />
+        <FormMessage tone="success">{RESET_LINK_SENT}</FormMessage>
         <p>The link works once and expires in an hour.</p>
         <p>
-          <Link href="/auth/sign-in">Back to sign in</Link>
+          <Link href="/auth/sign-in" className={linkClass}>
+            Back to sign in
+          </Link>
         </p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={submit}>
-      <h1>Forgot your password?</h1>
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <PageHeading title="Forgot your password?" />
+      <Field id="forgot-email" label="Email">
+        {(control) => (
+          <Input
+            {...control}
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={pending}
+          />
+        )}
+      </Field>
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      <Button type="submit" disabled={pending}>
+        {pending ? "Sending..." : "Send reset link"}
+      </Button>
       <p>
-        <label htmlFor="forgot-email">Email</label>
-        <br />
-        <input
-          id="forgot-email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={pending}
-        />
-      </p>
-      {error ? <p role="alert">{error}</p> : null}
-      <p>
-        <button type="submit" disabled={pending}>
-          {pending ? "Sending..." : "Send reset link"}
-        </button>
-      </p>
-      <p>
-        <Link href="/auth/sign-in">Back to sign in</Link>
+        <Link href="/auth/sign-in" className={linkClass}>
+          Back to sign in
+        </Link>
       </p>
     </form>
   );

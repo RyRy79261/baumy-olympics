@@ -74,7 +74,7 @@ export default async function KioskChoresPage() {
             <section
               aria-labelledby="needs-ok"
               data-testid="needs-ok-banner"
-              className="rounded border border-neutral-400 bg-neutral-50 p-4"
+              className="border-2 border-bm-line bg-bm-raised p-4"
             >
               <h2 id="needs-ok" className="mb-3 text-xl font-semibold">
                 {waiting > 0 ? needsOkLabel(waiting) : "Your open claims"}

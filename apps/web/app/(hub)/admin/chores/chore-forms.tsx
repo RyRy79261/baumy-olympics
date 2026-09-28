@@ -246,7 +246,7 @@ function EditChoreDialog({
           }}
           errors={errors}
         />
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-bm-muted">
           New points or a new cooldown apply from now on; what was already
           scored keeps its points.
         </p>
@@ -281,12 +281,12 @@ export function ChoreAdminRow({ chore }: { chore: ChoreView }) {
 
   return (
     <li
-      className="flex flex-wrap items-center gap-3 border-b border-neutral-200 py-3 last:border-b-0"
+      className="flex flex-wrap items-center gap-3 border-b border-bm-line py-3 last:border-b-0"
       data-testid={`admin-chore-${chore.name}`}
     >
       <Sprite name={chore.sprite} />
       <span className="font-semibold">{chore.name}</span>
-      <span className="text-sm text-neutral-700">
+      <span className="text-sm text-bm-muted">
         {chore.basePoints !== null ? `${chore.basePoints} pts` : "no points"}
         {chore.cooldownMinutes !== null
           ? ` · cooldown ${chore.cooldownMinutes / 60}h`

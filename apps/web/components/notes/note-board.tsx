@@ -37,7 +37,7 @@ import { toast, toastActionError } from "@/lib/ui/toast";
 // the acting member's PIN in the request that makes it; on a phone the
 // session vouches and no pad opens.
 //
-// NEUTRAL PLACEHOLDER layout; issue #7 restyles it through packages/ui.
+// Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
 export interface NoteActions {
   create: FormAction<NoteWriteData>;
@@ -77,7 +77,7 @@ export function NoteBoard({
         </div>
       ) : null}
       {notes.length === 0 ? (
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-bm-muted">
           No notes yet. Add one for the plumber, the bins or the guest wifi.
         </p>
       ) : (

@@ -31,7 +31,7 @@ import { toast, toastActionError } from "@/lib/ui/toast";
 // re-reads the list afterwards. On the kiosk nobody can change it until
 // someone taps their avatar; it asks for no PIN.
 //
-// NEUTRAL PLACEHOLDER layout; issue #7 restyles it through packages/ui.
+// Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
 export interface ShoppingActions {
   add: FormAction<AddShoppingData>;
@@ -59,7 +59,7 @@ export function ShoppingList({
         <QuickAdd action={actions.add} kiosk={kiosk} id={`${idPrefix}-add`} />
       ) : null}
       {items.length === 0 ? (
-        <p className="text-sm text-neutral-600" data-testid="shopping-empty">
+        <p className="text-sm text-bm-muted" data-testid="shopping-empty">
           The list is empty.
         </p>
       ) : canEdit ? (

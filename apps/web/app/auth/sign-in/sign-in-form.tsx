@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import {
+  Button,
+  Field,
+  FormMessage,
+  Input,
+  PageHeading,
+  linkClass,
+} from "@baumy/ui";
 import { authClient } from "@/lib/auth-client";
 import {
   OAUTH_FAILED,
@@ -62,52 +70,53 @@ export function SignInForm({
   }
 
   return (
-    <form onSubmit={submit}>
-      <h1>Sign in</h1>
-      <p>
-        <label htmlFor="signin-email">Email</label>
-        <br />
-        <input
-          id="signin-email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={pending}
-        />
-      </p>
-      <p>
-        <label htmlFor="signin-password">Password</label>
-        <br />
-        <input
-          id="signin-password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={pending}
-        />
-      </p>
-      {error ? <p role="alert">{error}</p> : null}
-      <p>
-        <button type="submit" disabled={pending}>
-          {pending ? "Signing in..." : "Sign in"}
-        </button>
-      </p>
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <PageHeading title="Sign in" />
+      <Field id="signin-email" label="Email">
+        {(control) => (
+          <Input
+            {...control}
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={pending}
+          />
+        )}
+      </Field>
+      <Field id="signin-password" label="Password">
+        {(control) => (
+          <Input
+            {...control}
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={pending}
+          />
+        )}
+      </Field>
+      {error ? <FormMessage tone="error">{error}</FormMessage> : null}
+      <Button type="submit" disabled={pending}>
+        {pending ? "Signing in..." : "Sign in"}
+      </Button>
       {googleEnabled ? (
-        <p>
-          <button type="button" onClick={google} disabled={pending}>
-            Continue with Google
-          </button>
-        </p>
+        <Button variant="secondary" onClick={google} disabled={pending}>
+          Continue with Google
+        </Button>
       ) : null}
       <p>
-        <Link href="/auth/forgot-password">Forgot your password?</Link>
+        <Link href="/auth/forgot-password" className={linkClass}>
+          Forgot your password?
+        </Link>
       </p>
       <p>
-        New here? <Link href="/auth/sign-up">Create an account</Link>
+        New here?{" "}
+        <Link href="/auth/sign-up" className={linkClass}>
+          Create an account
+        </Link>
       </p>
     </form>
   );
