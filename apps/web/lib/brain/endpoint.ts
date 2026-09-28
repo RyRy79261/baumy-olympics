@@ -37,9 +37,9 @@ import { z } from "zod";
 //      runs as that housemate, an active member of this household (else 404
 //      NOT_FOUND), and the audit row names the asker as its initiator. Not
 //      for `link_telegram`, nor for an action that names its member in its
-//      input (`member_field`, e.g. log_completion's doneBy) → 400. An
-//      `attested` action (claim events, note writes) is refused later, by
-//      requireAttested, with 403: nobody attests for someone else;
+//      input (`member_field`, e.g. log_completion's doneBy) → 400; a claim
+//      event (`own_word_only`: confirm, dispute, undo, withdraw, concede)
+//      → 403, so nobody confirms their own claim as a housemate;
 //   6. a `confirm` or `destructive` action, and any write on someone's
 //      behalf, needs `X-Baumy-Confirmed: 1`, which brain sends only after
 //      the person tapped its inline confirm button → else 428
@@ -288,6 +288,13 @@ async function onBehalfOf(
   // An unlinked asker only gets this far for link_telegram.
   if (name === LINK_ACTION || !asker) {
     return issue("Linking is always for the person who sent /link.");
+  }
+  if (spec.own_word_only) {
+    // Before the confirm check: no point asking for a tap that cannot help.
+    return fail(
+      "FORBIDDEN",
+      `Only that housemate can ${spec.title.toLowerCase()} themself. Ask them to do it in the app or in Telegram.`,
+    );
   }
   if (spec.member_field) {
     return issue(

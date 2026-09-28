@@ -137,13 +137,13 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   `doneBy: <Jo's id>`. The asker logs it and **vouches** for Jo, so it counts
   at once, and the record says truthfully who logged it. On-behalf would
   claim Jo logged it herself.
-- **Never for someone's own word** (403 `FORBIDDEN`, "Only that housemate
-  can do this themself"): the claim events (`confirm_completion`,
-  `dispute_completion`, `undo_completion`, `withdraw_dispute`,
-  `concede_completion`) and the note writes (`create_note`, `update_note`,
-  `pin_note`, `delete_note`). These are `attested` actions: the member has to
-  say it themself, or the honesty layer (nobody confirms their own claim)
-  would mean nothing. Tell the asker the housemate has to do it.
+- **Never for someone's own word** (403 `FORBIDDEN`, before any confirm
+  card): the claim events `confirm_completion`, `dispute_completion`,
+  `undo_completion`, `withdraw_dispute` and `concede_completion`
+  (`own_word_only` in the tool list). The member has to say it themself, or
+  the honesty layer (nobody confirms their own claim) would mean nothing.
+  Tell the asker the housemate has to do it. Notes, reminders, calendar
+  events and the rest do work on a housemate's behalf.
 - Admin actions stay unavailable, on anyone's behalf.
 - To turn a name into a member id, read the roster: `list_reminders` answers
   `members` (id, name) for every active member; `get_standings` lists them
