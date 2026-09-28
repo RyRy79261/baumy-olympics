@@ -276,7 +276,10 @@ export function MemberControls(props: MemberRowProps) {
         <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm underline">
           Edit name and colour
         </summary>
-        <form action={edit.formAction} className="mt-3 flex flex-col gap-4">
+        <form
+          action={edit.formAction}
+          className="mt-3 flex max-w-md flex-col gap-4"
+        >
           <input type="hidden" name="requestId" value={edit.requestId} />
           <input type="hidden" name="op" value="edit" />
           <input type="hidden" name="memberId" value={props.id} />
@@ -346,7 +349,7 @@ export function MemberControls(props: MemberRowProps) {
         </summary>
         <form
           action={telegram.formAction}
-          className="mt-3 flex flex-wrap items-end gap-3"
+          className="mt-3 flex max-w-md flex-col items-start gap-3"
         >
           <input type="hidden" name="requestId" value={telegram.requestId} />
           <input type="hidden" name="op" value="set_telegram" />
