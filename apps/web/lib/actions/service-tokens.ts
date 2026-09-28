@@ -61,20 +61,29 @@ export interface ServiceTokenData {
   token: string | null;
 }
 
-/** The session is live, and was signed in lately or proves the password. */
+/**
+ * The session was signed in lately or proves the password, and is live.
+ *
+ * ORDER MATTERS. The password is checked BEFORE `liveActor` share-locks the
+ * session row. Better Auth's verifyPassword reads the session on its own
+ * connection and may refresh it (an UPDATE of that row). If our
+ * transaction already held `FOR SHARE` on it, that UPDATE would wait on us
+ * while we wait on it, and Postgres cannot see that as a deadlock, so the
+ * request would hang (PR #105 review). Checking freshness needs no lock.
+ */
 async function reauthenticated(
   ctx: ActionCtx,
   currentPassword: string | undefined,
 ): Promise<MemberActor | ActionFailure> {
-  const actor = await liveActor(ctx, SIGNED_OUT);
-  if (isFailure(actor)) return actor;
-  const age = ctx.now.getTime() - Date.parse(actor.sessionCreatedAt);
-  if (age >= 0 && age < FRESH_SESSION_MS) return actor;
-  if (!currentPassword) return fail("REAUTH_REQUIRED", REAUTH_MESSAGE);
-  if (!(await verifyCurrentPassword(currentPassword))) {
-    return fail("REAUTH_REQUIRED", "That password is not right.");
+  const claimed = ctx.actor as MemberActor;
+  const age = ctx.now.getTime() - Date.parse(claimed.sessionCreatedAt);
+  if (!(age >= 0 && age < FRESH_SESSION_MS)) {
+    if (!currentPassword) return fail("REAUTH_REQUIRED", REAUTH_MESSAGE);
+    if (!(await verifyCurrentPassword(currentPassword))) {
+      return fail("REAUTH_REQUIRED", "That password is not right.");
+    }
   }
-  return actor;
+  return liveActor(ctx, SIGNED_OUT);
 }
 
 const shown = (data: ServiceTokenData) => ({
