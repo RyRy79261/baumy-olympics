@@ -26,6 +26,10 @@ secrets from earlier ones.
       integration's preview branching is **on** ([CORRECTION 2026-09-29]
       this said "off" while our own workflow made the branches; issue #99).
       Details: [Vercel and Neon previews](#vercel-and-neon-previews-issue-5).
+      [CORRECTION 2026-09-29] Preview deployments are now off
+      (`git.deploymentEnabled` in `apps/web/vercel.json`, issue #101): only
+      `main` deploys, so the integration makes no preview branches. Leave its
+      preview branching on; it is idle and ready if previews come back.
 - [ ] **Add the custom domain** to `baumy-olympics-web` (Settings → Domains).
       Several settings below need it (`BETTER_AUTH_URL`, `MCP_PUBLIC_URL`,
       the Google OAuth redirect, brain's `OLYMPICS_BASE_URL`), and the kiosk
@@ -298,6 +302,16 @@ What each piece does, and why, is in [deploy.md](deploy.md).
 [CORRECTION 2026-09-29] Previews used to get their Neon branch from our own
 workflow, with the integration's branching off; the Vercel Neon integration
 now makes them, as in camp-404 (issue #99).
+
+[CORRECTION 2026-09-29] **Previews are off** (issue #101): `apps/web/vercel.json`
+sets `git.deploymentEnabled` to `{"**": false, "main": true}`, so no branch
+but `main` creates a Vercel deployment and no PR gets a Neon branch. The
+steps below still describe the setup, so previews work again by deleting
+that key; the "Verify a normal PR" and "Verify the Dependabot skip" checks
+apply only then. To check it now: push any branch and confirm Vercel lists no
+deployment for it, and that the next merge to `main` still deploys to
+production. Do not also set the dashboard's Ignored Build Step or disconnect
+Git; the key is the one switch.
 
 - [ ] **Create the Vercel project** from this repository: Root Directory
       `apps/web`, framework Next.js. `apps/web/vercel.json` sets the build
