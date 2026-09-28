@@ -29,19 +29,17 @@ expect() {
 SKIP=0
 BUILD=1
 
-expect "dependabot preview is skipped even when ready" "$SKIP" \
-  VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF=dependabot/npm_and_yarn/next-16.4.0 NEON_PREVIEW_READY=1
+expect "dependabot preview is skipped" "$SKIP" \
+  VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF=dependabot/npm_and_yarn/next-16.4.0
 expect "dependabot/test-guard preview is skipped" "$SKIP" \
   VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF=dependabot/test-guard
-expect "normal preview without NEON_PREVIEW_READY is skipped" "$SKIP" \
+expect "normal preview builds (the Neon integration supplies its database)" "$BUILD" \
   VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF=feat/12-chores
-expect "normal preview with NEON_PREVIEW_READY=0 is skipped" "$SKIP" \
+expect "the retired NEON_PREVIEW_READY gate no longer skips a preview" "$BUILD" \
   VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF=feat/12-chores NEON_PREVIEW_READY=0
-expect "normal preview with NEON_PREVIEW_READY=1 builds" "$BUILD" \
-  VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF=feat/12-chores NEON_PREVIEW_READY=1
 expect "a ref that merely contains dependabot builds" "$BUILD" \
-  VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF=fix/dependabot-config NEON_PREVIEW_READY=1
-expect "production builds without NEON_PREVIEW_READY" "$BUILD" \
+  VERCEL_ENV=preview VERCEL_GIT_COMMIT_REF=fix/dependabot-config
+expect "production builds" "$BUILD" \
   VERCEL_ENV=production VERCEL_GIT_COMMIT_REF=main
 expect "no VERCEL_ENV (local run) builds" "$BUILD"
 
