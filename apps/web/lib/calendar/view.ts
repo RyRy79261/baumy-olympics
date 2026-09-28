@@ -223,6 +223,23 @@ export function parseViewParams(
   };
 }
 
+/** The chip colour of an event nobody in the app added: the house's. */
+export const HOUSE_EVENT_ACCENT = "var(--color-bm-amber)";
+
+/**
+ * An event chip's colour (the prototype's month grid): the colour of the
+ * member who added it, or the house's amber for everything else (added in
+ * Google, or by a member who has left). Only a `#rrggbb` is trusted into a
+ * style.
+ */
+export function eventAccent(
+  e: Pick<CalendarEventView, "addedBy">,
+  memberColors: Record<string, string>,
+): string {
+  const color = e.addedBy ? memberColors[e.addedBy] : undefined;
+  return color && /^#[0-9a-f]{6}$/i.test(color) ? color : HOUSE_EVENT_ACCENT;
+}
+
 /** The label of a view switch. */
 export function viewLabel(view: CalendarViewKind): string {
   return view === "day" ? "Day" : view === "week" ? "Week" : "Month";

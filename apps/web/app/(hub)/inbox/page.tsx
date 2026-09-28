@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Card, FormMessage, PageHeading } from "@baumy/ui";
+import { Card, FormMessage, PageHeading, SectionHeading } from "@baumy/ui";
 import { ClaimList } from "@/components/claims/claim-list";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
@@ -68,9 +68,7 @@ export default async function InboxPage() {
       />
       <div className="flex flex-col gap-8">
         <section aria-labelledby="needs-you" data-testid="needs-you">
-          <h2 id="needs-you" className="mb-3 text-lg font-semibold">
-            Waiting on you
-          </h2>
+          <SectionHeading id="needs-you">Waiting on you</SectionHeading>
           <ClaimList
             claims={needsYou}
             actions={actions}
@@ -79,9 +77,7 @@ export default async function InboxPage() {
           />
         </section>
         <section aria-labelledby="yours" data-testid="your-claims">
-          <h2 id="yours" className="mb-3 text-lg font-semibold">
-            Your open claims
-          </h2>
+          <SectionHeading id="yours">Your open claims</SectionHeading>
           <ClaimList
             claims={mine}
             actions={actions}
@@ -100,9 +96,7 @@ export default async function InboxPage() {
         ) : null}
         {others.length > 0 ? (
           <section aria-labelledby="others" data-testid="other-claims">
-            <h2 id="others" className="mb-3 text-lg font-semibold">
-              Everyone else's
-            </h2>
+            <SectionHeading id="others">Everyone else's</SectionHeading>
             <ClaimList
               claims={others}
               actions={actions}

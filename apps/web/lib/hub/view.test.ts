@@ -4,9 +4,12 @@ import { isUrgent } from "@/lib/chores/urgency";
 import { eventView } from "@/lib/calendar/view";
 import {
   HUB_EVENTS,
+  MESSAGES_WINDOW_MS,
+  agendaTime,
   OVERDUE_AFTER_MS,
   clockLines,
   dueChores,
+  recentNoteCount,
   upcomingEvents,
   widgetState,
 } from "./view";
@@ -27,7 +30,7 @@ function timed(id: string, from: number, to: number) {
     allDay: false,
     start: iso(from),
     end: iso(to),
-    member: null,
+    member: id === "lunch" ? "m1" : null,
   });
 }
 function allDay(id: string, start: string, end: string) {
@@ -73,11 +76,41 @@ describe("upcomingEvents", () => {
       timed("dinner", 7, 8),
     ];
     expect(upcomingEvents(events, NOW)).toEqual([
-      { id: "bins", title: "bins", time: "All day", location: null },
-      { id: "trip", title: "trip", time: "All day", location: null },
-      { id: "lunch", title: "lunch", time: "11:30–13:00", location: "Kitchen" },
-      { id: "late", title: "late", time: "From 23:00", location: null },
-      { id: "dinner", title: "dinner", time: "19:00–20:00", location: null },
+      {
+        id: "bins",
+        title: "bins",
+        time: "All day",
+        location: null,
+        addedBy: null,
+      },
+      {
+        id: "trip",
+        title: "trip",
+        time: "All day",
+        location: null,
+        addedBy: null,
+      },
+      {
+        id: "lunch",
+        title: "lunch",
+        time: "11:30–13:00",
+        location: "Kitchen",
+        addedBy: "m1",
+      },
+      {
+        id: "late",
+        title: "late",
+        time: "From 23:00",
+        location: null,
+        addedBy: null,
+      },
+      {
+        id: "dinner",
+        title: "dinner",
+        time: "19:00–20:00",
+        location: null,
+        addedBy: null,
+      },
     ]);
   });
 
@@ -168,6 +201,27 @@ describe("dueChores", () => {
     expect(dueChores([chore({ ...soon, urgent: false })], NOW)).toEqual([]);
   });
 
+  it("carries each bounty's glyph, kind, New mark and points", () => {
+    const [cat] = dueChores(
+      [
+        chore({
+          name: "Cat food",
+          sprite: "catfood",
+          kind: "consumable",
+          isNew: true,
+          basePoints: 20,
+        }),
+      ],
+      NOW,
+    );
+    expect(cat).toMatchObject({
+      sprite: "catfood",
+      kind: "consumable",
+      isNew: true,
+      points: 20,
+    });
+  });
+
   it("calls a chore overdue after a day of being due", () => {
     const at = (ms: number) =>
       dueChores(
@@ -186,5 +240,43 @@ describe("clockLines", () => {
       time: "19:05",
       date: "Fri 15 Jan",
     });
+  });
+});
+
+describe("recentNoteCount", () => {
+  it("counts the notes created or changed in the last 24 hours", () => {
+    const ago = (ms: number) => ({
+      updatedAt: new Date(NOW.getTime() - ms).toISOString(),
+    });
+    expect(
+      recentNoteCount(
+        [
+          ago(0),
+          ago(HOUR),
+          ago(MESSAGES_WINDOW_MS - 1),
+          ago(MESSAGES_WINDOW_MS),
+        ],
+        NOW,
+      ),
+    ).toBe(3);
+    expect(recentNoteCount([], NOW)).toBe(0);
+  });
+});
+
+describe("agendaTime", () => {
+  it("splits the start from the end", () => {
+    expect(agendaTime("19:00–20:30")).toEqual({
+      time: "19:00",
+      until: "to 20:30",
+    });
+    expect(agendaTime("Until 11:00")).toEqual({
+      time: "Now",
+      until: "to 11:00",
+    });
+    expect(agendaTime("From 22:00")).toEqual({
+      time: "22:00",
+      until: "till late",
+    });
+    expect(agendaTime("All day")).toEqual({ time: "All day" });
   });
 });

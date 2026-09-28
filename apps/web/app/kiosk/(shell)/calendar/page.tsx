@@ -71,6 +71,7 @@ export default async function KioskCalendarPage({
           memberNames={Object.fromEntries(
             people.map((p) => [p.id, p.displayName]),
           )}
+          memberColors={Object.fromEntries(people.map((p) => [p.id, p.color]))}
           actions={{
             create: kioskCreateEventAction,
             update: kioskUpdateEventAction,
