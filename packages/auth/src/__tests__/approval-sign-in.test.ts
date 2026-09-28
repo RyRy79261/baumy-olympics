@@ -11,6 +11,7 @@ import {
 } from "@baumy/db";
 import { APPROVAL_SIGN_IN_PATH } from "../approval-sign-in";
 import { createAuth, type Auth } from "../config";
+import { AUTH_COOKIE_PREFIX, SECURITY_COOKIES } from "../env";
 import { PASSWORD_MIN_LENGTH } from "../password";
 
 // "Sign in with Baumy" (issue #80): the server-only endpoint that makes the
@@ -125,25 +126,51 @@ describe("signInApproved", () => {
     expect(Number(rows[0]!.hours)).toBeLessThanOrEqual(24);
   });
 
-  it("refuses an account with two-factor on", async () => {
-    // Present before absent: with two-factor off, it signs in...
-    const ok = await auth.api.signInApproved({
-      body: { userId },
-      headers: browser,
-    });
-    expect(ok.userId).toBe(userId);
-    // ...and not once Better Auth's two-factor plugin (issue #79) has it on.
-    await client.query(
-      'update "user" set two_factor_enabled = true where id = $1',
+  it("signs in an account with two-factor on, with no code step", async () => {
+    // Owner ruling 2026-09-29 (issue #95, ADR 0006): the Telegram tap is the
+    // second factor. Better Auth's two-factor plugin (issue #79) has it on.
+    const { rows: on } = await client.query<{ on: boolean }>(
+      'update "user" set two_factor_enabled = true where id = $1 returning two_factor_enabled as "on"',
       [userId],
     );
-    await expect(
-      auth.api.signInApproved({ body: { userId }, headers: browser }),
-    ).rejects.toMatchObject({ status: "FORBIDDEN" });
-    await client.query(
-      'update "user" set two_factor_enabled = false where id = $1',
-      [userId],
-    );
+    expect(on[0]?.on).toBe(true);
+    try {
+      const { headers, response } = await auth.api.signInApproved({
+        body: { userId },
+        headers: browser,
+        returnHeaders: true,
+      });
+      expect(response.sessionId).toEqual(expect.any(String));
+      const cookies = headers.getSetCookie();
+      expect(cookies.some((c) => c.startsWith("baumy.session_token="))).toBe(
+        true,
+      );
+      // No two-factor challenge instead of the session (the password
+      // sign-in's behaviour).
+      expect(
+        cookies.some((c) =>
+          c.startsWith(
+            `${AUTH_COOKIE_PREFIX}.${SECURITY_COOKIES.twoFactorChallenge}=`,
+          ),
+        ),
+      ).toBe(false);
+      // And the session works: signed in, not waiting for a code.
+      const cookie = cookies.map((c) => c.split(";")[0]).join("; ");
+      const got = await auth.handler(
+        new Request(`${ORIGIN}/api/auth/get-session`, { headers: { cookie } }),
+      );
+      const body = (await got.json()) as {
+        user: { id: string; twoFactorEnabled: boolean };
+        session: { id: string };
+      };
+      expect(body.user).toMatchObject({ id: userId, twoFactorEnabled: true });
+      expect(body.session.id).toBe(response.sessionId);
+    } finally {
+      await client.query(
+        'update "user" set two_factor_enabled = false where id = $1',
+        [userId],
+      );
+    }
   });
 
   it("refuses an unknown user", async () => {

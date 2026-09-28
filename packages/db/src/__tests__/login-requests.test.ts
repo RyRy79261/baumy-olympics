@@ -17,7 +17,6 @@ import {
   lockLoginRequest,
   loginRequestState,
   pruneLoginRequests,
-  userHasTwoFactor,
 } from "../login-requests";
 import { loginRequests, members, user } from "../schema";
 import { useTestDb } from "./_harness";
@@ -120,23 +119,28 @@ describe("findLoginCandidate", () => {
     ).toEqual({ memberId: m.id, authUserId: m.authUserId, telegramUserId: 42 });
   });
 
-  it("finds nobody with two-factor on", async () => {
+  it("finds a member with two-factor on too: the tap is the second factor", async () => {
+    // Owner ruling 2026-09-29 (issue #95, ADR 0006).
     const m = await member({ email: "tfa@example.com", telegramUserId: 77 });
-    // Present before absent: found while two-factor is off...
-    expect(await userHasTwoFactor(db(), m.authUserId!)).toBe(false);
+    const found = {
+      memberId: m.id,
+      authUserId: m.authUserId,
+      telegramUserId: 77,
+    };
     expect(
       await findLoginCandidate(db(), HOUSEHOLD_ID, "tfa@example.com"),
-    ).not.toBeNull();
-    // ...and not once it is on (Better Auth's two-factor plugin, issue #79).
-    await t
+    ).toEqual(found);
+    // Better Auth's two-factor plugin (issue #79) turns the flag on.
+    const [on] = await t
       .db()
       .update(user)
       .set({ twoFactorEnabled: true })
-      .where(eq(user.id, m.authUserId!));
-    expect(await userHasTwoFactor(db(), m.authUserId!)).toBe(true);
+      .where(eq(user.id, m.authUserId!))
+      .returning({ on: user.twoFactorEnabled });
+    expect(on?.on).toBe(true);
     expect(
       await findLoginCandidate(db(), HOUSEHOLD_ID, "tfa@example.com"),
-    ).toBeNull();
+    ).toEqual(found);
   });
 
   it("finds nobody unlinked, deactivated, unknown or without a member", async () => {

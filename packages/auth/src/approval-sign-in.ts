@@ -10,6 +10,9 @@
 // ends it after a day at most, instead of the 30 days a password sign-in
 // gets. A tap on a shared screen should not leave it signed in for a month.
 //
+// A member with two-factor on is asked for no code: the tap in Telegram
+// counts as the second factor (owner ruling 2026-09-29, ADR 0006).
+//
 // It is SERVER_ONLY: Better Auth's router does not mount it, so no request
 // can reach it over HTTP. Only a server call, `auth.api.signInApproved`,
 // runs it, and it refuses any call that carries a request as a second belt.
@@ -18,8 +21,6 @@ import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthEndpoint } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import * as z from "zod";
-import { createHttpDb, type Queryable } from "@baumy/db";
-import { userHasTwoFactor } from "@baumy/db/login-requests";
 
 export const APPROVAL_SIGN_IN_PATH = "/sign-in/baumy-approval";
 
@@ -43,17 +44,11 @@ export function approvalSignIn() {
             ctx.body.userId,
           );
           if (!found) throw new APIError("UNAUTHORIZED");
-          // No TOTP step here, so an account with two-factor on is refused
-          // until the owner rules (ADR 0006, [UNRESOLVED]). The web app's
-          // start route already sends it no DM; this is the second belt.
-          if (
-            await userHasTwoFactor(
-              createHttpDb() as unknown as Queryable,
-              found.id,
-            )
-          ) {
-            throw new APIError("FORBIDDEN");
-          }
+          // No TOTP step, even with two-factor on: the tap on the matching
+          // number in Telegram is the second factor (owner ruling
+          // 2026-09-29, ADR 0006, SPEC §12 decision 19). Better Auth's
+          // two-factor hook watches only the password sign-in paths, so it
+          // does not step in here.
           const session = await ctx.context.internalAdapter.createSession(
             found.id,
             DONT_REMEMBER,
