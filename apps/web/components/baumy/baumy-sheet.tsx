@@ -476,7 +476,14 @@ export function BaumySheet({
           <>
             <CatSays>Mrrp? Who&apos;s talking?</CatSays>
             <CatText tone="muted">Tap yourself first.</CatText>
-            <div className="mt-3 flex flex-wrap gap-2">{who}</div>
+            {/* The bubble grows up from the cat, so a long list scrolls
+                inside it rather than running off the top of the screen. */}
+            <div
+              className="mt-3 flex max-h-[45vh] flex-wrap gap-2 overflow-y-auto"
+              data-testid="who-list"
+            >
+              {who}
+            </div>
           </>
         ) : bubble === "ready" ? (
           <>
