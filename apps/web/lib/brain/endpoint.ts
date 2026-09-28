@@ -285,10 +285,24 @@ async function onBehalfOf(
     fail("INVALID_INPUT", message, {
       issues: [{ path: [ON_BEHALF_HEADER], message }],
     });
-  // An unlinked asker only gets this far for link_telegram.
-  if (name === LINK_ACTION || !asker) {
-    return issue("Linking is always for the person who sent /link.");
+  const linking = "Linking is always for the person who sent /link.";
+  // An unlinked asker only gets this far for link_telegram, and has no id
+  // of their own to name: refuse before looking anyone up.
+  if (!asker) return issue(linking);
+  const id = MemberId.safeParse(raw);
+  if (!id.success) return issue("Expected a member id (a UUID).");
+  // Postgres answers an upper-case uuid too: compare the row it found.
+  const target = await deps.findHousemate(id.data.toLowerCase());
+  if (!target) {
+    return fail(
+      "NOT_FOUND",
+      "That person is not an active member of the household.",
+    );
   }
+  // The asker's own id counts as no header at all, for every action; the
+  // refusals below are about acting for someone else.
+  if (target.id === asker.id) return { ok: true, target: null };
+  if (name === LINK_ACTION) return issue(linking);
   if (spec.own_word_only) {
     // Before the confirm check: no point asking for a tap that cannot help.
     return fail(
@@ -301,17 +315,7 @@ async function onBehalfOf(
       `${spec.title} names who it is for in ${spec.member_field}. Send that instead of X-Baumy-On-Behalf-Of.`,
     );
   }
-  const id = MemberId.safeParse(raw);
-  if (!id.success) return issue("Expected a member id (a UUID).");
-  // Postgres answers an upper-case uuid too: compare the row it found.
-  const target = await deps.findHousemate(id.data.toLowerCase());
-  if (!target) {
-    return fail(
-      "NOT_FOUND",
-      "That person is not an active member of the household.",
-    );
-  }
-  return { ok: true, target: target.id === asker.id ? null : target };
+  return { ok: true, target };
 }
 
 /** POST /api/v1/actions/{name}: run one action for a Telegram user. */

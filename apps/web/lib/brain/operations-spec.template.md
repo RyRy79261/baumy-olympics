@@ -130,7 +130,8 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   `source=brain`.
 - Any **write** on someone's behalf needs the asker's tap (section 3). Reads
   do not.
-- The asker's own id in the header is the same as no header.
+- The asker's own id in the header is the same as no header, for every
+  action: the refusals below are only for acting for someone else.
 - Not for `link_telegram`, and not for an action that names its member in its
   own input (`member_field` in the tool list): those answer 400. Today that is
   `log_completion`: "Jo did the dishes" is `log_completion` with

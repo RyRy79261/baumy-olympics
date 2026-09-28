@@ -678,6 +678,75 @@ describe("X-Baumy-On-Behalf-Of", () => {
     });
   });
 
+  it("treats the asker's own id as no header for the claim events and member_field actions too", async () => {
+    const { deps, runAction } = setup();
+    // The same header with a housemate's id is refused (403 and 400)...
+    const claim = await handleBrainAction(
+      post("confirm_completion", { onBehalfOf: HOUSEMATE, confirmed: "1" }),
+      "confirm_completion",
+      deps,
+    );
+    expect(claim.status).toBe(403);
+    const logged = await handleBrainAction(
+      post("log_completion", { onBehalfOf: HOUSEMATE, confirmed: "1" }),
+      "log_completion",
+      deps,
+    );
+    expect(logged.status).toBe(400);
+    expect(runAction).not.toHaveBeenCalled();
+    // ...but the asker's own id, in any case, runs as the asker.
+    const names = [
+      "confirm_completion",
+      "dispute_completion",
+      "undo_completion",
+      "withdraw_dispute",
+      "concede_completion",
+      "log_completion",
+    ];
+    for (const own of [MEMBER, MEMBER.toUpperCase()]) {
+      for (const name of names) {
+        const res = await handleBrainAction(
+          post(name, { onBehalfOf: own, confirmed: "1" }),
+          name,
+          deps,
+        );
+        expect(res.status, `${name} ${own}`).toBe(200);
+      }
+    }
+    expect(runAction).toHaveBeenCalledTimes(names.length * 2);
+    for (const call of runAction.mock.calls) {
+      expect(call[2].actor).toEqual({
+        kind: "service",
+        tokenName: "baumy-brain",
+        telegramUserId: LINKED_TG,
+        memberId: MEMBER,
+      });
+    }
+    // Without the tap, the own id asks for it only when the action itself
+    // would: it is not a write on someone's behalf.
+    const direct = await handleBrainAction(
+      post("log_completion"),
+      "log_completion",
+      deps,
+    );
+    const own = await handleBrainAction(
+      post("log_completion", { onBehalfOf: MEMBER }),
+      "log_completion",
+      deps,
+    );
+    expect(own.status).toBe(direct.status);
+    // And a linked asker's own id on link_telegram is no header either.
+    const link = await handleBrainAction(
+      post("link_telegram", {
+        onBehalfOf: MEMBER,
+        body: JSON.stringify({ code: "ABCDEFGH23" }),
+      }),
+      "link_telegram",
+      deps,
+    );
+    expect(link.status).toBe(200);
+  });
+
   it("refuses it for link_telegram and for actions that name their member in the input", async () => {
     const { deps, runAction } = setup();
     const done = await handleBrainAction(
