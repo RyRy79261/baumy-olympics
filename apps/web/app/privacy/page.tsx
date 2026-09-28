@@ -205,9 +205,12 @@ export default function PrivacyPage() {
             Baumy is switched on and you use it, the bot messages you the
             sign-in&apos;s device name (for example &quot;Chrome on macOS&quot;)
             with the numbers to tap; the request (device name, the numbers and
-            what you answered) is kept for {LOGIN_REQUEST_HOURS} hours, and a
+            what you answered) is deleted by the daily clean-up once it is more
+            than {LOGIN_REQUEST_HOURS} hours old (so within two days), and a
             record that it was asked for, with the asking device&apos;s IP
-            address, stays in the audit log.
+            address, stays in the audit log. baumy-brain keeps its own copy of
+            the device name and the numbers, in the pending sign-in card it
+            sends and in its log.
           </li>
           <li>
             <strong>Chatbots you connect:</strong> a chatbot you connect (for
