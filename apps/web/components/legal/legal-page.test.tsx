@@ -70,7 +70,7 @@ describe("PrivacyPage", () => {
     expect(out).toContain("including the audit log");
     expect(out).toContain("title, times, place, description");
     expect(out).toContain("server code runs in Frankfurt (fra1)");
-    expect(out).toContain("region of the");
+    expect(out).toContain("Vercel Blob in Frankfurt (fra1)");
     expect(out).not.toContain("processed in the EU");
     expect(out).toContain("the calendar, the pot");
     expect(out).toContain("change its colour and avatar");
