@@ -183,9 +183,25 @@ describe("Better Auth against Postgres", () => {
     expect(link).toMatch(/\/api\/auth\/reset-password\//);
     const token = new URL(link!).pathname.split("/").at(-1)!;
 
+    // A device trusted for two-factor, which the reset must forget.
+    await client.query(
+      `insert into verification (id, identifier, value, expires_at)
+       select 'trust-1', 'trust-device-abc', id, now() + interval '1 day'
+         from "user" where email = $1`,
+      [email],
+    );
+    const trusted = async () =>
+      (
+        await client.query<{ n: number }>(
+          "select count(*)::int as n from verification where identifier like 'trust-device-%'",
+        )
+      ).rows[0]?.n;
+    expect(await trusted()).toBe(1);
+
     const newPassword = "a-brand-new-passphrase".padEnd(PASSWORD_MIN_LENGTH);
     const reset = await post("/reset-password", { newPassword, token });
     expect(reset.status).toBe(200);
+    expect(await trusted()).toBe(0);
 
     const stale = await getSession({ authorization: `Bearer ${before}` });
     expect(await stale.json()).toBeNull();

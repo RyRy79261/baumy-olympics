@@ -18,7 +18,11 @@ export const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const TOKEN_EXPIRY_HOURS = 1;
 
 export type AuthEmailKind =
-  "reset" | "verify" | "password-reset-completed" | "password-set";
+  | "reset"
+  | "verify"
+  | "password-reset-completed"
+  | "password-set"
+  | "passkey-added";
 
 export interface AuthEmailInput {
   to: string;
@@ -91,6 +95,18 @@ export function buildAuthEmail(input: AuthEmailInput): AuthEmailBody {
           "If this was you, there is nothing to do.\n\n" +
           "If it wasn't, reset the password from the sign-in page straight " +
           "away, then sign out every other device on Settings, Security." +
+          SIGN_OFF,
+      };
+    case "passkey-added":
+      // Also a new way in (issue #79): the owner hears about it.
+      return {
+        subject: "A passkey was added to your Baumy Olympics account",
+        text:
+          "A passkey was just added to this Baumy Olympics account, so a " +
+          "device can now sign in to it without the password.\n\n" +
+          "If this was you, there is nothing to do.\n\n" +
+          "If it wasn't, sign in, remove the passkey on Settings, Security, " +
+          "sign out every other device and change your password." +
           SIGN_OFF,
       };
   }

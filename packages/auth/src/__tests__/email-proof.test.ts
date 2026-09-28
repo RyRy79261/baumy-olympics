@@ -2,9 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { buildAuthOptions } from "../config";
-import { CONFIRM_EMAIL_FIRST } from "../email-proof";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { APIError } from "better-auth/api";
+import { CONFIRM_EMAIL_FIRST, DEVICE_SIGNED_OUT } from "../email-proof";
 import { SECURITY_COOKIES, type AuthEnv } from "../env";
-import { LAST_LOGIN_METHOD_COOKIE, PASSKEYS_OFF } from "../security";
+import {
+  LAST_LOGIN_METHOD_COOKIE,
+  PASSKEYS_OFF,
+  newWayInNotices,
+} from "../security";
 import { totpFromUri } from "./_totp";
 
 // The account-security plugins (issue #79), driven through a real Better Auth
@@ -659,13 +667,13 @@ describe("Google sign-in never links itself", () => {
   }
 
   /** Google's token endpoint, answering with an id token for `email`. */
-  function fakeGoogle(email: string, sub: string) {
+  function fakeGoogle(email: string, sub: string, emailVerified = true) {
     const idToken = `${b64url({ alg: "RS256", typ: "JWT" })}.${b64url({
       iss: "https://accounts.google.com",
       aud: "client-id",
       sub,
       email,
-      email_verified: true,
+      email_verified: emailVerified,
       name: "Owner",
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 3600,
@@ -743,6 +751,55 @@ describe("Google sign-in never links itself", () => {
     ).toHaveLength(1);
   });
 
+  /** "Link Google" on Settings, Security, and back from Google. */
+  async function linkGoogle(cookie: string) {
+    const start = await call("/link-social", {
+      body: { provider: "google", callbackURL: "/settings/security" },
+      cookie,
+    });
+    expect(start.status).toBe(200);
+    const { url } = (await start.json()) as { url: string };
+    const state = new URL(url).searchParams.get("state")!;
+    return auth.handler(
+      new Request(
+        `${BASE}/api/auth/callback/google?code=the-code&state=${encodeURIComponent(state)}`,
+        {
+          headers: new Headers({ cookie: cookiesFrom(start, cookie) }),
+          redirect: "manual",
+        },
+      ),
+    );
+  }
+
+  it("confirms the address when the owner links a Google account that verified it", async () => {
+    auth = makeAuth(GOOGLE);
+    const { cookie, userId } = await signUp("owner@example.com");
+    expect(userRow(userId).emailVerified).toBe(false);
+    fakeGoogle("owner@example.com", "google-sub-4");
+    const res = await linkGoogle(cookie);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).not.toContain("error=");
+    expect(
+      db.account!.filter(
+        (a) => a.providerId === "google" && a.userId === userId,
+      ),
+    ).toHaveLength(1);
+    expect(userRow(userId).emailVerified).toBe(true);
+  });
+
+  it("leaves the address unconfirmed when Google has not verified it", async () => {
+    auth = makeAuth(GOOGLE);
+    const { cookie, userId } = await signUp("owner@example.com");
+    fakeGoogle("owner@example.com", "google-sub-5", false);
+    await linkGoogle(cookie);
+    expect(
+      db.account!.filter(
+        (a) => a.providerId === "google" && a.userId === userId,
+      ),
+    ).toHaveLength(1);
+    expect(userRow(userId).emailVerified).toBe(false);
+  });
+
   it("signs in once the owner has linked Google", async () => {
     auth = makeAuth(GOOGLE);
     const { userId } = await signUp("owner@example.com");
@@ -811,5 +868,92 @@ describe("the cookies the privacy page names", () => {
       [`baumy.${SECURITY_COOKIES.passkeyChallenge}`]:
         SECURITY_COOKIES.passkeyChallengeMaxAgeSeconds,
     });
+  });
+});
+
+describe("a device signed out elsewhere", () => {
+  const CALLS: [string, { body?: unknown }][] = [
+    ["/passkey/generate-register-options", {}],
+    ["/passkey/verify-registration", { body: { response: {} } }],
+    ["/two-factor/enable", { body: { password: PASSWORD } }],
+    ["/two-factor/get-totp-uri", { body: { password: PASSWORD } }],
+    ["/two-factor/verify-totp", { body: { code: "000000" } }],
+    ["/two-factor/verify-backup-code", { body: { code: "abcde-fghij" } }],
+    ["/two-factor/generate-backup-codes", { body: { password: PASSWORD } }],
+    ["/two-factor/disable", { body: { password: PASSWORD } }],
+    [
+      "/link-social",
+      { body: { provider: "google", callbackURL: "/settings/security" } },
+    ],
+  ];
+
+  it("cannot add or change a passkey or two-factor with its cached cookie", async () => {
+    for (const [path, init] of CALLS) {
+      db.session = [];
+      const { cookie, userId } = await signUp(
+        `o${db.user!.length}@example.com`,
+      );
+      userRow(userId).emailVerified = true;
+      // The control: with the session there, the guard lets it through.
+      const live = await call(path, { ...init, cookie });
+      expect(
+        (
+          (await live
+            .clone()
+            .json()
+            .catch(() => ({}))) as { code?: string }
+        ).code,
+        path,
+      ).not.toBe("SESSION_REVOKED");
+      // Signed out elsewhere: the row is gone, the cached cookie is not.
+      db.session = db.session!.filter((s) => s.userId !== userId);
+      const res = await call(path, { ...init, cookie });
+      expect(res.status, path).toBe(401);
+      await expect(res.json()).resolves.toMatchObject({
+        code: "SESSION_REVOKED",
+        message: DEVICE_SIGNED_OUT,
+      });
+    }
+    expect(db.passkey).toEqual([]);
+  });
+});
+
+describe("the new-way-in email", () => {
+  it("is sent after a passkey is registered, and not after a refused one", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "baumy-passkey-mail-"));
+    const file = path.join(dir, "mail.jsonl");
+    try {
+      const plugin = newWayInNotices({
+        E2E_TEST_MODE: "1",
+        AUTH_EMAIL_CAPTURE_FILE: file,
+      });
+      const hook = plugin.hooks.after[0]!;
+      expect(
+        hook.matcher({ path: "/passkey/verify-registration" } as never),
+      ).toBe(true);
+      expect(
+        hook.matcher({ path: "/passkey/verify-authentication" } as never),
+      ).toBe(false);
+      const run = (returned: unknown) =>
+        hook.handler({
+          path: "/passkey/verify-registration",
+          context: {
+            returned,
+            session: { user: { email: "owner@example.com" } },
+          },
+        } as never);
+      await run(new APIError("BAD_REQUEST"));
+      await expect(readFile(file, "utf8")).rejects.toThrow();
+      await run({ id: "pk" });
+      const lines = (await readFile(file, "utf8")).trim().split("\n");
+      expect(lines.map((l) => JSON.parse(l))).toEqual([
+        expect.objectContaining({
+          to: "owner@example.com",
+          kind: "passkey-added",
+        }),
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

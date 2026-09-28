@@ -7,7 +7,11 @@
 import { readFile } from "node:fs/promises";
 
 type AuthMailKind =
-  "reset" | "verify" | "password-reset-completed" | "password-set";
+  | "reset"
+  | "verify"
+  | "password-reset-completed"
+  | "password-set"
+  | "passkey-added";
 
 interface CapturedMail {
   at: string;
@@ -55,6 +59,24 @@ export async function waitForAuthMail(
       .filter((m) => m.to === to && m.kind === kind && m.url)
       .at(-1);
     if (match?.url) return match.url;
+    if (Date.now() > deadline) {
+      throw new Error(`No "${kind}" email to ${to} in ${captureFile()}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+}
+
+/**
+ * Wait up to 15 s for an auth email of `kind` to `to` that carries no link
+ * (a notice, such as "passkey-added").
+ */
+export async function waitForNotice(
+  to: string,
+  kind: AuthMailKind,
+): Promise<void> {
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    if ((await readMail()).some((m) => m.to === to && m.kind === kind)) return;
     if (Date.now() > deadline) {
       throw new Error(`No "${kind}" email to ${to} in ${captureFile()}`);
     }

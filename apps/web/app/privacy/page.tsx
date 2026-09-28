@@ -197,8 +197,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Resend:</strong> sends the account emails (confirm your
-            address, reset your password, password changed, a password was added
-            to your account). It receives your email address and that email.
+            address, reset your password, password changed, a password or a
+            passkey was added to your account). It receives your email address
+            and that email.
           </li>
           <li>
             <strong>baumy-brain and Telegram:</strong> baumy-brain
@@ -312,7 +313,8 @@ export default function PrivacyPage() {
             has open can keep working for up to {SESSION_CACHE_MIN} minutes. It
             cannot change your sign-in settings in that time: those check the
             session in the database each time. Signing devices out, or changing
-            your password, also forgets every device you trusted for two-factor.
+            or resetting your password, also forgets every device you trusted
+            for two-factor.
           </li>
           <li>
             Proof photos are deleted {PHOTO_RETENTION_DAYS} days after their

@@ -43,11 +43,48 @@ export const ENROLMENT_PATHS: ReadonlySet<string> = new Set([
 export const CONFIRM_EMAIL_FIRST =
   "Confirm your email first. Passkeys and two-factor are for an address you've proven is yours.";
 
+/**
+ * The endpoints that add or change a second way in (issue #79). Better Auth
+ * checks their session through the signed cookie cache, which keeps working
+ * for up to 5 minutes after the session is revoked; these ask the database.
+ */
+export const LIVE_SESSION_PATHS: ReadonlySet<string> = new Set([
+  ...ENROLMENT_PATHS,
+  "/two-factor/get-totp-uri",
+  "/two-factor/verify-totp",
+  "/two-factor/verify-backup-code",
+  "/two-factor/generate-backup-codes",
+  "/two-factor/disable",
+  // Starting "Link Google": the callback trusts the link it carries.
+  "/link-social",
+]);
+
+/** What a signed-out device is told when it tries one of them. */
+export const DEVICE_SIGNED_OUT =
+  "This device was signed out. Sign in again to change your security settings.";
+
 export function emailProofGuards() {
   return {
     id: "baumy-email-proof",
     hooks: {
       before: [
+        {
+          matcher: (ctx) => LIVE_SESSION_PATHS.has(String(ctx.path)),
+          handler: createAuthMiddleware(async (ctx) => {
+            // No session (a sign-in's two-factor step, or nobody): the
+            // endpoint decides for itself.
+            const session = await getSessionFromCtx(ctx);
+            if (!session) return;
+            const stored = await ctx.context.internalAdapter.findSession(
+              session.session.token,
+            );
+            if (stored && stored.session.expiresAt > new Date()) return;
+            throw new APIError("UNAUTHORIZED", {
+              code: "SESSION_REVOKED",
+              message: DEVICE_SIGNED_OUT,
+            });
+          }),
+        },
         {
           matcher: (ctx) => ENROLMENT_PATHS.has(String(ctx.path)),
           handler: createAuthMiddleware(async (ctx) => {
