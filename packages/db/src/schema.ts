@@ -953,6 +953,11 @@ export const actionRequests = pgTable(
  * Who did what, through which surface. Owned by `runAction` and written in the
  * SAME transaction as the change it records. `entity_id` is text because
  * entities are keyed by uuid, bigserial or a natural key.
+ *
+ * `initiated_by_member_id` is set only when someone else asked for the change
+ * on the actor's behalf: brain's `X-Baumy-On-Behalf-Of` (issue #70), where
+ * `actor_member_id` is the housemate it was done for and this column is the
+ * linked Telegram member who asked. Null when the actor did it themself.
  */
 export const auditEvents = pgTable(
   "audit_events",
@@ -961,6 +966,9 @@ export const auditEvents = pgTable(
     actorMemberId: uuid("actor_member_id")
       .notNull()
       .references(() => members.id),
+    initiatedByMemberId: uuid("initiated_by_member_id").references(
+      () => members.id,
+    ),
     source: surface("source").notNull(),
     action: text("action").notNull(),
     entity: text("entity").notNull(),
