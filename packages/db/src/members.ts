@@ -184,6 +184,7 @@ export type MemberPatch = Partial<
     typeof members.$inferInsert,
     | "displayName"
     | "avatarSprite"
+    | "avatar"
     | "color"
     | "role"
     | "deactivatedAt"

@@ -7,6 +7,7 @@ import {
   type ProofMode,
   type RuleVersion,
 } from "@baumy/core";
+import type { ChoreKind } from "@baumy/types";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { Queryable } from "./index";
 import { rescoreChore } from "./completions";
@@ -37,6 +38,11 @@ const DAY_MIN = 24 * HOUR_MIN;
 export interface StarterChore {
   name: string;
   sprite: string;
+  /**
+   * All eleven are chores to clean or fix, so all are `maintenance`, the
+   * column's default; nothing in the list is bought or refilled.
+   */
+  kind: ChoreKind;
   /** The expected interval SPEC §4.7 derived `basePoints` from; docs only. */
   intervalDays: number;
   basePoints: number;
@@ -51,6 +57,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Trash",
     sprite: "trash",
+    kind: "maintenance",
     intervalDays: 4,
     basePoints: 20,
     cooldownMinutes: 48 * HOUR_MIN,
@@ -58,6 +65,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Recycling",
     sprite: "recycling",
+    kind: "maintenance",
     intervalDays: 7,
     basePoints: 26,
     cooldownMinutes: 84 * HOUR_MIN,
@@ -65,6 +73,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Dishes",
     sprite: "dishes",
+    kind: "maintenance",
     intervalDays: 1,
     basePoints: 10,
     cooldownMinutes: 12 * HOUR_MIN,
@@ -72,6 +81,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Dishwasher (unload)",
     sprite: "dishwasher",
+    kind: "maintenance",
     intervalDays: 2,
     basePoints: 14,
     cooldownMinutes: 24 * HOUR_MIN,
@@ -79,6 +89,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Bathroom",
     sprite: "bathroom",
+    kind: "maintenance",
     intervalDays: 7,
     basePoints: 26,
     cooldownMinutes: 84 * HOUR_MIN,
@@ -86,6 +97,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Vacuum",
     sprite: "vacuum",
+    kind: "maintenance",
     intervalDays: 7,
     basePoints: 26,
     cooldownMinutes: 84 * HOUR_MIN,
@@ -93,6 +105,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Mop",
     sprite: "mop",
+    kind: "maintenance",
     intervalDays: 14,
     basePoints: 37,
     cooldownMinutes: 7 * DAY_MIN,
@@ -100,6 +113,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Laundry",
     sprite: "laundry",
+    kind: "maintenance",
     intervalDays: 3,
     basePoints: 17,
     cooldownMinutes: 36 * HOUR_MIN,
@@ -107,6 +121,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Plants",
     sprite: "plants",
+    kind: "maintenance",
     intervalDays: 4,
     basePoints: 20,
     cooldownMinutes: 48 * HOUR_MIN,
@@ -114,6 +129,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Fridge clean-out",
     sprite: "fridge",
+    kind: "maintenance",
     intervalDays: 30,
     basePoints: 55,
     cooldownMinutes: 7 * DAY_MIN,
@@ -121,6 +137,7 @@ export const STARTER_CHORES: readonly StarterChore[] = [
   {
     name: "Keller",
     sprite: "keller",
+    kind: "maintenance",
     intervalDays: 30,
     basePoints: 55,
     cooldownMinutes: 7 * DAY_MIN,
@@ -166,6 +183,7 @@ export async function seedStarterChores(
         householdId: input.householdId,
         name: starter.name,
         sprite: starter.sprite,
+        kind: starter.kind,
         createdAt: input.now,
       })
       .returning({ id: chores.id });
@@ -186,10 +204,12 @@ export interface ChoreBoardRow {
   id: string;
   name: string;
   sprite: string;
+  kind: ChoreKind;
   proofMode: ProofMode;
   confirmMode: ConfirmMode;
   effortFactorPct: number;
   archivedAt: Date | null;
+  createdAt: Date;
   /** The rule version in effect at `now`; null if none is yet. */
   rule: { id: string; basePoints: number; cooldownMinutes: number } | null;
   /** Who holds the chore's streak this season, from the stored scores. */
@@ -315,10 +335,12 @@ export async function listChoreBoard(
         id: c.id,
         name: c.name,
         sprite: c.sprite,
+        kind: c.kind,
         proofMode: c.proofMode,
         confirmMode: c.confirmMode,
         effortFactorPct: c.effortFactorPct,
         archivedAt: c.archivedAt,
+        createdAt: c.createdAt,
         rule: inEffect
           ? {
               id: inEffect.id,
@@ -459,6 +481,7 @@ async function rescoreSeasons(
 
 export interface ChoreSettings {
   name: string;
+  kind: ChoreKind;
   proofMode: ProofMode;
   confirmMode: ConfirmMode;
   effortFactorPct: number;
@@ -481,6 +504,7 @@ export async function createChore(
       householdId: input.householdId,
       name: input.name,
       sprite: input.sprite,
+      kind: input.kind,
       proofMode: input.proofMode,
       confirmMode: input.confirmMode,
       effortFactorPct: input.effortFactorPct,

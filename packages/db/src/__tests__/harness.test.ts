@@ -63,6 +63,8 @@ describe("useTestDb", () => {
       "point_adjustments",
       "pot_contributions",
       "rate_limit",
+      "reminder_acks",
+      "reminders",
       "seasons",
       "service_tokens",
       "session",

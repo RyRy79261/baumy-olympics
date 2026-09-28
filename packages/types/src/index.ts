@@ -3,16 +3,27 @@
 
 export { Surface, SURFACES } from "./surface";
 export {
+  AVATAR_HAIR_COLORS,
+  AVATAR_HAIR_STYLES,
+  AVATAR_SHIRT_COLORS,
+  AVATAR_SKIN_TONES,
   AVATAR_SPRITES,
+  AvatarHairColor,
+  AvatarHairStyle,
+  AvatarShirtColor,
+  AvatarSkinTone,
   AvatarSprite,
   DISPLAY_NAME_MAX,
   DisplayName,
   KioskPin,
   MEMBER_COLORS,
+  MemberAvatar,
   MemberColor,
   MemberRole,
   TelegramLinkCode,
   TelegramUserId,
+  avatarFor,
+  defaultAvatar,
 } from "./member";
 export {
   KIOSK_DEVICE_NAME_MAX,
@@ -24,9 +35,11 @@ export {
   BASE_POINTS_MAX,
   BASE_POINTS_MIN,
   BasePoints,
+  CHORE_KINDS,
   CHORE_NAME_MAX,
   COMPLETION_NOTE_MAX,
   COOLDOWN_HOURS_MAX,
+  ChoreKind,
   ChoreName,
   CompletionNote,
   ConfirmMode,
@@ -96,3 +109,13 @@ export {
   ShoppingWrite,
   splitShoppingText,
 } from "./shopping";
+export {
+  ListRemindersInput,
+  NewReminder,
+  REMINDER_BODY_MAX,
+  REMINDER_TITLE_MAX,
+  ReminderBody,
+  ReminderId,
+  ReminderRef,
+  ReminderTitle,
+} from "./reminders";
