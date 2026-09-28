@@ -85,7 +85,10 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
+  // The founder works on a phone and the kiosk is a context of its own at
+  // 820×1180 (pairedKiosk), as in hub.spec: the ipad-portrait founder
+  // already pairs close to pair_kiosk's 10 codes per 10 minutes.
+  test.skip(project !== "mobile-360", "Paired from the phone project.");
   const tag = Math.random().toString(36).slice(2, 8);
   const bins = `Bins ${tag}`;
   const milk = `Oat milk ${tag}`;
