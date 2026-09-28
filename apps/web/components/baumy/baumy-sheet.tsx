@@ -35,7 +35,11 @@ import {
   type ReviewRow,
 } from "@/lib/ai/review";
 import { canRecord } from "@/lib/ai/voice";
-import { KIOSK_IDLE_MS, PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
+import {
+  KIOSK_COVER_EVENT,
+  KIOSK_IDLE_MS,
+  PIN_PROMPT_CODES,
+} from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
 import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
 import { ProposalRow } from "./proposal-row";
@@ -393,6 +397,17 @@ export function BaumySheet({
 
   // A bubble left open closes after a minute untouched.
   useIdle(cat && bubble !== null, KIOSK_IDLE_MS, hideBubble);
+  // A reminder or the screensaver taking the screen closes it at once, and
+  // drops any recording: nothing listens under them.
+  const hideLatest = useRef(hideBubble);
+  hideLatest.current = hideBubble;
+  const bubbleOpen = cat && bubble !== null;
+  useEffect(() => {
+    if (!bubbleOpen) return;
+    const onCover = () => hideLatest.current();
+    window.addEventListener(KIOSK_COVER_EVENT, onCover);
+    return () => window.removeEventListener(KIOSK_COVER_EVENT, onCover);
+  }, [bubbleOpen]);
 
   const targets = approveAllTargets(rows, kiosk);
   const skips = approveAllSkips(rows, kiosk);
