@@ -129,6 +129,18 @@ export { NoteGrid, StickyNote } from "./note";
 export { PageHeading, SectionHeading } from "./page-heading";
 export { PixelBubble } from "./pixel-bubble";
 export {
+  CHORE_ICON_LABELS,
+  CharacterPicker,
+  ChoreIconPicker,
+  choreIconValue,
+  Swatch,
+  SwatchPicker,
+  TilePicker,
+  memberColourOptions,
+  type SwatchOption,
+  type TileOption,
+} from "./pickers";
+export {
   CatBubble,
   CatButton,
   CatLink,
