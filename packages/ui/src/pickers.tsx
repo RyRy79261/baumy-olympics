@@ -102,14 +102,17 @@ export function TilePicker({
                 aria-label={o.label}
                 className="sr-only"
               />
-              <span aria-hidden className="flex items-center justify-center">
+              <span
+                aria-hidden
+                className="pointer-events-none flex items-center justify-center"
+              >
                 {o.tile}
               </span>
               {captions ? (
                 <span
                   aria-hidden
                   className={cx(
-                    "font-label text-[10px] leading-none font-bold uppercase",
+                    "pointer-events-none font-label text-[10px] leading-none font-bold uppercase",
                     chosen ? "text-bm-text" : "text-bm-muted",
                   )}
                 >
@@ -120,7 +123,7 @@ export function TilePicker({
                 <span
                   aria-hidden
                   data-check
-                  className="absolute top-0 right-0 grid size-4 place-items-center bg-bm-violet"
+                  className="pointer-events-none absolute top-0 right-0 grid size-4 place-items-center bg-bm-violet"
                 >
                   <Glyph name="check" size={12} color="var(--color-bm-ink)" />
                 </span>
