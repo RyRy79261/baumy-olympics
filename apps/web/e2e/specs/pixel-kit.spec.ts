@@ -196,9 +196,12 @@ test("every hub page is in the kit and fits the screen", async ({
     const tile = page.getByTestId(`hub-tile-${key}`);
     await expect(tile).toBeVisible();
     await expect(tile.locator("svg").first()).toBeVisible();
+    // Every read works here, so each tile has a real count.
     const name = (await tile.getAttribute("aria-label"))!;
+    expect(name).toMatch(/: \d+$/);
     const count = Number(name.split(": ")[1]);
     await expect(tile.locator("[data-count]")).toHaveCount(count > 0 ? 1 : 0);
+    await expect(tile.locator("[data-unavailable]")).toHaveCount(0);
   }
 
   for (const { path, title } of PAGES) {
