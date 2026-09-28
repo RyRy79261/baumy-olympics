@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { createHttpDb } from "@baumy/db";
+import { createHttpDb, type Queryable } from "@baumy/db";
+import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { members } from "@baumy/db/schema";
 import { Card, FormMessage, PageHeading } from "@baumy/ui";
 import { avatarFor } from "@baumy/types";
 import { requireMemberPage } from "@/lib/auth";
+import { activeCharacters } from "@/lib/members/characters";
 import { AvatarForm } from "./avatar-form";
 import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
 
@@ -43,7 +45,15 @@ export default async function SettingsPage() {
         ) : null}
         <AvatarForm
           memberId={me.memberId}
-          initial={avatarFor({ id: me.memberId, avatar: me.avatar ?? null })}
+          initial={
+            (
+              await activeCharacters(
+                createHttpDb() as unknown as Queryable,
+                HOUSEHOLD_ID,
+              )
+            ).get(me.memberId) ??
+            avatarFor({ id: me.memberId, avatar: me.avatar ?? null })
+          }
         />
         <KioskPinForm hasPin={Boolean(row?.kioskPinHash)} />
         <TelegramLinkForm linked={row?.telegramUserId != null} />

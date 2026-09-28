@@ -13,6 +13,7 @@ import {
   NewReminder,
   ReminderRef,
   avatarFor,
+  rosterAvatars,
   type MemberAvatar,
 } from "@baumy/types";
 import { defineAction } from "./define";
@@ -75,12 +76,16 @@ function reminderView(r: ReminderRow, people: ReminderMember[]): ReminderView {
   };
 }
 
-function memberView(m: ReminderMember): ReminderMemberView {
+function memberView(
+  m: ReminderMember,
+  roster: ReadonlyMap<string, MemberAvatar>,
+): ReminderMemberView {
   return {
     id: m.id,
     displayName: m.displayName,
     color: m.color,
-    avatar: avatarFor(m),
+    // The same character everywhere: chosen, or the roster's default.
+    avatar: roster.get(m.id) ?? avatarFor(m),
   };
 }
 
@@ -108,8 +113,10 @@ export const listReminders = defineAction({
       ctx.db,
       ctx.householdId,
     );
+    // The active members, in join order: one roster for their characters.
+    const roster = rosterAvatars(members);
     const data: ListRemindersData = {
-      members: members.map(memberView),
+      members: members.map((m) => memberView(m, roster)),
       reminders: reminders.map((r) => reminderView(r, members)),
     };
     return { ok: true, data };
