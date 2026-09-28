@@ -849,7 +849,6 @@ describe("set_prize_mode", () => {
 describe("the admin writes' surfaces and gates", () => {
   const writes: [string, Record<string, unknown>][] = [
     ["set_prize_mode", { season: "next", mode: "points" }],
-    ["add_pot_contribution", { month: "2026-09", amount: 5 }],
     ["adjust_points", { op: "create", memberId: "", points: 5, reason: "x" }],
   ];
 

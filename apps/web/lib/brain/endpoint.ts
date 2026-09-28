@@ -60,7 +60,9 @@ export interface BrainEndpointDeps {
   /** The live service token with this plaintext, or null. */
   verifyToken: (token: string) => Promise<ServiceCaller | null>;
   /** The active member linked to this Telegram user id, or null. */
-  findMember: (telegramUserId: number) => Promise<{ id: string } | null>;
+  findMember: (
+    telegramUserId: number,
+  ) => Promise<{ id: string; role?: "admin" | "member" } | null>;
   /** The active member of this household with this id, or null. */
   findHousemate: (memberId: string) => Promise<{ id: string } | null>;
   /** `toolSpecs("brain")`: admin and UI-only actions already dropped. */
@@ -416,7 +418,10 @@ export async function handleBrainAction(
       ...(target
         ? { memberId: target.id, initiatorMemberId: member!.id }
         : member
-          ? { memberId: member.id }
+          ? {
+              memberId: member.id,
+              ...(member.role ? { role: member.role } : {}),
+            }
           : {}),
     };
     const result = await deps.runAction(name, body.input, {

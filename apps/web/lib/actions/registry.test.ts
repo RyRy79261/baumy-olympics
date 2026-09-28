@@ -52,19 +52,22 @@ describe("the registry", () => {
     }
   });
 
-  it("keeps exactly the five claim events and the sign-in answers to the member's own word", () => {
+  it("keeps exactly the five claim events, the sign-in answers and the admin writes brain gets to the member's own word", () => {
     expect(
       entries
         .filter(([, d]) => d.ownWordOnly)
         .map(([n]) => n)
         .sort(),
     ).toEqual([
+      "add_pot_contribution",
       "approve_login",
       "concede_completion",
       "confirm_completion",
+      "create_bounty",
       "deny_login",
       "dispute_completion",
       "undo_completion",
+      "update_bounty",
       "withdraw_dispute",
     ]);
   });
@@ -90,13 +93,27 @@ describe("the registry", () => {
   });
 
   it("guards writes that need a real session to the ui", () => {
-    for (const [, def] of entries) {
+    for (const [name, def] of entries) {
+      if (def.requires === "session" || def.requires === "account") {
+        expect(def.surfaces, name).toEqual(["ui"]);
+      }
+    }
+  });
+
+  it("keeps admin actions to the ui, except the bounty and pot writes Baumy may propose (issue #107)", () => {
+    const admin = entries.filter(([, d]) => d.requires === "admin");
+    expect(admin.map(([n]) => n)).toContain("manage_chore");
+    for (const [name, def] of admin) {
       if (
-        def.requires === "session" ||
-        def.requires === "admin" ||
-        def.requires === "account"
+        ["create_bounty", "update_bounty", "add_pot_contribution"].includes(
+          name,
+        )
       ) {
-        expect(def.surfaces).toEqual(["ui"]);
+        expect(def.surfaces, name).toEqual(["ui", "ai", "brain"]);
+        expect(def.ownWordOnly, name).toBe(true);
+        expect(def.risk, name).toBe("confirm");
+      } else {
+        expect(def.surfaces, name).toEqual(["ui"]);
       }
     }
   });

@@ -66,7 +66,7 @@ type JsonSchema = {
   required?: string[];
 };
 
-const MEMBER_FIELDS = new Set(["doneBy", "memberId"]);
+const MEMBER_FIELDS = new Set(["doneBy", "memberId", "contributedBy"]);
 const LONG_TEXT = 200;
 
 /** "occurredAt" → "Occurred at". */
@@ -83,6 +83,7 @@ function labelFor(name: string): string {
   if (name === "choreId") return "Chore";
   if (name === "doneBy") return "Done by";
   if (name === "memberId") return "Member";
+  if (name === "contributedBy") return "Paid by";
   if (name === "bodyMd") return "Text";
   return humanize(name.replace(/Id$/, ""));
 }
