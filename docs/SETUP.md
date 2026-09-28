@@ -54,15 +54,24 @@ secrets from earlier ones.
 ### 4. Auth, founders and email (Resend, optional Google sign-in)
 
 - [ ] **`BETTER_AUTH_SECRET`** (Production and Preview,
-      `openssl rand -base64 32`) and **`BETTER_AUTH_URL`** (Production = the
-      custom domain).
+      `openssl rand -base64 32`) and **`BETTER_AUTH_URL`** (Production =
+      `https://www.baumy.tech`; the apex `baumy.tech` redirects to it), plus
+      **`PASSKEY_RP_ID=baumy.tech`** (Production). Passkeys are bound to
+      `baumy.tech` for life, so set both before anyone adds one.
+      Details: [Passkeys, two-factor and devices](#passkeys-two-factor-and-devices-issue-79).
 - [ ] **Resend account:** verify the sending domain, then set
       `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Without it nobody can reset a
-      password, and founders can verify only through Google.
-- [ ] **Google sign-in (optional):** OAuth client with redirect
-      `<BETTER_AUTH_URL>/api/auth/callback/google`; set `GOOGLE_CLIENT_ID`
+      password, and founders can verify only by signing up with Google.
+- [ ] **Google sign-in (optional):** OAuth client with JavaScript origin
+      `https://www.baumy.tech` and redirect
+      `https://www.baumy.tech/api/auth/callback/google` (the same URI serves
+      "Link Google" on Settings, Security); set `GOOGLE_CLIENT_ID`
       and `GOOGLE_CLIENT_SECRET`. You need Resend **or** this so founders can
-      verify their address.
+      verify their address. Without Resend, a founder must **sign up with
+      Continue with Google**: since issue #79 Google never joins an existing
+      password account by itself (only "Link Google" on Settings, Security
+      does), so a founder who signed up with a password first cannot verify
+      through Google.
 - [ ] **`FOUNDER_EMAILS`** (Production): your address and your partner's,
       comma-separated.
       Details: [Auth](#auth-issue-6), [Membership](#membership-issue-9).
@@ -104,7 +113,7 @@ secrets from earlier ones.
 
 ### 10. MCP (claude.ai connector)
 
-- [ ] **`MCP_PUBLIC_URL`** (Production) = the custom domain, never a
+- [ ] **`MCP_PUBLIC_URL`** (Production) = `https://www.baumy.tech`, never a
       `*.vercel.app` address. Without it MCP answers 503.
       Details: [MCP OAuth](#mcp-oauth-issue-23).
 
@@ -122,6 +131,10 @@ for each are in the sections below):
 
 ```sh
 FOUNDER_EMAILS=
+# Optional (issue #79): the domain passkeys are bound to, the site's host or
+# a parent of it. Production: baumy.tech (the app is www.baumy.tech).
+# Unset, passkeys bind to BETTER_AUTH_URL's own host.
+PASSKEY_RP_ID=
 BLOB_READ_WRITE_TOKEN=
 CRON_SECRET=
 GOOGLE_CALENDAR_ID=
@@ -331,7 +344,7 @@ nobody is signed in (CI checks this against the real build).
       preview's sessions then do not work on production). Use
       `openssl rand -base64 32`. Never commit it.
 - [ ] **Set `BETTER_AUTH_URL`** (Production scope) to the address people
-      visit: `https://www.baumy.tech` (owner decision 2026-09-28). Leave it unset on Preview:
+      visit: `https://www.baumy.tech` (owner decision 2026-09-28; the apex redirects to it). Leave it unset on Preview:
       a preview uses its own `VERCEL_URL`.
 - [ ] **Resend, for password reset.** Create a Resend account, verify the
       sending domain, then set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (for
@@ -340,7 +353,7 @@ nobody is signed in (CI checks this against the real build).
       forgotten password.
 - [ ] **Google sign-in (optional).** In Google Cloud Console create an OAuth
       client (type Web application) with the authorised redirect URI
-      `<BETTER_AUTH_URL>/api/auth/callback/google`, then set `GOOGLE_CLIENT_ID`
+      `https://www.baumy.tech/api/auth/callback/google` (JavaScript origin `https://www.baumy.tech`), then set `GOOGLE_CLIENT_ID`
       and `GOOGLE_CLIENT_SECRET` (Production scope). The button only appears
       when both are set. Previews cannot finish a Google sign-in (Google only
       calls back registered URIs); use email and password there.
@@ -357,6 +370,51 @@ nobody is signed in (CI checks this against the real build).
 - [ ] **After the first production deploy**, sign up at `/auth/sign-up`,
       sign out, sign in, and request a password reset to check the email
       arrives. The deploy log should show no `[auth]` warning.
+
+## Passkeys, two-factor and devices (issue #79)
+
+Settings → Security (`/settings/security`) has passkeys, two-factor (an
+authenticator app plus backup codes), linking and unlinking Google, adding a
+first password to a Google-only account, and the devices signed in now. No
+new service: it all runs on Better Auth and our own tables (migration 0016).
+
+- [ ] **`BETTER_AUTH_URL=https://www.baumy.tech`** and
+      **`PASSKEY_RP_ID=baumy.tech`** (both Production). The canonical app is
+      `https://www.baumy.tech`; passkeys are bound to the registrable domain
+      `baumy.tech` (the relying-party id), and a ceremony is accepted only
+      from the origin `https://www.baumy.tech`. A passkey made under one id
+      never works under another, so do not change `PASSKEY_RP_ID` once people
+      have added passkeys. Binding to `baumy.tech` rather than the www host
+      keeps them working if the app ever moves to the apex or another
+      subdomain.
+- [ ] **Serve one host.** Redirect the apex `baumy.tech` to
+      `https://www.baumy.tech` in Vercel (Settings → Domains). A passkey
+      ceremony from any other origin is refused.
+- [ ] **If `PASSKEY_RP_ID` is wrong,** meaning it is neither the site's host
+      nor a parent of it, passkeys switch **off** (fail closed) and the
+      deploy log says so. Leave it unset on Preview: previews bind passkeys
+      to their own `*.vercel.app` host, so a passkey made on a preview never
+      works on production, and the other way round.
+- [ ] **Google.** The OAuth client's authorised JavaScript origin is
+      `https://www.baumy.tech`, and its redirect URI is
+      `https://www.baumy.tech/api/auth/callback/google`. Signing in and
+      "Link Google" both use it.
+- [ ] **After deploy:** on your phone, add a passkey on Settings → Security,
+      sign out, and sign in with "Sign in with a passkey". Then turn on
+      two-factor with an authenticator app and keep the backup codes.
+
+Worth knowing:
+
+- Passkeys and two-factor need a **confirmed email** (the sign-up link or
+  Google). An unconfirmed account's passkeys and two-factor are cleared by a
+  password reset.
+- Two-factor asks for a code after a **password** sign-in. Google and
+  passkey sign-ins are not asked: a passkey is two factors already, and
+  Google has its own.
+- Signing a device out ends its session at once, but a page it has open can
+  keep working for up to **5 minutes** (the cookie cache); the page says so.
+- The Security page never lets you remove your last way in (a password,
+  Google or a passkey).
 
 ## Action registry (issue #8)
 
@@ -390,7 +448,8 @@ first admin, so everyone who signs up waits on `/join`.
 - [ ] **Make verification possible.** A founder must confirm their address
       before `/join` lets them in as admin. That needs Resend
       (`RESEND_API_KEY` and `RESEND_FROM_EMAIL`, see "Auth" above) or
-      Google sign-in (Google addresses count as verified).
+      signing up with Google (Google addresses count as verified; a Google
+      sign-in no longer links itself to an existing password account).
 - [ ] **After the first production deploy**: sign up with a founder address,
       open the confirmation email, go to `/join` and press "Join as admin".
       Then open `/admin/members`, create an invite code and check that a

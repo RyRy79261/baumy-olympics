@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import {
@@ -119,31 +120,23 @@ describe("findLoginCandidate", () => {
     ).toEqual({ memberId: m.id, authUserId: m.authUserId, telegramUserId: 42 });
   });
 
-  it("finds nobody with two-factor on, and works before that column exists", async () => {
+  it("finds nobody with two-factor on", async () => {
     const m = await member({ email: "tfa@example.com", telegramUserId: 77 });
+    // Present before absent: found while two-factor is off...
     expect(await userHasTwoFactor(db(), m.authUserId!)).toBe(false);
     expect(
       await findLoginCandidate(db(), HOUSEHOLD_ID, "tfa@example.com"),
     ).not.toBeNull();
-    // What Better Auth's two-factor plugin (issue #79) will add.
+    // ...and not once it is on (Better Auth's two-factor plugin, issue #79).
     await t
-      .client()
-      .query(
-        'alter table "user" add column two_factor_enabled boolean not null default false',
-      );
-    expect(
-      await findLoginCandidate(db(), HOUSEHOLD_ID, "tfa@example.com"),
-    ).not.toBeNull();
-    await t
-      .client()
-      .query('update "user" set two_factor_enabled = true where id = $1', [
-        m.authUserId,
-      ]);
+      .db()
+      .update(user)
+      .set({ twoFactorEnabled: true })
+      .where(eq(user.id, m.authUserId!));
     expect(await userHasTwoFactor(db(), m.authUserId!)).toBe(true);
     expect(
       await findLoginCandidate(db(), HOUSEHOLD_ID, "tfa@example.com"),
     ).toBeNull();
-    await t.client().query('alter table "user" drop column two_factor_enabled');
   });
 
   it("finds nobody unlinked, deactivated, unknown or without a member", async () => {

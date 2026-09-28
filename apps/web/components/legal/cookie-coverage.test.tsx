@@ -3,8 +3,9 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { createCookieGetter, getCookies } from "better-auth/cookies";
 import { buildAuthOptions } from "@baumy/auth";
-import { AUTH_COOKIE_PREFIX } from "@baumy/auth/env";
+import { LAST_LOGIN_METHOD_COOKIE, SECURITY_COOKIES } from "@baumy/auth/env";
 import PrivacyPage from "@/app/privacy/page";
 import { REFRESH_COOKIE } from "@/lib/hub/refresh";
 import { KIOSK_COOKIE, KIOSK_MEMBER_COOKIE } from "@/lib/kiosk/cookies";
@@ -22,9 +23,11 @@ import { LOGIN_COOKIE } from "@/lib/login-approval/flow";
 
 const WEB = path.resolve(import.meta.dirname, "../..");
 const AUTH_SRC = path.resolve(WEB, "../../packages/auth/src");
+const UI_SRC = path.resolve(WEB, "../../packages/ui/src");
 const SCANNED = [
   ...["app", "lib", "components", "public"].map((d) => path.join(WEB, d)),
   AUTH_SRC,
+  UI_SRC,
 ];
 
 /** What a setter's first argument names, for every setter in the code. */
@@ -39,8 +42,18 @@ const KNOWN: Record<string, string> = {
 
 /** Better Auth plugins and social providers the page was written against. */
 // baumy-approval-sign-in (issue #80) sets only the session cookies and
-// dont_remember, which the page names.
-const AUTH_PLUGINS = ["bearer", "baumy-approval-sign-in"];
+// dont_remember, which the page names; the account-security plugins (issue
+// #79) set the cookies in SECURITY_COOKIES, named below.
+const AUTH_PLUGINS = [
+  "bearer",
+  "two-factor",
+  "passkey",
+  "last-login-method",
+  "baumy-email-proof",
+  "baumy-trusted-devices",
+  "baumy-new-way-in",
+  "baumy-approval-sign-in",
+];
 const AUTH_SOCIAL = ["google"];
 
 function sourceFiles(dir: string): string[] {
@@ -80,6 +93,8 @@ function cookieSetters(file: string, source: string): string[] {
     String.raw`\.cookies`,
     String.raw`\bcookieStore`,
     ...stores.map((s) => String.raw`\b${escape(s)}`),
+    // `(await store).set(…)` for a store held unawaited.
+    ...stores.map((s) => String.raw`\(\s*await\s+${escape(s)}\s*\)`),
   ];
   const setter = new RegExp(
     String.raw`(?:${receivers.join("|")})\s*\.set\(\s*([^,\s)]+(?:\(\))?)`,
@@ -118,11 +133,20 @@ describe("the privacy page's cookie list", () => {
   });
 
   it("names every cookie the code sets, and Better Auth's", () => {
+    // Better Auth's names as Better Auth builds them from our options, so a
+    // renamed prefix or cookie fails here, not only a renamed constant.
+    const options = buildAuthOptions({});
+    const auth = getCookies(options);
+    const plugin = createCookieGetter(options);
     const names = [
       ...Object.values(KNOWN),
-      `${AUTH_COOKIE_PREFIX}.session_token`,
-      `${AUTH_COOKIE_PREFIX}.session_data`,
-      `${AUTH_COOKIE_PREFIX}.dont_remember`,
+      auth.sessionToken.name,
+      auth.sessionData.name,
+      auth.dontRememberToken.name,
+      LAST_LOGIN_METHOD_COOKIE,
+      plugin(SECURITY_COOKIES.twoFactorChallenge).name,
+      plugin(SECURITY_COOKIES.trustDevice).name,
+      plugin(SECURITY_COOKIES.passkeyChallenge).name,
     ];
     for (const name of names) expect(page).toContain(`<code>${name}</code>`);
   });
@@ -149,6 +173,7 @@ describe("the privacy page's cookie list", () => {
         "D",
       ],
       ['res.cookies.set(E, "1")', "E"],
+      ['const store = cookies();\n(await store).set(H, "1")', "H"],
       ['cookieStore.set("f", "1")', '"f"'],
       ['document.cookie = "g=1"', '"g=1"'],
       ['headers.append("Set-Cookie", x)', '"Set-Cookie"'],

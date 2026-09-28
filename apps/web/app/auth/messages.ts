@@ -45,6 +45,21 @@ export const OAUTH_FAILED =
   "Signing in with Google didn't finish. Try again, or use your email and password.";
 
 /**
+ * A Google sign-in for an address that already has an account which has not
+ * linked Google (issue #79: Google never links itself on sign-in). Saying so
+ * tells whoever holds that Google account that the address has an account,
+ * which they could learn from sign-up anyway; they still cannot get in.
+ */
+export const GOOGLE_NOT_LINKED =
+  "That Google account isn't linked yet. Sign in with your email and password, then link Google on Settings, Security.";
+
+/** The sentence for `?error=<code>` on sign-in; null when there is none. */
+export function oauthErrorSentence(code: string | undefined): string | null {
+  if (!code) return null;
+  return code === "account_not_linked" ? GOOGLE_NOT_LINKED : OAUTH_FAILED;
+}
+
+/**
  * What a refused sign-up says. An address that already has an account says so,
  * with the way in. That does tell anyone which addresses are registered: a cost
  * accepted with open sign-up and automatic sign-in, as camp-404 does
@@ -70,4 +85,51 @@ export function signUpErrorSentence(
 /** What a forgot-password failure says: never whether the account exists. */
 export function forgotPasswordErrorSentence(error: AuthError): string {
   return error.status === 429 ? TOO_MANY_ATTEMPTS : SOMETHING_WENT_WRONG;
+}
+
+// Passkeys and two-factor (issue #79).
+
+/** A passkey prompt that did not finish: cancelled, timed out, or refused. */
+export const PASSKEY_DIDNT_FINISH =
+  "That didn't finish. Your device may have cancelled it. Try again.";
+
+/**
+ * What a passkey sign-in or enrolment failure says. A passkey sign-in never
+ * names an account, so nothing here can be used to find one out.
+ */
+export function passkeyErrorSentence(error: AuthError & { message?: string }) {
+  if (error.status === 429) return TOO_MANY_ATTEMPTS;
+  if (error.code === "PASSKEYS_NOT_CONFIGURED") {
+    return "Passkeys aren't set up on this site yet. Use your password or Google.";
+  }
+  if (error.code === "EMAIL_NOT_VERIFIED") {
+    return "Confirm your email first. Passkeys and two-factor are for an address you've proven is yours.";
+  }
+  if (error.code === "SESSION_NOT_FRESH") {
+    return "For your safety, sign out and in again, then add the passkey within a day.";
+  }
+  if (error.status !== undefined && error.status >= 500) {
+    return SOMETHING_WENT_WRONG;
+  }
+  return PASSKEY_DIDNT_FINISH;
+}
+
+/** What a refused two-factor code says, at sign-in or while turning it on. */
+export function twoFactorErrorSentence(
+  error: AuthError,
+  mode: "totp" | "backup",
+): string {
+  if (error.status === 429) return TOO_MANY_ATTEMPTS;
+  if (error.code === "ACCOUNT_TEMPORARILY_LOCKED") {
+    return "Too many wrong codes. Wait 15 minutes, then try again.";
+  }
+  if (error.code === "INVALID_TWO_FACTOR_COOKIE") {
+    return "That sign-in took too long. Start again with your email and password.";
+  }
+  if (error.status !== undefined && error.status >= 500) {
+    return SOMETHING_WENT_WRONG;
+  }
+  return mode === "totp"
+    ? "That code didn't match. It changes every 30 seconds, so try the newest one."
+    : "That backup code didn't match, or it has been used already.";
 }

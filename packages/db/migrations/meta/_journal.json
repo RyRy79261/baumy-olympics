@@ -113,6 +113,13 @@
       "when": 1790607787868,
       "tag": "0015_audit_anonymous_actor",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790613918842,
+      "tag": "0016_auth_passkeys_two_factor",
+      "breakpoints": true
     }
   ]
 }

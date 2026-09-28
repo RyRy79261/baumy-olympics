@@ -27,6 +27,7 @@
     "@baumy/db": "workspace:*",
     "@baumy/types": "workspace:*",
     "@baumy/ui": "workspace:*",
+    "@better-auth/passkey": "1.6.25",
     "@modelcontextprotocol/sdk": "1.30.1",
     "@vercel/blob": "^2.8.0",
     "better-auth": "1.6.25",
@@ -36,6 +37,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "server-only": "^0.0.1",
+    "uqr": "^0.1.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {

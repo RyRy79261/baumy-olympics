@@ -1,10 +1,11 @@
 // THE Better Auth configuration for Baumy Olympics (ADR 0001), self-hosted in
 // the web app's own process against our own database.
 //
-// Ported from camp-404 `packages/auth/src/config.ts`, without two-factor,
-// passkeys, the email-proof guards and the preview OAuth proxy (SPEC §11
-// defers passkeys and 2FA), and with the `bearer()` plugin added so a future
-// native shell can authenticate without cookies.
+// Ported from camp-404 `packages/auth/src/config.ts`, without the preview
+// OAuth proxy, and with the `bearer()` plugin added so a future native shell
+// can authenticate without cookies. Two-factor, passkeys, the email-proof
+// guards and the last-used hint (issue #79) are `accountSecurityPlugins`
+// (security.ts).
 //
 // Boots with no env: it constructs with a placeholder secret and the database
 // placeholder URL, so `next build` and an env-less local start never throw.
@@ -14,7 +15,8 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins/bearer";
-import { createHttpDb, schema } from "@baumy/db";
+import { createHttpDb, schema, type Queryable } from "@baumy/db";
+import { forgetTrustedDevices } from "@baumy/db/account-security";
 import { approvalSignIn } from "./approval-sign-in";
 import { sendAuthEmail } from "./email";
 import {
@@ -30,6 +32,10 @@ import {
   type AuthEnv,
 } from "./env";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "./password";
+import {
+  ACCOUNT_SECURITY_DISABLED_PATHS,
+  accountSecurityPlugins,
+} from "./security";
 
 /**
  * Placeholder secret (at least 32 characters) so the instance constructs
@@ -56,6 +62,8 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
     trustedOrigins: resolveTrustedOrigins(env),
     // No outbound telemetry from an auth stack that holds household data.
     telemetry: { enabled: false },
+    // Endpoints an audited action replaces (issue #79, security.ts).
+    disabledPaths: [...ACCOUNT_SECURITY_DISABLED_PATHS],
 
     // The HTTP driver has no transactions, so `transaction` stays at its
     // default (false): operations run one after another, the documented
@@ -68,6 +76,8 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
         account: schema.account,
         verification: schema.verification,
         rateLimit: schema.rateLimit,
+        twoFactor: schema.twoFactor,
+        passkey: schema.passkey,
       },
     }),
 
@@ -84,6 +94,12 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
         await sendAuthEmail(env, { to: user.email, kind: "reset", url });
       },
       onPasswordReset: async ({ user }) => {
+        // A reset also forgets every device trusted for two-factor (issue
+        // #79): whoever reset the password must pass the code again.
+        await forgetTrustedDevices(
+          createHttpDb() as unknown as Queryable,
+          user.id,
+        );
         await sendAuthEmail(env, {
           to: user.email,
           kind: "password-reset-completed",
@@ -120,14 +136,18 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
       },
     },
 
-    // Google may link to an existing account with the same email. Linking
-    // still refuses when the LOCAL account has not confirmed its email
-    // (`requireLocalEmailVerified`, left at its default, true). Never relax
-    // it (ADR 0001 "Traps"): otherwise someone could sign up with a member's
-    // address and a password first, and the member's later Google sign-in
-    // would join that account.
+    // Google joins an existing account ONLY when its owner presses "Link
+    // Google" on Settings, Security (issue #79, `linkSocial`): a Google
+    // sign-in never links itself (`disableImplicitLinking`), so "Unlink
+    // Google" really stops Google signing in. A Google address with no
+    // account still signs up as before. `requireLocalEmailVerified` stays at
+    // its default, true; never relax it (ADR 0001 "Traps").
     account: {
-      accountLinking: { enabled: true, trustedProviders: ["google"] },
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ["google"],
+        disableImplicitLinking: true,
+      },
     },
 
     // An OAuth callback failure lands on our sign-in form with `?error=`,
@@ -160,6 +180,9 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
       // token: Better Auth stores `session.token` in plaintext, so without it
       // anyone who can read the table could present a row as a bearer token.
       bearer({ requireSignature: true }),
+      // Two-factor, passkeys, the email-proof guards and the last-used
+      // sign-in hint (issue #79).
+      ...accountSecurityPlugins(env),
       // "Sign in with Baumy" (issue #80): a server-only endpoint that makes
       // the session once the member approved it in Telegram.
       approvalSignIn(),

@@ -331,6 +331,10 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(bubble()!.dataset.mode).toBe("who");
     expect(bubble()!.textContent).toContain("Who's talking?");
     expect(bubble()!.textContent).toContain("Kim");
+    // However many housemates, the list scrolls inside the bubble.
+    const list = bubble()!.querySelector('[data-testid="who-list"]')!;
+    expect(list.className).toContain("overflow-y-auto");
+    expect(list.className).toMatch(/max-h-/);
     act(() =>
       root!.render(
         <BaumySheet kiosk cat voice actingName="Kim" who={<i>Kim</i>} />,
