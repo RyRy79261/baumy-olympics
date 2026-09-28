@@ -10,13 +10,16 @@ import {
   insertCredentialAccount,
   listUserPasskeys,
   listUserSessions,
+  TRUSTED_DEVICE_PREFIX,
   findAuthUser,
+  forgetTrustedDevices,
+  isLiveSession,
   lockAuthUser,
   renameUserPasskey,
   signInMethods,
 } from "../account-security";
 import type { Queryable } from "../index";
-import { account, passkey, session, user } from "../schema";
+import { account, passkey, session, user, verification } from "../schema";
 import { useTestDb } from "./_harness";
 
 // Settings → Security's own-account queries (issue #79). Every one is
@@ -257,5 +260,66 @@ describe("provider accounts and the first password", () => {
     await expect(signInMethods(db(), "u1")).resolves.toMatchObject({
       password: true,
     });
+  });
+});
+
+describe("isLiveSession and forgetTrustedDevices", () => {
+  it("sees my own unexpired session only, and nothing once it is deleted", async () => {
+    await seedUser("u1");
+    await seedUser("u2");
+    await seedSession("mine", "u1", NOW);
+    await seedSession(
+      "old",
+      "u1",
+      new Date(NOW.getTime() - 2 * HOUR),
+      new Date(NOW.getTime() - 1),
+    );
+    await seedSession("theirs", "u2", NOW);
+    const live = (sessionId: string) =>
+      isLiveSession(db(), { userId: "u1", sessionId, now: NOW });
+    await expect(live("mine")).resolves.toBe(true);
+    await expect(live("old")).resolves.toBe(false);
+    await expect(live("theirs")).resolves.toBe(false);
+    await deleteUserSession(db(), { userId: "u1", sessionId: "mine" });
+    await expect(live("mine")).resolves.toBe(false);
+  });
+
+  it("forgets my trusted devices and nothing else", async () => {
+    const at = new Date(NOW.getTime() + 24 * HOUR);
+    await t
+      .db()
+      .insert(verification)
+      .values([
+        {
+          id: "v1",
+          identifier: `${TRUSTED_DEVICE_PREFIX}a`,
+          value: "u1",
+          expiresAt: at,
+        },
+        {
+          id: "v2",
+          identifier: `${TRUSTED_DEVICE_PREFIX}b`,
+          value: "u1",
+          expiresAt: at,
+        },
+        {
+          id: "v3",
+          identifier: `${TRUSTED_DEVICE_PREFIX}c`,
+          value: "u2",
+          expiresAt: at,
+        },
+        {
+          id: "v4",
+          identifier: "reset-password:x",
+          value: "u1",
+          expiresAt: at,
+        },
+      ]);
+    await expect(forgetTrustedDevices(db(), "u1")).resolves.toBe(2);
+    const left = await t
+      .db()
+      .select({ id: verification.id })
+      .from(verification);
+    expect(left.map((r) => r.id).sort()).toEqual(["v3", "v4"]);
   });
 });

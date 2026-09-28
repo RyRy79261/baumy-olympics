@@ -8,7 +8,9 @@ import {
   deleteUserPasskey,
   deleteUserSession,
   findAuthUser,
+  forgetTrustedDevices,
   insertCredentialAccount,
+  isLiveSession,
   listUserPasskeys,
   listUserSessions,
   lockAuthUser,
@@ -19,7 +21,7 @@ import type { MemberActor } from "@/lib/auth";
 import { sessionLabel } from "@/lib/auth/session-label";
 import type { ActionCtx } from "./define";
 import { defineAction } from "./define";
-import { fail } from "./result";
+import { fail, type ActionFailure } from "./result";
 
 // Settings, Security (issue #79, camp-404 parity): the member's own ways in
 // and the devices signed in now. Every one needs the member's OWN session
@@ -40,6 +42,34 @@ export const GOOGLE_PROVIDER = "google";
 function me(ctx: ActionCtx): MemberActor {
   return ctx.actor as MemberActor;
 }
+
+export const SIGNED_OUT =
+  "This device was signed out. Sign in again to change your security settings.";
+
+/**
+ * The actor, if the session this request came in on still exists in the
+ * database. Better Auth accepts a signed cookie cache for up to 5 minutes
+ * after a session is revoked, so without this a device signed out elsewhere
+ * could, in that window, sign the owner out everywhere, unlink Google or add
+ * a password. Every write here asks first, share-locking the row.
+ */
+async function liveActor(ctx: ActionCtx): Promise<MemberActor | ActionFailure> {
+  const actor = me(ctx);
+  if (
+    !actor.sessionId ||
+    !(await isLiveSession(ctx.db, {
+      userId: actor.userId,
+      sessionId: actor.sessionId,
+      now: ctx.now,
+    }))
+  ) {
+    return fail("UNAUTHENTICATED", SIGNED_OUT);
+  }
+  return actor;
+}
+
+const isFailure = (x: MemberActor | ActionFailure): x is ActionFailure =>
+  "ok" in x;
 
 const NO_WAY_IN =
   "That's your only way in. Add a password, a passkey or Google first.";
@@ -131,7 +161,8 @@ export const revokeSession = defineAction({
   requires: "session",
   input: z.strictObject({ sessionId: SessionId }),
   async execute(ctx, { sessionId }) {
-    const actor = me(ctx);
+    const actor = await liveActor(ctx);
+    if (isFailure(actor)) return actor;
     if (sessionId === actor.sessionId) {
       return fail(
         "CURRENT_SESSION",
@@ -145,10 +176,18 @@ export const revokeSession = defineAction({
     if (!ended) {
       return fail("NOT_FOUND", "That device is already signed out.");
     }
+    // The device may have been trusted for two-factor; which trust cookie is
+    // its own cannot be told apart, so every device is forgotten and the next
+    // password sign-in anywhere asks for the code again.
+    const forgotten = await forgetTrustedDevices(ctx.db, actor.userId);
     return {
       ok: true,
       data: { sessionId },
-      audit: { entity: "session", entityId: sessionId },
+      audit: {
+        entity: "session",
+        entityId: sessionId,
+        payload: { sessionId, trustedDevicesForgotten: forgotten },
+      },
     };
   },
 });
@@ -165,21 +204,23 @@ export const revokeOtherSessions = defineAction({
   requires: "session",
   input: z.strictObject({}),
   async execute(ctx) {
-    const actor = me(ctx);
-    if (!actor.sessionId) {
-      return fail(
-        "FORBIDDEN",
-        "Sign in with your own browser to sign other devices out.",
-      );
-    }
+    const actor = await liveActor(ctx);
+    if (isFailure(actor)) return actor;
     const count = await deleteOtherUserSessions(ctx.db, {
       userId: actor.userId,
-      keepSessionId: actor.sessionId,
+      keepSessionId: actor.sessionId!,
     });
+    // A signed-out device that was trusted for two-factor must not skip the
+    // code with just the password (Better Auth 1.6.25 keeps the trust for 30
+    // days otherwise).
+    const forgotten = await forgetTrustedDevices(ctx.db, actor.userId);
     return {
       ok: true,
       data: { count },
-      audit: { entity: "session", payload: { count } },
+      audit: {
+        entity: "session",
+        payload: { count, trustedDevicesForgotten: forgotten },
+      },
     };
   },
 });
@@ -203,8 +244,10 @@ export const renamePasskey = defineAction({
       .max(64, "Use at most 64 characters."),
   }),
   async execute(ctx, { passkeyId, name }) {
+    const actor = await liveActor(ctx);
+    if (isFailure(actor)) return actor;
     const renamed = await renameUserPasskey(ctx.db, {
-      userId: me(ctx).userId,
+      userId: actor.userId,
       passkeyId,
       name,
     });
@@ -229,7 +272,9 @@ export const removePasskey = defineAction({
   requires: "session",
   input: z.strictObject({ passkeyId: PasskeyId }),
   async execute(ctx, { passkeyId }) {
-    const { userId } = me(ctx);
+    const actor = await liveActor(ctx);
+    if (isFailure(actor)) return actor;
+    const { userId } = actor;
     await lockAuthUser(ctx.db, userId);
     const removed = await deleteUserPasskey(ctx.db, { userId, passkeyId });
     if (!removed) return fail("NOT_FOUND", "That passkey is already gone.");
@@ -252,7 +297,7 @@ export const unlinkGoogle = defineAction({
   name: "unlink_google",
   title: "Unlink Google",
   description:
-    "Stops the signed-in member signing in with Google. Refused when Google is their only way in.",
+    "Unlinks Google from the signed-in member's account, so Continue with Google no longer signs in to it until they press Link Google again. Refused when Google is their only way in.",
   consent: "Unlink Google from your account",
   kind: "write",
   risk: "destructive",
@@ -260,7 +305,9 @@ export const unlinkGoogle = defineAction({
   requires: "session",
   input: z.strictObject({}),
   async execute(ctx) {
-    const { userId } = me(ctx);
+    const actor = await liveActor(ctx);
+    if (isFailure(actor)) return actor;
+    const { userId } = actor;
     await lockAuthUser(ctx.db, userId);
     const unlinked = await deleteProviderAccount(ctx.db, {
       userId,
@@ -306,7 +353,9 @@ export const setFirstPassword = defineAction({
       ),
   }),
   async execute(ctx, { password }) {
-    const { userId } = me(ctx);
+    const actor = await liveActor(ctx);
+    if (isFailure(actor)) return actor;
+    const { userId } = actor;
     await lockAuthUser(ctx.db, userId);
     if ((await signInMethods(ctx.db, userId)).password) {
       return fail(
