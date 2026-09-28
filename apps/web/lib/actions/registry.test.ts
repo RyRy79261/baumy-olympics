@@ -52,6 +52,21 @@ describe("the registry", () => {
     }
   });
 
+  it("keeps exactly the five claim events to the member's own word", () => {
+    expect(
+      entries
+        .filter(([, d]) => d.ownWordOnly)
+        .map(([n]) => n)
+        .sort(),
+    ).toEqual([
+      "concede_completion",
+      "confirm_completion",
+      "dispute_completion",
+      "undo_completion",
+      "withdraw_dispute",
+    ]);
+  });
+
   it("offers brain every member action but the listed exceptions (issue #70)", () => {
     const uiOnlyGates = ["admin", "session", "account"];
     const member = entries.filter(

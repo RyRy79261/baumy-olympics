@@ -222,21 +222,6 @@ describe("requireAttested", () => {
     expect(verify).not.toHaveBeenCalled();
   });
 
-  it("never takes brain acting on a housemate's behalf as their attestation", async () => {
-    const verify = vi.fn(async (): Promise<PinVerdict> => PASS);
-    const onBehalf: Actor = { ...brain, initiatorMemberId: "m2" };
-    await expect(
-      requireAttested(ctx(onBehalf), everywhere, verify),
-    ).resolves.toMatchObject({
-      ok: false,
-      code: "FORBIDDEN",
-      message: expect.stringContaining("Only that housemate"),
-    });
-    // The same actor on a plain member gate passes: only attestation refuses.
-    expect(requireMember(ctx(onBehalf), everywhere)).toEqual({ ok: true });
-    expect(verify).not.toHaveBeenCalled();
-  });
-
   it("needs the kiosk member's PIN, checked in this request", async () => {
     const verify = vi.fn(pinIs("4321"));
     await expect(

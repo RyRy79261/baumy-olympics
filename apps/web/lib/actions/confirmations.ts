@@ -138,6 +138,8 @@ const byId = {
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
   requires: ATTESTED,
+  // Never on someone's behalf: it is the member's own word (issue #70).
+  ownWordOnly: true,
   input: z.strictObject({ completionId }),
 } as const;
 
@@ -216,6 +218,7 @@ export const disputeCompletion = defineAction({
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
   requires: ATTESTED,
+  ownWordOnly: true,
   input: z.strictObject({
     completionId,
     reason: DisputeReason.describe("Why you think it was not done."),

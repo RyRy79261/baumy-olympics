@@ -411,17 +411,20 @@ describe("the brain endpoint on PGlite", () => {
       ["withdraw_dispute", { completionId }],
       ["concede_completion", { completionId }],
     ] as const) {
-      const res = await call(name, input, {
-        ...actor,
-        "x-baumy-on-behalf-of": jo,
-        "x-baumy-confirmed": "1",
-        "idempotency-key": `brain-${name}-behalf`,
-      });
-      expect(res.status, name).toBe(403);
-      expect(await res.json()).toMatchObject({
-        code: "FORBIDDEN",
-        message: expect.stringContaining("Only that housemate"),
-      });
+      const tap: Record<string, string>[] = [{}, { "x-baumy-confirmed": "1" }];
+      for (const confirmed of tap) {
+        const res = await call(name, input, {
+          ...actor,
+          ...confirmed,
+          "x-baumy-on-behalf-of": jo,
+          "idempotency-key": `brain-${name}-behalf`,
+        });
+        expect(res.status, name).toBe(403);
+        expect(await res.json()).toMatchObject({
+          code: "FORBIDDEN",
+          message: expect.stringContaining("Only that housemate"),
+        });
+      }
     }
     const [row] = await t
       .db()
@@ -432,6 +435,70 @@ describe("the brain endpoint on PGlite", () => {
     const audits = await t.db().select().from(auditEvents);
     expect(audits.map((a) => a.action)).toEqual(["log_completion"]);
     expect(audits[0]!.actorMemberId).toBe(ryan);
+  });
+
+  it("writes, pins and deletes a note on a housemate's behalf", async () => {
+    const ryan = await seedMember(db(), { telegramUserId: TG });
+    const jo = await seedMember(db(), { displayName: "Jo" });
+    const forJo = {
+      "x-baumy-actor": `tg:${TG}`,
+      "x-baumy-on-behalf-of": jo,
+      "x-baumy-confirmed": "1",
+    };
+    const created = await call(
+      "create_note",
+      { title: "Jo's note" },
+      { ...forJo, "idempotency-key": "brain-note-behalf-1" },
+    );
+    expect(created.status).toBe(200);
+    const note = (
+      (await created.json()) as {
+        data: { note: { id: string; authorId: string } };
+      }
+    ).data.note;
+    for (const [name, input] of [
+      ["update_note", { noteId: note.id, title: "Jo's note, edited" }],
+      ["pin_note", { noteId: note.id, pinned: true }],
+      ["delete_note", { noteId: note.id }],
+    ] as const) {
+      const res = await call(name, input, {
+        ...forJo,
+        "idempotency-key": `brain-${name}-behalf-1`,
+      });
+      expect(res.status, name).toBe(200);
+    }
+    const audits = await t.db().select().from(auditEvents);
+    expect(
+      audits.map((a) => [a.action, a.actorMemberId, a.initiatedByMemberId]),
+    ).toEqual([
+      ["create_note", jo, ryan],
+      ["update_note", jo, ryan],
+      ["pin_note", jo, ryan],
+      ["delete_note", jo, ryan],
+    ]);
+  });
+
+  it("takes the asker's own id, upper-cased, as no on-behalf at all", async () => {
+    const ryan = await seedMember(db(), { telegramUserId: TG });
+    expect(ryan).toMatch(/[a-f]/);
+    expect(ryan.toUpperCase()).not.toBe(ryan);
+    // A safe write for the asker: no tap needed, no initiator recorded.
+    const res = await call(
+      "create_reminder",
+      { title: "Bins out" },
+      {
+        "x-baumy-actor": `tg:${TG}`,
+        "x-baumy-on-behalf-of": ryan.toUpperCase(),
+        "idempotency-key": "brain-rem-upper-1",
+      },
+    );
+    expect(res.status).toBe(200);
+    const [row] = await t.db().select().from(auditEvents);
+    expect(row).toMatchObject({
+      action: "create_reminder",
+      actorMemberId: ryan,
+      initiatedByMemberId: null,
+    });
   });
 
   it("records the initiator on a non-transactional write done on someone's behalf", async () => {
