@@ -61,31 +61,12 @@ export function LandingPage() {
 
         <HowItWorks />
 
-        <Card title="Why it uses Google">
-          <div className="flex flex-col gap-3 text-lg leading-relaxed">
-            <p>
-              <strong>Sign in with Google is optional.</strong> Email and
-              password, or a passkey, work just as well. If you choose Google,
-              it shares only your basic profile: your name, your email address
-              and your profile picture. The app asks for nothing else from your
-              Google account: not your Gmail, your Drive, your contacts or your
-              own calendar.
-            </p>
-            <p>
-              <strong>The house calendar</strong> is one Google Calendar
-              belonging to the house, shared with a Google service account made
-              for this house. The app reads and writes the house&apos;s events
-              through that account, never through yours.
-            </p>
-          </div>
-        </Card>
-
         <Card title="Who can use it">
           <p className="text-lg leading-relaxed">
-            Only the housemates. Anyone can create an account, but an account
-            opens nothing until the house&apos;s admin gives it an invite code.
-            It is not a commercial service: there are no ads, nothing is sold,
-            and nobody pays for it.
+            Only the housemates: the house&apos;s founders, and people the admin
+            invites. Anyone can create an account, but it opens nothing without
+            an invite code. It is not a commercial service: there are no ads,
+            nothing is sold, and nobody pays for it.
           </p>
         </Card>
 
@@ -177,8 +158,8 @@ function HowItWorks() {
           <p>
             Do a job while someone else holds its streak and you break it, for a
             bonus of {R.breakPctPerLen}% of the job&apos;s points for each job
-            in their run (up to {BREAK_CAP_PCT}%). They lose nothing: scores
-            only go up.
+            in their run (up to {BREAK_CAP_PCT}%). Breaking a streak never takes
+            points from them.
           </p>
         </Step>
         <Step
@@ -218,7 +199,8 @@ function HowItWorks() {
         >
           <p>
             An iPad in the kitchen shows the month&apos;s calendar, the bounties
-            and the board. Tap your face to act as you.
+            and the board. Tap your face to act as you (some things ask for your
+            PIN).
           </p>
           <p>
             A reminder fills the screen until everyone has tapped
@@ -228,10 +210,10 @@ function HowItWorks() {
         </Step>
         <Step icon={<BaumyBadge scale={1} />} title="Baumy the cat">
           <p>
-            Ask Baumy by voice or by typing, for example &quot;who&apos;s
-            winning?&quot; or &quot;I took the bins out&quot;. Baumy answers,
-            and anything it would change comes back as a proposal for you to
-            approve first.
+            Ask Baumy by typing, or by voice where it&apos;s set up, for example
+            &quot;who&apos;s winning?&quot; or &quot;I took the bins out&quot;.
+            Baumy answers, and anything it would change comes back as a proposal
+            for you to approve first.
           </p>
           <p>
             Baumy is in the house&apos;s Telegram group too, and asks you to

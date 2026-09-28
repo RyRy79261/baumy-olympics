@@ -26,13 +26,20 @@ describe("LandingPage", () => {
     expect(out).toContain('href="/terms"');
   });
 
-  it("says why it uses Google, and that only housemates get in", () => {
-    expect(out).toContain("Sign in with Google is optional.");
-    expect(out).toContain(
-      "your name, your email address and your profile picture",
-    );
-    expect(out).toContain("Google service account made for this house");
+  it("says only housemates get in, and leaves Google to the privacy page", () => {
+    expect(out).toContain("Who can use it");
+    expect(out).toContain('href="/privacy"');
+    expect(out).not.toMatch(/google/i);
     expect(out).toContain("invite code");
+    expect(out).toContain("founders, and people the admin");
+  });
+
+  it("claims only what is true everywhere", () => {
+    expect(out).toContain("Breaking a streak never");
+    expect(out).not.toContain("scores only go up");
+    expect(out).toContain("or by voice where it&#x27;s set up");
+    expect(out).toContain("(some things ask for your PIN)");
+    expect(out).not.toContain("passkey");
   });
 
   it("explains the game with the numbers the code plays by", () => {
