@@ -11,6 +11,7 @@ import type { ServiceActor } from "@/lib/auth";
 import { getClientIp, type RateLimiter } from "@/lib/rate-limit";
 import { BRAIN_SCOPE } from "@baumy/db/service-tokens";
 import { TelegramUserId } from "@baumy/types";
+import { z } from "zod";
 
 // The brain endpoint (SPEC §6.3, §6.6, ADR 0003, issue #27): baumy-brain,
 // the Telegram bot, calls the action registry over HTTP. It is only an
@@ -26,16 +27,24 @@ import { TelegramUserId } from "@baumy/types";
 //      scope → else 403.
 //   2. a rate limit per token (all calls), → 429;
 //   3. (POST) the action must be on the brain surface: unknown → 404
-//      UNKNOWN_ACTION; admin-only, destructive or otherwise not offered to
-//      brain → 403 SURFACE_FORBIDDEN;
+//      UNKNOWN_ACTION; admin-only or otherwise not offered to brain → 403
+//      SURFACE_FORBIDDEN;
 //   4. `X-Baumy-Actor: tg:<telegram user id>`, mapped to an active member
 //      through `members.telegram_user_id` on every call. An unlinked user
 //      gets 403 TELEGRAM_NOT_LINKED, except for `link_telegram`, where the
 //      member comes from the code (and which has its own per-token bucket);
-//   5. a `confirm`-risk action needs `X-Baumy-Confirmed: 1`, which brain
-//      sends only after the person tapped its inline confirm button → else
-//      428 CONFIRMATION_REQUIRED;
-//   6. a write needs `Idempotency-Key`, used as the `requestId`: the same key
+//   5. optional `X-Baumy-On-Behalf-Of: <member id>` (issue #70): the action
+//      runs as that housemate, an active member of this household (else 404
+//      NOT_FOUND), and the audit row names the asker as its initiator. Not
+//      for `link_telegram`, nor for an action that names its member in its
+//      input (`member_field`, e.g. log_completion's doneBy) → 400. An
+//      `attested` action (claim events, note writes) is refused later, by
+//      requireAttested, with 403: nobody attests for someone else;
+//   6. a `confirm` or `destructive` action, and any write on someone's
+//      behalf, needs `X-Baumy-Confirmed: 1`, which brain sends only after
+//      the person tapped its inline confirm button → else 428
+//      CONFIRMATION_REQUIRED;
+//   7. a write needs `Idempotency-Key`, used as the `requestId`: the same key
 //      again returns the stored result without running twice.
 //
 // Failures come back as `{ok: false, code, message}` plus only `issues`,
@@ -52,7 +61,9 @@ export interface BrainEndpointDeps {
   verifyToken: (token: string) => Promise<ServiceCaller | null>;
   /** The active member linked to this Telegram user id, or null. */
   findMember: (telegramUserId: number) => Promise<{ id: string } | null>;
-  /** `toolSpecs("brain")`: destructive and admin actions already dropped. */
+  /** The active member of this household with this id, or null. */
+  findHousemate: (memberId: string) => Promise<{ id: string } | null>;
+  /** `toolSpecs("brain")`: admin and UI-only actions already dropped. */
   specs: () => readonly ToolSpec[];
   /** Whether `name` is a registered action at all (registry.ts). */
   isAction: (name: string) => boolean;
@@ -81,6 +92,7 @@ export const LINK_ACTION = "link_telegram";
 
 export const ACTOR_HEADER = "x-baumy-actor";
 export const CONFIRMED_HEADER = "x-baumy-confirmed";
+export const ON_BEHALF_HEADER = "x-baumy-on-behalf-of";
 export const IDEMPOTENCY_HEADER = "idempotency-key";
 
 export const GENERIC_ERROR = "Something went wrong. Please try again.";
@@ -152,6 +164,19 @@ export function failureResponse(result: ActionFailure): Response {
 export function bearerToken(header: string | null): string | null {
   const m = /^Bearer\s+(\S+)\s*$/i.exec(header ?? "");
   return m?.[1] ?? null;
+}
+
+const MemberId = z.uuid();
+
+/**
+ * Whether the request must carry `X-Baumy-Confirmed: 1`: every action that
+ * is not `safe`, and any write done on someone else's behalf.
+ */
+export function needsConfirmation(
+  spec: Pick<ToolSpec, "kind" | "risk">,
+  onBehalf: boolean,
+): boolean {
+  return spec.risk !== "safe" || (onBehalf && spec.kind === "write");
 }
 
 /** `tg:<id>` to the Telegram user id, or null when it is anything else. */
@@ -243,6 +268,45 @@ export async function handleListActions(
   }
 }
 
+/**
+ * Step 5: the housemate named by `X-Baumy-On-Behalf-Of`, or null when the
+ * header is absent or names the asker themself.
+ */
+async function onBehalfOf(
+  req: Request,
+  name: string,
+  spec: ToolSpec,
+  asker: { id: string } | null,
+  deps: BrainEndpointDeps,
+): Promise<{ ok: true; target: { id: string } | null } | ActionFailure> {
+  const raw = req.headers.get(ON_BEHALF_HEADER)?.trim();
+  if (!raw) return { ok: true, target: null };
+  const issue = (message: string) =>
+    fail("INVALID_INPUT", message, {
+      issues: [{ path: [ON_BEHALF_HEADER], message }],
+    });
+  // An unlinked asker only gets this far for link_telegram.
+  if (name === LINK_ACTION || !asker) {
+    return issue("Linking is always for the person who sent /link.");
+  }
+  if (spec.member_field) {
+    return issue(
+      `${spec.title} names who it is for in ${spec.member_field}. Send that instead of X-Baumy-On-Behalf-Of.`,
+    );
+  }
+  const id = MemberId.safeParse(raw);
+  if (!id.success) return issue("Expected a member id (a UUID).");
+  // Postgres answers an upper-case uuid too: compare the row it found.
+  const target = await deps.findHousemate(id.data.toLowerCase());
+  if (!target) {
+    return fail(
+      "NOT_FOUND",
+      "That person is not an active member of the household.",
+    );
+  }
+  return { ok: true, target: target.id === asker.id ? null : target };
+}
+
 /** POST /api/v1/actions/{name}: run one action for a Telegram user. */
 export async function handleBrainAction(
   req: Request,
@@ -292,20 +356,27 @@ export async function handleBrainAction(
       if (tooMany) return failureResponse(tooMany);
     }
 
-    // 5. The person confirmed it in Telegram.
+    // 5. On a housemate's behalf.
+    const behalf = await onBehalfOf(req, name, spec, member, deps);
+    if (!behalf.ok) return failureResponse(behalf);
+    const target = behalf.target;
+
+    // 6. The person confirmed it in Telegram.
     if (
-      spec.risk === "confirm" &&
+      needsConfirmation(spec, target !== null) &&
       req.headers.get(CONFIRMED_HEADER)?.trim() !== "1"
     ) {
       return failureResponse(
         fail(
           "CONFIRMATION_REQUIRED",
-          "Ask the person to confirm this first, then send it again with X-Baumy-Confirmed: 1.",
+          target
+            ? "Doing this for a housemate needs the asker's confirmation first. Ask them, then send it again with X-Baumy-Confirmed: 1."
+            : "Ask the person to confirm this first, then send it again with X-Baumy-Confirmed: 1.",
         ),
       );
     }
 
-    // 6. Writes carry their idempotency key.
+    // 7. Writes carry their idempotency key.
     const key = req.headers.get(IDEMPOTENCY_HEADER)?.trim() || undefined;
     if (spec.kind === "write" && !(key && REQUEST_ID_PATTERN.test(key))) {
       return failureResponse(
@@ -331,7 +402,11 @@ export async function handleBrainAction(
       kind: "service",
       tokenName: caller.name,
       telegramUserId,
-      ...(member ? { memberId: member.id } : {}),
+      ...(target
+        ? { memberId: target.id, initiatorMemberId: member!.id }
+        : member
+          ? { memberId: member.id }
+          : {}),
     };
     const result = await deps.runAction(name, body.input, {
       actor,

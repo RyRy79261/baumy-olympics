@@ -16,10 +16,18 @@ export interface ToolSpec {
   /** Which MCP scope the tool needs (baumy:read or baumy:write). */
   kind: ActionKind;
   risk: ActionRisk;
+  /**
+   * The input field naming the member the action is done for, if it has one
+   * (`ActionDef.memberField`). Only set when there is one.
+   */
+  member_field?: string;
 }
 
-/** Destructive actions are never exposed over MCP or to brain (SPEC §9). */
-const NO_DESTRUCTIVE: ReadonlySet<Surface> = new Set(["mcp", "brain"]);
+/**
+ * Destructive actions are never exposed over MCP (SPEC §9). Brain gets them,
+ * behind its inline confirm button (owner ruling 2026-09-28, issue #70).
+ */
+const NO_DESTRUCTIVE: ReadonlySet<Surface> = new Set(["mcp"]);
 
 export function toolSpecs(
   surface: Surface,
@@ -40,5 +48,6 @@ export function toolSpecs(
       >,
       kind: def.kind,
       risk: def.risk,
+      ...(def.memberField ? { member_field: def.memberField } : {}),
     }));
 }

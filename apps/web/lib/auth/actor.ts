@@ -90,8 +90,8 @@ export interface KioskActor {
 /**
  * A service token (baumy-brain) acting for a Telegram user (issue #27, the
  * `/api/v1/actions` adapter in lib/brain). `memberId` is the member that
- * Telegram user is linked to, if any; an unlinked one may only call
- * `link_telegram`.
+ * Telegram user is linked to, if any (an unlinked one may only call
+ * `link_telegram`), or the housemate it acts for on their behalf.
  */
 export interface ServiceActor {
   kind: "service";
@@ -99,6 +99,12 @@ export interface ServiceActor {
   /** From `X-Baumy-Actor: tg:<id>`. */
   telegramUserId?: number;
   memberId?: string;
+  /**
+   * Set only for `X-Baumy-On-Behalf-Of` (issue #70): the linked member who
+   * asked, while `memberId` is the housemate the action is done for.
+   * `runAction` records it on the audit row as `initiated_by_member_id`.
+   */
+  initiatorMemberId?: string;
 }
 
 /** An MCP access token, issued to one member with the scopes they ticked. */

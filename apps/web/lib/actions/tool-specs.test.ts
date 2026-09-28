@@ -24,14 +24,22 @@ describe("toolSpecs", () => {
     );
   });
 
-  it("builds the brain tools: link_telegram, and nothing destructive or admin", async () => {
+  it("builds the brain tools: link_telegram and the destructive member actions, nothing admin", async () => {
     const specs = toolSpecs("brain");
     const names = specs.map((s) => s.name);
     expect(names).toContain("link_telegram");
     expect(names).toContain("create_event");
-    expect(names).not.toContain("delete_event");
+    // Owner ruling 2026-09-28 (issue #70): behind brain's confirm button.
+    expect(names).toContain("delete_event");
+    expect(names).toContain("delete_note");
     expect(names).not.toContain("manage_members");
     expect(specs.find((s) => s.name === "create_event")?.risk).toBe("confirm");
+    expect(specs.find((s) => s.name === "log_completion")?.member_field).toBe(
+      "doneBy",
+    );
+    expect(specs.find((s) => s.name === "create_event")).not.toHaveProperty(
+      "member_field",
+    );
     await expect(`${JSON.stringify(specs, null, 2)}\n`).toMatchFileSnapshot(
       "./__snapshots__/tool-specs.brain.json",
     );
@@ -48,7 +56,7 @@ describe("toolSpecs", () => {
     );
   });
 
-  it("never exposes a destructive action over mcp or to brain", () => {
+  it("never exposes a destructive action over mcp; brain and ai get it", () => {
     const drop = defineAction({
       name: "test_delete",
       title: "Delete",
@@ -66,7 +74,9 @@ describe("toolSpecs", () => {
       "test_delete",
     ]);
     expect(toolSpecs("mcp", registry)).toEqual([]);
-    expect(toolSpecs("brain", registry)).toEqual([]);
+    expect(toolSpecs("brain", registry).map((s) => s.name)).toEqual([
+      "test_delete",
+    ]);
     expect(toolSpecs("ai", registry)[0]).toMatchObject({
       risk: "destructive",
       input_schema: {

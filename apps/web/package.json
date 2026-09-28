@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
-    "test:local": "vitest run --config vitest.local.config.ts"
+    "test:local": "vitest run --config vitest.local.config.ts",
+    "brain:spec": "vitest run lib/brain/operations-spec.test.ts --update"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
