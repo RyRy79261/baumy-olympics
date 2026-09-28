@@ -10,7 +10,6 @@ import { ChoreGrid } from "@/components/chores/chore-grid";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { runAction } from "@/lib/actions/registry";
 import { getKioskActor } from "@/lib/auth";
-import { parseBountyFilter } from "@/lib/chores/view";
 import { needsOkLabel } from "@/lib/claims/view";
 import {
   kioskConcedeClaimAction,
@@ -34,13 +33,8 @@ import { CheckPinForm } from "./check-pin-form";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Bounties - Kiosk - Baumy" };
 
-export default async function KioskChoresPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ show?: string | string[] }>;
-}) {
+export default async function KioskChoresPage() {
   const kiosk = await getKioskActor();
-  const show = parseBountyFilter((await searchParams).show);
   if (!kiosk) redirect("/kiosk/pair");
   const acting = kiosk.memberId;
   const ctx = acting ? await kioskRequestCtx(undefined, undefined) : null;
@@ -105,8 +99,6 @@ export default async function KioskChoresPage({
           ) : null}
           {listed.ok ? (
             <ChoreGrid
-              key={show}
-              initialFilter={show}
               chores={listed.data.chores}
               members={people.map((p) => ({
                 id: p.id,

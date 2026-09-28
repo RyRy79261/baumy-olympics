@@ -1,7 +1,6 @@
 "use client";
 
-import type { Route } from "next";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   BountyList,
@@ -24,6 +23,7 @@ import type { ActionResult } from "@/lib/actions/result";
 import {
   bountyCounts,
   filterBounties,
+  parseBountyFilter,
   previewFor,
   sortBounties,
   statusLabel,
@@ -75,7 +75,6 @@ export function ChoreGrid({
   members,
   actorId,
   kiosk = false,
-  initialFilter = "all",
   action,
 }: {
   chores: ChoreView[];
@@ -83,11 +82,15 @@ export function ChoreGrid({
   /** The member acting: the signed-in one, or the kiosk's picked avatar. */
   actorId: string;
   kiosk?: boolean;
-  /** The tab to start on (the hub's Urgent and New tiles link to theirs). */
-  initialFilter?: BountyFilter;
   action: FormAction<LogCompletionData>;
 }) {
-  const [filter, setFilter] = useState<BountyFilter>(initialFilter);
+  // The tab lives in the address (`?show=`): the hub's Urgent and New tiles
+  // link to theirs, and a refresh keeps it. A tap shows the tab at once and
+  // writes the address without a server round trip; a navigation (a tile's
+  // link, back) brings the address's tab in.
+  const shownInUrl = parseBountyFilter(useSearchParams().get("show"));
+  const [filter, setFilter] = useState<BountyFilter>(shownInUrl);
+  useEffect(() => setFilter(shownInUrl), [shownInUrl]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [doneBy, setDoneBy] = useState(actorId);
   const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
@@ -154,10 +157,10 @@ export function ChoreGrid({
   }
 
   /**
-   * Choose a tab, and keep it in the address (`?show=`) so a refresh or
-   * coming back shows the same tab. Through the router (replace, no new
-   * history entry, no scroll), so its own idea of the URL has ?show= too:
-   * a bare replaceState was undone by the re-render after logging a chore.
+   * Choose a tab and keep it in the address. `history.replaceState` with a
+   * null state is the form Next.js keeps its router in step with, so the
+   * re-render after logging a chore keeps ?show= and nothing is fetched or
+   * remounted (an open sheet stays open).
    */
   function choose(next: BountyFilter) {
     setFilter(next);
@@ -165,9 +168,10 @@ export function ChoreGrid({
     if (next === "all") params.delete("show");
     else params.set("show", next);
     const query = params.toString();
-    router.replace(
-      `${window.location.pathname}${query ? `?${query}` : ""}` as Route,
-      { scroll: false },
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}`,
     );
   }
 

@@ -65,11 +65,16 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
 
   // The first log, from the Maintenance tab: the preview, then the points
   // it promised; the tab stays in the address through the log.
+  // A tab tap fetches and remounts nothing: a sheet opened straight after
+  // it is still open once the page has settled.
   await page.goto("/chores");
-  await tabs.getByRole("button", { name: /^Maintenance/ }).click();
-  await expect(page).toHaveURL(/\/chores\?show=maintenance$/);
   await expect(tile(page, name)).toContainText("No streak yet");
+  await tabs.getByRole("button", { name: /^Maintenance/ }).click();
   let sheet = await openChore(page, name);
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(1500);
+  await expect(sheet).toBeVisible();
+  await expect(page).toHaveURL(/\/chores\?show=maintenance$/);
   await expect(sheet.getByTestId("log-preview")).toContainText("+20, streak 1");
   await sheet.getByRole("button", { name: "Log it" }).click();
   await expect(sheet).toBeHidden();
