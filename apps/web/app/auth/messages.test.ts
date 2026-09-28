@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEVICE_SIGNED_OUT } from "@baumy/auth/env";
 import {
   forgotPasswordErrorSentence,
   GOOGLE_NOT_LINKED,
@@ -91,6 +92,11 @@ describe("passkeys and two-factor", () => {
     expect(
       passkeyErrorSentence({ status: 403, code: "SESSION_NOT_FRESH" }),
     ).toMatch(/sign out and in again/);
+    // Signed out elsewhere: the guard's own sentence, not "didn't finish".
+    expect(passkeyErrorSentence({ status: 401, code: "SESSION_REVOKED" })).toBe(
+      DEVICE_SIGNED_OUT,
+    );
+    expect(DEVICE_SIGNED_OUT).toMatch(/^This device was signed out/);
     expect(PASSKEY_DIDNT_FINISH).not.toMatch(/exist|found|registered/i);
   });
 
