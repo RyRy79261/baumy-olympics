@@ -5,6 +5,7 @@
 // INKBLOT cat through Scale2x, and new glyphs go into pixel/glyphs.ts.
 
 export { AppShell, navItemClass } from "./app-shell";
+export { NavMenu } from "./nav-menu";
 export { AuthFrame, linkClass } from "./auth-frame";
 export { ProposalItem, SpeechBubble, type ProposalState } from "./baumy";
 export {
@@ -106,5 +107,5 @@ export {
   Sprite,
   type SpriteState,
 } from "./sprite";
-export { ToastItem, ToastList } from "./toast";
+export { ToastItem, ToastList, toastDismissClass } from "./toast";
 export { LevelMeter, MicButton, type MicState } from "./voice";

@@ -2,12 +2,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { findKioskPinLockedAt } from "@baumy/db/members";
-import { AppShell, FormMessage, buttonClass } from "@baumy/ui";
+import { AppShell, FormMessage, Housemate, navItemClass } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
-import { NavLinks, type NavItem } from "./nav-links";
+import { HubMenu, NavLinks, type NavItem } from "./nav-links";
 
 // The hub's shell (SPEC §7) around every page for household members. The
 // gate here is for the frame; each page runs its own gate too, because a
@@ -33,6 +33,8 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     (await uiRequestCtx(undefined))!,
   );
   const waiting = pending.ok ? pending.data.needsYouCount : 0;
+  // The main pages sit in one row; Admin and the account fold into menus
+  // (issue #64), so the header stays one row on a laptop.
   const items: NavItem[] = [
     { href: "/", label: "Hub" },
     { href: "/chores", label: "Chores" },
@@ -45,14 +47,11 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
       href: "/inbox",
       label: waiting > 0 ? `Needs your OK (${waiting})` : "Needs your OK",
     },
-    { href: "/settings", label: "Settings" },
-    ...(me.role === "admin"
-      ? ([
-          { href: "/admin/members", label: "Members" },
-          { href: "/admin/chores", label: "Edit chores" },
-          { href: "/admin/weights", label: "Weights" },
-        ] as NavItem[])
-      : []),
+  ];
+  const admin: NavItem[] = [
+    { href: "/admin/members", label: "Members" },
+    { href: "/admin/chores", label: "Edit chores" },
+    { href: "/admin/weights", label: "Weights" },
   ];
   return (
     <AppShell
@@ -60,12 +59,31 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
       nav={<NavLinks items={items} />}
       user={
         <>
-          <span data-testid="signed-in-as" title={me.email}>
-            {me.displayName}
-          </span>
-          <Link href="/auth/sign-out" className={buttonClass("secondary")}>
-            Sign out
-          </Link>
+          {me.role === "admin" ? (
+            <HubMenu label="Admin" items={admin} data-testid="admin-menu" />
+          ) : null}
+          <HubMenu
+            label={
+              <>
+                <Housemate memberId={me.memberId} scale={1} />
+                {/* On a phone only the character shows; the name is still
+                    the button's accessible name. */}
+                <span
+                  data-testid="signed-in-as"
+                  title={me.email}
+                  className="inline-block max-w-48 truncate normal-case max-sm:sr-only"
+                >
+                  {me.displayName}
+                </span>
+              </>
+            }
+            items={[{ href: "/settings", label: "Settings" }]}
+            data-testid="account-menu"
+          >
+            <Link href="/auth/sign-out" className={navItemClass(false)}>
+              Sign out
+            </Link>
+          </HubMenu>
         </>
       }
     >

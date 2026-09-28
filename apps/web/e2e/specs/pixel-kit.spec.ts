@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { founderAdmin } from "../lib/household";
+import { openAccountMenu, openAdminMenu } from "../lib/nav";
 
 // Issue #64: the pixel UI kit (ADR 0005), a visual smoke in every project
 // (desktop-chromium, ipad-landscape, mobile-360). The pages are dark plum,
@@ -110,4 +111,42 @@ test("the hub shell: Baumy by the brand, the page you are on framed", async ({
     client: document.documentElement.clientWidth,
   }));
   expect(width.scroll).toBeLessThanOrEqual(width.client);
+
+  // The admin pages and the account fold into menus that close again.
+  await expect(nav.getByRole("link", { name: "Members" })).toHaveCount(0);
+  await openAdminMenu(page);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("link", { name: "Members" })).toHaveCount(0);
+  await openAccountMenu(page);
+  await expect(page.getByRole("link", { name: "Sign out" })).toBeVisible();
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Settings", level: 1 }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign out" })).toHaveCount(0);
+});
+
+test("on a laptop the whole header is one row", async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop-chromium",
+    "The laptop width (1280) is desktop-chromium's.",
+  );
+  await founderAdmin(page, testInfo.project.name);
+  await page.goto("/");
+  const header = page.locator("header").first();
+  const rows = await header.evaluate((h) => {
+    const tops = [
+      ...h.querySelectorAll(
+        'nav[aria-label="Main"] a, [data-testid$="-menu"] > button',
+      ),
+    ].map((el) => Math.round(el.getBoundingClientRect().top));
+    return { tops: [...new Set(tops)], count: tops.length };
+  });
+  expect(rows.count).toBeGreaterThanOrEqual(10);
+  expect(rows.tops).toHaveLength(1);
+  // And nothing in the nav is cut off: it does not need to scroll.
+  const nav = page.getByRole("navigation", { name: "Main" });
+  expect(await nav.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
 });

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PASSWORD_MIN_LENGTH } from "@baumy/auth/password";
 import { readMail, waitForAuthMail } from "../lib/mail";
+import { openAccountMenu } from "../lib/nav";
 
 // The real login, end to end, against Docker Postgres (issue #6): sign up,
 // sign out, a refused sign-in that says nothing about whether the account
@@ -45,6 +46,7 @@ async function expectRefused(page: Page) {
 }
 
 async function signOut(page: Page) {
+  await openAccountMenu(page);
   await page.getByRole("link", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/auth\/sign-in$/);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
