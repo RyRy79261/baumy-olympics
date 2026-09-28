@@ -25,7 +25,7 @@ describe("Table", () => {
     expect(out).toContain("overflow-x-auto");
     expect(out).toContain('<caption class="sr-only">Standings</caption>');
     expect(out).toContain('scope="col"');
-    expect(out).toContain("text-right font-mono");
+    expect(out).toContain("text-right font-label tabular-nums");
   });
 
   it("has no caption unless given one", () => {
@@ -38,7 +38,7 @@ describe("Points", () => {
     const out = html(<Points points={45} provisional={20} />);
     expect(out).toContain(">45<");
     expect(out).toContain("data-provisional");
-    expect(out).toContain("opacity-50");
+    expect(out).toContain("text-bm-dim");
     expect(out).toContain("(20 pending)");
   });
 
@@ -66,6 +66,6 @@ describe("Stat", () => {
     expect(html(<Stat label="Pot" value="€80.50" hint="Since Jan" />)).toMatch(
       /Pot.*€80\.50.*Since Jan/,
     );
-    expect(html(<Stat label="Pot" value="€0" />)).not.toContain("text-sm");
+    expect(html(<Stat label="Pot" value="€0" />)).not.toContain("text-base");
   });
 });

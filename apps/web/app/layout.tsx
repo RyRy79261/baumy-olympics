@@ -1,8 +1,26 @@
 import type { Metadata, Viewport } from "next";
+import { Pixelify_Sans, Press_Start_2P, Silkscreen } from "next/font/google";
 import type { ReactNode } from "react";
 import { APP_BACKGROUND } from "@/components/app-icon";
 import { Toaster } from "@/components/toaster";
 import "./globals.css";
+
+// The pixel fonts (ADR 0005 §7), self-hosted by next/font. globals.css maps
+// them to `font-display`, `font-label` and `font-body`.
+const press = Press_Start_2P({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-press",
+});
+const silk = Silkscreen({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-silk",
+});
+const pixelify = Pixelify_Sans({
+  subsets: ["latin"],
+  variable: "--font-pixelify",
+});
 
 export const metadata: Metadata = {
   title: "Baumy Olympics",
@@ -16,7 +34,10 @@ export const viewport: Viewport = { themeColor: APP_BACKGROUND };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${press.variable} ${silk.variable} ${pixelify.variable}`}
+    >
       <body>
         {children}
         <Toaster />

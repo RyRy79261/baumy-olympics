@@ -2,9 +2,8 @@ import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { cx } from "./cx";
 import { Sprite, type SpriteState } from "./sprite";
 
-// NEUTRAL PLACEHOLDERS for the hub (SPEC §3.1; issue #7 restyles them here):
-// the widget frame, the grid the widgets sit in, the clock face and the Baumy
-// button. On the kiosk the grid fills the screen and never scrolls: each
+// The hub in the pixel kit (SPEC §3.1; ADR 0005): the widget frame, the grid
+// the widgets sit in, the clock face and the Baumy button. On the kiosk the grid fills the screen and never scrolls: each
 // widget clips what does not fit, so the page stays one screen at 1180×820.
 
 /** What a widget has to show. */
@@ -38,13 +37,16 @@ export function Widget({
       aria-label={headingId ? undefined : title}
       data-status={status}
       className={cx(
-        "flex min-h-0 flex-col gap-2 overflow-hidden rounded border border-neutral-300 bg-white p-3",
+        "pixel-frame pixel-frame-4 flex min-h-0 flex-col gap-2 overflow-hidden bg-bm-surface p-4 text-bm-text",
         className,
       )}
       {...props}
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 id={headingId} className="text-base font-semibold text-neutral-900">
+        <h2
+          id={headingId}
+          className="font-display text-sm leading-relaxed text-bm-text"
+        >
           {title}
         </h2>
         {action}
@@ -56,8 +58,8 @@ export function Widget({
           <p
             role={status === "unavailable" ? "alert" : undefined}
             className={cx(
-              "text-sm",
-              status === "unavailable" ? "text-red-800" : "text-neutral-600",
+              "text-lg",
+              status === "unavailable" ? "text-bm-red" : "text-bm-muted",
             )}
           >
             {message}
@@ -112,13 +114,16 @@ export function ClockFace({
       <span
         data-testid="clock-time"
         className={cx(
-          "font-mono font-semibold tabular-nums text-neutral-900",
+          "font-display leading-none text-bm-text",
           kiosk ? "text-5xl" : "text-4xl",
         )}
       >
         {time}
       </span>
-      <span data-testid="clock-date" className="text-sm text-neutral-700">
+      <span
+        data-testid="clock-date"
+        className="mt-3 font-label text-lg font-bold tracking-wider text-bm-muted uppercase"
+      >
         {date}
       </span>
     </div>
@@ -133,7 +138,7 @@ export function WidgetList({
 }: HTMLAttributes<HTMLUListElement>) {
   return (
     <ul
-      className={cx("flex flex-col divide-y divide-neutral-200", className)}
+      className={cx("flex flex-col divide-y-2 divide-bm-line", className)}
       {...props}
     >
       {children}
@@ -154,24 +159,26 @@ export function WidgetItem({
   return (
     <li className="flex items-center justify-between gap-2 py-1.5" {...props}>
       <div className="flex min-w-0 flex-col">
-        <span className="truncate text-sm font-medium text-neutral-900">
+        <span className="truncate text-lg leading-tight text-bm-text">
           {primary}
         </span>
         {secondary ? (
-          <span className="truncate text-xs text-neutral-600">{secondary}</span>
+          <span className="truncate font-label text-xs text-bm-muted uppercase">
+            {secondary}
+          </span>
         ) : null}
       </div>
       {trailing ? (
-        <span className="shrink-0 text-sm text-neutral-900">{trailing}</span>
+        <span className="shrink-0 text-lg text-bm-text">{trailing}</span>
       ) : null}
     </li>
   );
 }
 
 /**
- * The Baumy button (SPEC §3.1, §3.6): bottom right, over everything, the way
- * into the command sheet. A placeholder sprite until issue #7 draws Baumy;
- * `state` is the animation it will play.
+ * The Baumy button (SPEC §3.1, §3.6; ADR 0005 §1): the cat itself, bottom
+ * right, over everything, the way into the command sheet. `state` is its
+ * mood (lib/ai/mood.ts).
  */
 export function BaumyButton({
   state = "idle",
@@ -184,13 +191,13 @@ export function BaumyButton({
       type={type}
       aria-label="Ask Baumy"
       className={cx(
-        "fixed right-4 bottom-4 z-10 inline-flex min-h-16 min-w-16 items-center justify-center rounded-full border border-neutral-900 bg-white shadow",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900",
+        "fixed right-4 bottom-4 z-10 inline-flex min-h-16 min-w-16 touch-manipulation items-end justify-center",
+        "drop-shadow-[0_4px_0_rgb(0_0_0/0.45)] active:translate-y-px",
         className,
       )}
       {...props}
     >
-      <Sprite name="baumy" state={state} size={3} color="#171717" />
+      <Sprite name="baumy" state={state} size={3} />
     </button>
   );
 }

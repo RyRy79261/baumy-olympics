@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { buttonClass } from "./button";
 import { cx } from "./cx";
 
-// NEUTRAL PLACEHOLDER for the kiosk PIN pad (SPEC §6.2, §8; issue #7 restyles
-// it). It sits INSIDE the form of the request it attests and submits the PIN
+// The kiosk PIN pad in the pixel kit (SPEC §6.2, §8; ADR 0005). It sits INSIDE the form of the request it attests and submits the PIN
 // as a hidden field with that one request. It keeps the digits only until
 // the form is sent: the page remounts it (a new `key`) after every attempt,
 // and nothing is written to storage, so the next request needs the PIN
@@ -16,7 +15,11 @@ import { cx } from "./cx";
 export const PIN_MIN_LENGTH = 4;
 export const PIN_MAX_LENGTH = 6;
 
-const KEY = buttonClass("secondary", "kiosk", "min-h-16 text-2xl");
+const KEY = buttonClass(
+  "secondary",
+  "kiosk",
+  "min-h-16 font-display text-xl font-normal",
+);
 
 export function PinPad({
   label,
@@ -56,21 +59,28 @@ export function PinPad({
   return (
     <div role="group" aria-label={label} className="flex flex-col gap-3">
       <input type="hidden" name={name} value={digits} />
-      <p className="text-center text-base font-medium">{label}</p>
+      <p className="text-center font-display text-sm leading-relaxed">
+        {label}
+      </p>
       <output
         aria-live="polite"
         aria-label={`${digits.length} of ${PIN_MAX_LENGTH} digits entered`}
         data-testid="pin-dots"
-        className="flex justify-center gap-3 text-3xl tracking-widest"
+        className="flex justify-center gap-3"
       >
         {Array.from({ length: PIN_MAX_LENGTH }, (_, i) => (
           <span
             key={i}
             aria-hidden
-            className={cx(i >= PIN_MIN_LENGTH && "opacity-50")}
-          >
-            {i < digits.length ? "●" : "○"}
-          </span>
+            data-filled={i < digits.length ? "true" : "false"}
+            className={cx(
+              "block size-5",
+              i < digits.length
+                ? "bg-bm-yellow"
+                : "border-[3px] border-bm-muted bg-bm-ink",
+              i >= PIN_MIN_LENGTH && "opacity-50",
+            )}
+          />
         ))}
       </output>
       <div className="grid grid-cols-3 gap-2">

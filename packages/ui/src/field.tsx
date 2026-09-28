@@ -6,10 +6,11 @@ import type {
 } from "react";
 import { cx } from "./cx";
 
+// Controls sit sunk into the page: ink-dark, a stepped frame in the line
+// colour, red when invalid, and the focus ring inside the frame.
 const CONTROL =
-  "block min-h-11 w-full rounded border border-neutral-400 bg-white px-3 text-base text-neutral-900 " +
-  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-neutral-900 " +
-  "aria-[invalid=true]:border-red-700 disabled:opacity-50";
+  "pixel-frame block min-h-11 w-full bg-bm-ink px-3 font-body text-lg text-bm-text placeholder:text-bm-dim " +
+  "aria-[invalid=true]:[--pf:var(--color-bm-red)] disabled:opacity-50";
 
 /** A text input; `kiosk` makes it a 56px touch target with larger text. */
 export function Input({
@@ -73,7 +74,10 @@ export function Field({
   const describedBy = [hintId, errorId].filter(Boolean).join(" ");
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-neutral-900">
+      <label
+        htmlFor={id}
+        className="font-label text-sm font-bold tracking-wide text-bm-text uppercase"
+      >
         {label}
       </label>
       {children({
@@ -82,12 +86,12 @@ export function Field({
         ...(errorId ? { "aria-invalid": true as const } : {}),
       })}
       {hint ? (
-        <p id={hintId} className="text-sm text-neutral-600">
+        <p id={hintId} className="text-base text-bm-muted">
           {hint}
         </p>
       ) : null}
       {errorId ? (
-        <p id={errorId} className="text-sm text-red-700">
+        <p id={errorId} className="text-base text-bm-red">
           {errors!.join(" ")}
         </p>
       ) : null}
@@ -107,10 +111,10 @@ export function FormMessage({
     <p
       role={tone === "error" ? "alert" : "status"}
       className={cx(
-        "rounded border px-3 py-2 text-sm",
+        "pixel-frame px-4 py-3 text-base",
         tone === "error"
-          ? "border-red-700 bg-red-50 text-red-800"
-          : "border-green-700 bg-green-50 text-green-800",
+          ? "bg-bm-red/10 text-bm-red [--pf:var(--color-bm-red)]"
+          : "bg-bm-green/10 text-bm-green [--pf:var(--color-bm-green)]",
       )}
     >
       {children}
@@ -141,19 +145,19 @@ export function Checkbox({
     <div className={cx("flex flex-col gap-1", className)}>
       <label
         htmlFor={id}
-        className="inline-flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-neutral-900"
+        className="inline-flex min-h-11 cursor-pointer items-center gap-3 text-lg text-bm-text"
       >
         <input
           id={id}
           type="checkbox"
           aria-describedby={hintId}
-          className="size-5 shrink-0 accent-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+          className="size-5 shrink-0 accent-bm-green"
           {...props}
         />
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className="ml-8 text-sm text-neutral-600">
+        <p id={hintId} className="ml-8 text-base text-bm-muted">
           {hint}
         </p>
       ) : null}
