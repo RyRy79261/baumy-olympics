@@ -186,7 +186,7 @@ describe("Telegram lookups", () => {
     await updateMember(db(), m.id, { telegramUserId: TG });
     await expect(
       findActiveMemberByTelegramUserId(db(), HOUSEHOLD_ID, TG),
-    ).resolves.toEqual({ id: m.id, displayName: "Ryan" });
+    ).resolves.toEqual({ id: m.id, displayName: "Ryan", role: "admin" });
     await expect(findMemberIdByTelegramUserId(db(), TG)).resolves.toBe(m.id);
     await expect(findMemberIdByTelegramUserId(db(), TG + 1)).resolves.toBe(
       null,
