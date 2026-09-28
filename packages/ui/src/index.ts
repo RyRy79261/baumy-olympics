@@ -8,6 +8,7 @@ export { AppShell, navBadgeClass, navItemClass } from "./app-shell";
 export { NavMenu } from "./nav-menu";
 export { AuthFrame, linkClass } from "./auth-frame";
 export { ProposalItem, SpeechBubble, type ProposalState } from "./baumy";
+export { BaumyBadge } from "./baumy-badge";
 export {
   BAUMY_STATE_FRAMES,
   BaumyCat,
@@ -135,6 +136,15 @@ export {
   CatText,
   LevelBars,
 } from "./cat-bubble";
+export {
+  BADGE_COLOURS,
+  BADGE_GRID,
+  BADGE_PALETTE,
+  BADGE_RIM,
+  BADGE_SIZE,
+  BADGE_SPARKLES,
+  badgeCat,
+} from "./pixel/baumy-badge";
 export {
   BAUMY_COLOURS,
   BAUMY_FRAMES,
