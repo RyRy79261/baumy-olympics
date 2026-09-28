@@ -106,6 +106,10 @@ describe("BaumyCat", () => {
         expect(out).toContain('data-mark="true"');
         expect(out).toContain(`>${mark}</span>`);
       } else expect(out).not.toContain("data-mark");
+      // A scene that draws its own mark turns the cat's off.
+      expect(html(<BaumyCat state={state} showMark={false} />)).not.toContain(
+        "data-mark",
+      );
       const motion = SPRITE_MOTION[state];
       if (motion) expect(out).toContain(motion);
       expect(out.replace(/motion-safe:animate-[\w-]+/g, "")).not.toMatch(

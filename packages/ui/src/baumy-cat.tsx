@@ -105,6 +105,7 @@ export function BaumyCat({
   facing = "left",
   label,
   speech,
+  showMark = true,
   className,
 }: {
   state?: SpriteState;
@@ -116,11 +117,16 @@ export function BaumyCat({
   label?: string;
   /** What Baumy says, in a bubble above it. */
   speech?: ReactNode;
+  /**
+   * Draw the state's mark (the sleeping "z"). Off where the scene draws its
+   * own, like the screensaver's floating z's.
+   */
+  showMark?: boolean;
   className?: string;
 }) {
   const { frameMs } = BAUMY_STATE_FRAMES[state];
   const frames = baumyFrames(state);
-  const mark = STATE_MARK[state];
+  const mark = showMark ? STATE_MARK[state] : null;
   const anchor = mark ? markAnchor(frames[0]!, facing) : null;
   return (
     <span

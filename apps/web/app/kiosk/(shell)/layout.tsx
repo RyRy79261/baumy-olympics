@@ -8,7 +8,7 @@ import { listActiveMembers } from "@baumy/db/members";
 import { AvatarButton, Button, KioskShell } from "@baumy/ui";
 import { IdleReset } from "@/components/kiosk/idle-reset";
 import { KeepScreenOn } from "@/components/kiosk/keep-screen-on";
-import { NightMode } from "@/components/kiosk/night-mode";
+import { KioskOverlays } from "@/components/kiosk/overlays";
 import { RegisterServiceWorker } from "@/components/kiosk/service-worker";
 import { getKioskActor } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
@@ -63,6 +63,7 @@ export default async function KioskLayout({
             sprite={p.avatarSprite}
             color={p.color}
             memberId={p.id}
+            avatar={p.avatar}
             selected={p.id === kiosk.memberId}
           />
         </form>
@@ -84,7 +85,9 @@ export default async function KioskLayout({
     >
       <KeepScreenOn />
       <IdleReset memberPicked={Boolean(kiosk.memberId)} />
-      <NightMode serverNow={at.toISOString()} window={night} />
+      {/* Issue #66: the full-screen reminder and the raccoon screensaver
+          (at night, and after 5 minutes untouched), over every page. */}
+      <KioskOverlays serverNow={at.toISOString()} window={night} />
       <RegisterServiceWorker />
       {children}
     </KioskShell>

@@ -10,11 +10,14 @@ import {
   vi,
 } from "vitest";
 import { DEFAULT_NIGHT_WINDOW, NIGHT_EVENT } from "@/lib/kiosk/night";
-import { NightMode } from "./night-mode";
+import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
+import { KioskScreensaver } from "./screensaver";
 
-// Night mode on the kiosk (SPEC §8): asleep inside the window, a tap wakes
-// it, a minute untouched puts it back to sleep, the morning wakes it, and the
-// home page's refresh never puts a screen someone is using back to sleep.
+// The kiosk's screensaver (SPEC §8, ADR 0005 §6): on inside the night
+// window, a tap wakes it, a minute untouched puts it back to sleep, the
+// morning wakes it; by day it comes on after 5 minutes untouched unless a
+// reminder is up; and the home page's refresh never puts a screen someone is
+// using back to sleep.
 
 beforeAll(() => {
   (
@@ -51,17 +54,19 @@ function mount(serverNow: string, window = DEFAULT_NIGHT_WINDOW) {
   div = document.createElement("div");
   document.body.append(div);
   root = createRoot(div);
-  act(() => root!.render(<NightMode serverNow={serverNow} window={window} />));
+  act(() =>
+    root!.render(<KioskScreensaver serverNow={serverNow} window={window} />),
+  );
 }
 
 const screen = () =>
-  div.querySelector<HTMLButtonElement>("[data-testid=night-screen]");
+  div.querySelector<HTMLButtonElement>("[data-testid=screensaver]");
 const wait = (ms: number) =>
   act(() => {
     vi.advanceTimersByTime(ms);
   });
 
-describe("NightMode", () => {
+describe("KioskScreensaver", () => {
   it("sleeps at once at night, with the server's time on the clock", () => {
     mount(SERVER_NIGHT);
     expect(screen()).not.toBeNull();
@@ -87,37 +92,84 @@ describe("NightMode", () => {
     expect(events).toEqual([true, false, true]);
   });
 
-  it("wakes for good in the morning", () => {
+  it("wakes in the morning, and the day's idle wait starts then", () => {
     mount(SERVER_NIGHT);
     expect(screen()).not.toBeNull();
     // 23:30 + 7h = 06:30.
     wait(7 * 60 * 60_000);
     expect(screen()).toBeNull();
-    wait(10 * 60_000);
+    wait(SCREENSAVER_IDLE_MS - 2_000);
     expect(screen()).toBeNull();
     expect(events).toEqual([true, false]);
-  });
-
-  it("stays awake by day, and falls asleep when the night starts", () => {
-    mount(SERVER_DAY); // 11:00 Berlin
-    expect(screen()).toBeNull();
-    wait(11 * 60 * 60_000 + 59_000); // 22:00:59, the screen untouched
-    expect(screen()).toBeNull();
-    wait(60 * 60_000); // 23:00:59
+    wait(3_000);
     expect(screen()).not.toBeNull();
   });
 
-  it("is never on when night mode is off", () => {
+  it("by day, comes on after 5 minutes untouched", () => {
+    mount(SERVER_DAY); // 11:00 Berlin
+    expect(screen()).toBeNull();
+    wait(SCREENSAVER_IDLE_MS - 2_000);
+    expect(screen()).toBeNull();
+    // A touch starts the 5 minutes again.
+    act(() => {
+      window.dispatchEvent(new Event("keydown"));
+    });
+    wait(SCREENSAVER_IDLE_MS - 2_000);
+    expect(screen()).toBeNull();
+    wait(3_000);
+    expect(screen()).not.toBeNull();
+    expect(screen()!.textContent).toContain("all quiet");
+    expect(events).toEqual([true]);
+    // A tap wakes it for another 5 minutes.
+    act(() => screen()!.click());
+    expect(screen()).toBeNull();
+    wait(SCREENSAVER_IDLE_MS - 2_000);
+    expect(screen()).toBeNull();
+    wait(3_000);
+    expect(screen()).not.toBeNull();
+  });
+
+  it("by day, waits while a reminder is up", () => {
+    const reminder = document.createElement("div");
+    reminder.setAttribute("data-reminder", "");
+    document.body.append(reminder);
+    mount(SERVER_DAY);
+    wait(SCREENSAVER_IDLE_MS + 60_000);
+    expect(screen()).toBeNull();
+    reminder.remove();
+    wait(1_000);
+    expect(screen()).not.toBeNull();
+  });
+
+  it("falls asleep when the night starts, touched or not", () => {
+    mount(SERVER_DAY); // 11:00 Berlin
+    for (let h = 0; h < 12; h++) {
+      // Someone touches it every few minutes all day.
+      for (let m = 0; m < 60; m += 4) {
+        wait(4 * 60_000);
+        act(() => {
+          window.dispatchEvent(new Event("pointerdown"));
+        });
+      }
+      if (h < 11) expect(screen()).toBeNull();
+    }
+    // 23:00 Berlin.
+    expect(screen()).not.toBeNull();
+  });
+
+  it("with night mode off, is only the idle screensaver", () => {
     div = document.createElement("div");
     document.body.append(div);
     root = createRoot(div);
     vi.setSystemTime(Date.parse(SERVER_NIGHT));
     act(() =>
-      root!.render(<NightMode serverNow={SERVER_NIGHT} window={null} />),
+      root!.render(<KioskScreensaver serverNow={SERVER_NIGHT} window={null} />),
     );
-    wait(5 * 60_000);
+    wait(SCREENSAVER_IDLE_MS - 1_000);
     expect(screen()).toBeNull();
     expect(events).toEqual([]);
+    wait(2_000);
+    expect(screen()).not.toBeNull();
   });
 
   it("does not put a woken screen back to sleep when the page refreshes", () => {
@@ -128,7 +180,10 @@ describe("NightMode", () => {
     const later = new Date(Date.parse(SERVER_NIGHT) + 30_000).toISOString();
     act(() =>
       root!.render(
-        <NightMode serverNow={later} window={{ ...DEFAULT_NIGHT_WINDOW }} />,
+        <KioskScreensaver
+          serverNow={later}
+          window={{ ...DEFAULT_NIGHT_WINDOW }}
+        />,
       ),
     );
     expect(screen()).toBeNull();
