@@ -14,6 +14,7 @@ export {
   type ServiceActor,
 } from "./actor";
 export {
+  memberOrVisitorPage,
   pageGate,
   requireAdminPage,
   requireJoiningPage,

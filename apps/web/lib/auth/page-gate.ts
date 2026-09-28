@@ -12,7 +12,8 @@ import {
 // The gate ladder for PAGES (SPEC §6.2). Actions have their own gates
 // (gates.ts, run by runAction); a page only decides what the visitor may SEE:
 //
-//   nobody signed in           → /auth/sign-in
+//   nobody signed in           → /auth/sign-in (on `/`, the public landing
+//                                page instead: issue #96)
 //   a paired kiosk             → /kiosk (its own shell), or 404 on admin
 //                                pages
 //   not a person's own session → 404 (MCP and brain never get the hub's
@@ -23,16 +24,23 @@ import {
 //
 // `/join` itself runs the ladder the other way: a member there goes home.
 
-export type PageNeed = "member" | "admin" | "joining";
+export type PageNeed = "member" | "admin" | "joining" | "home";
 
 export type PageVerdict =
   | { kind: "ok" }
   | { kind: "redirect"; to: "/auth/sign-in" | "/join" | "/" | "/kiosk" }
-  | { kind: "not_found" };
+  | { kind: "not_found" }
+  | { kind: "public" };
 
 /** Pure: what a page that needs `need` does with this actor. */
 export function pageGate(actor: Actor | null, need: PageNeed): PageVerdict {
-  if (!actor) return { kind: "redirect", to: "/auth/sign-in" };
+  if (!actor) {
+    // Google's branding check (and anyone else) must read what the app is at
+    // `/` without signing in, so home shows the landing page, not a 302.
+    return need === "home"
+      ? { kind: "public" }
+      : { kind: "redirect", to: "/auth/sign-in" };
+  }
   if (actor.kind === "kiosk") {
     return need === "admin"
       ? { kind: "not_found" }
@@ -57,9 +65,10 @@ export type PageMember = MemberActor & {
 async function enforce(
   need: PageNeed,
   returnTo?: string,
-): Promise<MemberActor> {
+): Promise<MemberActor | null> {
   const actor = await getActor();
   const verdict = pageGate(actor, need);
+  if (verdict.kind === "public") return null;
   if (verdict.kind === "redirect") {
     // Only sign-in comes back: a page reached from outside (the MCP consent
     // page) returns there once the person has signed in.
@@ -83,6 +92,16 @@ export async function requireMemberPage(
   return (await enforce("member", opts.returnTo)) as PageMember;
 }
 
+/**
+ * For `/` and the hub's frame: the member, or null when nobody is signed in
+ * (the public landing page, issue #96). Everyone else is sent where the
+ * member ladder sends them: an account with no member row to /join, a kiosk
+ * to /kiosk.
+ */
+export async function memberOrVisitorPage(): Promise<PageMember | null> {
+  return (await enforce("home")) as PageMember | null;
+}
+
 /** For /admin/*: an admin; anyone else gets a 404. */
 export async function requireAdminPage(): Promise<PageMember> {
   return (await enforce("admin")) as PageMember;
@@ -90,5 +109,5 @@ export async function requireAdminPage(): Promise<PageMember> {
 
 /** For /join: a signed-in account with no member row yet. */
 export async function requireJoiningPage(): Promise<MemberActor> {
-  return enforce("joining");
+  return (await enforce("joining")) as MemberActor;
 }
