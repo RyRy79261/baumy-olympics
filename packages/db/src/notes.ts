@@ -17,6 +17,8 @@ export interface NoteRow {
   authorName: string;
   createdAt: Date;
   updatedAt: Date;
+  /** When its words last changed: `edited_at`, else when it was added. */
+  editedAt: Date;
 }
 
 const noteColumns = {
@@ -29,6 +31,9 @@ const noteColumns = {
   authorName: members.displayName,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt,
+  editedAt: sql<Date>`coalesce(${notes.editedAt}, ${notes.createdAt})`
+    .mapWith(notes.createdAt)
+    .as("edited_at"),
 };
 
 function live(householdId: string, id?: string) {

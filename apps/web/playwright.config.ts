@@ -13,6 +13,7 @@ const SHARED_CLOCK_SPECS = [
   "**/clock.spec.ts",
   "**/claims.spec.ts",
   "**/kiosk-night.spec.ts",
+  "**/kiosk-dashboard-clock.spec.ts",
 ];
 
 export default defineConfig({
@@ -81,13 +82,13 @@ export default defineConfig({
       },
     },
     {
-      // The kitchen kiosk.
-      name: "ipad-landscape",
+      // The kitchen kiosk: an iPad in portrait (ADR 0005).
+      name: "ipad-portrait",
       testIgnore: SHARED_CLOCK_SPECS,
       dependencies: ["server-clock"],
       use: {
         ...devices["Desktop Chrome"],
-        viewport: { width: 1180, height: 820 },
+        viewport: { width: 820, height: 1180 },
         deviceScaleFactor: 2,
         isMobile: true,
         hasTouch: true,

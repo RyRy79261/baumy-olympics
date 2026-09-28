@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { rosterAvatars } from "@baumy/types";
+import { rosterColours } from "@/lib/members/characters";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { listActiveMembers } from "@baumy/db/members";
@@ -37,7 +39,7 @@ export default async function HubPage() {
       <HubHome
         hub={hub}
         voice={voiceConfigured()}
-        memberColors={Object.fromEntries(people.map((p) => [p.id, p.color]))}
+        memberColors={rosterColours(rosterAvatars(people))}
         shopping={{ add: addShoppingAction, checkOff: checkOffShoppingAction }}
       />
       {/* Issue #66: a reminder for the kitchen screen. */}

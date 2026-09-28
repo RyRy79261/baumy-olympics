@@ -3,7 +3,11 @@
 import { usePathname, useRouter } from "next/navigation";
 import { KioskNotice } from "@baumy/ui";
 import { clearPickAction } from "@/app/kiosk/actions";
-import { KIOSK_IDLE_MS, KIOSK_IDLE_WARN_MS } from "@/lib/kiosk/constants";
+import {
+  KIOSK_COVER_EVENT,
+  KIOSK_IDLE_MS,
+  KIOSK_IDLE_WARN_MS,
+} from "@/lib/kiosk/constants";
 import { useIdle } from "./use-idle";
 
 /**
@@ -47,4 +51,7 @@ export function closeOpenDialogs(doc: Document): void {
   for (const dialog of doc.querySelectorAll("dialog[open]")) {
     (dialog as HTMLDialogElement).close();
   }
+  // What is open without being a dialog (Baumy's speech bubble, and any
+  // recording in it) closes on this too.
+  doc.defaultView?.dispatchEvent(new Event(KIOSK_COVER_EVENT));
 }

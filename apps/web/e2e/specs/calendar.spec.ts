@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { founderAdmin } from "../lib/household";
-import { expectKioskTargets, pairedKiosk } from "../lib/kiosk";
+import { expectKioskTargets, kioskNav, pairedKiosk } from "../lib/kiosk";
 
 // Issue #19, against the in-memory calendar that stands in for Google under
 // E2E_TEST_MODE=1 (lib/integrations/calendar-memory.ts). The fake takes the
@@ -39,7 +39,7 @@ test("add, edit and delete an event on /calendar", async ({
   page,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-landscape", "The kiosk has its own spec below.");
+  test.skip(project === "ipad-portrait", "The kiosk has its own spec below.");
   const tag = Math.random().toString(36).slice(2, 8);
   const title = `Dinner ${tag}`;
   const renamed = `Supper ${tag}`;
@@ -120,19 +120,35 @@ test("on the kiosk, 19:00 in January and in July both stay 19:00", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad in landscape.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const tag = Math.random().toString(36).slice(2, 8);
   const founder = `Founder ${project}`;
 
   await founderAdmin(page, project);
   const ipad = await pairedKiosk(browser, page, `iPad cal ${tag}`);
   const kiosk = ipad.page;
-  await kiosk.getByRole("button", { name: founder, exact: true }).click();
-  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  await kiosk.getByRole("link", { name: "Calendar" }).click();
+  await kioskNav(kiosk, "Calendar");
   await expect(
     kiosk.getByRole("heading", { name: "Calendar", level: 1 }),
   ).toBeVisible();
+  await kiosk.getByRole("button", { name: founder, exact: true }).click();
+  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+
+  // A six-week month fits the portrait screen above the footer: no scroll.
+  await kiosk.goto("/kiosk/calendar?view=month&date=2026-11-10");
+  const lastWeek = kiosk.getByTestId("day-2026-12-06");
+  await expect(lastWeek).toBeVisible();
+  const fits = await kiosk.evaluate(() => {
+    const main = document.querySelector("main")!;
+    const nav = document.querySelector('nav[aria-label="Kiosk"]')!;
+    const last = document.querySelector('[data-testid="day-2026-12-06"]')!;
+    return {
+      scroll: main.scrollHeight <= main.clientHeight,
+      above:
+        last.getBoundingClientRect().bottom <= nav.getBoundingClientRect().top,
+    };
+  });
+  expect(fits).toEqual({ scroll: true, above: true });
 
   for (const [date, label] of [
     ["2027-01-15", "Fri 15 Jan"],

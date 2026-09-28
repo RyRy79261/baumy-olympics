@@ -23,6 +23,7 @@ export {
   TelegramLinkCode,
   TelegramUserId,
   avatarFor,
+  rosterAvatars,
   defaultAvatar,
 } from "./member";
 export {

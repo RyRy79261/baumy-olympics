@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { createHttpDb, type Queryable } from "@baumy/db";
+import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { findKioskPinLockedAt } from "@baumy/db/members";
 import { AppShell, FormMessage, Housemate, navItemClass } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
+import { activeCharacters } from "@/lib/members/characters";
 import { HubMenu, InboxBadge, NavLinks, type NavItem } from "./nav-links";
 
 // The hub's shell (SPEC §7) around every page for household members. The
@@ -17,6 +19,11 @@ export const dynamic = "force-dynamic";
 
 export default async function HubLayout({ children }: { children: ReactNode }) {
   const me = await requireMemberPage();
+  // Their character as every screen draws it (lib/members/characters.ts).
+  const characters = await activeCharacters(
+    createHttpDb() as unknown as Queryable,
+    HOUSEHOLD_ID,
+  );
   // SPEC §6.7: the daily job's sweep, at most every 15 minutes, after this
   // response (lib/background-work.ts). Nothing on the page waits on it.
   runSweepAfterResponse();
@@ -70,7 +77,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
               <>
                 <Housemate
                   memberId={me.memberId}
-                  avatar={me.avatar}
+                  avatar={characters.get(me.memberId) ?? me.avatar}
                   scale={1}
                 />
                 {/* On a phone only the character shows; the name is still

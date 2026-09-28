@@ -63,6 +63,7 @@ export { Dialog } from "./dialog";
 export { Checkbox, Field, FormMessage, Input, Select, Textarea } from "./field";
 export {
   HAIR_COLOURS,
+  HOUSE_COLOUR,
   HAIR_STYLE_HEADS,
   Housemate,
   SHIRT_COLOURS,
@@ -83,8 +84,41 @@ export { KioskIndicator, KioskNotice } from "./kiosk-night";
 export {
   AvatarButton,
   KioskShell,
+  KioskTopBar,
   type AvatarButtonProps,
 } from "./kiosk-shell";
+export {
+  ActingChip,
+  ModuleBountyRow,
+  DayEventRow,
+  EventChip,
+  KIOSK_FOOTER_H,
+  KioskFooter,
+  KioskNavItem,
+  MessageRow,
+  ModuleEmpty,
+  ModulePanel,
+  MonthDayCell,
+  NotificationIcon,
+  SheetTabs,
+  WeekdayRow,
+  WhoLine,
+  actingDoneClass,
+  bountyActionClass,
+  kioskArrowClass,
+  kioskNavItemClass,
+  tint,
+  todayButtonClass,
+  toneColour,
+  type DashboardTone,
+} from "./kiosk-dashboard";
+export { KioskModal } from "./kiosk-modal";
+export {
+  PixelScroll,
+  seekTo,
+  thumbFor,
+  type ScrollMetrics,
+} from "./pixel-scroll";
 export {
   MarkdownBody,
   NOTE_SANITIZE_SCHEMA,
@@ -93,6 +127,14 @@ export {
 export { NoteGrid, StickyNote } from "./note";
 export { PageHeading, SectionHeading } from "./page-heading";
 export { PixelBubble } from "./pixel-bubble";
+export {
+  CatBubble,
+  CatButton,
+  CatLink,
+  CatSays,
+  CatText,
+  LevelBars,
+} from "./cat-bubble";
 export {
   BAUMY_COLOURS,
   BAUMY_FRAMES,

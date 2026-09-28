@@ -76,6 +76,7 @@ export function ChoreGrid({
   actorId,
   kiosk = false,
   action,
+  initialOpenId,
 }: {
   chores: ChoreView[];
   members: GridMember[];
@@ -83,6 +84,11 @@ export function ChoreGrid({
   actorId: string;
   kiosk?: boolean;
   action: FormAction<LogCompletionData>;
+  /**
+   * A chore whose sheet opens at once: the dashboard's "I'll do it"
+   * (`/kiosk/chores?chore=<id>`, ADR 0005 §1). Ignored if it is not listed.
+   */
+  initialOpenId?: string;
 }) {
   // The tab lives in the address (`?show=`): the hub's Urgent and New tiles
   // link to theirs, and a refresh keeps it. A tap shows the tab at once and
@@ -91,7 +97,11 @@ export function ChoreGrid({
   const shownInUrl = parseBountyFilter(useSearchParams().get("show"));
   const [filter, setFilter] = useState<BountyFilter>(shownInUrl);
   useEffect(() => setFilter(shownInUrl), [shownInUrl]);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(() =>
+    chores.some((c) => c.id === initialOpenId && c.state !== "unavailable")
+      ? initialOpenId!
+      : null,
+  );
   const [doneBy, setDoneBy] = useState(actorId);
   const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
   const [broken, setBroken] = useState<LogCompletionData | null>(null);

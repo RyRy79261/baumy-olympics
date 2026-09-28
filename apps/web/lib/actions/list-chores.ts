@@ -54,6 +54,8 @@ export interface ChoreView {
   urgent: boolean;
   /** Created in the last 3 days (`NEW_BOUNTY_MS`). */
   isNew: boolean;
+  /** When it was added, ISO 8601. */
+  createdAt: string;
   /**
    * For the member asking; null when the chore cannot be scored now, or when
    * nobody is asking (the kitchen screen before anyone taps in).
@@ -71,7 +73,7 @@ export const listChores = defineAction({
   name: "list_chores",
   title: "List chores",
   description:
-    "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (due now or falling due before midnight in Berlin), `isNew` (added in the last 3 days), and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
+    "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (due now or falling due before midnight in Berlin), `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
   consent: "See the household's chores, streaks and points",
   kind: "read",
   risk: "safe",
@@ -129,6 +131,7 @@ export const listChores = defineAction({
           dueAt,
           urgent: isUrgent({ state, dueAt }, ctx.now),
           isNew: isNewChore(c.createdAt, ctx.now),
+          createdAt: c.createdAt.toISOString(),
           next: next
             ? {
                 totalPts: next.totalPts,
