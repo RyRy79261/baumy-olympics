@@ -25,6 +25,11 @@ import {
   sessionActor,
 } from "@/test-utils/actions";
 import type { Actor } from "@/lib/auth";
+import {
+  NEW_BOUNTY_MS,
+  berlinMidnightAfter,
+  isUrgent,
+} from "@/lib/chores/urgency";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { RequestCtx } from "./define";
 import { spriteFor } from "./manage-chore";
@@ -107,7 +112,11 @@ beforeEach(async () => {
     displayName: "Partner",
     kioskPinHash: pinHash,
   });
-  ({ choreId: trash } = await seedChore(db(), TRASH));
+  // Added a month ago, so it is not new.
+  ({ choreId: trash } = await seedChore(db(), {
+    ...TRASH,
+    createdAt: at(-30 * 24),
+  }));
 });
 
 describe("list_chores", () => {
@@ -132,6 +141,7 @@ describe("list_chores", () => {
       id: trash,
       name: "Trash",
       sprite: "trash",
+      kind: "maintenance",
       proofMode: "none",
       confirmMode: "optimistic",
       effortFactorPct: 100,
@@ -145,6 +155,8 @@ describe("list_chores", () => {
       state: "cooldown",
       availableAt: at(48).toISOString(),
       dueAt: at(96).toISOString(),
+      urgent: false,
+      isNew: false,
       // Ryan would break the partner's 1-streak: 20 + 20% of 20.
       next: {
         totalPts: 24,
@@ -158,10 +170,86 @@ describe("list_chores", () => {
     expect(data.chores[0]).toMatchObject({
       id: dishes,
       state: "due",
+      urgent: true,
       streak: null,
       lastDoneAt: null,
       next: { totalPts: SEED_CHORES.dishes.basePoints, streakLen: 1 },
     });
+  });
+
+  it("says each chore's kind, and whether it is new (added in the last 3 days)", async () => {
+    await seedChore(db(), {
+      ...SEED_CHORES.dishes,
+      kind: "consumable",
+      createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS + MIN),
+    });
+    await seedChore(db(), {
+      ...SEED_CHORES.bathroom,
+      createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS),
+    });
+    const data = ok(
+      await runAction("list_chores", {}, ctxFor(sessionActor(ryan))),
+    );
+    expect(data.chores.map((c) => [c.name, c.kind, c.isNew])).toEqual([
+      ["Bathroom", "maintenance", false],
+      ["Dishes", "consumable", true],
+      ["Trash", "maintenance", false],
+    ]);
+  });
+
+  it("calls a chore urgent when it falls due before Berlin midnight", async () => {
+    // Trash was done 73 hours ago: out of its 48h cooldown, due again at
+    // 4 days, which is 23 hours from now (11:00Z tomorrow). It is 12:00 in
+    // Berlin now, so the next midnight (22:00Z) comes first.
+    await t.db().delete(completions);
+    ok(
+      await runAction(
+        "log_completion",
+        { choreId: trash, occurredAt: at(-73).toISOString() },
+        ctxFor(sessionActor(partner), { now: at(-73) }),
+      ),
+    );
+    const list = async (hours: number) =>
+      ok(
+        await runAction(
+          "list_chores",
+          {},
+          ctxFor(sessionActor(ryan), { now: at(hours) }),
+        ),
+      ).chores[0]!;
+    const noon = await list(0);
+    expect(noon).toMatchObject({
+      state: "done",
+      dueAt: at(23).toISOString(),
+      urgent: false,
+    });
+    // Half an hour before midnight: still due tomorrow, not today.
+    expect(await list(11.5)).toMatchObject({ state: "done", urgent: false });
+    // Half an hour after midnight it falls due today: urgent.
+    expect(await list(12.5)).toMatchObject({ state: "done", urgent: true });
+    // And once it is due, it stays urgent.
+    expect(await list(24)).toMatchObject({ state: "due", urgent: true });
+  });
+
+  it("isUrgent: due, or due before midnight; never an unavailable chore", () => {
+    const now = FIXED_NOW;
+    const midnight = berlinMidnightAfter(now);
+    // 12:00 in Berlin (CEST): midnight is 22:00Z.
+    expect(midnight.toISOString()).toBe("2026-09-27T22:00:00.000Z");
+    const due = (
+      state: "due" | "cooldown" | "done" | "unavailable",
+      t: Date | null,
+    ) => isUrgent({ state, dueAt: t ? t.toISOString() : null }, now);
+    expect(due("due", null)).toBe(true);
+    expect(due("cooldown", new Date(midnight.getTime() - 1))).toBe(true);
+    expect(due("done", new Date(midnight.getTime() - 1))).toBe(true);
+    expect(due("cooldown", midnight)).toBe(false);
+    expect(due("done", null)).toBe(false);
+    expect(due("unavailable", new Date(midnight.getTime() - 1))).toBe(false);
+    // The day the clocks go back is 25 hours long: midnight is 23:00Z.
+    expect(
+      berlinMidnightAfter(new Date("2026-10-25T10:00:00Z")).toISOString(),
+    ).toBe("2026-10-25T23:00:00.000Z");
   });
 
   it("leaves archived chores out unless asked, and never offers to score one", async () => {
@@ -732,6 +820,7 @@ describe("manage_chore", () => {
       .where(eq(chores.id, data.choreId));
     expect(chore).toMatchObject({
       sprite: "windows",
+      kind: "maintenance",
       proofMode: "none",
       confirmMode: "optimistic",
       effortFactorPct: 100,
@@ -819,6 +908,55 @@ describe("manage_chore", () => {
         adminCtx(),
       ),
     ).resolves.toMatchObject({ ok: false, code: "CHORE_NAME_TAKEN" });
+  });
+
+  it("sets a chore's kind on create and update, and keeps it when left out", async () => {
+    const kindOf = async (id: string) =>
+      (
+        await t
+          .db()
+          .select({ kind: chores.kind })
+          .from(chores)
+          .where(eq(chores.id, id))
+      )[0]!.kind;
+    const created = ok(
+      await runAction(
+        "manage_chore",
+        { ...windows, name: "Toilet paper", kind: "consumable" },
+        adminCtx(),
+      ),
+    );
+    expect(await kindOf(created.choreId)).toBe("consumable");
+
+    const update = {
+      op: "update",
+      choreId: trash,
+      name: "Trash",
+      basePoints: String(TRASH.basePoints),
+      cooldownHours: String(TRASH.cooldownMinutes / 60),
+      proofMode: "none",
+      confirmMode: "optimistic",
+      effortFactorPct: "100",
+    };
+    expect(await kindOf(trash)).toBe("maintenance");
+    ok(
+      await runAction(
+        "manage_chore",
+        { ...update, kind: "consumable" },
+        adminCtx(),
+      ),
+    );
+    expect(await kindOf(trash)).toBe("consumable");
+    ok(await runAction("manage_chore", update, adminCtx({ now: at(1) })));
+    expect(await kindOf(trash)).toBe("consumable");
+
+    await expect(
+      runAction("manage_chore", { ...update, kind: "errand" }, adminCtx()),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "INVALID_INPUT",
+      issues: [{ path: ["kind"], message: "Pick consumable or maintenance." }],
+    });
   });
 
   it("archives and restores, unless the name was taken meanwhile", async () => {

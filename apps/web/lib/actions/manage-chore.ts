@@ -8,6 +8,7 @@ import {
 } from "@baumy/db/chores";
 import {
   BasePoints,
+  ChoreKind,
   ChoreName,
   ConfirmMode,
   CooldownHours,
@@ -40,11 +41,18 @@ const input = z.discriminatedUnion(
     z.strictObject({
       op: z.literal("create"),
       ...settings,
+      kind: ChoreKind.default("maintenance"),
       proofMode: ProofMode.default("none"),
       confirmMode: ConfirmMode.default("optimistic"),
       effortFactorPct: EffortFactorPct.default(100),
     }),
-    z.strictObject({ op: z.literal("update"), choreId, ...settings }),
+    // A kind left out is kept as it is.
+    z.strictObject({
+      op: z.literal("update"),
+      choreId,
+      ...settings,
+      kind: ChoreKind.optional(),
+    }),
     z.strictObject({ op: z.literal("archive"), choreId }),
     z.strictObject({ op: z.literal("restore"), choreId }),
   ],
@@ -79,7 +87,7 @@ export const manageChore = defineAction({
   name: "manage_chore",
   title: "Manage chores",
   description:
-    "Creates a household chore, edits its name, points, cooldown, proof mode, confirm mode and effort factor, or archives or restores it.",
+    "Creates a household chore, edits its name, kind (consumable or maintenance), points, cooldown, proof mode, confirm mode and effort factor, or archives or restores it.",
   consent: "Manage the household's chores",
   kind: "write",
   risk: "confirm",
@@ -100,6 +108,7 @@ export const manageChore = defineAction({
       const chore = await createChore(ctx.db, {
         householdId: ctx.householdId,
         name: change.name,
+        kind: change.kind,
         sprite: spriteFor(change.name),
         proofMode: change.proofMode,
         confirmMode: change.confirmMode,
@@ -141,6 +150,7 @@ export const manageChore = defineAction({
         chore,
         settings: {
           name: change.name,
+          ...(change.kind ? { kind: change.kind } : {}),
           proofMode: change.proofMode,
           confirmMode: change.confirmMode,
           effortFactorPct: change.effortFactorPct,

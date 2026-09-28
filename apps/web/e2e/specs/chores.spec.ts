@@ -63,15 +63,23 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
   await expect(tile(page, name)).toContainText(`${me} · streak 1`);
 
   // The admin changes its points; the tile shows the new base.
+  // It is a maintenance bounty until the admin makes it a consumable.
   await page.goto("/admin/chores");
+  await expect(page.getByTestId(`admin-chore-${name}`)).toContainText(
+    "maintenance",
+  );
   await page.getByRole("button", { name: `Edit ${name}` }).click();
   const edit = page.getByRole("dialog", { name: `Edit ${name}` });
   await edit.getByLabel("Base points").fill("30");
+  await edit.getByLabel("Kind").selectOption("consumable");
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(
     page.getByRole("status").filter({ hasText: `Saved ${name}.` }),
   ).toBeVisible();
   await expect(page.getByTestId(`admin-chore-${name}`)).toContainText("30 pts");
+  await expect(page.getByTestId(`admin-chore-${name}`)).toContainText(
+    "consumable",
+  );
 
   // Archived, it leaves the grid; restored, it is back.
   await page.getByRole("button", { name: `Archive ${name}` }).click();
