@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   forgotPasswordErrorSentence,
+  GOOGLE_NOT_LINKED,
+  OAUTH_FAILED,
+  oauthErrorSentence,
+  PASSKEY_DIDNT_FINISH,
+  passkeyErrorSentence,
+  twoFactorErrorSentence,
   RESET_LINK_SENT,
   SIGN_IN_REFUSED,
   signInErrorSentence,
@@ -68,5 +74,60 @@ describe("forgot password", () => {
     expect(forgotPasswordErrorSentence({ status: 404 })).toBe(
       SOMETHING_WENT_WRONG,
     );
+  });
+});
+
+describe("passkeys and two-factor", () => {
+  it("says what a passkey failure means without naming an account", () => {
+    expect(passkeyErrorSentence({ status: 400 })).toBe(PASSKEY_DIDNT_FINISH);
+    expect(passkeyErrorSentence({ status: 429 })).toBe(TOO_MANY_ATTEMPTS);
+    expect(passkeyErrorSentence({ status: 500 })).toBe(SOMETHING_WENT_WRONG);
+    expect(
+      passkeyErrorSentence({ status: 503, code: "PASSKEYS_NOT_CONFIGURED" }),
+    ).toMatch(/aren't set up/);
+    expect(
+      passkeyErrorSentence({ status: 403, code: "EMAIL_NOT_VERIFIED" }),
+    ).toMatch(/^Confirm your email first/);
+    expect(
+      passkeyErrorSentence({ status: 403, code: "SESSION_NOT_FRESH" }),
+    ).toMatch(/sign out and in again/);
+    expect(PASSKEY_DIDNT_FINISH).not.toMatch(/exist|found|registered/i);
+  });
+
+  it("says what a refused code means, for either kind of code", () => {
+    expect(twoFactorErrorSentence({ status: 401 }, "totp")).toMatch(
+      /newest one/,
+    );
+    expect(twoFactorErrorSentence({ status: 401 }, "backup")).toMatch(
+      /used already/,
+    );
+    expect(twoFactorErrorSentence({ status: 429 }, "totp")).toBe(
+      TOO_MANY_ATTEMPTS,
+    );
+    expect(
+      twoFactorErrorSentence(
+        { status: 403, code: "ACCOUNT_TEMPORARILY_LOCKED" },
+        "totp",
+      ),
+    ).toMatch(/15 minutes/);
+    expect(
+      twoFactorErrorSentence(
+        { status: 401, code: "INVALID_TWO_FACTOR_COOKIE" },
+        "backup",
+      ),
+    ).toMatch(/Start again/);
+    expect(twoFactorErrorSentence({ status: 502 }, "totp")).toBe(
+      SOMETHING_WENT_WRONG,
+    );
+  });
+});
+
+describe("oauthErrorSentence", () => {
+  it("says why Google did not sign in, and never echoes the code", () => {
+    expect(oauthErrorSentence(undefined)).toBeNull();
+    expect(oauthErrorSentence("account_not_linked")).toBe(GOOGLE_NOT_LINKED);
+    expect(GOOGLE_NOT_LINKED).toMatch(/link Google on Settings/);
+    expect(oauthErrorSentence("<script>alert(1)</script>")).toBe(OAUTH_FAILED);
+    expect(oauthErrorSentence("state_mismatch")).toBe(OAUTH_FAILED);
   });
 });

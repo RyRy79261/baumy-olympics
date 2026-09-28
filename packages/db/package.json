@@ -29,7 +29,8 @@
     "./reminders": "./src/reminders.ts",
     "./ai-usage": "./src/ai-usage.ts",
     "./mcp-oauth": "./src/mcp-oauth.ts",
-    "./service-tokens": "./src/service-tokens.ts"
+    "./service-tokens": "./src/service-tokens.ts",
+    "./account-security": "./src/account-security.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

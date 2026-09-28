@@ -119,8 +119,9 @@ export const aiProvider = pgEnum("ai_provider", ["anthropic", "groq"]);
 // Better Auth (ADR 0001, SPEC §5)
 // ---------------------------------------------------------------------------
 //
-// Copied from camp-404 `packages/db/src/schema.ts` (the Better Auth block),
-// without `two_factor` and `passkey`, which v1 leaves out (SPEC §11). Better
+// Copied from camp-404 `packages/db/src/schema.ts` (the Better Auth block).
+// `two_factor`, `passkey` and `user.two_factor_enabled` came with the
+// twoFactor and @better-auth/passkey plugins (issue #79). Better
 // Auth 1.6.25 owns these tables through its drizzle adapter
 // (packages/auth/src/config.ts). The JS keys are Better Auth's field names,
 // which the adapter reads; the columns are snake_case like the rest of this
@@ -137,6 +138,10 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  // Added by the twoFactor plugin (issue #79): true once a TOTP enrolment is
+  // verified, which is what makes a password sign-in ask for the code. The
+  // secret and the backup codes live in `two_factor`, never on this row.
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -239,6 +244,63 @@ export const rateLimit = pgTable("rate_limit", {
   count: integer("count").notNull(),
   lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
+
+/**
+ * The twoFactor plugin's per-user TOTP secret and backup codes, both
+ * ENCRYPTED with BETTER_AUTH_SECRET (the plugin encrypts the secret, and
+ * @baumy/auth sets `storeBackupCodes: "encrypted"`). One row per user who has
+ * started enrolment; `user.twoFactorEnabled` is the "actually on" flag.
+ * Copied from camp-404 `packages/db/src/schema.ts` (issue #79).
+ */
+export const twoFactor = pgTable(
+  "two_factor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean("verified").notNull().default(true),
+    failedVerificationCount: integer("failed_verification_count")
+      .notNull()
+      .default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  },
+  (t) => [
+    index("two_factor_user_id_idx").on(t.userId),
+    index("two_factor_secret_idx").on(t.secret),
+  ],
+);
+
+/**
+ * One row per registered passkey (@better-auth/passkey, issue #79). A passkey
+ * is bound for life to the relying-party id it was made under
+ * (`resolvePasskeyRpID` in @baumy/auth). `counter` is the WebAuthn signature
+ * counter; `public_key` is public by definition, so nothing here is a secret.
+ */
+export const passkey = pgTable(
+  "passkey",
+  {
+    id: text("id").primaryKey(),
+    name: text("name"),
+    publicKey: text("public_key").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    credentialID: text("credential_id").notNull(),
+    counter: integer("counter").notNull(),
+    deviceType: text("device_type").notNull(),
+    backedUp: boolean("backed_up").notNull(),
+    transports: text("transports"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    aaguid: text("aaguid"),
+  },
+  (t) => [
+    index("passkey_user_id_idx").on(t.userId),
+    index("passkey_credential_id_idx").on(t.credentialID),
+  ],
+);
 
 // ---------------------------------------------------------------------------
 // Identity

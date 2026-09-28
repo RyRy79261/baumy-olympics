@@ -125,17 +125,14 @@ describe("signInApproved", () => {
     expect(Number(rows[0]!.hours)).toBeLessThanOrEqual(24);
   });
 
-  it("refuses an account with two-factor on, and works before the column exists", async () => {
-    // Before Better Auth's two-factor plugin (issue #79) the column is absent:
-    // the tests above signed in fine. Add it as that migration will.
-    await client.query(
-      'alter table "user" add column if not exists two_factor_enabled boolean default false',
-    );
+  it("refuses an account with two-factor on", async () => {
+    // Present before absent: with two-factor off, it signs in...
     const ok = await auth.api.signInApproved({
       body: { userId },
       headers: browser,
     });
     expect(ok.userId).toBe(userId);
+    // ...and not once Better Auth's two-factor plugin (issue #79) has it on.
     await client.query(
       'update "user" set two_factor_enabled = true where id = $1',
       [userId],
@@ -143,7 +140,10 @@ describe("signInApproved", () => {
     await expect(
       auth.api.signInApproved({ body: { userId }, headers: browser }),
     ).rejects.toMatchObject({ status: "FORBIDDEN" });
-    await client.query('alter table "user" drop column two_factor_enabled');
+    await client.query(
+      'update "user" set two_factor_enabled = false where id = $1',
+      [userId],
+    );
   });
 
   it("refuses an unknown user", async () => {

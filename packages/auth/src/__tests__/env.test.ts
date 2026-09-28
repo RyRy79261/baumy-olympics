@@ -10,6 +10,7 @@ import {
   isGoogleConfigured,
   resolveAuthEmailCaptureFile,
   resolveBaseURL,
+  resolvePasskeyScope,
   resolveFounderEmails,
   resolveRateLimit,
   resolveTrustedOrigins,
@@ -270,9 +271,9 @@ describe("authConfigWarnings", () => {
     expect(authConfigWarnings({})).toEqual([
       expect.stringContaining("public placeholder"),
     ]);
-    expect(authConfigWarnings({ VERCEL_ENV: "preview" })).toEqual([
-      expect.stringContaining("fail closed"),
-    ]);
+    expect(
+      authConfigWarnings({ VERCEL_ENV: "preview", VERCEL_URL: "p.vercel.app" }),
+    ).toEqual([expect.stringContaining("fail closed")]);
   });
 
   it("warns when a configured stack cannot deliver a reset link", () => {
@@ -287,6 +288,7 @@ describe("authConfigWarnings", () => {
       RESEND_API_KEY: "k",
       RESEND_FROM_EMAIL: "f",
       VERCEL_ENV: "production",
+      VERCEL_PROJECT_PRODUCTION_URL: "baumy.vercel.app",
     });
     expect(warnings).toEqual([expect.stringContaining("BETTER_AUTH_URL")]);
     expect(
@@ -328,5 +330,93 @@ describe("founder emails", () => {
   it("is empty when unset, so nobody is a founder", () => {
     expect(resolveFounderEmails({}).size).toBe(0);
     expect(isFounderEmail({}, "ryan@example.com")).toBe(false);
+  });
+});
+
+describe("resolvePasskeyScope", () => {
+  it("binds passkeys to the base URL's own host and origin", () => {
+    expect(
+      resolvePasskeyScope({ BETTER_AUTH_URL: "http://localhost:3000" }),
+    ).toEqual({ rpID: "localhost", origin: ["http://localhost:3000"] });
+    expect(
+      resolvePasskeyScope({
+        VERCEL_ENV: "production",
+        VERCEL_PROJECT_PRODUCTION_URL: "baumy.vercel.app",
+        VERCEL_URL: "baumy-abc123.vercel.app",
+      }),
+    ).toEqual({
+      rpID: "baumy.vercel.app",
+      origin: ["https://baumy.vercel.app"],
+    });
+  });
+
+  it("uses PASSKEY_RP_ID when it is the host or a parent of it", () => {
+    expect(
+      resolvePasskeyScope({
+        BETTER_AUTH_URL: "https://olympics.baumy.example",
+        PASSKEY_RP_ID: " Baumy.Example ",
+      }),
+    ).toEqual({
+      rpID: "baumy.example",
+      origin: ["https://olympics.baumy.example"],
+    });
+    expect(
+      resolvePasskeyScope({
+        BETTER_AUTH_URL: "https://baumy.example",
+        PASSKEY_RP_ID: "baumy.example",
+      }),
+    ).toEqual({ rpID: "baumy.example", origin: ["https://baumy.example"] });
+  });
+
+  it("binds production to baumy.tech and accepts only https://www.baumy.tech", () => {
+    // The owner's setup (2026-09-28): the app is www.baumy.tech, the apex
+    // redirects to it, and passkeys belong to the registrable domain.
+    expect(
+      resolvePasskeyScope({
+        VERCEL_ENV: "production",
+        BETTER_AUTH_URL: "https://www.baumy.tech",
+        PASSKEY_RP_ID: "baumy.tech",
+        VERCEL_URL: "baumy-olympics-web-abc123.vercel.app",
+        VERCEL_PROJECT_PRODUCTION_URL: "baumy-olympics-web.vercel.app",
+      }),
+    ).toEqual({ rpID: "baumy.tech", origin: ["https://www.baumy.tech"] });
+  });
+
+  it("fails closed on a PASSKEY_RP_ID that does not cover the site", () => {
+    for (const rp of [
+      "other.example",
+      "ample",
+      "olympics.baumy.example.evil",
+    ]) {
+      expect(
+        resolvePasskeyScope({
+          BETTER_AUTH_URL: "https://olympics.baumy.example",
+          PASSKEY_RP_ID: rp,
+        }),
+        rp,
+      ).toBeNull();
+    }
+  });
+
+  it("fails closed on a deployment with no base URL, and leaves local defaults alone", () => {
+    expect(resolvePasskeyScope({ VERCEL_ENV: "preview" })).toBeNull();
+    expect(resolvePasskeyScope({ PASSKEY_RP_ID: "localhost" })).toBeNull();
+    expect(resolvePasskeyScope({})).toEqual({});
+  });
+
+  it("warns, in plain words, when passkeys are off", () => {
+    expect(
+      authConfigWarnings({
+        BETTER_AUTH_SECRET: SECRET,
+        RESEND_API_KEY: "k",
+        RESEND_FROM_EMAIL: "f",
+        BETTER_AUTH_URL: "https://baumy.example",
+        PASSKEY_RP_ID: "other.example",
+      }),
+    ).toEqual([expect.stringContaining("PASSKEY_RP_ID")]);
+    expect(authConfigWarnings({ VERCEL_ENV: "preview" })).toEqual([
+      expect.stringContaining("fail closed"),
+      expect.stringContaining("passkeys are OFF"),
+    ]);
   });
 });

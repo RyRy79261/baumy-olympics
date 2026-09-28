@@ -33,6 +33,17 @@ describe("buildAuthEmail", () => {
     expect(text).not.toContain("http");
   });
 
+  it("tells the owner a password was added, and what to do if it wasn't them", () => {
+    const { subject, text } = buildAuthEmail({
+      to: "a@b.c",
+      kind: "password-set",
+    });
+    expect(subject).toContain("password was added");
+    expect(text).toContain("If it wasn't");
+    expect(text).toContain("Security");
+    expect(text).not.toContain("http");
+  });
+
   it("tolerates a missing link", () => {
     expect(buildAuthEmail({ to: "a@b.c", kind: "reset" }).text).toContain(
       "expires in 1 hour",

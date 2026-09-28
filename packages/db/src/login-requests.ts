@@ -60,26 +60,20 @@ export function loginRequestState(
   }
 }
 
-/** `user.two_factor_enabled`, false while the column does not exist yet. */
-const TWO_FACTOR_ON = sql`coalesce((to_jsonb(${user}) ->> 'two_factor_enabled')::boolean, false)`;
-
 /**
  * Whether this Better Auth user has two-factor on. Sign in with Baumy makes
  * a session without a TOTP step, so until the owner rules whether a Telegram
  * tap counts as the second factor (ADR 0006, [UNRESOLVED]), such a user is
  * refused: fail closed.
- *
- * `user.two_factor_enabled` does not exist until Better Auth's two-factor
- * plugin adds it (issue #79). Reading it through `to_jsonb(u)` answers false
- * while the column is missing and true once it exists and is set, with no
- * error either way, so this works before and after that migration.
+ * Read from `user.two_factor_enabled`, which Better Auth's two-factor
+ * plugin keeps (issue #79).
  */
 export async function userHasTwoFactor(
   db: Queryable,
   authUserId: string,
 ): Promise<boolean> {
   const rows = await db
-    .select({ on: sql<boolean>`${TWO_FACTOR_ON}` })
+    .select({ on: user.twoFactorEnabled })
     .from(user)
     .where(eq(user.id, authUserId))
     .limit(1);
@@ -117,7 +111,7 @@ export async function findLoginCandidate(
         isNull(members.deactivatedAt),
         isNotNull(members.telegramUserId),
         // In the same query, so a two-factor account costs no extra time.
-        sql`not ${TWO_FACTOR_ON}`,
+        eq(user.twoFactorEnabled, false),
       ),
     )
     .limit(1);

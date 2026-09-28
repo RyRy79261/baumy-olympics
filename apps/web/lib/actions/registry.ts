@@ -2,6 +2,15 @@ import "server-only";
 
 import type { ActionResult } from "./result";
 import type { ActionDef, ActionName, AnyActionDef, RequestCtx } from "./define";
+import {
+  getAccountSecurity,
+  removePasskey,
+  renamePasskey,
+  revokeOtherSessions,
+  revokeSession,
+  setFirstPassword,
+  unlinkGoogle,
+} from "./account-security";
 import { addPotContribution } from "./add-pot-contribution";
 import { adjustPoints } from "./adjust-points";
 import { attachCompletionPhoto } from "./attach-completion-photo";
@@ -87,6 +96,13 @@ export const REGISTRY = {
   authorize_mcp_client: authorizeMcpClient,
   list_mcp_connections: listMcpConnectionsAction,
   revoke_mcp_connection: revokeMcpConnection,
+  get_account_security: getAccountSecurity,
+  revoke_session: revokeSession,
+  revoke_other_sessions: revokeOtherSessions,
+  rename_passkey: renamePasskey,
+  remove_passkey: removePasskey,
+  unlink_google: unlinkGoogle,
+  set_first_password: setFirstPassword,
   pair_kiosk: pairKiosk,
   revoke_kiosk: revokeKiosk,
   check_kiosk_pin: checkKioskPin,

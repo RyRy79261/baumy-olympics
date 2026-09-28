@@ -5,7 +5,7 @@ import {
   getAuth,
   PLACEHOLDER_SECRET,
 } from "../config";
-import { AUTH_SESSION } from "../env";
+import { AUTH_RP_NAME, AUTH_SESSION } from "../env";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "../password";
 
 // The options that make this login safe. Each is a line someone could delete
@@ -44,12 +44,61 @@ describe("buildAuthOptions", () => {
     expect(options.rateLimit.modelName).toBe("rateLimit");
   });
 
-  it("turns on the bearer plugin and the Sign in with Baumy endpoint, and only them", () => {
+  it("turns on bearer, two-factor, passkeys, the last-used hint, the guards and Sign in with Baumy", () => {
     expect(options.plugins.map((p) => p.id)).toEqual([
       "bearer",
+      "two-factor",
+      "passkey",
+      "last-login-method",
+      "baumy-email-proof",
+      "baumy-trusted-devices",
+      "baumy-new-way-in",
       "baumy-approval-sign-in",
     ]);
     expect(options.plugins[0]?.options).toEqual({ requireSignature: true });
+  });
+
+  it("encrypts backup codes, names the authenticator entry and allows passwordless members", () => {
+    const tf = options.plugins.find((p) => p.id === "two-factor")!;
+    expect(tf.options).toMatchObject({
+      issuer: AUTH_RP_NAME,
+      backupCodeOptions: { storeBackupCodes: "encrypted" },
+      allowPasswordless: true,
+    });
+  });
+
+  it("binds passkeys to the base URL's host and origin", () => {
+    const pk = buildAuthOptions({
+      BETTER_AUTH_URL: "https://olympics.baumy.example",
+      PASSKEY_RP_ID: "baumy.example",
+    }).plugins.find((p) => p.id === "passkey")!;
+    expect(pk.options).toMatchObject({
+      rpID: "baumy.example",
+      rpName: AUTH_RP_NAME,
+      origin: ["https://olympics.baumy.example"],
+    });
+  });
+
+  it("switches passkeys off, failing closed, when there is no host to bind them to", () => {
+    const ids = buildAuthOptions({
+      BETTER_AUTH_URL: "https://olympics.baumy.example",
+      PASSKEY_RP_ID: "elsewhere.example",
+    }).plugins.map((p) => p.id);
+    expect(ids).toContain("passkey");
+    expect(ids.indexOf("baumy-passkeys-off")).toBeGreaterThan(-1);
+    expect(ids.indexOf("baumy-passkeys-off")).toBeLessThan(
+      ids.indexOf("baumy-email-proof"),
+    );
+    expect(options.plugins.map((p) => p.id)).not.toContain(
+      "baumy-passkeys-off",
+    );
+  });
+
+  it("maps the two-factor and passkey tables for the adapter", () => {
+    // The drizzle adapter reads its schema map from its closure; building an
+    // instance proves the plugins' models resolve (it throws otherwise).
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() => createAuth({})).not.toThrow();
   });
 
   it("names cookies baumy.* and sends no telemetry", () => {
@@ -69,6 +118,21 @@ describe("buildAuthOptions", () => {
     expect(
       "socialProviders" in buildAuthOptions({ GOOGLE_CLIENT_ID: "id" }),
     ).toBe(false);
+  });
+
+  it("switches off the endpoints an audited action replaces", () => {
+    expect(options.disabledPaths).toEqual([
+      "/passkey/delete-passkey",
+      "/passkey/update-passkey",
+      "/unlink-account",
+      "/revoke-session",
+      "/revoke-sessions",
+      "/revoke-other-sessions",
+    ]);
+  });
+
+  it("links Google only when the member asks, never on sign-in", () => {
+    expect(options.account.accountLinking.disableImplicitLinking).toBe(true);
   });
 
   it("never links Google to an account whose email is unconfirmed", () => {
