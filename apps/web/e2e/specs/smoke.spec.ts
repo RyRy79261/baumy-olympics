@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-// Runs in every project (desktop-chromium, ipad-landscape, mobile-360): the
+// Runs in every project (desktop-chromium, ipad-portrait, mobile-360): the
 // app boots, sends a signed-out visitor from the hub to sign-in, and answers
 // its health check.
 

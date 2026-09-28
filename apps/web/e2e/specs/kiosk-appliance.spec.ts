@@ -2,13 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { founderAdmin } from "../lib/household";
 import { openKioskChores, pairedKiosk } from "../lib/kiosk";
 
-// Issue #29 on the kitchen iPad (ipad-landscape): the web app manifest and
-// icons that make the home-screen app open full screen in landscape, the
+// Issue #29 on the kitchen iPad (ipad-portrait): the web app manifest and
+// icons that make the home-screen app open full screen in portrait, the
 // screen wake lock and its notice, the 60-second idle reset (with its
 // countdown, from any kiosk page), and the offline page. Night mode moves
 // the server clock, so it is kiosk-night.spec.ts (the server-clock project).
 
-const KIOSK_ONLY = "The kiosk is an iPad in landscape.";
+const KIOSK_ONLY = "The kiosk is an iPad in portrait.";
 
 /**
  * A stand-in for Safari's Screen Wake Lock, installed before the page loads:
@@ -52,10 +52,10 @@ function fakeWakeLock() {
 const visibilityChange = (kiosk: Page) =>
   kiosk.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
 
-test("the manifest installs /kiosk full screen in landscape, with icons", async ({
+test("the manifest installs /kiosk full screen in portrait, with icons", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== "ipad-landscape", KIOSK_ONLY);
+  test.skip(testInfo.project.name !== "ipad-portrait", KIOSK_ONLY);
   const res = await page.request.get("/manifest.webmanifest");
   expect(res.status()).toBe(200);
   const manifest = (await res.json()) as {
@@ -67,7 +67,7 @@ test("the manifest installs /kiosk full screen in landscape, with icons", async 
   expect(manifest).toMatchObject({
     start_url: "/kiosk",
     display: "standalone",
-    orientation: "landscape",
+    orientation: "portrait",
   });
   expect(manifest.icons.map((i) => i.sizes)).toEqual(
     expect.arrayContaining(["192x192", "512x512", "180x180"]),
@@ -97,7 +97,7 @@ test("wake lock, idle reset and the offline page", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", KIOSK_ONLY);
+  test.skip(project !== "ipad-portrait", KIOSK_ONLY);
   const suffix = Math.random().toString(36).slice(2, 8);
   const founder = `Founder ${project}`;
   await founderAdmin(page, project);
@@ -130,10 +130,10 @@ test("wake lock, idle reset and the offline page", async ({
   await visibilityChange(kiosk);
   await expect(notice).toHaveCount(0);
 
-  // Idle reset: someone taps in and opens the chores, then walks away.
+  // Idle reset: someone opens the chores and taps in, then walks away.
+  await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  await openKioskChores(kiosk);
   const countdown = kiosk.getByTestId("idle-countdown");
   await context.clock.fastForward(50_000);
   await expect(countdown).toContainText("back to the start in 10 s");
@@ -144,6 +144,8 @@ test("wake lock, idle reset and the offline page", async ({
   await context.clock.fastForward(61_000);
   // Home, and nobody is acting.
   await expect(kiosk).toHaveURL(/\/kiosk$/);
+  await expect(kiosk.getByTestId("kiosk-home")).toBeVisible();
+  await openKioskChores(kiosk);
   await expect(
     kiosk.getByText("Tap your avatar", { exact: true }),
   ).toBeVisible();

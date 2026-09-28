@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { addChore } from "../lib/chores";
 import { founderAdmin } from "../lib/household";
-import { pairedKiosk } from "../lib/kiosk";
+import { openKioskChores, pairedKiosk } from "../lib/kiosk";
 
 // Issue #22 (SPEC §3.6): hold to speak to Baumy. Chromium records its fake
 // microphone (a beep) and the server's fake transcriber
@@ -49,7 +49,7 @@ test("hold to speak on the phone: the transcript goes to Baumy", async ({
   page,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-landscape", "The kiosk has its own test.");
+  test.skip(project === "ipad-portrait", "The kiosk has its own test.");
   const chore = `Sink ${Math.random().toString(36).slice(2, 8)}`;
   await founderAdmin(page, project);
   await addChore(page, { name: chore, basePoints: 15, cooldownHours: 0 });
@@ -101,13 +101,15 @@ test("on the kiosk, a tap starts recording and a second tap sends it", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad in landscape.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const suffix = Math.random().toString(36).slice(2, 8);
   await founderAdmin(page, project);
   const ipad = await pairedKiosk(browser, page, `Mic iPad ${suffix}`);
   await ipad.context.grantPermissions(["microphone"]);
   const kiosk = ipad.page;
   const founder = `Founder ${project}`;
+  // Baumy stands over the footer on every kiosk page; tap in on one.
+  await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
 

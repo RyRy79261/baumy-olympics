@@ -12,7 +12,7 @@ import { founderAdmin } from "../lib/household";
 
 test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-landscape", "The kiosk has its own spec.");
+  test.skip(project === "ipad-portrait", "The kiosk has its own spec.");
   const name = `Trash ${Math.random().toString(36).slice(2, 8)}`;
   const me = `Founder ${project}`;
 

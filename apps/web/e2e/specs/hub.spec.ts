@@ -1,12 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import { expectKioskTargets, pairedKiosk, typePin } from "../lib/kiosk";
+import {
+  expectKioskTargets,
+  kioskNav,
+  pairedKiosk,
+  typePin,
+} from "../lib/kiosk";
 
-// Issue #20: the hub and notes. A note pinned on a phone shows on the
-// kitchen screen's home after it re-reads itself (the focus refresh), its
-// markdown cannot inject HTML or script, and the home stays one screen with
-// no scrollbars at 1180×820 whatever the widgets hold. On the kiosk every
-// change to a note needs the acting member's PIN.
+// Issue #20: the hub and notes. A note written on a phone shows in the
+// kitchen dashboard's Messages (ADR 0005 §3) after it re-reads itself (the
+// focus refresh), its markdown cannot inject HTML or script, and the home
+// stays one screen with no scrollbars at 820×1180 whatever the notes hold.
+// On the kiosk every change to a note needs the acting member's PIN.
 //
 // The household is shared by the specs running in parallel, so each note
 // has a title of its own.
@@ -59,14 +64,15 @@ test("pin a note on the phone and see it on the kiosk home after a refresh", asy
   await baumy.getByRole("button", { name: "Close" }).click();
   await expect(baumy).toBeHidden();
 
-  // The kitchen screen, before anyone taps in: the widgets, and no scroll.
+  // The kitchen screen, before anyone taps in: the dashboard, and no scroll.
   const ipad = await pairedKiosk(browser, page, `iPad ${suffix}`);
   const kiosk = ipad.page;
-  await expect(kiosk.getByTestId("widget-notes")).toBeVisible();
+  const messages = kiosk.locator('[data-icon="messages"]');
+  await expect(messages).toBeVisible();
   await expect(kiosk.getByTestId("clock-time")).toHaveText(/^\d\d:\d\d$/);
-  await expect(kiosk.getByTestId(`hub-note-${title}`)).toHaveCount(0);
   await expectNoScroll(kiosk);
   await expectKioskTargets(kiosk.locator("main"));
+  const before = Number(await messages.getAttribute("data-count"));
 
   // On the phone: a long note whose body tries to inject HTML and script.
   await page.goto("/notes");
@@ -103,14 +109,24 @@ test("pin a note on the phone and see it on the kiosk home after a refresh", asy
   ).toBeVisible();
   await expect(note).toContainText("Pinned");
 
-  // The kiosk shows it once it re-reads itself (coming back into view).
+  // The kiosk counts it once it re-reads itself (coming back into view),
+  // and its Messages module shows it, the markdown still harmless.
   await kiosk.evaluate(() => window.dispatchEvent(new Event("focus")));
-  const pinned = kiosk.getByTestId(`hub-note-${title}`);
-  await expect(pinned).toBeVisible();
-  await expect(pinned.locator("strong")).toHaveText("guest");
-  await expect(pinned.locator("script, img, [onerror]")).toHaveCount(0);
+  await expect
+    .poll(async () => Number(await messages.getAttribute("data-count")))
+    .toBeGreaterThan(before);
+  await messages.click();
+  const module = kiosk.getByRole("dialog", { name: "Messages" });
+  await expect(module).toBeVisible();
+  await expectKioskTargets(module);
+  const message = module.getByTestId(`message-${title}`);
+  await expect(message).toBeVisible();
+  await expect(message.locator("strong")).toHaveText("guest");
+  await expect(message.locator("script, img, [onerror]")).toHaveCount(0);
   expect(await kiosk.evaluate(() => "pwned" in window)).toBe(false);
   expect(await page.evaluate(() => "pwned" in window)).toBe(false);
+  await module.getByRole("button", { name: "Close" }).click();
+  await expect(module).toBeHidden();
   // Thirty lines of note, and the screen still does not scroll.
   await expectNoScroll(kiosk);
 
@@ -126,7 +142,7 @@ test("on the kiosk, adding a note asks for the member's PIN", async ({
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad in landscape.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const suffix = Math.random().toString(36).slice(2, 8);
   const partner = `Partner ${suffix}`;
   const title = `Bins ${suffix}`;
@@ -150,10 +166,7 @@ test("on the kiosk, adding a note asks for the member's PIN", async ({
   await expectNoScroll(kiosk);
 
   // Nobody has tapped in: the notes can be read, not changed.
-  await kiosk
-    .getByTestId("widget-notes")
-    .getByRole("link", { name: "All notes" })
-    .click();
+  await kioskNav(kiosk, "Board");
   await expect(
     kiosk.getByRole("heading", { name: "Notes", level: 1 }),
   ).toBeVisible();

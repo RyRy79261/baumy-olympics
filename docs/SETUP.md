@@ -392,7 +392,7 @@ first admin, so everyone who signs up waits on `/join`.
 
 Nothing here needs an account or a secret, and no new env var: pairing,
 the device cookie and PIN attestation are tested on PGlite, on Docker
-Postgres (concurrent claims and guesses) and end to end in `ipad-landscape`.
+Postgres (concurrent claims and guesses) and end to end in `ipad-portrait`.
 
 - [ ] **Serve the kiosk over HTTPS.** The `baumy_kiosk` cookie is `Secure`,
       so the iPad can pair only over HTTPS (production or a preview URL).

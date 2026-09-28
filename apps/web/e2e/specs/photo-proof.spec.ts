@@ -15,7 +15,7 @@ test("a chore that needs photo proof is logged with a photo", async ({
   page,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-landscape", "The kiosk has its own spec.");
+  test.skip(project === "ipad-portrait", "The kiosk has its own spec.");
   const name = `Fridge ${Math.random().toString(36).slice(2, 8)}`;
 
   await founderAdmin(page, project);
