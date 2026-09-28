@@ -45,13 +45,21 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
     "true",
   );
   await expect(tile(page, name)).toContainText("New");
-  await expect(tile(page, name)).toContainText("Urgent");
+  // Urgent is said once, by the red status line; there is no second mark.
+  await expect(tile(page, name)).toHaveAttribute("data-urgent", "true");
+  await expect(tile(page, name)).not.toContainText("Urgent");
   await expect(tile(page, name)).toContainText("Maintenance");
   await tabs.getByRole("button", { name: /^Consumables/ }).click();
   await expect(
     tabs.getByRole("button", { name: /^Consumables/ }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId(`chore-${name}`)).toHaveCount(0);
+  // The tab is kept in the address, so a reload shows it again.
+  await expect(page).toHaveURL(/\/chores\?show=consumable$/);
+  await page.reload();
+  await expect(
+    tabs.getByRole("button", { name: /^Consumables/ }),
+  ).toHaveAttribute("aria-pressed", "true");
   await tabs.getByRole("button", { name: /^Maintenance/ }).click();
   await expect(tile(page, name)).toBeVisible();
 

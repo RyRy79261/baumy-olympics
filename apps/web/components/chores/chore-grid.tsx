@@ -63,7 +63,7 @@ const TABS: { filter: BountyFilter; label: string; accent: TabAccent }[] = [
 const EMPTY: Record<BountyFilter, string> = {
   all: "",
   urgent: "Nothing is urgent. Baumy approves.",
-  new: "No new bounties this week.",
+  new: "No bounties added in the last 3 days.",
   consumable: "No consumables to buy or refill.",
   maintenance: "No maintenance bounties.",
 };
@@ -152,6 +152,19 @@ export function ChoreGrid({
     setBroken(d.brokenLen !== null ? d : null);
   }
 
+  /**
+   * Choose a tab, and keep it in the address (`?show=`) so a refresh or
+   * coming back shows the same tab. replaceState: no new history entry and
+   * no server round trip (Next.js keeps its router in step with it).
+   */
+  function choose(next: BountyFilter) {
+    setFilter(next);
+    const url = new URL(window.location.href);
+    if (next === "all") url.searchParams.delete("show");
+    else url.searchParams.set("show", next);
+    window.history.replaceState(window.history.state, "", url);
+  }
+
   const counts = bountyCounts(chores);
   const shown = filterBounties(sortBounties(chores), filter);
 
@@ -191,7 +204,7 @@ export function ChoreGrid({
               aria-pressed={on}
               data-tab={t.filter}
               className={tabClass(on, t.accent, kiosk)}
-              onClick={() => setFilter(t.filter)}
+              onClick={() => choose(t.filter)}
             >
               <TabLabel
                 label={t.label}

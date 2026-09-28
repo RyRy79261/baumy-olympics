@@ -123,6 +123,29 @@ export function eventsOnDay(
     );
 }
 
+/**
+ * The month view on a phone, as an agenda: today first (when it is in the
+ * month), then only the later days that have events; for another month,
+ * every day of it that has events. The stacked grid of 35 empty boxes put
+ * today three screens down.
+ */
+export function agendaDays(
+  range: Pick<ViewRange, "days" | "month">,
+  events: readonly CalendarEventView[],
+  today: string,
+): string[] {
+  const days = range.days.filter(
+    (d) => range.month === null || d.startsWith(range.month),
+  );
+  const busy = (d: string) => eventsOnDay(events, d).length > 0;
+  return days.includes(today)
+    ? [today, ...days.filter((d) => d > today && busy(d))]
+    : days.filter(busy);
+}
+
+/** How many chips a kitchen-screen month cell shows before "+N more". */
+export const KIOSK_MONTH_CHIPS = 3;
+
 export const CALENDAR_VIEWS = ["day", "week", "month"] as const;
 export type CalendarViewKind = (typeof CALENDAR_VIEWS)[number];
 
@@ -223,12 +246,16 @@ export function parseViewParams(
   };
 }
 
-/** The chip colour of an event nobody in the app added: the house's. */
-export const HOUSE_EVENT_ACCENT = "var(--color-bm-amber)";
+/**
+ * The chip colour of an event nobody in the app added: the house's, a
+ * neutral grey, since amber already means consumable (ADR 0005 §8) and
+ * members' own colours include oranges.
+ */
+export const HOUSE_EVENT_ACCENT = "var(--color-bm-muted)";
 
 /**
  * An event chip's colour (the prototype's month grid): the colour of the
- * member who added it, or the house's amber for everything else (added in
+ * member who added it, or the house's grey for everything else (added in
  * Google, or by a member who has left). Only a `#rrggbb` is trusted into a
  * style.
  */

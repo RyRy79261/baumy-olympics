@@ -90,7 +90,10 @@ export function HubHome({
   const { events, chores, standings, pot, notes, counts } = hub;
   const list = hub.shopping;
   return (
-    <>
+    // From lg up the page keeps clear of the corner Baumy's button sits in
+    // (fixed, bottom right), so it never covers a widget's link or the
+    // shopping list's Add; from 2xl the page's own margin is wide enough.
+    <div className="lg:pr-32 2xl:pr-0">
       <section
         aria-label="At a glance"
         data-testid="hub-glance"
@@ -99,14 +102,16 @@ export function HubHome({
         <LiveClock serverNow={hub.now} />
         <nav aria-label="Needs attention" className="flex gap-3">
           {TILES.map((t) => {
-            const n = counts[t.key] ?? 0;
+            // Null: the read behind it failed. The tile says so rather
+            // than showing a zero that looks real.
+            const n = counts[t.key];
             return (
               <Link
                 key={t.key}
                 href={t.href}
                 data-testid={`hub-tile-${t.key}`}
-                aria-label={`${t.label}: ${n}`}
-                className={statusTileClass(n > 0)}
+                aria-label={`${t.label}: ${n ?? "unavailable"}`}
+                className={statusTileClass(n !== null && n > 0)}
               >
                 <StatusTileFace
                   icon={t.icon}
@@ -280,6 +285,6 @@ export function HubHome({
         </div>
       </div>
       <BaumySheet voice={voice} />
-    </>
+    </div>
   );
 }
