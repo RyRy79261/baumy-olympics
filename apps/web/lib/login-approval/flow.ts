@@ -102,7 +102,7 @@ export interface LoginApprovalDeps {
   auditRequest: (row: RequestAudit) => Promise<void>;
   /** Runs `fn` once the response has gone (Next's `after`). */
   afterResponse: (fn: () => Promise<void>) => void;
-  /** Better Auth's session for this user: the `Set-Cookie` values. */
+  /** Better Auth's session for this user: the Set-Cookie values. */
   signIn: (authUserId: string, headers: Headers) => Promise<string[]>;
   /** Whether auth may serve on this deployment (`authMayServe`). */
   authMayServe: () => boolean;
@@ -139,7 +139,7 @@ const CLOSED = () =>
     "Sign-in is switched off on this deployment until BETTER_AUTH_SECRET is set.",
   );
 
-/** `Set-Cookie` for the browser's secret, or to clear it (`maxAge` 0). */
+/** Set-Cookie for the browser's secret, or to clear it (`maxAge` 0). */
 export function loginCookie(value: string, maxAge: number): string {
   return [
     `${LOGIN_COOKIE}=${value}`,
