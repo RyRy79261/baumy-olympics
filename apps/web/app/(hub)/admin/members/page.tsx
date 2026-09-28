@@ -64,7 +64,6 @@ export default async function AdminMembersPage() {
                 key={m.id}
                 id={m.id}
                 displayName={m.displayName}
-                avatarSprite={m.avatarSprite}
                 color={m.color}
                 role={m.role}
                 active={m.deactivatedAt === null}
