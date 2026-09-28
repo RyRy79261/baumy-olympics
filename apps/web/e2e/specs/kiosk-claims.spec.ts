@@ -20,7 +20,7 @@ test("on the kiosk, confirm a housemate's claim with a PIN; undo asks for one to
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad in landscape.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const suffix = Math.random().toString(36).slice(2, 8);
   const chore = `Sink ${suffix}`;
   const founder = `Founder ${project}`;
@@ -44,9 +44,9 @@ test("on the kiosk, confirm a housemate's claim with a PIN; undo asks for one to
   const kiosk = ipad.page;
 
   // The founder logs it twice; the banner offers to undo them.
+  await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  await openKioskChores(kiosk);
   for (let i = 0; i < 2; i++) {
     const sheet = await openChore(kiosk, chore);
     await sheet.getByRole("button", { name: "Log it" }).click();

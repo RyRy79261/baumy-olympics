@@ -68,6 +68,7 @@ describe("insertNote and findNote", () => {
       authorName: "Ryan",
       createdAt: T0,
       updatedAt: T0,
+      editedAt: T0,
     });
   });
 
@@ -166,6 +167,8 @@ describe("setNotePinned", () => {
     expect(await findNote(db(), HOUSEHOLD_ID, id)).toMatchObject({
       pinned: true,
       updatedAt: at(4),
+      // A change, but not an edit: the note is no newer as a message.
+      editedAt: T0,
     });
     await setNotePinned(db(), {
       householdId: HOUSEHOLD_ID,

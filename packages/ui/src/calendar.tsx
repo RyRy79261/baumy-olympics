@@ -12,22 +12,31 @@ const WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 /**
  * The days of a view. `columns` 1 is the day view; 7 lays the days out as a
  * week (Monday first) from the `sm` breakpoint up, one under the other on a
- * phone. `weekdays` adds the Mon…Sun header row (month view).
+ * phone. `weekdays` adds the Mon…Sun header row (month view). `fill` makes
+ * the weeks share the height it is given (the kitchen screen's month, which
+ * never scrolls), `rows` of them.
  */
 export function CalendarGrid({
   columns,
   weekdays = false,
   label,
+  fill,
   children,
 }: {
   columns: 1 | 7;
   weekdays?: boolean;
   /** What the grid shows, for screen readers ("Week of 11 Jan"). */
   label: string;
+  /** Share the given height between this many rows of days. */
+  fill?: { rows: number };
   children: ReactNode;
 }) {
   return (
-    <div role="region" aria-label={label} className="flex flex-col gap-1">
+    <div
+      role="region"
+      aria-label={label}
+      className={cx("flex flex-col gap-1", fill && "min-h-0 flex-1")}
+    >
       {weekdays ? (
         <div
           aria-hidden="true"
@@ -42,7 +51,13 @@ export function CalendarGrid({
         className={cx(
           "grid gap-1.5",
           columns === 7 ? "grid-cols-1 sm:grid-cols-7" : "grid-cols-1",
+          fill && "min-h-0 flex-1",
         )}
+        style={
+          fill
+            ? { gridTemplateRows: `repeat(${fill.rows}, minmax(0, 1fr))` }
+            : undefined
+        }
       >
         {children}
       </ol>
@@ -57,6 +72,7 @@ export function CalendarDayCell({
   today = false,
   muted = false,
   tall = false,
+  fill = false,
   children,
   ...props
 }: {
@@ -74,6 +90,8 @@ export function CalendarDayCell({
   muted?: boolean;
   /** The day and week views give each day more room. */
   tall?: boolean;
+  /** In a `fill` grid: as tall as its row, clipping what does not fit. */
+  fill?: boolean;
   children?: ReactNode;
   "data-testid"?: string;
 }) {
@@ -84,7 +102,11 @@ export function CalendarDayCell({
         // Square pixel cells (no notched corners, which read as rounded at
         // this size): a 2px line frame, today a 4px violet one.
         "relative flex min-w-0 flex-col gap-1 p-1.5",
-        tall ? "min-h-40" : "min-h-24 sm:min-h-32",
+        fill
+          ? "min-h-0 overflow-hidden"
+          : tall
+            ? "min-h-40"
+            : "min-h-24 sm:min-h-32",
         today
           ? "border-4 border-bm-violet bg-bm-raised"
           : muted

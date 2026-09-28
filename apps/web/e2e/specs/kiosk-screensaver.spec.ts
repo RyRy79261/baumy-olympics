@@ -15,7 +15,7 @@ test("the screensaver comes on after 5 minutes untouched and a tap wakes it", as
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad.");
   const suffix = Math.random().toString(36).slice(2, 8);
   await founderAdmin(page, project);
   const { context, page: kiosk } = await pairedKiosk(

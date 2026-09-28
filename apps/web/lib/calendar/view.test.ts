@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  kioskMonthChips,
   HOUSE_EVENT_ACCENT,
   agendaDays,
   eventAccent,
@@ -263,5 +264,24 @@ describe("agendaDays", () => {
       "2027-01-11",
       "2027-01-15",
     ]);
+  });
+});
+
+describe("kioskMonthChips", () => {
+  // A cell holds its frame, padding and date (40px), then 28px chips 4px
+  // apart, and "+N more" (16px) when not every chip fits.
+  it("shows every chip that fits", () => {
+    expect(kioskMonthChips(40 + 28, 1)).toBe(1);
+    expect(kioskMonthChips(40 + 28 + 4 + 28, 2)).toBe(2);
+    expect(kioskMonthChips(200, 0)).toBe(0);
+  });
+
+  it("keeps room for +N more when they do not all fit", () => {
+    // Two chips fit, three do not: one chip beside "+2 more".
+    expect(kioskMonthChips(40 + 28 + 4 + 28, 3)).toBe(1);
+    // Only room for the "+N more".
+    expect(kioskMonthChips(40 + 20, 3)).toBe(0);
+    // A tall cell (a five-week month) keeps two beside "+N more".
+    expect(kioskMonthChips(40 + 3 * 28 + 2 * 4 - 1, 5)).toBe(2);
   });
 });

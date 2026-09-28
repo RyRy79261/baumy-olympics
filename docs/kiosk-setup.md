@@ -12,16 +12,18 @@ Pairing itself is in [SETUP.md](SETUP.md#kiosk-issue-10).
    bars (`display: standalone` in `app/manifest.ts`, and `appleWebApp`
    in the root layout).
 
-The manifest says `orientation: landscape`, but iPadOS ignores that for
-home-screen apps. Hold the iPad in landscape and lock the rotation
-(Control Centre → Rotation Lock), or let Guided Access hold it (below).
+The manifest says `orientation: portrait` (the kitchen dashboard, ADR
+0005), but iPadOS ignores that for home-screen apps. Hold the iPad upright,
+in portrait, and lock the rotation (Control Centre → Rotation Lock), or let
+Guided Access hold it (below).
 
 ## 2. Keep it awake
 
 The kiosk asks for the Screen Wake Lock every time it opens, every time it
 comes back into view and on any touch while it does not hold it. iPadOS
 supports it from 16.4 in Safari and in home-screen apps. While the lock is
-not held, a tag in the bottom-left corner says:
+not held, a tag in the bottom-left corner, just above the footer nav,
+says:
 
 - **Screen may sleep**: the browser refused or dropped the lock (Low Power
   Mode, the page was hidden). Touch the screen and it asks again.
@@ -46,7 +48,7 @@ Guided Access keeps the iPad in Baumy: no swiping home, no notifications.
    Guided Access has its own auto-lock, and it wins over the one in Display
    & Brightness.
 4. Open Baumy from the home screen, triple-click the top (or home) button,
-   and tap **Start**. Under Options, turn **Motion** off to hold landscape.
+   and tap **Start**. Under Options, turn **Motion** off to hold portrait.
 5. To leave it: triple-click, type the passcode, End.
 
 ## 4. What the screen does on its own
@@ -54,7 +56,8 @@ Guided Access keeps the iPad in Baumy: no swiping home, no notifications.
 - **Idle reset.** After 60 seconds untouched it forgets who tapped their
   avatar and goes back to the kitchen home, from any kiosk page, and closes
   any open sheet or PIN pad. The last 10 seconds show a countdown; any
-  touch cancels it.
+  touch cancels it. On the home, a day sheet or module left open closes,
+  and another month left showing goes back to this one.
 - **Night mode.** From 23:00 to 06:30 Berlin time it dims to a sleeping
   Baumy and a big clock. A touch wakes it; after a minute untouched it goes
   back to sleep; 06:30 wakes it for good. The hours are
@@ -66,18 +69,19 @@ Guided Access keeps the iPad in Baumy: no swiping home, no notifications.
   "No connection" instead of Safari's error page, and reloads itself as
   soon as the connection is back (and every minute). Nothing is stored for
   offline use.
-- **Freshness.** The kitchen home re-reads itself every 60 seconds and
-  when it comes back into view (issue #20).
+- **Freshness.** The kitchen home and the Shop page re-read themselves
+  every 60 seconds and when they come back into view (issues #20, #65).
 
 ## 5. Checks before calling it done
 
-- [ ] Launched from the home screen, it is full screen in landscape.
+- [ ] Launched from the home screen, it is full screen in portrait.
 - [ ] **2-hour soak test:** leave it on the kitchen home, untouched, for two
       hours in the day. The screen stays on, the corner tag never appears,
       and the clock is still ticking. Note the iPadOS version and the result
       in the PR or issue #29.
 - [ ] Tap an avatar, open Chores, walk away: after 50 seconds the countdown
-      shows, after 60 the screen is home and says "Tap your avatar".
+      shows, after 60 the screen is home, and Chores says "Tap your
+      avatar".
 - [ ] After 23:00 (or with `KIOSK_NIGHT_HOURS` set to the next few minutes
       on a preview): the night screen shows, a tap wakes it, a minute
       later it sleeps again, and in the morning it is awake.

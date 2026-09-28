@@ -29,7 +29,7 @@ test("type a chore to Baumy, approve it, and the scoreboard counts it once", asy
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-landscape", "The kiosk has its own spec.");
+  test.skip(project === "ipad-portrait", "The kiosk has its own spec.");
   const tag = Math.random().toString(36).slice(2, 8);
   const chore = `Pail ${tag}`;
   const player = `Asker ${tag}`;

@@ -6,6 +6,8 @@ export interface NewChore {
   name: string;
   basePoints: number;
   cooldownHours: number;
+  /** Maintenance unless given (ADR 0005 §2). */
+  kind?: "consumable" | "maintenance";
 }
 
 /** An admin adds a chore on /admin/chores. */
@@ -18,6 +20,7 @@ export async function addChore(admin: Page, chore: NewChore) {
     has: admin.getByRole("button", { name: "Add chore" }),
   });
   await form.getByLabel("Name").fill(chore.name);
+  if (chore.kind) await form.getByLabel("Kind").selectOption(chore.kind);
   await form.getByLabel("Base points").fill(String(chore.basePoints));
   await form.getByLabel("Cooldown (hours)").fill(String(chore.cooldownHours));
   await form.getByRole("button", { name: "Add chore" }).click();

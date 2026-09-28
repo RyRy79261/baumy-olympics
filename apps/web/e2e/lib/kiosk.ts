@@ -8,6 +8,9 @@ import {
   type Page,
 } from "@playwright/test";
 
+/** The kitchen iPad, in portrait (ADR 0005). */
+export const KIOSK_VIEWPORT = { width: 820, height: 1180 };
+
 /** Every visible button in `scope` is a 56px (or larger) square target. */
 export async function expectKioskTargets(scope: Locator) {
   const buttons = scope.getByRole("button");
@@ -56,7 +59,7 @@ export async function pairedKiosk(
 ) {
   const code = await pairCode(admin, deviceName);
   const context = await browser.newContext({
-    viewport: { width: 1180, height: 820 },
+    viewport: KIOSK_VIEWPORT,
     hasTouch: true,
     // Its own address, so pairing's limit of 10 tries per address per 15
     // minutes (lib/kiosk/pairing.ts) counts this kiosk alone, not every
@@ -78,12 +81,31 @@ export async function typePin(dialog: Locator, pin: string) {
   await dialog.getByRole("button", { name: "OK" }).click();
 }
 
-/** From the kiosk home, open the chores (the grid and "Needs your OK"). */
-export async function openKioskChores(kiosk: Page) {
+/** Go to a page by the kiosk's footer nav (Home, Bounties, Calendar, ...). */
+export async function kioskNav(kiosk: Page, label: string) {
   await kiosk
-    .getByTestId("widget-chores")
-    .getByRole("link", { name: "Chores" })
+    .getByRole("navigation", { name: "Kiosk" })
+    .getByRole("link", { name: label, exact: true })
     .click();
+}
+
+/**
+ * Open the Baumy sheet (typing) on the kiosk: tap the cat, and if it starts
+ * talking in its bubble (listening, or asking who is there), "Type instead".
+ */
+export async function openBaumySheet(kiosk: Page): Promise<Locator> {
+  await kiosk.getByRole("button", { name: "Ask Baumy" }).click();
+  const sheet = kiosk.getByRole("dialog", { name: "Ask Baumy" });
+  const typeInstead = kiosk.getByRole("button", { name: "Type instead" });
+  await expect(sheet.or(typeInstead)).toBeVisible();
+  if (await typeInstead.isVisible()) await typeInstead.click();
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+/** Open the chores (the grid and "Needs your OK") from the footer nav. */
+export async function openKioskChores(kiosk: Page) {
+  await kioskNav(kiosk, "Bounties");
   await expect(
     kiosk.getByRole("heading", { name: "Bounties", level: 1 }),
   ).toBeVisible();

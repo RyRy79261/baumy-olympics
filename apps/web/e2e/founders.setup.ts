@@ -10,7 +10,7 @@ import { founderAdmin } from "./lib/household";
 const PROJECTS = [
   "server-clock",
   "desktop-chromium",
-  "ipad-landscape",
+  "ipad-portrait",
   "mobile-360",
 ];
 

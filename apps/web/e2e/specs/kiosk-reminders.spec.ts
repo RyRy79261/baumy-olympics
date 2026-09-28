@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import { expectKioskTargets, pairedKiosk } from "../lib/kiosk";
+import { expectKioskTargets, openKioskChores, pairedKiosk } from "../lib/kiosk";
 
 // Issue #66 (ADR 0005 §4, §5), on the kitchen iPad against Docker Postgres:
 // a member chooses their character in Settings and it shows in the hub
@@ -56,7 +56,7 @@ test("choose a character, post a reminder, and see it on the kiosk until everyon
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-landscape", "The kiosk is an iPad.");
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad.");
   test.setTimeout(240_000);
   const suffix = Math.random().toString(36).slice(2, 8);
   const name = `Jo ${suffix}`;
@@ -118,7 +118,8 @@ test("choose a character, post a reminder, and see it on the kiosk until everyon
     page,
     `iPad ${suffix}`,
   );
-  // Jo's character is in the avatar bar.
+  // Jo's character is in the avatar bar (on a page past the dashboard).
+  await openKioskChores(kiosk);
   await expect(
     kiosk
       .getByRole("button", { name, exact: true })

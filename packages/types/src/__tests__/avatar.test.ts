@@ -7,6 +7,7 @@ import {
   MemberAvatar,
   avatarFor,
   defaultAvatar,
+  rosterAvatars,
 } from "../member";
 
 const CHOSEN = {
@@ -79,5 +80,59 @@ describe("avatarFor", () => {
     expect(
       avatarFor({ id: ids[2]!, avatar: { ...CHOSEN, hairStyle: "mohawk" } }),
     ).toEqual(defaultAvatar(ids[2]!));
+  });
+});
+
+describe("rosterAvatars", () => {
+  const shirts = (m: Map<string, { shirtColor: string }>) =>
+    [...m.values()].map((a) => a.shirtColor);
+
+  it("gives members who have not chosen shirts nobody else wears", () => {
+    // Any six ids: all six shirts, whatever their hashes say.
+    for (let k = 0; k + 6 <= ids.length; k += 6) {
+      const roster = ids.slice(k, k + 6).map((id) => ({ id, avatar: null }));
+      expect(new Set(shirts(rosterAvatars(roster))).size).toBe(6);
+    }
+  });
+
+  it("keeps each default but the shirt, and the earlier joiner's shirt", () => {
+    // Two ids whose default shirts collide.
+    const [a, b] = ids
+      .flatMap((x, i) => ids.slice(i + 1).map((y) => [x, y] as const))
+      .find(
+        ([x, y]) => defaultAvatar(x).shirtColor === defaultAvatar(y).shirtColor,
+      )!;
+    const out = rosterAvatars([
+      { id: a, avatar: null },
+      { id: b, avatar: null },
+    ]);
+    expect(out.get(a)).toEqual(defaultAvatar(a));
+    const bDefault = defaultAvatar(b);
+    const next =
+      AVATAR_SHIRT_COLORS[
+        (AVATAR_SHIRT_COLORS.indexOf(bDefault.shirtColor) + 1) %
+          AVATAR_SHIRT_COLORS.length
+      ];
+    expect(out.get(b)).toEqual({ ...bDefault, shirtColor: next });
+  });
+
+  it("keeps a chosen character, and steers defaults around its shirt", () => {
+    const first = ids[0]!;
+    const chooser = {
+      id: ids[1]!,
+      avatar: { ...CHOSEN, shirtColor: defaultAvatar(first).shirtColor },
+    };
+    const out = rosterAvatars([{ id: first, avatar: null }, chooser]);
+    expect(out.get(ids[1]!)).toEqual(chooser.avatar);
+    expect(out.get(first)!.shirtColor).not.toBe(
+      defaultAvatar(first).shirtColor,
+    );
+  });
+
+  it("lets defaults repeat only once every shirt is worn", () => {
+    const roster = ids.slice(0, 8).map((id) => ({ id, avatar: null }));
+    const out = rosterAvatars(roster);
+    expect(new Set(shirts(out)).size).toBe(AVATAR_SHIRT_COLORS.length);
+    expect(out.get(ids[7]!)).toEqual(defaultAvatar(ids[7]!));
   });
 });
