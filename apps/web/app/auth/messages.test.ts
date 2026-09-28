@@ -125,6 +125,12 @@ describe("passkeys and two-factor", () => {
     expect(twoFactorErrorSentence({ status: 502 }, "totp")).toBe(
       SOMETHING_WENT_WRONG,
     );
+    // Signed out elsewhere while turning it on: not "that code didn't match".
+    for (const mode of ["totp", "backup"] as const) {
+      expect(
+        twoFactorErrorSentence({ status: 401, code: "SESSION_REVOKED" }, mode),
+      ).toBe(DEVICE_SIGNED_OUT);
+    }
   });
 });
 
