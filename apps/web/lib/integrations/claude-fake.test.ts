@@ -2,7 +2,13 @@
 import { describe, expect, it } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { MessageParams } from "./claude";
-import { choresNamed, fakeClaude, shoppingItemsNamed } from "./claude-fake";
+import {
+  bountyNamed,
+  choresNamed,
+  fakeClaude,
+  potAmountNamed,
+  shoppingItemsNamed,
+} from "./claude-fake";
 
 // The e2e fake Claude answers in real Messages API shapes, and only from
 // the tool results it is sent.
@@ -195,6 +201,52 @@ describe("fakeClaude", () => {
       params([{ role: "user", content: "add milk" }], []),
     );
     expect(uses(off)).toEqual([]);
+  });
+
+  it("proposes create_bounty and add_pot_contribution when offered (issue #107)", async () => {
+    const offered = [
+      { name: "create_bounty", input_schema: { type: "object" as const } },
+      {
+        name: "add_pot_contribution",
+        input_schema: { type: "object" as const },
+      },
+      { name: "add_shopping_items", input_schema: { type: "object" as const } },
+    ];
+    const bounty = await fakeClaude(
+      params(
+        [
+          {
+            role: "user",
+            content: "Add a bounty for recycling paper, 15 points",
+          },
+        ],
+        offered,
+      ),
+    );
+    expect(uses(bounty).map((u) => [u.name, u.input])).toEqual([
+      ["create_bounty", { name: "Recycling paper", points: 15 }],
+    ]);
+    const pot = await fakeClaude(
+      params([{ role: "user", content: "put €20 in the pot" }], offered),
+    );
+    expect(uses(pot).map((u) => [u.name, u.input])).toEqual([
+      ["add_pot_contribution", { amount: "20" }],
+    ]);
+    // Not among the tools: no proposal.
+    const none = await fakeClaude(
+      params([{ role: "user", content: "put €20 in the pot" }]),
+    );
+    expect(uses(none)).toEqual([]);
+  });
+
+  it("reads a bounty's name and points, and a pot amount", () => {
+    expect(
+      bountyNamed("add a new bounty called Dish soap worth 10 pts"),
+    ).toEqual({ name: "Dish soap", points: 10 });
+    expect(bountyNamed("add a bounty for the bins")).toBeNull();
+    expect(potAmountNamed("add 12.50 euros to the pot")).toBe("12.50");
+    expect(potAmountNamed("put 5€ into the pot")).toBe("5");
+    expect(potAmountNamed("how big is the pot?")).toBeNull();
   });
 
   it("gives a help line for anything else, or when logging is not offered", async () => {

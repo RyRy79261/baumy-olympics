@@ -19,7 +19,10 @@ import type { MessageParams } from "./claude";
 //     log_completion for every chore named in the text (the longest names
 //     first), or asks which chore when none is;
 //   - "add milk and eggs (to the list)": proposes ONE add_shopping_items
-//     with every item named (issue #26).
+//     with every item named (issue #26);
+//   - "add a bounty for <name>, <N> points": proposes create_bounty
+//     (issue #107);
+//   - "put €<X> in the pot": proposes add_pot_contribution (issue #107).
 //
 // Anything else gets a short help line and no tool. It never touches the
 // database itself: everything it knows comes from the tool results.
@@ -41,6 +44,30 @@ export function shoppingItemsNamed(said: string): string[] {
     .split(/,|\band\b/)
     .map((s) => s.trim())
     .filter((s) => s !== "");
+}
+
+/** "add a bounty for Recycling paper, 15 points" → its name and points. */
+const ADD_BOUNTY =
+  /\badd\s+(?:a\s+|new\s+)*bounty\s+(?:for\s+|called\s+)?(.+?)[\s,]+(?:worth\s+)?(\d{1,3})\s*(?:points?|pts)\b/i;
+
+export function bountyNamed(
+  said: string,
+): { name: string; points: number } | null {
+  const m = ADD_BOUNTY.exec(said);
+  if (!m) return null;
+  const name = m[1]!.trim();
+  return {
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    points: Number(m[2]),
+  };
+}
+
+/** "put €20 in the pot", "add 12.50 euros to the pot" → "20", "12.50". */
+const POT_AMOUNT =
+  /\b(?:put|add)\s+€?\s*(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur|euros?)?\s+(?:in|into|to)\s+the\s+pot\b/i;
+
+export function potAmountNamed(said: string): string | null {
+  return POT_AMOUNT.exec(said)?.[1] ?? null;
 }
 
 let seq = 0;
@@ -129,8 +156,8 @@ export async function fakeClaude(
 ): Promise<Anthropic.Message> {
   const model = params.model;
   const at = commandIndex(params.messages);
-  const said =
-    at >= 0 ? (params.messages[at]!.content as string).toLowerCase() : "";
+  const original = at >= 0 ? (params.messages[at]!.content as string) : "";
+  const said = original.toLowerCase();
   const reads = readsSince(params.messages, at);
   const offered = new Set(
     (params.tools ?? []).map((t) => ("name" in t ? t.name : "")),
@@ -209,6 +236,30 @@ export async function fakeClaude(
           `I've lined up confirming ${claim.doneByName}'s ${claim.choreName}.`,
         ),
         toolUse("confirm_completion", { completionId: claim.completionId }),
+      ],
+      "tool_use",
+    );
+  }
+
+  const bounty = offered.has("create_bounty") ? bountyNamed(original) : null;
+  if (bounty) {
+    return message(
+      model,
+      [
+        text(`I've lined up a new bounty: ${bounty.name}. Confirm it below.`),
+        toolUse("create_bounty", bounty),
+      ],
+      "tool_use",
+    );
+  }
+
+  const pot = offered.has("add_pot_contribution") ? potAmountNamed(said) : null;
+  if (pot) {
+    return message(
+      model,
+      [
+        text(`I've lined up €${pot} for the pot. Confirm it below.`),
+        toolUse("add_pot_contribution", { amount: pot }),
       ],
       "tool_use",
     );
