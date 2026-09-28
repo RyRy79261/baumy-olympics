@@ -34,7 +34,7 @@ export default async function SettingsPage() {
     <>
       <PageHeading
         title="Settings"
-        description="Your character, your kiosk PIN, your Telegram link and your connected apps."
+        description="Your character, your sign-in security, your kiosk PIN, your Telegram link and your connected apps."
       />
       <div className="flex max-w-xl flex-col gap-6">
         {row?.kioskPinLockedAt ? (
@@ -55,6 +55,14 @@ export default async function SettingsPage() {
             avatarFor({ id: me.memberId, avatar: me.avatar ?? null })
           }
         />
+        <Card
+          title="Security"
+          description="Passkeys, two-factor, Google, your password and the devices signed in as you."
+        >
+          <Link href="/settings/security" className="text-sm underline">
+            Manage sign-in and devices
+          </Link>
+        </Card>
         <KioskPinForm hasPin={Boolean(row?.kioskPinHash)} />
         <TelegramLinkForm linked={row?.telegramUserId != null} />
         <Card
