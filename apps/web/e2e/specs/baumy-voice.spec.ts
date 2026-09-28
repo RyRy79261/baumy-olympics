@@ -101,7 +101,10 @@ test("on the kitchen dashboard, the cat listens and answers in its bubble", asyn
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
+  // Paired from the phone project, like kiosk-dashboard.spec: the iPad is
+  // its own 820×1180 context, and the ipad-portrait founder already pairs
+  // close to pair_kiosk's 10 codes per 10 minutes.
+  test.skip(project !== "mobile-360", "Paired from the phone project.");
   const suffix = Math.random().toString(36).slice(2, 8);
   const chore = `Kettle ${suffix}`;
   await founderAdmin(page, project);
