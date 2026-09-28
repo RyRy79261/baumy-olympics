@@ -240,6 +240,23 @@ describe("agendaDays", () => {
     expect(agendaDays(jan, [], "2026-12-01")).toEqual([]);
   });
 
+  it("takes in the next month's days that close the grid, not the last month's", () => {
+    // September 2026's grid runs Mon 31 Aug to Sun 4 Oct.
+    const sep = viewRange("month", "2026-09-10");
+    const on = (id: string, day: string, next: string) =>
+      eventView({ ...timed, id, allDay: true, start: day, end: next });
+    const around = [
+      on("aug", "2026-08-31", "2026-09-01"),
+      on("oct", "2026-10-02", "2026-10-03"),
+      on("late", "2026-10-06", "2026-10-07"),
+    ];
+    expect(agendaDays(sep, around, "2026-09-28")).toEqual([
+      "2026-09-28",
+      "2026-10-02",
+    ]);
+    expect(agendaDays(sep, around, "2026-01-01")).toEqual(["2026-10-02"]);
+  });
+
   it("keeps a week's days when there is no month", () => {
     const week = viewRange("week", "2027-01-15");
     expect(agendaDays(week, events, "2027-01-11")).toEqual([
