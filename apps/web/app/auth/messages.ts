@@ -71,3 +71,50 @@ export function signUpErrorSentence(
 export function forgotPasswordErrorSentence(error: AuthError): string {
   return error.status === 429 ? TOO_MANY_ATTEMPTS : SOMETHING_WENT_WRONG;
 }
+
+// Passkeys and two-factor (issue #79).
+
+/** A passkey prompt that did not finish: cancelled, timed out, or refused. */
+export const PASSKEY_DIDNT_FINISH =
+  "That didn't finish. Your device may have cancelled it. Try again.";
+
+/**
+ * What a passkey sign-in or enrolment failure says. A passkey sign-in never
+ * names an account, so nothing here can be used to find one out.
+ */
+export function passkeyErrorSentence(error: AuthError & { message?: string }) {
+  if (error.status === 429) return TOO_MANY_ATTEMPTS;
+  if (error.code === "PASSKEYS_NOT_CONFIGURED") {
+    return "Passkeys aren't set up on this site yet. Use your password or Google.";
+  }
+  if (error.code === "EMAIL_NOT_VERIFIED") {
+    return "Confirm your email first. Passkeys and two-factor are for an address you've proven is yours.";
+  }
+  if (error.code === "SESSION_NOT_FRESH") {
+    return "For your safety, sign out and in again, then add the passkey within a day.";
+  }
+  if (error.status !== undefined && error.status >= 500) {
+    return SOMETHING_WENT_WRONG;
+  }
+  return PASSKEY_DIDNT_FINISH;
+}
+
+/** What a refused two-factor code says, at sign-in or while turning it on. */
+export function twoFactorErrorSentence(
+  error: AuthError,
+  mode: "totp" | "backup",
+): string {
+  if (error.status === 429) return TOO_MANY_ATTEMPTS;
+  if (error.code === "ACCOUNT_TEMPORARILY_LOCKED") {
+    return "Too many wrong codes. Wait 15 minutes, then try again.";
+  }
+  if (error.code === "INVALID_TWO_FACTOR_COOKIE") {
+    return "That sign-in took too long. Start again with your email and password.";
+  }
+  if (error.status !== undefined && error.status >= 500) {
+    return SOMETHING_WENT_WRONG;
+  }
+  return mode === "totp"
+    ? "That code didn't match. It changes every 30 seconds, so try the newest one."
+    : "That backup code didn't match, or it has been used already.";
+}
