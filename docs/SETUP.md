@@ -69,7 +69,7 @@ secrets from earlier ones.
 
 ### 5. Vercel Blob (photo proof)
 
-- [ ] **Create a PRIVATE Blob store** and connect it to `baumy-olympics-web`
+- [ ] **Create a PRIVATE Blob store in Frankfurt (`fra1`)** and connect it to `baumy-olympics-web`
       (Production); Vercel sets `BLOB_READ_WRITE_TOKEN`.
       Details: [Confirmations and photo proof](#confirmations-and-photo-proof-issue-15).
 
@@ -454,8 +454,12 @@ and store nothing, so a chore with "Photo proof: Required" cannot be logged.
 E2E and CI use an in-memory fake (`E2E_TEST_MODE=1`), so CI stays green
 without it.
 
-- [ ] **Create a PRIVATE Blob store** in Vercel (Storage → Blob → Create,
-      access "Private") and connect it to the project for Production (and
+- [ ] **Create a PRIVATE Blob store in Frankfurt** in Vercel (Storage → Blob
+      → Create, access "Private", region Frankfurt `fra1`; a store's region
+      is fixed when it is created and defaults to `iad1`, Washington). If an
+      existing store is in `iad1`, create a new one in `fra1` and swap the
+      token (no photos exist yet). The privacy page says photos are stored in
+      Frankfurt when set up this way. Connect it to the project for Production (and
       Preview if you test photos there). Vercel then sets
       `BLOB_READ_WRITE_TOKEN` on the project.
 - [ ] **Add `BLOB_READ_WRITE_TOKEN` to `.env.example`** (agents cannot edit

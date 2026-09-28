@@ -69,7 +69,11 @@ describe("PrivacyPage", () => {
     expect(out).toContain("a copy of what was entered");
     expect(out).toContain("including the audit log");
     expect(out).toContain("title, times, place, description");
-    expect(out).toContain("pinned to Frankfurt");
+    expect(out).toContain("server code runs in Frankfurt (fra1)");
+    expect(out).toContain("region of the");
+    expect(out).not.toContain("processed in the EU");
+    expect(out).toContain("the calendar, the pot");
+    expect(out).toContain("change its colour and avatar");
     expect(out).toContain("US");
     // The page's Frankfurt claim holds only while Vercel pins the functions.
     const vercel = JSON.parse(
