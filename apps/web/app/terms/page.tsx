@@ -21,9 +21,9 @@ export default function TermsPage() {
     >
       <LegalSection title="What this is">
         <p>
-          Baumy Olympics (baumy.tech) is a private app for one household, run by
-          the house&apos;s owner. It is not a commercial service. By using it
-          you agree to these terms.
+          Baumy Olympics (www.baumy.tech) is a private app for one household,
+          run by the house&apos;s owner. It is not a commercial service. By
+          using it you agree to these terms.
         </p>
       </LegalSection>
 
