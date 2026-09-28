@@ -59,13 +59,9 @@ function behalfAllowed(spec: ToolSpec): boolean {
   return spec.name !== LINK_ACTION && !spec.member_field && !ownWordOnly(spec);
 }
 
-/**
- * `attested` actions are the member's own word (a claim event, a note
- * edit): requireAttested refuses them on anyone's behalf (issue #70).
- */
+/** A claim event: the member's own word, never on anyone's behalf. */
 function ownWordOnly(spec: ToolSpec): boolean {
-  const def = REGISTRY[spec.name as keyof typeof REGISTRY] as AnyActionDef;
-  return def.requires === "attested";
+  return spec.own_word_only === true;
 }
 
 function confirmLine(spec: ToolSpec): string {

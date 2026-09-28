@@ -48,14 +48,17 @@ describe("the brain operations spec", () => {
       "no (400): name the housemate in `doneBy` instead",
     );
     expect(section("log_completion")).toContain("`COOLDOWN` (422)");
+    for (const name of ["create_note", "update_note", "delete_note"]) {
+      expect(section(name), name).toContain(
+        "yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap",
+      );
+    }
     for (const name of [
       "confirm_completion",
       "dispute_completion",
       "undo_completion",
       "withdraw_dispute",
       "concede_completion",
-      "create_note",
-      "delete_note",
     ]) {
       expect(section(name), name).toContain(
         "no (403 `FORBIDDEN`): only the member themself may",

@@ -23,8 +23,9 @@ import {
 // exception, the confirm header, the surface filter and the idempotency key.
 // lib/brain/flow.test.ts runs the same routes against the real registry.
 
-const MEMBER = "22222222-2222-4222-8222-222222222222";
-const HOUSEMATE = "33333333-3333-4333-8333-333333333333";
+// Hex letters in both, so upper-casing them changes them.
+const MEMBER = "2a2b2c2d-2e2f-4a2b-8c2d-2e2f2a2b2c2d";
+const HOUSEMATE = "3a3b3c3d-3e3f-4a3b-8c3d-3e3f3a3b3c3d";
 const STRANGER = "44444444-4444-4444-8444-444444444444";
 const LINKED_TG = 1001;
 const UNLINKED_TG = 2002;
@@ -498,6 +499,61 @@ describe("POST /api/v1/actions/{name}", () => {
 });
 
 describe("X-Baumy-On-Behalf-Of", () => {
+  it("refuses the claim events on someone's behalf with 403, before asking for a tap", async () => {
+    const { deps, runAction } = setup();
+    for (const name of [
+      "confirm_completion",
+      "dispute_completion",
+      "undo_completion",
+      "withdraw_dispute",
+      "concede_completion",
+    ]) {
+      // No confirm header: still 403, not 428.
+      const res = await handleBrainAction(
+        post(name, { onBehalfOf: HOUSEMATE }),
+        name,
+        deps,
+      );
+      expect(res.status, name).toBe(403);
+      expect(await body(res)).toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("Only that housemate can"),
+      });
+    }
+    expect(runAction).not.toHaveBeenCalled();
+    // For the asker themself they run as before, behind the tap.
+    const own = await handleBrainAction(
+      post("confirm_completion", { confirmed: "1" }),
+      "confirm_completion",
+      deps,
+    );
+    expect(own.status).toBe(200);
+  });
+
+  it("lets the note writes run on someone's behalf, behind the tap", async () => {
+    const { deps, runAction } = setup();
+    for (const name of [
+      "create_note",
+      "update_note",
+      "pin_note",
+      "delete_note",
+    ]) {
+      const res = await handleBrainAction(
+        post(name, { onBehalfOf: HOUSEMATE, confirmed: "1" }),
+        name,
+        deps,
+      );
+      expect(res.status, name).toBe(200);
+    }
+    expect(runAction).toHaveBeenCalledTimes(4);
+    for (const call of runAction.mock.calls) {
+      expect(call[2].actor).toMatchObject({
+        memberId: HOUSEMATE,
+        initiatorMemberId: MEMBER,
+      });
+    }
+  });
+
   it("runs a confirmed write as the housemate, with the asker as initiator", async () => {
     const { deps, runAction } = setup();
     const res = await handleBrainAction(

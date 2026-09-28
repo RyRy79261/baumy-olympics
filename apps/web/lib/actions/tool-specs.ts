@@ -21,6 +21,11 @@ export interface ToolSpec {
    * (`ActionDef.memberField`). Only set when there is one.
    */
   member_field?: string;
+  /**
+   * Only the member themself may do it (`ActionDef.ownWordOnly`): never on
+   * someone's behalf. Only set when true.
+   */
+  own_word_only?: true;
 }
 
 /**
@@ -49,5 +54,6 @@ export function toolSpecs(
       kind: def.kind,
       risk: def.risk,
       ...(def.memberField ? { member_field: def.memberField } : {}),
+      ...(def.ownWordOnly ? { own_word_only: true as const } : {}),
     }));
 }
