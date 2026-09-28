@@ -202,7 +202,7 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
     .click();
   await expect(kiosk).toHaveURL(/\/kiosk\/chores\?chore=/);
   await expect(
-    kiosk.getByRole("heading", { name: "Chores", level: 1 }),
+    kiosk.getByRole("heading", { name: "Bounties", level: 1 }),
   ).toBeVisible();
   await expect(nav.getByRole("link", { name: "Bounties" })).toHaveAttribute(
     "aria-current",
