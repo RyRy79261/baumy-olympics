@@ -14,7 +14,12 @@ import { downWhenAsked, memoryBrain } from "./brain-memory";
 //   POST {BRAIN_BASE_URL}/api/kitchen/shopping/add       { items } → { ok, added, already, items }
 //   POST {BRAIN_BASE_URL}/api/kitchen/shopping/checkoff  { items } → { ok, checkedOff, notFound, items }
 //
-// all with `Authorization: Bearer $KITCHEN_API_TOKEN`. Brain scopes the house
+//   POST {BRAIN_BASE_URL}/api/kitchen/login-approval  { requestId, telegramUserId, device, choices, expiresAt } → { ok, sent }
+//
+// all with `Authorization: Bearer $KITCHEN_API_TOKEN`. The last one (issue
+// #80) asks brain to DM a member "Sign in on <device>? Tap the number on the
+// screen" with the five numbers (the right one and four decoys) and Deny as buttons; the tap comes back
+// through `/api/v1/actions` (`approve_login`, `deny_login`). Brain scopes the house
 // itself; nothing here names it. Its 503 `not_configured` means the bot is
 // not in the house group yet.
 //
@@ -70,7 +75,21 @@ export interface ShoppingCheckOffResult {
   items: ShoppingEntry[];
 }
 
-/** The shopping list, whichever brain this environment talks to. */
+/** What brain DMs a member for "Sign in with Baumy" (issue #80). */
+export interface LoginApprovalMessage {
+  /** The login request's id; the buttons send it back with the number. */
+  requestId: string;
+  /** The member's linked Telegram account: the DM goes there only. */
+  telegramUserId: number;
+  /** "Chrome on macOS". */
+  device: string;
+  /** The number on the screen and four decoys, in button order. */
+  choices: number[];
+  /** When the request stops being answerable, ISO 8601. */
+  expiresAt: string;
+}
+
+/** The shopping list and the sign-in DM, whichever brain this environment talks to. */
 export interface BrainClient {
   /** The open items, oldest first. */
   listShopping(): Promise<BrainResult<ShoppingEntry[]>>;
@@ -78,6 +97,10 @@ export interface BrainClient {
   checkOffShopping(
     items: string[],
   ): Promise<BrainResult<ShoppingCheckOffResult>>;
+  /** DM the approval buttons; `sent` is false when brain knows no such member. */
+  requestLoginApproval(
+    message: LoginApprovalMessage,
+  ): Promise<BrainResult<{ sent: boolean }>>;
 }
 
 // --- Configuration -----------------------------------------------------------
@@ -136,6 +159,11 @@ const CheckOffAnswer = z.object({
   checkedOff: z.array(z.string()),
   notFound: z.array(z.string()),
   items: Items,
+});
+
+const LoginApprovalAnswer = z.object({
+  ok: z.literal(true),
+  sent: z.boolean(),
 });
 
 function entries(items: z.output<typeof Items>): ShoppingEntry[] {
@@ -197,6 +225,7 @@ export function cachedBrain(
         forgetShoppingReads();
       }
     },
+    requestLoginApproval: (message) => inner.requestLoginApproval(message),
   };
 }
 
@@ -335,6 +364,15 @@ export function httpBrain(
           }
         : r;
     },
+    async requestLoginApproval(message) {
+      const r = await call(
+        "login-approval",
+        "/api/kitchen/login-approval",
+        LoginApprovalAnswer,
+        message,
+      );
+      return r.ok ? { ok: true, data: { sent: r.data.sent } } : r;
+    },
   };
 }
 
@@ -346,6 +384,7 @@ export const unconfiguredBrain: BrainClient = {
   listShopping: async () => NOT_CONFIGURED,
   addShopping: async () => NOT_CONFIGURED,
   checkOffShopping: async () => NOT_CONFIGURED,
+  requestLoginApproval: async () => NOT_CONFIGURED,
 };
 
 let override: BrainClient | null = null;

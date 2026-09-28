@@ -3,6 +3,7 @@ import { AuthFrame } from "@baumy/ui";
 import { isGoogleConfigured } from "@baumy/auth/env";
 import { LegalLinks } from "@/components/legal/legal-page";
 import { redirectIfSignedIn } from "@/lib/auth";
+import { signInWithBaumyEnabled } from "@/lib/login-approval/flag";
 import { safeCallbackUrl } from "@/lib/auth/callback-url";
 import { SignInForm } from "./sign-in-form";
 
@@ -22,6 +23,8 @@ export default async function SignInPage({
     <AuthFrame>
       <SignInForm
         googleEnabled={isGoogleConfigured(process.env)}
+        // Off until the owner turns it on, once brain can send the DM (#80).
+        baumyEnabled={signInWithBaumyEnabled(process.env)}
         oauthFailed={Boolean(error)}
         callbackURL={next}
       />

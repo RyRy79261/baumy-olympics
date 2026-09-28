@@ -52,15 +52,17 @@ describe("the registry", () => {
     }
   });
 
-  it("keeps exactly the five claim events to the member's own word", () => {
+  it("keeps exactly the five claim events and the sign-in answers to the member's own word", () => {
     expect(
       entries
         .filter(([, d]) => d.ownWordOnly)
         .map(([n]) => n)
         .sort(),
     ).toEqual([
+      "approve_login",
       "concede_completion",
       "confirm_completion",
+      "deny_login",
       "dispute_completion",
       "undo_completion",
       "withdraw_dispute",

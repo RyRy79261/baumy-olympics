@@ -76,6 +76,37 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
     reply:
       '"Linked you as <displayName>." On LINK_CODE_INVALID: "That code didn\'t work. Make a new one in Olympics → Settings (it lasts 10 minutes)." On TELEGRAM_ALREADY_LINKED: show `message`.',
   },
+  approve_login: {
+    purpose:
+      "Approves a 'Sign in with Baumy' request with the number the member tapped in the approval DM.",
+    when: "ONLY from the number buttons of the approval DM (`POST /api/kitchen/login-approval` asked for it), as the member who tapped. Never from a conversation, never from the LLM, never on anyone's behalf: the number proves the person holding the phone is looking at the sign-in screen. Send the tapped number as it is; Olympics decides whether it is the right one.",
+    examples: [
+      {
+        say: "(taps 47 on the approval DM)",
+        call: 'approve_login {"requestId": "<from the DM request>", "code": 47}',
+      },
+    ],
+    returns:
+      "`outcome`: `approved` (the browser signs in now) or `blocked` (that was not the number on the screen, so the sign-in was refused and Sign in with Baumy is off for this member for 15 minutes); `device`, e.g. `Chrome on macOS`.",
+    errors: ["NOT_FOUND", "INVALID_STATE"],
+    reply:
+      'Edit the DM, dropping the buttons. approved: "✅ Signed in on <device>." blocked: "🚫 That wasn\'t the number on the screen, so I blocked this sign-in. If it wasn\'t you, nothing happened; sign in with your password if it was." NOT_FOUND or INVALID_STATE: show `message`.',
+  },
+  deny_login: {
+    purpose: "Denies a 'Sign in with Baumy' request: the member tapped Deny.",
+    when: "ONLY from the Deny button of the approval DM, as the member who tapped. Never from a conversation.",
+    examples: [
+      {
+        say: "(taps Deny on the approval DM)",
+        call: 'deny_login {"requestId": "<from the DM request>"}',
+      },
+    ],
+    returns:
+      "`outcome`: `denied` (Sign in with Baumy is then off for this member for 15 minutes); `device`.",
+    errors: ["NOT_FOUND", "INVALID_STATE"],
+    reply:
+      'Edit the DM, dropping the buttons: "✖️ Denied the sign-in on <device>." NOT_FOUND or INVALID_STATE: show `message`.',
+  },
   list_chores: {
     purpose:
       "Lists the bounties (chores): what is due, urgent or new, and what each would score now.",
