@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { addChore } from "../lib/chores";
 import { founderAdmin } from "../lib/household";
-import { expectKioskTargets, kioskNav, pairedKiosk } from "../lib/kiosk";
+import {
+  expectKioskTargets,
+  kioskNav,
+  openBaumySheet,
+  pairedKiosk,
+} from "../lib/kiosk";
 
 // Issue #65 (ADR 0005): the portrait kitchen dashboard on the iPad
 // (820×1180). One screen that never scrolls: the date, a big clock and the
@@ -101,6 +106,15 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   });
   await addEvent(page, dinner, today, "19:00");
   await addEvent(page, vet, tomorrow, "09:00");
+  // A note on the board: the kitchen's Messages list it.
+  const note = `Parcel ${tag}`;
+  await page.goto("/notes");
+  await page.getByRole("button", { name: "New note" }).click();
+  const noteSheet = page.getByRole("dialog", { name: "New note" });
+  await noteSheet.getByLabel("Title").fill(note);
+  await noteSheet.getByLabel("Note").fill("On the **shoe rack**");
+  await noteSheet.getByRole("button", { name: "Add note" }).click();
+  await expect(noteSheet).toBeHidden();
 
   const { context, page: kiosk } = await pairedKiosk(
     browser,
@@ -148,7 +162,7 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const milkRow = module.getByTestId(`bounty-${milk}`);
   await expect(binsRow).toContainText("Maintenance");
   await expect(binsRow).toContainText("no streak yet");
-  await expect(binsRow).toContainText("Due now");
+  await expect(binsRow).toContainText("Never done");
   await expect(binsRow).toContainText("+20");
   await expect(binsRow).toContainText("new");
   await expect(milkRow).toContainText("Consumable");
@@ -170,6 +184,10 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await kiosk.locator('[data-icon="messages"]').click();
   const messages = kiosk.getByRole("dialog", { name: "Messages" });
   await expect(messages).toBeVisible();
+  const message = messages.getByTestId(`message-${note}`);
+  await expect(message).toContainText(founder);
+  await expect(message).toContainText(/just now|\dm ago/);
+  await expect(message.locator("strong")).toHaveText("shoe rack");
   await messages.getByRole("button", { name: "Close" }).click();
   await expect(messages).toBeHidden();
 
@@ -202,6 +220,23 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await expect(module.getByTestId(`bounty-${milk}`)).toBeVisible();
   await expect(module.getByTestId(`bounty-${bins}`)).toHaveCount(0);
   await module.getByRole("button", { name: "Close" }).click();
+
+  // The home shows who is acting, so the next person sees whose name a tap
+  // logs under; Baumy's sheet shows them picked.
+  const chip = kiosk.getByTestId("acting-chip");
+  await expect(chip.getByTestId("acting-as")).toHaveText(founder);
+  await expectKioskTargets(chip);
+  const baumy = await openBaumySheet(kiosk);
+  await expect(
+    baumy
+      .getByRole("region", { name: "Who's asking?" })
+      .getByRole("button", { name: founder, exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await baumy.getByRole("button", { name: "Close" }).click();
+  await expect(baumy).toBeHidden();
+  // Done: nobody is acting any more.
+  await chip.getByRole("button", { name: "Done" }).click();
+  await expect(chip).toHaveCount(0);
 
   // Today's cell opens its sheet with every event; ▶ steps to tomorrow.
   const todayCell = kiosk.locator('[aria-current="date"]');
@@ -249,6 +284,29 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
     monthTitle(firstAfter),
   );
   await expectNoScroll(kiosk);
+  // Closing it takes the day out of the URL, so a reload keeps it shut.
+  await kiosk
+    .locator(`[data-sheet="${firstAfter}"]`)
+    .getByRole("button", { name: "Close" })
+    .click();
+  await expect(kiosk).toHaveURL(
+    new RegExp(`\\?month=${firstAfter.slice(0, 7)}$`),
+  );
+  await kiosk.reload();
+  await expect(kiosk.getByTestId("month-title")).toHaveText(
+    monthTitle(firstAfter),
+  );
+  await expect(kiosk.locator("[data-sheet]")).toHaveCount(0);
+
+  // Scores: the season's standings, the founder's 20 points among them.
+  await kioskNav(kiosk, "Scores");
+  await expect(
+    kiosk.getByRole("heading", { name: "Scores", level: 1 }),
+  ).toBeVisible();
+  const standing = kiosk.getByTestId(`standing-${founder}`);
+  await expect(standing).toBeVisible();
+  await expect(standing).toContainText(/\d+/);
+  await expect(kiosk.getByTestId("standings")).toContainText("Rank");
 
   await context.close();
 });

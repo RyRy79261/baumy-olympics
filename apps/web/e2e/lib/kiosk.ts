@@ -89,6 +89,20 @@ export async function kioskNav(kiosk: Page, label: string) {
     .click();
 }
 
+/**
+ * Open the Baumy sheet (typing) on the kiosk: tap the cat, and if it starts
+ * talking in its bubble (listening, or asking who is there), "Type instead".
+ */
+export async function openBaumySheet(kiosk: Page): Promise<Locator> {
+  await kiosk.getByRole("button", { name: "Ask Baumy" }).click();
+  const sheet = kiosk.getByRole("dialog", { name: "Ask Baumy" });
+  const typeInstead = kiosk.getByRole("button", { name: "Type instead" });
+  await expect(sheet.or(typeInstead)).toBeVisible();
+  if (await typeInstead.isVisible()) await typeInstead.click();
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
 /** Open the chores (the grid and "Needs your OK") from the footer nav. */
 export async function openKioskChores(kiosk: Page) {
   await kioskNav(kiosk, "Bounties");

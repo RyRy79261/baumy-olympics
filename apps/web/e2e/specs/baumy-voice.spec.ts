@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { addChore } from "../lib/chores";
 import { founderAdmin } from "../lib/household";
-import { openKioskChores, pairedKiosk } from "../lib/kiosk";
+import { expectKioskTargets, pairedKiosk } from "../lib/kiosk";
 
 // Issue #22 (SPEC §3.6): hold to speak to Baumy. Chromium records its fake
 // microphone (a beep) and the server's fake transcriber
@@ -96,38 +96,79 @@ test("hold to speak on the phone: the transcript goes to Baumy", async ({
   await expect(sprite(sheet)).toHaveAttribute("data-state", "happy");
 });
 
-test("on the kiosk, a tap starts recording and a second tap sends it", async ({
+test("on the kitchen dashboard, the cat listens and answers in its bubble", async ({
   page,
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
   test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const suffix = Math.random().toString(36).slice(2, 8);
+  const chore = `Kettle ${suffix}`;
   await founderAdmin(page, project);
+  await addChore(page, { name: chore, basePoints: 12, cooldownHours: 0 });
   const ipad = await pairedKiosk(browser, page, `Mic iPad ${suffix}`);
   await ipad.context.grantPermissions(["microphone"]);
   const kiosk = ipad.page;
   const founder = `Founder ${project}`;
-  // Baumy stands over the footer on every kiosk page; tap in on one.
-  await openKioskChores(kiosk);
-  await kiosk.getByRole("button", { name: founder, exact: true }).click();
-  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+  const cat = kiosk.getByRole("button", { name: "Ask Baumy" });
+  const bubble = kiosk.getByTestId("cat-bubble");
 
-  const sheet = await openBaumy(kiosk);
-  const mic = sheet.getByRole("button", { name: "Hold to speak" });
-  expect((await mic.boundingBox())!.height).toBeGreaterThanOrEqual(56);
-  await mic.tap();
-  const recording = sheet.getByRole("button", { name: "Tap to send" });
-  await expect(recording).toHaveAttribute("aria-pressed", "true");
-  await expect(sprite(sheet)).toHaveAttribute("data-state", "listening");
-  await kiosk.waitForTimeout(900);
-  await recording.tap();
-  await expect(sheet.getByTestId("baumy-heard")).toHaveText(
-    "You said: “Who's winning?”",
+  // Nobody tapped in: the bubble asks who is talking, with the avatars.
+  await cat.click();
+  await expect(bubble).toHaveAttribute("data-mode", "who");
+  await expect(bubble).toContainText("Who's talking?");
+  await bubble.getByRole("button", { name: founder, exact: true }).click();
+  await expect(bubble).toHaveAttribute("data-mode", "ready");
+  await expect(bubble).toContainText(`Hi ${founder}.`);
+
+  // Talking: the listening bubble, then the answer in it.
+  await bubble.getByRole("button", { name: "Start talking" }).click();
+  await expect(bubble).toHaveAttribute("data-mode", "listening");
+  await expect(bubble).toContainText("Mrrp? I'm listening");
+  await expect(sprite(kiosk.locator("[data-voice-cat]"))).toHaveAttribute(
+    "data-state",
+    "listening",
   );
-  await expect(sheet.getByTestId("baumy-says")).toContainText(
+  await expectKioskTargets(bubble);
+  await kiosk.waitForTimeout(900);
+  await bubble.getByRole("button", { name: "Done talking" }).click();
+  await expect(bubble).toHaveAttribute("data-mode", "answer");
+  await expect(bubble).toContainText(
     /is winning with \d+ points|Nobody is ahead/,
   );
+  await bubble.getByRole("button", { name: "OK" }).click();
+  await expect(bubble).toHaveCount(0);
+
+  // "I cleaned the kettle" (this browser's clips say so): Baumy proposes
+  // logging it in the bubble, and "Yes, do it" does.
+  await ipad.context.addCookies([
+    {
+      name: "baumy_e2e_transcript",
+      value: encodeURIComponent(`I cleaned the ${chore}`),
+      url: new URL(kiosk.url()).origin,
+    },
+  ]);
+  await cat.click();
+  await expect(bubble).toHaveAttribute("data-mode", "listening");
+  await kiosk.waitForTimeout(900);
+  await bubble.getByRole("button", { name: "Done talking" }).click();
+  await expect(bubble).toContainText("Got it! I'll do this:");
+  await expect(bubble.getByTestId("cat-row-log_completion")).toContainText(
+    `Log ${chore} for ${founder}: +12`,
+  );
+  await bubble.getByRole("button", { name: "Yes, do it" }).click();
+  await expect(bubble).toContainText(
+    new RegExp(`Purrfect\\. \\+12 for ${founder}|Saved`),
+  );
+
+  // "Type instead" opens the sheet, with the same conversation.
+  await cat.click();
+  await expect(bubble).toHaveAttribute("data-mode", "listening");
+  await bubble.getByRole("button", { name: "Type instead" }).click();
+  await expect(bubble).toHaveCount(0);
+  const sheet = kiosk.getByRole("dialog", { name: "Ask Baumy" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel("Message to Baumy")).toBeVisible();
   await ipad.context.close();
 });
 

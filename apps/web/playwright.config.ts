@@ -13,6 +13,7 @@ const SHARED_CLOCK_SPECS = [
   "**/clock.spec.ts",
   "**/claims.spec.ts",
   "**/kiosk-night.spec.ts",
+  "**/kiosk-dashboard-clock.spec.ts",
 ];
 
 export default defineConfig({
