@@ -202,7 +202,22 @@ from a conversation, and never offered to brain's LLM.
 ## Service tokens
 
 Only the sha256 of a token is stored (`service_tokens`); the plaintext lives
-in brain's env and never in Olympics'. The script prints it once, alone on
+in brain's env and never in Olympics'.
+
+An admin manages them on **`/admin/connections`** (issue #104; Admin →
+Connections): **Create token**, **Rotate** and **Revoke**, with the name,
+scopes, created, last used and revoked dates of every token. The new token
+is shown once, with a Copy button and "put it in brain's Vercel project as
+`BRAIN_SERVICE_TOKEN`". These are the registry actions
+`create_service_token`, `rotate_service_token` and `revoke_service_token`
+(`apps/web/lib/actions/service-tokens.ts`): admin only, UI only, audited,
+each refused on a session signed out elsewhere. Creating and rotating also
+need the admin's password or a sign-in under 10 minutes old; the result
+keeps the token out of the request ledger (`storedData`) and the audit row
+names only the token. Tokens minted there always get the `brain` scope.
+`last_used_at` is written by the endpoint at most every 5 minutes.
+
+The CLI does the same from a terminal. It prints the token once, alone on
 stdout, and needs `DATABASE_URL_UNPOOLED` (the direct Neon string for
 production):
 
