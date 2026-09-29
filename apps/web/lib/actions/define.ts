@@ -15,6 +15,11 @@ export const ACTION_NAMES = [
   "whoami",
   "update_my_profile",
   "update_avatar",
+  "choose_avatar",
+  "preview_avatar",
+  "add_avatar",
+  "archive_avatar",
+  "restore_avatar",
   "redeem_invite",
   "join_as_founder",
   "mint_invite",
@@ -125,6 +130,22 @@ export interface RequestCtx {
    * surface can name a photo it did not upload.
    */
   photo?: { completionId: string; pathname: string };
+  /**
+   * The image the avatar upload route (app/api/uploads/avatar) just received,
+   * for `preview_avatar` to clean. Only that route sets it, after checking
+   * its type and size; it never comes from an action's input.
+   */
+  avatarUpload?: { bytes: Uint8Array };
+  /**
+   * The cleaned sprite that route has just stored in Blob, for `add_avatar`
+   * to record. Like `photo`, no other surface can name one.
+   */
+  avatarImage?: {
+    avatarId: string;
+    pathname: string;
+    width: number;
+    height: number;
+  };
   /** From lib/clock.ts, never `new Date()`. */
   now: Date;
 }

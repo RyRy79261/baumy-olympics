@@ -109,7 +109,13 @@ export type DomainErrorCode =
   /** `link_telegram`: the code is wrong, used or expired. */
   | "LINK_CODE_INVALID"
   /** That Telegram user id is already linked to another member. */
-  | "TELEGRAM_ALREADY_LINKED";
+  | "TELEGRAM_ALREADY_LINKED"
+  /** `add_avatar` or `preview_avatar` without an image from the upload route. */
+  | "AVATAR_IMAGE_MISSING"
+  /** The upload is not a readable image, or nothing is left once cleaned. */
+  | "AVATAR_IMAGE_UNREADABLE"
+  /** That gallery character is archived, so it cannot be picked now. */
+  | "AVATAR_ARCHIVED";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 
