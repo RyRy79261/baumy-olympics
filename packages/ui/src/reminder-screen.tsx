@@ -1,5 +1,7 @@
+"use client";
+
 import { avatarFor, type AvatarSprites } from "@baumy/types";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { BaumyCat } from "./baumy-cat";
 import { cx } from "./cx";
 import { SHIRT_COLOURS } from "./housemate";
@@ -103,6 +105,9 @@ export function ReminderScreen({
   message?: string;
 }) {
   const seen = faces.filter((f) => f.seen).length;
+  // Only the face that was just tapped plays its emote (issue #111), not
+  // everyone who had seen it already when the screen came up.
+  const [tapped, setTapped] = useState<string | null>(null);
   return (
     <div
       role="dialog"
@@ -238,7 +243,7 @@ export function ReminderScreen({
                 }
               >
                 <MemberCharacter
-                  moment={f.seen ? "emote" : undefined}
+                  moment={f.seen && f.id === tapped ? "emote" : undefined}
                   sprites={f.sprites}
                   avatar={f.avatar}
                   memberId={f.id}
@@ -265,7 +270,10 @@ export function ReminderScreen({
                     ? `${f.displayName} has seen it`
                     : `I've seen it, ${f.displayName}`
                 }
-                onClick={() => onSeen(f.id)}
+                onClick={() => {
+                  setTapped(f.id);
+                  onSeen(f.id);
+                }}
                 className={cx(
                   "h-[72px] w-full font-display text-[14px] leading-tight uppercase",
                   "active:translate-y-px disabled:cursor-default",
