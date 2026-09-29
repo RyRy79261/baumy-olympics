@@ -49,7 +49,7 @@ export function AvatarGallery({
       <legend className="mb-1 font-label text-sm font-bold tracking-wide text-bm-text uppercase">
         {legend}
       </legend>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
         {tiles.map((t) => {
           const picked = t.id === value;
           return (
@@ -79,7 +79,12 @@ export function AvatarGallery({
                 </span>
               ) : null}
               {t.picture}
-              <span className="max-w-full truncate">{t.name}</span>
+              <span
+                data-name
+                className="max-w-full text-center leading-tight break-words"
+              >
+                {t.name}
+              </span>
             </label>
           );
         })}
