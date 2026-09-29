@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { KIOSK_WALK_IN_COOKIE } from "@/lib/kiosk/cookies";
+import { KIOSK_WALK_IN_COOKIE } from "@/lib/kiosk/walk-in";
 
-// Forgets the kiosk's one-shot walk-in cookie (lib/kiosk/cookies.ts) as soon
+// Forgets the kiosk's one-shot walk-in cookie (lib/kiosk/walk-in.ts) as soon
 // as the dashboard that used it is on screen, so the walk plays once for the
 // tap that set it, not again on the next visit to Home.
 
