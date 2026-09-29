@@ -1,6 +1,11 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import {
+  avatarImageColumns,
+  avatarImageOf,
+  type AvatarImageRef,
+} from "./avatars";
 import { createHttpDb, type Queryable } from "./index";
-import { members } from "./schema";
+import { avatars, members } from "./schema";
 
 // Member reads and writes. `findActiveMemberByAuthUserId` runs on the request
 // path before any action (apps/web/lib/auth). The rest take the caller's
@@ -59,6 +64,8 @@ export interface NewMember {
   authUserId: string;
   displayName: string;
   avatarSprite: string;
+  /** The gallery character picked on /join (issue #111), if any. */
+  avatarImageId?: string | null;
   color: string;
   role: "admin" | "member";
   createdAt: Date;
@@ -257,6 +264,8 @@ export interface KioskMember {
 export interface KioskMemberWithAvatar extends KioskMember {
   /** As stored: `avatarFor` (packages/types) reads it; null is the default. */
   avatar: unknown;
+  /** The gallery sprite they picked (issue #111), or null. */
+  avatarImage: AvatarImageRef | null;
 }
 
 /** The active members, in the order they joined: the kiosk's avatar bar. */
@@ -264,19 +273,32 @@ export async function listActiveMembers(
   db: Queryable,
   householdId: string,
 ): Promise<KioskMemberWithAvatar[]> {
-  return db
+  const rows = await db
     .select({
       id: members.id,
       displayName: members.displayName,
       avatarSprite: members.avatarSprite,
       color: members.color,
       avatar: members.avatar,
+      ...avatarImageColumns,
     })
     .from(members)
+    .leftJoin(avatars, eq(avatars.id, members.avatarImageId))
     .where(
       and(eq(members.householdId, householdId), isNull(members.deactivatedAt)),
     )
     .orderBy(asc(members.createdAt), asc(members.id));
+  return rows.map(
+    ({ imageId, imagePathname, imageWidth, imageHeight, ...m }) => ({
+      ...m,
+      avatarImage: avatarImageOf({
+        imageId,
+        imagePathname,
+        imageWidth,
+        imageHeight,
+      }),
+    }),
+  );
 }
 
 /** One active member of the household, or null. */

@@ -27,6 +27,7 @@
     "./game-fixtures": "./src/__tests__/_game-fixtures.ts",
     "./notes": "./src/notes.ts",
     "./reminders": "./src/reminders.ts",
+    "./avatars": "./src/avatars.ts",
     "./ai-usage": "./src/ai-usage.ts",
     "./mcp-oauth": "./src/mcp-oauth.ts",
     "./service-tokens": "./src/service-tokens.ts",

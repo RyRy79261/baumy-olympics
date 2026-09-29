@@ -120,6 +120,13 @@
       "when": 1790613918842,
       "tag": "0016_auth_passkeys_two_factor",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790640582021,
+      "tag": "0017_avatar_gallery",
+      "breakpoints": true
     }
   ]
 }

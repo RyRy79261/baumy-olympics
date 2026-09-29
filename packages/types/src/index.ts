@@ -27,6 +27,16 @@ export {
   defaultAvatar,
 } from "./member";
 export {
+  AVATAR_NAME_MAX,
+  AvatarId,
+  AvatarName,
+  AvatarRef,
+  ChooseAvatar,
+  JoinAvatarId,
+  NewAvatar,
+  type AvatarImage,
+} from "./avatars";
+export {
   KIOSK_DEVICE_NAME_MAX,
   KIOSK_PAIRING_CODE_LENGTH,
   KioskDeviceName,
