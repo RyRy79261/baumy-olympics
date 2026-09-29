@@ -127,13 +127,6 @@
       "when": 1790635084873,
       "tag": "0017_service_token_last_used",
       "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1790690367920,
-      "tag": "0018_admin_points_changes",
-      "breakpoints": true
     }
   ]
 }
