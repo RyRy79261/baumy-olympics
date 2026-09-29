@@ -62,6 +62,7 @@ const member = (id: string, displayName: string) => ({
   displayName,
   color: "#4ff5e6",
   avatar: defaultAvatar(id),
+  image: null,
 });
 const R1: ReminderView = {
   id: "r1",

@@ -4,7 +4,12 @@ import {
   berlinTimeKey,
   dateKeyWeekday,
 } from "@baumy/core";
-import { avatarFor, isCalendarDate, type ChoreKind } from "@baumy/types";
+import {
+  avatarFor,
+  isCalendarDate,
+  type AvatarImage,
+  type ChoreKind,
+} from "@baumy/types";
 import { HOUSE_COLOUR, SHIRT_COLOURS } from "@baumy/ui";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import type { NoteView } from "@/lib/actions/notes";
@@ -30,6 +35,8 @@ export interface DashboardMember {
    * than shirts.
    */
   avatar: unknown;
+  /** Their gallery sprite (issue #111), drawn instead when they picked one. */
+  image?: AvatarImage | null;
 }
 
 /** The house's colour (the kit's `--color-bm-house`), which no shirt uses. */

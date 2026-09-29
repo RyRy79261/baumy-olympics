@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cx } from "./cx";
-import { Housemate } from "./housemate";
+import type { AvatarImage } from "@baumy/types";
+import { MemberCharacter } from "./member-character";
 import { Sprite } from "./sprite";
 
 // The kitchen kiosk's frame in the pixel kit (SPEC §8; ADR 0005): a
@@ -82,6 +83,8 @@ export interface AvatarButtonProps extends ButtonHTMLAttributes<HTMLButtonElemen
    * instead of the sprite tile.
    */
   avatar?: unknown;
+  /** Their gallery sprite (issue #111), drawn instead when they picked one. */
+  image?: AvatarImage | null;
   memberId?: string;
   /** This member is the one acting now. */
   selected?: boolean;
@@ -94,6 +97,7 @@ export function AvatarButton({
   color,
   selected = false,
   avatar,
+  image,
   memberId,
   className,
   type = "button",
@@ -114,7 +118,12 @@ export function AvatarButton({
       {...props}
     >
       {memberId ? (
-        <Housemate avatar={avatar} memberId={memberId} scale={2} />
+        <MemberCharacter
+          image={image}
+          avatar={avatar}
+          memberId={memberId}
+          scale={2}
+        />
       ) : (
         <Sprite name={sprite} color={color} size={2} />
       )}

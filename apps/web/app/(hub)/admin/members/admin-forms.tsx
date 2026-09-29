@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AVATAR_SPRITES } from "@baumy/types";
+import { AVATAR_SPRITES, type AvatarImage } from "@baumy/types";
 import {
   Button,
   Card,
@@ -9,8 +9,8 @@ import {
   Field,
   FormMessage,
   Input,
+  MemberCharacter,
   Select,
-  Housemate,
 } from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
 import { toast } from "@/lib/ui/toast";
@@ -126,6 +126,8 @@ export interface MemberRowProps {
    * a member who has left is drawn from their id.
    */
   character?: unknown;
+  /** Their gallery sprite (issue #111), if they picked one. */
+  image?: AvatarImage | null;
 }
 
 /** One member: role, active or not, and how they look (manage_members). */
@@ -173,7 +175,8 @@ export function MemberControls(props: MemberRowProps) {
       data-testid={`member-${props.displayName}`}
     >
       <div className="flex flex-wrap items-center gap-3">
-        <Housemate
+        <MemberCharacter
+          image={props.image}
           avatar={props.character}
           memberId={props.id}
           scale={2}

@@ -1,8 +1,9 @@
-import { avatarFor } from "@baumy/types";
+import { avatarFor, type AvatarImage } from "@baumy/types";
 import type { CSSProperties } from "react";
 import { BaumyCat } from "./baumy-cat";
 import { cx } from "./cx";
-import { Housemate, SHIRT_COLOURS } from "./housemate";
+import { SHIRT_COLOURS } from "./housemate";
+import { MemberCharacter } from "./member-character";
 import { Glyph } from "./pixel/glyph";
 
 // The kitchen screen's full-screen reminder (ADR 0005 §4), the approved
@@ -24,6 +25,8 @@ export interface ReminderFace {
    * name, their seen card and their dismiss button take its shirt colour.
    */
   avatar: unknown;
+  /** Their gallery sprite (issue #111), drawn instead when they picked one. */
+  image?: AvatarImage | null;
   seen: boolean;
 }
 
@@ -234,7 +237,8 @@ export function ReminderScreen({
                     : undefined
                 }
               >
-                <Housemate
+                <MemberCharacter
+                  image={f.image}
                   avatar={f.avatar}
                   memberId={f.id}
                   scale={7}

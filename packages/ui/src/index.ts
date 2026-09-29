@@ -73,6 +73,11 @@ export {
   housematePalette,
 } from "./housemate";
 export {
+  HOUSEMATE_HEIGHT_PX,
+  MemberCharacter,
+  spriteFactor,
+} from "./member-character";
+export {
   BaumyButton,
   ClockFace,
   HubGrid,

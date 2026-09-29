@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { berlinDateKey } from "@baumy/core";
 import { createHttpDb, type Queryable } from "@baumy/db";
-import { ActingChip, Housemate, actingDoneClass } from "@baumy/ui";
+import { ActingChip, MemberCharacter, actingDoneClass } from "@baumy/ui";
 import { AutoRefresh } from "@/components/hub/auto-refresh";
 import { DashboardHeader } from "@/components/kiosk/dashboard/dashboard-header";
 import { MonthCalendar } from "@/components/kiosk/dashboard/month-calendar";
@@ -86,7 +86,10 @@ export default async function KioskHomePage({
             <ActingChip
               name={kiosk.displayName ?? ""}
               who={
-                <Housemate
+                <MemberCharacter
+                  image={
+                    data.members.find((m) => m.id === kiosk.memberId)?.image
+                  }
                   avatar={
                     data.members.find((m) => m.id === kiosk.memberId)?.avatar
                   }
