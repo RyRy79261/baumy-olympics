@@ -114,6 +114,7 @@ describe("listActiveReminders", () => {
         displayName: "Ryan",
         color: "#112233",
         avatar: null,
+        avatarImage: null,
         createdAt: at(-60),
       },
       {
@@ -121,6 +122,7 @@ describe("listActiveReminders", () => {
         displayName: "Jo",
         color: "#112233",
         avatar,
+        avatarImage: null,
         createdAt: at(-30),
       },
     ]);

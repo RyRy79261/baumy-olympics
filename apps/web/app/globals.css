@@ -35,6 +35,12 @@
   --animate-pixel-bob: pixel-bob 1.2s steps(2) infinite;
   --animate-pixel-hop: pixel-hop 0.6s steps(3) infinite;
   --animate-pixel-in: pixel-in 0.2s steps(4) both;
+  /* A gallery character's moments (packages/ui MemberCharacter, issue #111):
+     the emote pose shown for 2s over the idle one, then gone; the walk pose
+     stepping in from the left, then handing over to idle. */
+  --animate-pose-flash: pose-flash 2s steps(1) both;
+  --animate-pose-after-walk: pose-after-walk 0.9s steps(1) both;
+  --animate-pose-walk-in: pose-walk-in 0.9s steps(6) both;
 
   @keyframes sprite-strip {
     from {
@@ -73,6 +79,36 @@
     to {
       transform: translateY(0);
       opacity: 1;
+    }
+  }
+  @keyframes pose-flash {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes pose-after-walk {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes pose-walk-in {
+    0% {
+      transform: translateX(-150%);
+      opacity: 1;
+    }
+    99% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 0;
     }
   }
 }

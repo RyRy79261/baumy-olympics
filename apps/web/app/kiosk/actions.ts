@@ -24,7 +24,9 @@ import {
   KIOSK_COOKIE_MAX_AGE_S,
   KIOSK_MEMBER_COOKIE,
   KIOSK_MEMBER_MAX_AGE_S,
+  KIOSK_WALK_IN_COOKIE,
   kioskCookieOptions,
+  walkInCookieOptions,
 } from "@/lib/kiosk/cookies";
 import { pairKioskDevice } from "@/lib/kiosk/pairing";
 import { pickKioskMember } from "@/lib/kiosk/selection";
@@ -66,11 +68,14 @@ export async function pickMemberAction(form: FormData): Promise<void> {
     if (picked.code === "UNAUTHENTICATED") redirect("/kiosk/pair");
     return;
   }
-  (await cookies()).set(
+  const jar = await cookies();
+  jar.set(
     KIOSK_MEMBER_COOKIE,
     picked.data.memberId,
     kioskCookieOptions(KIOSK_MEMBER_MAX_AGE_S),
   );
+  // The tap that picks someone walks them in on the dashboard, once.
+  jar.set(KIOSK_WALK_IN_COOKIE, picked.data.memberId, walkInCookieOptions());
 }
 
 /** "Done", or 60 seconds idle: nobody is acting. */

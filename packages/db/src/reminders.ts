@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull, lte, notExists } from "drizzle-orm";
+import { withAvatarImages, type AvatarImageRef } from "./avatars";
 import type { Queryable } from "./index";
 import { members, reminderAcks, reminders } from "./schema";
 
@@ -20,6 +21,8 @@ export interface ReminderMember {
   color: string;
   /** `members.avatar` as stored: `avatarFor` (packages/types) reads it. */
   avatar: unknown;
+  /** The gallery sprite they picked (issue #111), or null. */
+  avatarImage: AvatarImageRef | null;
   /** When they joined: only reminders posted since then wait for them. */
   createdAt: Date;
 }
@@ -179,19 +182,26 @@ export async function listActiveReminders(
   db: Queryable,
   householdId: string,
 ): Promise<ActiveReminders> {
-  const people = await db
-    .select({
-      id: members.id,
-      displayName: members.displayName,
-      color: members.color,
-      avatar: members.avatar,
-      createdAt: members.createdAt,
-    })
-    .from(members)
-    .where(
-      and(eq(members.householdId, householdId), isNull(members.deactivatedAt)),
-    )
-    .orderBy(asc(members.createdAt), asc(members.id));
+  const people = await withAvatarImages(
+    db,
+    await db
+      .select({
+        id: members.id,
+        displayName: members.displayName,
+        color: members.color,
+        avatar: members.avatar,
+        createdAt: members.createdAt,
+        avatarImageId: members.avatarImageId,
+      })
+      .from(members)
+      .where(
+        and(
+          eq(members.householdId, householdId),
+          isNull(members.deactivatedAt),
+        ),
+      )
+      .orderBy(asc(members.createdAt), asc(members.id)),
+  );
   const open = await withAcks(
     db,
     await db

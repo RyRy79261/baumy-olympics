@@ -1,11 +1,14 @@
 // @vitest-environment node
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
+import { insertAvatar } from "@baumy/db/avatars";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import {
   actionRequests,
   auditEvents,
+  avatars,
   inviteCodes,
   members,
 } from "@baumy/db/schema";
@@ -408,5 +411,84 @@ describe("join_as_founder", () => {
     ]);
     expect([a.ok, b.ok].sort()).toEqual([false, true]);
     expect(await t.db().select().from(members)).toHaveLength(1);
+  });
+});
+
+describe("picking a gallery character on /join (issue #111)", () => {
+  async function galleryAvatar(archived = false) {
+    const admin = await seedMember(db(), { role: "admin" });
+    const id = randomUUID();
+    await insertAvatar(db(), {
+      id,
+      householdId: HOUSEHOLD_ID,
+      name: "Knight",
+      createdBy: admin,
+      createdAt: FIXED_NOW,
+      poses: {
+        idle: {
+          pathname: `avatars/${id}/a1b2c3d4e5f60718.png`,
+          width: 28,
+          height: 56,
+        },
+      },
+    });
+    if (archived) {
+      await t
+        .db()
+        .update(avatars)
+        .set({ archivedAt: FIXED_NOW })
+        .where(eq(avatars.id, id));
+    }
+    return id;
+  }
+
+  it("joins wearing the picked character, by code or as a founder", async () => {
+    const id = await galleryAvatar();
+    await code("gallery-code");
+    expect(
+      await join("u_gallery", { code: "gallery-code", avatarImageId: id }),
+    ).toMatchObject({ ok: true });
+    expect((await memberOf("u_gallery"))?.avatarImageId).toBe(id);
+
+    vi.stubEnv("FOUNDER_EMAILS", "f@example.com");
+    expect(
+      await runAction(
+        "join_as_founder",
+        { displayName: "F", avatarImageId: id },
+        ctxFor(accountActor("u_f", { email: "f@example.com" })),
+      ),
+    ).toMatchObject({ ok: true });
+    expect((await memberOf("u_f"))?.avatarImageId).toBe(id);
+
+    // No pick (an empty form value) is the drawn character.
+    await code("plain-code");
+    await join("u_plain", { code: "plain-code", avatarImageId: "" });
+    expect((await memberOf("u_plain"))?.avatarImageId).toBeNull();
+  });
+
+  it("refuses an archived or unknown pick, creating nobody and keeping the code's use", async () => {
+    const archived = await galleryAvatar(true);
+    await code("stale-code");
+    expect(
+      await join("u_stale", { code: "stale-code", avatarImageId: archived }),
+    ).toMatchObject({ ok: false, code: "AVATAR_ARCHIVED" });
+    expect(
+      await join("u_stale", {
+        code: "stale-code",
+        avatarImageId: randomUUID(),
+      }),
+    ).toMatchObject({ ok: false, code: "NOT_FOUND" });
+    expect(await memberOf("u_stale")).toBeUndefined();
+    expect(await uses("stale-code")).toBe(0);
+
+    vi.stubEnv("FOUNDER_EMAILS", "g@example.com");
+    expect(
+      await runAction(
+        "join_as_founder",
+        { displayName: "G", avatarImageId: archived },
+        ctxFor(accountActor("u_g", { email: "g@example.com" })),
+      ),
+    ).toMatchObject({ ok: false, code: "AVATAR_ARCHIVED" });
+    expect(await memberOf("u_g")).toBeUndefined();
   });
 });

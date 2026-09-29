@@ -8,7 +8,9 @@ import {
   Input,
   SwatchPicker,
   memberColourOptions,
+  type GalleryOption,
 } from "@baumy/ui";
+import { GalleryField } from "./gallery-field";
 
 const COLOUR_OPTIONS = memberColourOptions();
 
@@ -23,11 +25,17 @@ export function ProfileFields({
   errors,
   pending,
   initialAvatar,
+  gallery = [],
 }: {
   prefix: string;
   errors: Record<string, string[]>;
   pending: boolean;
   initialAvatar: MemberAvatar;
+  /**
+   * The household's avatar gallery (issue #111), offered first; the drawn
+   * character below is what they wear if they pick none.
+   */
+  gallery?: readonly GalleryOption[];
 }) {
   const [color, setColor] = useState<string>(MEMBER_COLORS[0]);
   const [avatar, setAvatar] = useState<MemberAvatar>(initialAvatar);
@@ -74,9 +82,10 @@ export function ProfileFields({
           </p>
         ) : null}
       </div>
+      <GalleryField options={gallery} pending={pending} />
       <div className="flex flex-col gap-1" data-testid={`${prefix}-character`}>
         <p className="font-label text-sm font-bold tracking-wide text-bm-text uppercase">
-          Your character
+          {gallery.length > 0 ? "Your drawn character" : "Your character"}
         </p>
         <CharacterPicker
           avatar={avatar}

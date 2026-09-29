@@ -20,6 +20,16 @@ export const KIOSK_MEMBER_COOKIE = "baumy_kiosk_member";
 export const KIOSK_COOKIE_MAX_AGE_S = 365 * 24 * 60 * 60;
 export const KIOSK_MEMBER_MAX_AGE_S = 10 * 60;
 
+// The walk-in cookie lives in walk-in.ts, which has no node imports, so the
+// client component that clears it does not pull node:crypto into the
+// browser bundle.
+export {
+  KIOSK_WALK_IN_COOKIE,
+  KIOSK_WALK_IN_MAX_AGE_S,
+  walkInCookieOptions,
+  walksIn,
+} from "./walk-in";
+
 /** A token is 43 base64url characters; anything much longer is not ours. */
 export const KIOSK_TOKEN_MAX_LENGTH = 128;
 
