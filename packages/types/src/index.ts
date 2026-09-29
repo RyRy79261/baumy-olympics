@@ -23,6 +23,7 @@ export {
   MemberRole,
   TelegramLinkCode,
   TelegramUserId,
+  TELEGRAM_ID_MESSAGE,
   avatarFor,
   memberColorName,
   newcomerAvatar,

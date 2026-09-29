@@ -58,6 +58,18 @@ describe("telegramIdError", () => {
     expect(telegramIdError(" 123456789 ")).toBeUndefined();
     expect(telegramIdError("@ryan")).toBe(DIGITS_ONLY);
     expect(telegramIdError("12a")).toBe(DIGITS_ONLY);
+    // The server's rules exactly: no leading 0, no zero, at most 16 digits,
+    // and within a JS number.
+    expect(telegramIdError("0")).toBe(DIGITS_ONLY);
+    expect(telegramIdError("0123")).toBe(DIGITS_ONLY);
+    expect(telegramIdError("12345678901234567")).toBe(DIGITS_ONLY);
+    expect(telegramIdError("9999999999999999")).toBe(DIGITS_ONLY);
+    expect(telegramIdError("9007199254740991")).toBeUndefined();
+    for (const v of ["0", "0123", "12345678901234567", "12a", "42"]) {
+      expect(telegramIdError(v) === undefined).toBe(
+        TelegramUserId.safeParse(v).success,
+      );
+    }
     // The same sentence manage_members' schema answers with.
     const server = TelegramUserId.safeParse("@ryan");
     expect(server.error?.issues[0]?.message).toBe(DIGITS_ONLY);
