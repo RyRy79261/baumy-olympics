@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { insertTelegramLinkCode } from "@baumy/db/telegram-link-codes";
+import {
+  TELEGRAM_LINK_CODE_TTL_MS,
+  insertTelegramLinkCode,
+} from "@baumy/db/telegram-link-codes";
 import { generateTelegramLinkCode } from "@/lib/codes";
 import { defineAction } from "./define";
 
@@ -13,6 +16,11 @@ export interface TelegramLinkCodeData {
   /** Null on a replay: the code is shown once and never stored. */
   code: string | null;
   expiresAt: string;
+  /**
+   * Seconds until it expires by the server's clock: Settings times its
+   * polling on this, never on the device clock (issue #118).
+   */
+  expiresInSeconds: number;
 }
 
 export const createTelegramLinkCode = defineAction({
@@ -38,11 +46,12 @@ export const createTelegramLinkCode = defineAction({
     const data: TelegramLinkCodeData = {
       code,
       expiresAt: expiresAt.toISOString(),
+      expiresInSeconds: TELEGRAM_LINK_CODE_TTL_MS / 1000,
     };
     return {
       ok: true,
       data,
-      storedData: { code: null, expiresAt: data.expiresAt },
+      storedData: { ...data, code: null },
       audit: {
         entity: "telegram_link_code",
         entityId: memberId,
