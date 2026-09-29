@@ -8,6 +8,7 @@ import {
   cleanAvatar,
   cleanAvatarSet,
   gridSize,
+  MAX_SHAPES,
   sampleCells,
   sharedPalette,
   type RgbaImage,
@@ -373,6 +374,54 @@ describe("cleanAvatarSet (a set of poses)", () => {
 });
 
 describe("the pieces", () => {
+  it("sampleCells does not crash when dark pixels sit among slightly lighter ones", () => {
+    // (72,0,0) is dark, (79,0,0) is not, yet both fall in one 4-bit group.
+    const data = new Uint8Array([72, 0, 0, 255, 79, 0, 0, 255, 79, 0, 0, 255]);
+    const out = sampleCells({ data, width: 3, height: 1 }, 1, 1);
+    expect(Array.from(out.data)).toEqual([72, 0, 0, 255]);
+  });
+
+  it("sampleCells lets scattered dark pixels on a face lose to the skin", () => {
+    // 27 × 27 skin; the middle cell's middle has dark pixels on every other
+    // spot, in two darks: no row or column of it is a line.
+    const data = new Uint8Array(27 * 27 * 4);
+    for (let y = 0; y < 27; y++) {
+      for (let x = 0; x < 27; x++) {
+        const middle = x >= 9 && x < 18 && y >= 9 && y < 18;
+        const speck = middle && (x + y) % 2 === 0;
+        data.set(
+          speck
+            ? x % 4 < 2
+              ? [20, 10, 30, 255]
+              : [40, 20, 50, 255]
+            : [230, 190, 160, 255],
+          (y * 27 + x) * 4,
+        );
+      }
+    }
+    const out = sampleCells({ data, width: 27, height: 27 }, 3, 3);
+    expect(Array.from(out.data.subarray(16, 20))).toEqual([230, 190, 160, 255]);
+  });
+
+  it("refuses an image of more separate shapes than a sprite has", async () => {
+    // Opaque dots two pixels apart on transparency: 150 × 150 shapes.
+    const width = 300;
+    const data = new Uint8Array(width * width * 4);
+    for (let y = 0; y < width; y += 2) {
+      for (let x = 0; x < width; x += 2) {
+        // Every dot its own colour, so none of them reads as a backdrop.
+        data.set(
+          [(x * 37) % 256, (y * 59) % 256, ((x + y) * 11) % 256, 255],
+          (y * width + x) * 4,
+        );
+      }
+    }
+    expect((width / 2) ** 2).toBeGreaterThan(MAX_SHAPES);
+    expect(
+      await cleanAvatarSet([await png({ data, width, height: width })]),
+    ).toEqual({ ok: false, reason: "noisy" });
+  });
+
   it("sampleCells keeps a thin dark line that plain sampling would lose", () => {
     // A 27 × 27 light square with a 2px dark line down columns 11-12,
     // sampled to 3 × 3 (9px cells): the line is 2 of the 5 middle columns

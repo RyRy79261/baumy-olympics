@@ -104,6 +104,13 @@ export interface PreviewAvatarData {
 
 export const PNG_DATA_URL = "data:image/png;base64,";
 
+const UNREADABLE = {
+  empty:
+    "Nothing was left once the background was removed. Try an image with the character on a plain or checkerboard background.",
+  noisy: "This image is too noisy to read as a sprite.",
+  unreadable: "That file could not be read as a PNG, JPEG or WebP image.",
+} as const;
+
 export const previewAvatar = defineAction({
   name: "preview_avatar",
   title: "Clean an uploaded character set",
@@ -123,9 +130,7 @@ export const previewAvatar = defineAction({
     if (!cleaned.ok) {
       return fail(
         "AVATAR_IMAGE_UNREADABLE",
-        cleaned.reason === "empty"
-          ? "Nothing was left once the background was removed. Try an image with the character on a plain or checkerboard background."
-          : "That file could not be read as a PNG, JPEG or WebP image.",
+        UNREADABLE[cleaned.reason],
       );
     }
     const data: PreviewAvatarData = {

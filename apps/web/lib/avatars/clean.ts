@@ -330,7 +330,7 @@ export function findFigures(
   height: number,
   bg: Uint8Array,
   max: number,
-): Figure[] {
+): Figure[] | null {
   const size = width * height;
   const label = new Int32Array(size).fill(-1);
   const shapes: (Box & { n: number })[] = [];
@@ -366,9 +366,12 @@ export function findFigures(
       }
     }
     shapes.push(shape);
+    // Noise, not a sprite: stop before the labels cost more.
+    if (shapes.length > MAX_SHAPES) return null;
   }
   if (shapes.length === 0) return [];
-  const biggest = Math.max(...shapes.map((s) => s.n));
+  let biggest = 0;
+  for (const s of shapes) if (s.n > biggest) biggest = s.n;
   const mains = shapes
     .map((s, id) => ({ s, id }))
     .filter(({ s }) => s.n >= biggest * 0.15)
@@ -407,6 +410,12 @@ export function findFigures(
     return { mask, box };
   });
 }
+
+/**
+ * More separate shapes than this (left once the background is gone) is not
+ * a sprite but noise, a photo or a busy scene: `findFigures` gives up.
+ */
+export const MAX_SHAPES = 10_000;
 
 /** One character alone, trimmed to its box, alpha all-or-nothing. */
 export function cutOut(img: RgbaImage, figure: Figure): RgbaImage {
@@ -577,6 +586,9 @@ export function toIndices(
 /** Below this (the brightest channel), a pixel counts as an outline's. */
 export const DARK_MAX = 72;
 
+/** How much of a row or column of a cell must be dark to be a line. */
+export const LINE_SHARE = 0.7;
+
 /**
  * Sample `img` down to `width` × `height`. Each output pixel looks at the
  * middle half of the source area it covers: opaque when most of it is, and
@@ -609,6 +621,8 @@ export function sampleCells(
       let clear = 0;
       let dark = 0;
       let all = 0;
+      const cols = new Array<number>(xb - xa).fill(0);
+      const rowsDark = new Array<number>(yb - ya).fill(0);
       for (let yy = ya; yy < yb; yy++) {
         for (let xx = xa; xx < xb; xx++) {
           const i = (yy * w + xx) * 4;
@@ -620,8 +634,19 @@ export function sampleCells(
           const r = img.data[i]!;
           const g = img.data[i + 1]!;
           const b = img.data[i + 2]!;
-          if (Math.max(r, g, b) <= DARK_MAX) dark += 1;
-          const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+          const isDark = Math.max(r, g, b) <= DARK_MAX;
+          if (isDark) {
+            dark += 1;
+            cols[xx - xa]! += 1;
+            rowsDark[yy - ya]! += 1;
+          }
+          // Dark pixels group apart from lighter ones, so a dark group is
+          // there whenever a dark pixel is.
+          const key =
+            (isDark ? 1 << 12 : 0) |
+            ((r >> 4) << 8) |
+            ((g >> 4) << 4) |
+            (b >> 4);
           const sum = groups.get(key) ?? [0, 0, 0, 0];
           sum[0]! += r;
           sum[1]! += g;
@@ -631,12 +656,17 @@ export function sampleCells(
         }
       }
       if (clear * 2 > all) continue;
-      const wantDark = dark * 3 >= all - clear;
+      // Dark wins only as a LINE (an outline crossing the cell: one row or
+      // column of its middle mostly dark), so a few dark pixels on a face
+      // do not turn into specks.
+      const line =
+        cols.some((n) => n >= (yb - ya) * LINE_SHARE) ||
+        rowsDark.some((n) => n >= (xb - xa) * LINE_SHARE);
+      const wantDark = line && dark * 3 >= all - clear;
       let best: number[] | null = null;
       let bestKey = -1;
       for (const [key, sum] of groups) {
-        const isDark =
-          Math.max(sum[0]!, sum[1]!, sum[2]!) / sum[3]! <= DARK_MAX;
+        const isDark = key >= 1 << 12;
         if (wantDark && !isDark) continue;
         if (
           !best ||
@@ -645,6 +675,12 @@ export function sampleCells(
         ) {
           best = sum;
           bestKey = key;
+        }
+      }
+      if (!best) {
+        // Unreachable with the grouping above; the commonest colour, then.
+        for (const sum of groups.values()) {
+          if (!best || sum[3]! > best[3]!) best = sum;
         }
       }
       const o = (y * width + x) * 4;
@@ -708,7 +744,7 @@ export interface CleanedFigure {
 
 export type CleanSetResult =
   | { ok: true; figures: CleanedFigure[] }
-  | { ok: false; reason: "unreadable" | "empty" };
+  | { ok: false; reason: "unreadable" | "empty" | "noisy" };
 
 type Sharp = (typeof import("sharp"))["default"];
 
@@ -774,6 +810,7 @@ export async function cleanAvatarSet(
       bg,
       sheet ? (options.maxFigures ?? SHEET_MAX_FIGURES) : 1,
     );
+    if (figures === null) return { ok: false, reason: "noisy" };
     if (figures.length === 0) return { ok: false, reason: "empty" };
     for (const f of figures) cuts.push(cutOut(img, f));
   }
@@ -807,7 +844,7 @@ export async function cleanAvatarSet(
 
 export type CleanResult =
   | ({ ok: true } & CleanedFigure)
-  | { ok: false; reason: "unreadable" | "empty" };
+  | { ok: false; reason: "unreadable" | "empty" | "noisy" };
 
 /** One image of one character in, one small PNG out. */
 export async function cleanAvatar(
