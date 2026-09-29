@@ -6,7 +6,10 @@ import {
   findActiveMember,
   findActiveMemberByTelegramUserId,
 } from "@baumy/db/members";
-import { findLiveServiceToken } from "@baumy/db/service-tokens";
+import {
+  findLiveServiceToken,
+  touchServiceToken,
+} from "@baumy/db/service-tokens";
 import { actionKind, runAction } from "@/lib/actions/registry";
 import { toolSpecs } from "@/lib/actions/tool-specs";
 import { now } from "@/lib/clock";
@@ -24,7 +27,18 @@ const db = () => createHttpDb() as unknown as Queryable;
 
 export function brainEndpointDeps(): BrainEndpointDeps {
   return {
-    verifyToken: (token) => findLiveServiceToken(db(), token),
+    verifyToken: async (token) => {
+      const found = await findLiveServiceToken(db(), token);
+      if (!found) return null;
+      // "Last used" on /admin/connections (issue #104). A failed write must
+      // not turn a good token away.
+      try {
+        await touchServiceToken(db(), found, now());
+      } catch (err) {
+        console.error("[brain] could not record last_used_at", err);
+      }
+      return { name: found.name, scopes: found.scopes };
+    },
     findMember: (telegramUserId) =>
       findActiveMemberByTelegramUserId(db(), HOUSEHOLD_ID, telegramUserId),
     findHousemate: (memberId) => findActiveMember(db(), HOUSEHOLD_ID, memberId),
