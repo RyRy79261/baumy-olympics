@@ -90,7 +90,8 @@ secrets from earlier ones.
 
 ### 5a. Avatar gallery (issue #111)
 
-- [ ] **Make the characters, then add them at Admin → Avatars** (needs the Blob store above).
+- [ ] **Make the character sets (idle, walk, emote), then add them at Admin → Avatars** (needs
+      the Blob store above). Brooklyn's sheet and Ryan's idle are the first two.
       Details: [Avatar gallery](#avatar-gallery-issue-111).
 
 ### 6. Daily job
@@ -1007,23 +1008,32 @@ itself, in [kiosk-setup.md](kiosk-setup.md).
 Owner ruling 2026-09-29: "have a collection of pre-generated avatars to select from, that way
 they're integrated and uniform." The app never draws a character; it only cleans what you upload.
 
-1. Make each character with Nano Banana (Gemini image), one image per character, with this
-   shared prompt so they match (add the person's description, or attach their photo, after it):
+Each character is a SET of three poses (owner ruling 2026-09-29): **idle** (standing,
+three-quarter; used everywhere), **walk** (a short walk-in on the kitchen screen when someone taps
+in) and **emote** (for example laughing with a peace sign: when they score, when they tap "I've
+seen it", and for the scoreboard's leader). A set with only idle works; walk and emote can come
+later as a new set.
+
+1. Make each set with Nano Banana (Gemini image), all three poses side by side on ONE image,
+   with this shared prompt so they match (add the person's description, or attach their photo,
+   after it):
 
    ```text
-   16-bit JRPG chibi pixel-art sprite of one character, full body, standing, three-quarter
-   view facing left, big head and small body (about 2.5 heads tall), clean dark outline,
+   16-bit JRPG chibi pixel-art character sheet of one character, three full-body poses side
+   by side, left to right: 1) idle, standing, three-quarter view; 2) walking, mid-stride;
+   3) emote, laughing with a peace sign. Same character, same size and scale in every pose,
+   feet on one line, space between the poses. Big head and small body, clean dark outline,
    flat shading with at most 24 colours, no dithering, no text, no shadow on the ground.
-   Plain flat background of one colour (or a transparent background), the character
-   centred with space around it. Crisp square pixels, as if drawn on a 32 x 56 grid and
-   scaled up. The character:
+   Plain solid black background. Crisp square pixels. The character:
    ```
 
-2. Download the PNG (JPEG and WebP work too; 4 MB at most; never SVG).
-3. In the app: **Admin → Avatars → Add characters**, choose one or several files. Each shows
-   before and after: the background (a fake grey checkerboard, or any one flat colour) is
-   removed, the character trimmed, snapped to a pixel grid about 56 pixels tall and limited to
-   24 colours. A watermark in a corner is dropped. Name it and **Save to gallery**.
+2. Download the image (PNG, JPEG or WebP; 4 MB at most; never SVG).
+3. In the app: **Admin → Avatars → Add a character**, choose the sheet (or one file per pose).
+   It shows before and after: the background (solid black or any flat colour, or a fake grey
+   checkerboard) is removed from the edges in, the figures found left to right and cleaned at
+   one scale with one palette of 24 colours, and the idle pose shown at the app's sizes. Pick
+   48, 56 or 64 pixels tall (64 by default), check each figure's pose (change it, or skip one),
+   name it and **Save to gallery**.
 4. Everyone picks theirs in **Settings → Your character** (or when joining at `/join`). Two
    housemates may pick the same one; tell an agent if you want that refused. Until the gallery
    has a character, Settings keeps the drawn (hair/skin/shirt) character, and anyone who has not

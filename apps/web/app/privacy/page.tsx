@@ -123,9 +123,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Avatar images:</strong> the pixel characters an admin adds
-            to the household&apos;s gallery (cleaned, about 56 pixels tall), who
-            added each, and which one each member picked. The file as uploaded
-            is not kept.
+            to the household&apos;s gallery (up to three poses each, cleaned, 48
+            to 64 pixels tall), who added each, and which one each member
+            picked. The files as uploaded are not kept.
           </li>
           <li>
             <strong>The audit log:</strong> who changed what, when, from which

@@ -3,24 +3,30 @@ import sharp from "sharp";
 import { founderAdmin, mintCode, newAccount } from "../lib/household";
 import { kioskNav, pairedKiosk } from "../lib/kiosk";
 
-// Issue #111: an admin uploads a character to the gallery (cleaned on the
-// way in, before and after shown), a new member picks it on /join, and it
-// is what the hub's header, Settings and the kitchen screen's avatar bar
-// draw, through /api/blob. Archiving it leaves it on the member.
+// Issue #111: an admin uploads a character SET to the gallery (one sheet
+// with three poses side by side, cleaned on the way in; before, after and
+// the app's sizes shown; the poses reassigned), a new member picks it on
+// /join, and it is what the hub's header, Settings and the kitchen screen's
+// avatar bar draw, through /api/blob. Archiving it leaves it on the member.
 
-/** A 10 × 14 sprite, 8× blown up, on a flat green backdrop. */
-async function characterPng(): Promise<Buffer> {
+/** Three 10 × 14 figures (one a pixel shorter), 8× blown up, on black. */
+async function sheetPng(): Promise<Buffer> {
   const block = (w: number, h: number, colour: string) =>
     sharp({ create: { width: w, height: h, channels: 3, background: colour } })
       .png()
       .toBuffer();
+  const figure = async (left: number, top: number, h = 112) => [
+    { input: await block(80, h, "#3b2a1a"), left, top },
+    { input: await block(64, 48, "#f2c29b"), left: left + 8, top: top + 8 },
+    { input: await block(64, 40, "#4ff5e6"), left: left + 8, top: top + 56 },
+  ];
   return sharp({
-    create: { width: 240, height: 240, channels: 3, background: "#00ff00" },
+    create: { width: 480, height: 240, channels: 3, background: "#000000" },
   })
     .composite([
-      { input: await block(80, 112, "#0b0712"), left: 80, top: 64 },
-      { input: await block(64, 48, "#f2c29b"), left: 88, top: 72 },
-      { input: await block(64, 48, "#4ff5e6"), left: 88, top: 120 },
+      ...(await figure(40, 64)),
+      ...(await figure(200, 72, 104)),
+      ...(await figure(360, 64)),
     ])
     .png()
     .toBuffer();
@@ -53,16 +59,26 @@ test("an admin adds a character, a new member picks it, every screen draws it", 
   await page.getByLabel("Images").setInputFiles({
     name: "knight.png",
     mimeType: "image/png",
-    buffer: await characterPng(),
+    buffer: await sheetPng(),
   });
   const draft = page.getByTestId("avatar-draft");
   await expect(
     draft.getByRole("img", { name: /before cleaning/ }),
   ).toBeVisible();
-  const after = draft.getByRole("img", { name: /after cleaning/ });
-  await expect(after).toBeVisible();
-  // Snapped back to the sprite's own 10 × 14 pixels.
-  await expect(draft).toContainText("10 × 14 px");
+  // Three figures, left to right, snapped back to their own pixels.
+  const figures = draft.getByTestId("avatar-figure");
+  await expect(figures).toHaveCount(3);
+  await expect(figures.nth(0)).toContainText("10 × 14 px");
+  await expect(figures.nth(1)).toContainText("10 × 13 px");
+  await expect(figures.nth(0).getByLabel("Figure 1")).toHaveValue("idle");
+  await expect(figures.nth(1).getByLabel("Figure 2")).toHaveValue("walk");
+  await expect(figures.nth(2).getByLabel("Figure 3")).toHaveValue("emote");
+  // The admin swaps walk and emote; the idle pose shows at the app's sizes.
+  await figures.nth(1).getByLabel("Figure 2").selectOption("emote");
+  await figures.nth(2).getByLabel("Figure 3").selectOption("walk");
+  await expect(
+    draft.getByTestId("avatar-app-sizes").locator("[data-member-sprite]"),
+  ).toHaveCount(4);
   await draft.getByLabel("Name").fill(character);
   await draft.getByRole("button", { name: "Save to gallery" }).click();
   await expect(
