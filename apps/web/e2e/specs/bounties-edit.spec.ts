@@ -1,32 +1,22 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openChore } from "../lib/chores";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 
-// Issue #109: an admin adds and edits bounties from the Bounties page. The
-// founder adds one with New bounty, renames it and makes it a consumable
-// with its Edit button, then schedules a points change from the dialog's
-// Change points (schedule_weight: next Monday at the earliest, vetoable).
-// The partner, a member, sees the board without New bounty or Edit.
-//
-// A points change needs the week's suggestion, so, as in weights.spec.ts,
-// the founder logs it seven times for the partner (confirmed at once) and
-// the test-only /api/test/weights runs the weekly compute; 40 points done
-// every few seconds suggests 30.
+// Issues #109 and #115: an admin adds and edits bounties from the Bounties
+// page, and changes any bounty's points in the open. The founder adds one
+// with New bounty, renames it and makes it a consumable with its Edit
+// button, then schedules new points with a reason from the dialog's Change
+// points (schedule_points_change: next Monday at the earliest, vetoable).
+// The partner, a member, sees the board without New bounty or Edit, vetoes
+// the change on /inbox, and the points history shows who proposed it and who
+// vetoed it, to both of them. On /admin/chores, clearing both points and
+// cooldown is an inline "Required", not a silent keep. At 360px the Edit
+// button sits on its own line under the row, so the name never breaks.
 
 function toast(page: Page, text: string) {
   return page.getByRole("status").filter({ hasText: text });
 }
 
-async function logFor(page: Page, chore: string, doer: string) {
-  await page.goto("/chores");
-  const sheet = await openChore(page, chore);
-  await sheet.getByText(doer, { exact: true }).click();
-  await expect(sheet.getByRole("radio", { name: doer })).toBeChecked();
-  await sheet.getByRole("button", { name: "Log it" }).click();
-  await expect(sheet).toBeHidden();
-}
-
-test("an admin adds and edits a bounty on /chores; a member cannot", async ({
+test("an admin schedules any points on /chores; a member vetoes them; the history shows both", async ({
   page,
   browser,
 }, testInfo) => {
@@ -35,11 +25,10 @@ test("an admin adds and edits a bounty on /chores; a member cannot", async ({
     project === "ipad-portrait",
     "Admin edits need a real session; the kiosk's board stays read-only.",
   );
-  // Two accounts, seven logs and the weekly compute: longer than most.
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
   const tag = Math.random().toString(36).slice(2, 8);
-  const first = `Mop ${tag}`;
-  const renamed = `Milk ${tag}`;
+  const first = `Bathroom ${tag}`;
+  const renamed = `Bathroom sink ${tag}`;
   const partnerName = `Partner ${tag}`;
 
   await founderAdmin(page, project);
@@ -53,17 +42,12 @@ test("an admin adds and edits a bounty on /chores; a member cannot", async ({
   const create = page.getByRole("dialog", { name: "New bounty" });
   await create.getByLabel("Name", { exact: true }).fill(first);
   await create.getByLabel("Base points").fill("40");
-  // No cooldown, so it can be logged again straight away.
-  await create.getByLabel("Cooldown (hours)").fill("0");
+  await create.getByLabel("Cooldown (hours)").fill("24");
   await create.getByRole("button", { name: "Add bounty" }).click();
   await expect(toast(page, `Added ${first}.`)).toBeVisible();
   await expect(create).toBeHidden();
   const row = page.getByTestId(`chore-${first}`);
   await expect(row).toContainText("40 pts");
-  await expect(row.locator("[data-kind]").first()).toHaveAttribute(
-    "data-kind",
-    "maintenance",
-  );
 
   // Edit: the name and the kind; the points are not a field here.
   await page.getByRole("button", { name: `Edit ${first}` }).click();
@@ -87,48 +71,60 @@ test("an admin adds and edits a bounty on /chores; a member cannot", async ({
   await expect(moved).toContainText("40 pts");
   await expect(page.getByTestId(`chore-${first}`)).toHaveCount(0);
 
-  // Without a suggestion, Change points says none is due.
-  await page.getByRole("button", { name: `Edit ${renamed}` }).click();
-  const again = page.getByRole("dialog", { name: `Edit ${renamed}` });
-  await again.getByRole("button", { name: "Change points" }).click();
-  await expect(again.getByTestId("no-suggestion")).toContainText(
-    "No change is due yet.",
-  );
-  await again.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(again).toBeHidden();
+  // Below `sm` Edit sits under the row, which keeps the whole width for
+  // the name; wider, it sits beside it.
+  const editButton = page.getByRole("button", { name: `Edit ${renamed}` });
+  const rowBox = (await moved.locator("button").first().boundingBox())!;
+  const editBox = (await editButton.boundingBox())!;
+  if (project === "mobile-360") {
+    expect(editBox.y).toBeGreaterThanOrEqual(rowBox.y + rowBox.height - 1);
+    expect(rowBox.width).toBeGreaterThan(300);
+    // The screen around the row, not the whole (long) board.
+    await moved.scrollIntoViewIfNeeded();
+    const shot = await page.screenshot();
+    await testInfo.attach("bounties-360", {
+      body: shot,
+      contentType: "image/png",
+    });
+  } else {
+    expect(editBox.x).toBeGreaterThanOrEqual(rowBox.x + rowBox.width - 1);
+  }
 
-  // A partner, and a week's suggestion to schedule.
+  // Change points: any points, a reason, scheduled.
+  await editButton.click();
+  const dialog = page.getByRole("dialog", { name: `Edit ${renamed}` });
+  const points = dialog.getByTestId("bounty-points");
+  await points.getByRole("button", { name: "Change points" }).click();
+  await expect(points).toContainText("unless another member vetoes them");
+  const change = points.getByRole("form", {
+    name: `Change ${renamed}'s points`,
+  });
+  await expect(change.getByLabel("Points")).toHaveValue("40");
+  await change.getByLabel("Points").fill("55");
+  await change.getByLabel("Cooldown (hours)").fill("12");
+  await change.getByLabel("Reason (optional)").fill("Takes ages");
+  await change.getByRole("button", { name: "Schedule change" }).click();
+  await expect(toast(page, "unless someone vetoes it")).toBeVisible();
+  await expect(points).toContainText("Scheduled: 40 → 55 pts");
+  await expect(
+    points.getByRole("button", { name: `Cancel the ${renamed} change` }),
+  ).toBeVisible();
+  const waiting = points
+    .getByTestId("points-change")
+    .and(page.locator('[data-outcome="pending"]'));
+  await expect(waiting).toContainText("40 → 55 pts");
+  await expect(waiting).toContainText("Takes ages");
+  await expect(waiting).toContainText("Set by an admin");
+  // Scheduled, not applied: the bounty is still worth 40.
+  await expect(moved).toContainText("40 pts");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).toBeHidden();
+
+  // The partner sees the bounty, and neither New bounty nor Edit…
   const invite = await mintCode(page, 1);
   const partner = await newAccount(browser, `bounties-${project}`);
   await redeem(partner.page, invite, partnerName);
   await expect(partner.page).toHaveURL(/\/$/);
-  for (let i = 0; i < 7; i += 1) await logFor(page, renamed, partnerName);
-  const res = await page.request.post("/api/test/weights", {
-    data: { run: "compute" },
-  });
-  expect(res.status()).toBe(200);
-  expect((await res.json()).suggested).toBeGreaterThanOrEqual(1);
-
-  await page.goto("/chores");
-  await page.getByRole("button", { name: `Edit ${renamed}` }).click();
-  const points = page.getByRole("dialog", { name: `Edit ${renamed}` });
-  await points.getByRole("button", { name: "Change points" }).click();
-  await expect(points).toContainText("unless another member vetoes it");
-  await expect(points).toContainText("40 → 30 pts");
-  const schedule = points.getByRole("form", { name: `Schedule ${renamed}` });
-  await schedule.getByLabel("Points").fill("32");
-  await schedule.getByRole("button", { name: "Schedule" }).click();
-  await expect(toast(page, "unless someone vetoes it")).toBeVisible();
-  const section = points.getByTestId("bounty-points");
-  await expect(section).toContainText("Scheduled: 40 → 32 pts");
-  await expect(
-    section.getByRole("button", { name: `Cancel the ${renamed} change` }),
-  ).toBeVisible();
-  // Scheduled, not applied: the bounty is still worth 40.
-  await expect(section).toContainText("40 pts");
-  await expect(moved).toContainText("40 pts");
-
-  // The partner sees the bounty, and neither New bounty nor Edit.
   const p = partner.page;
   await p.goto("/chores");
   await expect(p.getByTestId(`chore-${renamed}`)).toBeVisible();
@@ -136,10 +132,88 @@ test("an admin adds and edits a bounty on /chores; a member cannot", async ({
   await expect(p.getByRole("button", { name: `Edit ${renamed}` })).toHaveCount(
     0,
   );
-  // …and the change waits on their veto in /inbox.
+  // …and vetoes the change in /inbox, where its reason shows.
   await p.goto("/inbox");
-  await expect(p.getByTestId(`scheduled-${renamed}`)).toContainText(
-    "40 → 32 pts",
-  );
+  const scheduled = p.getByTestId(`scheduled-${renamed}`);
+  await expect(scheduled).toContainText("40 → 55 pts");
+  await expect(scheduled).toContainText("Takes ages");
+  await scheduled
+    .getByRole("button", { name: `Veto the ${renamed} change` })
+    .click();
+  await expect(toast(p, "Vetoed.")).toBeVisible();
+  await expect(p.getByTestId(`scheduled-${renamed}`)).toHaveCount(0);
+
+  // The history, for the member: from the Bounties page's link.
+  await p.goto("/chores");
+  await p.getByRole("link", { name: "Points history" }).click();
+  await expect(
+    p.getByRole("heading", { name: "Points history", level: 1 }),
+  ).toBeVisible();
+  const history = p.getByTestId(`history-${renamed}`);
+  const vetoed = history
+    .getByTestId("points-change")
+    .and(p.locator('[data-outcome="vetoed"]'));
+  await expect(vetoed).toContainText("40 → 55 pts");
+  await expect(vetoed).toContainText(`Founder ${project}`);
+  await expect(vetoed).toContainText("Takes ages");
+  await expect(vetoed).toContainText(`Vetoed by ${partnerName}`);
+  await expect(
+    history
+      .getByTestId("points-change")
+      .and(p.locator('[data-outcome="landed"]')),
+  ).toContainText("Starting points");
   await partner.context.close();
+
+  // …and for the admin, in the dialog, where Change points is back.
+  await page.goto("/chores");
+  await page.getByRole("button", { name: `Edit ${renamed}` }).click();
+  const after = page.getByRole("dialog", { name: `Edit ${renamed}` });
+  await expect(
+    after
+      .getByTestId("points-change")
+      .and(page.locator('[data-outcome="vetoed"]')),
+  ).toContainText(`Vetoed by ${partnerName}`);
+  await expect(
+    after.getByRole("button", { name: "Change points" }),
+  ).toBeVisible();
+  await expect(page.getByTestId(`chore-${renamed}`)).toContainText("40 pts");
+});
+
+test("admin chores says points and cooldown are required when both are cleared", async ({
+  page,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(
+    project !== "desktop-chromium",
+    "One viewport is enough for a form rule.",
+  );
+  const tag = Math.random().toString(36).slice(2, 8);
+  const name = `Windows ${tag}`;
+  await founderAdmin(page, project);
+  await page.goto("/admin/chores");
+  const add = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Add chore" }),
+  });
+  await add.getByLabel("Name", { exact: true }).fill(name);
+  await add.getByLabel("Base points").fill("30");
+  await add.getByLabel("Cooldown (hours)").fill("48");
+  await add.getByRole("button", { name: "Add chore" }).click();
+  await expect(toast(page, `Added ${name}.`)).toBeVisible();
+
+  await page.getByRole("button", { name: `Edit ${name}` }).click();
+  const edit = page.getByRole("dialog", { name: `Edit ${name}` });
+  await edit.getByLabel("Base points").fill("");
+  await edit.getByLabel("Cooldown (hours)").fill("");
+  await edit.getByRole("button", { name: "Save" }).click();
+  const required = "Required: give the points and the cooldown.";
+  await expect(edit.getByText(required)).toHaveCount(2);
+  await expect(edit.getByLabel("Base points")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(edit).toBeVisible();
+  await edit.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByTestId(`admin-chore-${name}`)).toContainText(
+    "30 pts · cooldown 48h",
+  );
 });

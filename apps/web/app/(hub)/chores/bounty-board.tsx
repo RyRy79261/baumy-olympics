@@ -1,41 +1,48 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@baumy/ui";
+import { Button, SectionHeading } from "@baumy/ui";
 import { ChoreGrid, type GridMember } from "@/components/chores/chore-grid";
+import { PointsHistory } from "@/components/chores/points-history";
 import type { FormAction } from "@/components/use-action-form";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
-import type { SuggestionView } from "@/lib/actions/weights";
+import type { PointsHistoryView, SuggestionView } from "@/lib/actions/weights";
 import { appliesLabel, changeLabel, hoursField } from "@/lib/weights/view";
 import { EditChoreDialog } from "../admin/chores/chore-forms";
 import {
   DismissWeightButton,
-  ScheduleWeightForm,
+  SchedulePointsForm,
 } from "../admin/weights/weight-forms";
 
 // /chores' board (issue #109). Everyone gets the bounty grid; an admin also
 // gets an Edit button on each row (and the page a "New bounty" button),
-// which open the same dialogs as /admin/chores. Points never change from here directly:
-// the edit dialog's Change points schedules a weight change (schedule_weight,
-// SPEC §4.4), which another member can veto until it applies. The actions
-// refuse anyone but an admin session anyway (SPEC §12 decision 10).
+// which open the same dialogs as /admin/chores. Points never change from
+// here directly: the edit dialog's Change points schedules any points the
+// admin picks (schedule_points_change, issue #115, SPEC §4.4), which another
+// member can veto until it applies, and shows the bounty's points history.
+// The actions refuse anyone but an admin session anyway (SPEC §12 decision
+// 10).
 
 export interface BountyAdmin {
   /** The open or scheduled weight suggestion per chore, if any. */
   suggestions: SuggestionView[];
+  /** Every bounty's points changes, newest first (`get_points_history`). */
+  history: PointsHistoryView[];
 }
 
 const SCHEDULED_NOTE =
-  "Points change on a schedule: at the first Monday at least 48 hours away (and 28 days after the last change), unless another member vetoes it first.";
+  "New points apply at the first Monday 00:00 (Berlin time) at least 48 hours away, unless another member vetoes them first. Points already scored never change.";
 
-/** The edit dialog's points: what they are, and the way to change them. */
+/** The edit dialog's points: what they are, how to change them, their story. */
 export function ChangePoints({
   chore,
   suggestion,
+  history,
 }: {
   chore: ChoreView;
   suggestion: SuggestionView | null;
+  history: PointsHistoryView[];
 }) {
   const [changing, setChanging] = useState(false);
   const cooldown =
@@ -89,52 +96,52 @@ export function ChangePoints({
         <div className="flex flex-col gap-3">
           <p className="text-sm text-bm-muted">{SCHEDULED_NOTE}</p>
           {open ? (
-            <>
-              <p className="text-sm">
-                Baumy suggests{" "}
-                {changeLabel({
-                  fromPoints: open.currentPoints,
-                  toPoints: open.suggestedPoints,
-                  fromCooldownMinutes: open.currentCooldownMinutes,
-                  toCooldownMinutes: open.suggestedCooldownMinutes,
-                })}
-                , from how often it is really done. Schedule that, or your own
-                numbers.
-              </p>
-              <ScheduleWeightForm
-                suggestionId={open.id}
-                choreName={chore.name}
-                suggestedPoints={open.suggestedPoints}
-                suggestedCooldownMinutes={open.suggestedCooldownMinutes}
-              />
-            </>
-          ) : (
-            <p className="text-sm" data-testid="no-suggestion">
-              No change is due yet. Points follow how often a bounty is really
-              done: each Monday Baumy suggests a change where they are off, and
-              you can schedule it here.
+            <p className="text-sm" data-testid="open-suggestion">
+              Baumy suggests{" "}
+              {changeLabel({
+                fromPoints: open.currentPoints,
+                toPoints: open.suggestedPoints!,
+                fromCooldownMinutes: open.currentCooldownMinutes,
+                toCooldownMinutes: open.suggestedCooldownMinutes!,
+              })}
+              , from how often it is really done. Schedule that, or your own
+              numbers.
             </p>
-          )}
+          ) : null}
+          <SchedulePointsForm
+            choreId={chore.id}
+            choreName={chore.name}
+            points={open?.suggestedPoints ?? chore.basePoints ?? 20}
+            cooldownMinutes={
+              open?.suggestedCooldownMinutes ?? chore.cooldownMinutes ?? 24 * 60
+            }
+          />
         </div>
       ) : null}
+      <div data-testid="bounty-points-history">
+        <SectionHeading>Points history</SectionHeading>
+        <PointsHistory changes={history} />
+      </div>
     </section>
   );
 }
 
-/** An admin's Edit beside a bounty row, and its dialog. */
+/** An admin's Edit under (phone) or beside (wider) a bounty row, and its dialog. */
 function EditBounty({
   chore,
   suggestion,
+  history,
 }: {
   chore: ChoreView;
   suggestion: SuggestionView | null;
+  history: PointsHistoryView[];
 }) {
   const [editing, setEditing] = useState(false);
   return (
     <>
       <Button
         variant="secondary"
-        className="shrink-0"
+        className="shrink-0 self-end sm:self-auto"
         onClick={() => setEditing(true)}
         aria-label={`Edit ${chore.name}`}
       >
@@ -144,7 +151,13 @@ function EditBounty({
         <EditChoreDialog
           chore={chore}
           onClose={() => setEditing(false)}
-          points={<ChangePoints chore={chore} suggestion={suggestion} />}
+          points={
+            <ChangePoints
+              chore={chore}
+              suggestion={suggestion}
+              history={history}
+            />
+          }
         />
       ) : null}
     </>
@@ -168,6 +181,10 @@ export function BountyBoard({
   const suggestionOf = new Map(
     (admin?.suggestions ?? []).map((s) => [s.choreId, s]),
   );
+  const historyOf = new Map<string, PointsHistoryView[]>();
+  for (const e of admin?.history ?? []) {
+    historyOf.set(e.choreId, [...(historyOf.get(e.choreId) ?? []), e]);
+  }
   return (
     <ChoreGrid
       chores={chores}
@@ -180,6 +197,7 @@ export function BountyBoard({
               <EditBounty
                 chore={c}
                 suggestion={suggestionOf.get(c.id) ?? null}
+                history={historyOf.get(c.id) ?? []}
               />
             )
           : undefined

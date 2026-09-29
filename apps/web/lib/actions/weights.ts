@@ -8,18 +8,26 @@ import {
   currentRule,
   dismissSuggestion,
   findSuggestion,
+  insertAdminChange,
   lastAppliedAt,
+  listPointsHistory,
   listScheduledChanges,
   listWeightPanel,
+  lockActiveSuggestion,
   lockSuggestion,
   scheduleSuggestion,
+  supersedeSuggestion,
   vetoSuggestion,
+  type HistoryMember,
+  type PointsChangeOutcome,
+  type PointsHistoryEntry,
   type WeightSuggestionRow,
 } from "@baumy/db/weights";
 import { lockChoreRow } from "@baumy/db/chores";
 import {
   BasePoints,
   CooldownHours,
+  WeightChangeReason,
   cooldownMinutesFromHours,
 } from "@baumy/types";
 import { defineAction, type ActionCtx } from "./define";
@@ -32,6 +40,12 @@ import { fail } from "./result";
 // 00:00 Berlin at least 48h ahead. Scheduling and dismissing are admin
 // actions, so UI only (SPEC §12 decision 10); reading the weights and a
 // member's veto are also offered to brain (issue #70).
+//
+// An admin may also set any bounty's points by hand at any time
+// (`schedule_points_change`, issue #115, SPEC §12 decision 20): the same
+// Monday at least 48h ahead, the same veto and cancel, but no measurement and
+// no 28-day spacing. `get_points_history` is every change, for every member
+// (in the UI and brain).
 
 const suggestionId = z.uuid("Pick a suggestion.");
 
@@ -39,17 +53,22 @@ const suggestionId = z.uuid("Pick a suggestion.");
 export interface SuggestionView {
   id: string;
   choreId: string;
+  /** `measured` (the weekly suggestion) or `admin` (set by hand). */
+  origin: "measured" | "admin";
   status: WeightSuggestionStatus;
   computedAt: string;
-  sampleIntervals: number[];
-  medianIntervalMinutes: number;
-  rawPoints: number;
+  /** The measurement: null on an admin's change. */
+  sampleIntervals: number[] | null;
+  medianIntervalMinutes: number | null;
+  rawPoints: number | null;
   currentPoints: number;
   currentCooldownMinutes: number;
-  suggestedPoints: number;
-  suggestedCooldownMinutes: number;
+  suggestedPoints: number | null;
+  suggestedCooldownMinutes: number | null;
   scheduledPoints: number | null;
   scheduledCooldownMinutes: number | null;
+  /** Why an admin set these points, if they said. */
+  reason: string | null;
   appliesAt: string | null;
   scheduledBy: string | null;
 }
@@ -58,6 +77,7 @@ export function suggestionView(s: WeightSuggestionRow): SuggestionView {
   return {
     id: s.id,
     choreId: s.choreId,
+    origin: s.origin,
     status: s.status,
     computedAt: s.computedAt.toISOString(),
     sampleIntervals: s.sampleIntervals,
@@ -69,6 +89,7 @@ export function suggestionView(s: WeightSuggestionRow): SuggestionView {
     suggestedCooldownMinutes: s.suggestedCooldownMinutes,
     scheduledPoints: s.scheduledPoints,
     scheduledCooldownMinutes: s.scheduledCooldownMinutes,
+    reason: s.reason,
     appliesAt: s.appliesAt?.toISOString() ?? null,
     scheduledBy: s.scheduledBy,
   };
@@ -264,10 +285,11 @@ export const scheduleWeight = defineAction({
     });
     const row = await scheduleSuggestion(ctx.db, {
       suggestionId: s.id,
-      basePoints: input.basePoints ?? s.suggestedPoints,
+      // An open suggestion is always a measured one, with its numbers.
+      basePoints: input.basePoints ?? s.suggestedPoints!,
       cooldownMinutes:
         input.cooldownHours === undefined
-          ? s.suggestedCooldownMinutes
+          ? s.suggestedCooldownMinutes!
           : cooldownMinutesFromHours(input.cooldownHours),
       appliesAt,
       scheduledBy: ctx.actor.memberId!,
@@ -279,6 +301,93 @@ export const scheduleWeight = defineAction({
       ok: true,
       data: decision(row),
       audit: { entity: "weight_suggestion", entityId: row.id },
+    };
+  },
+});
+
+export const schedulePointsChange = defineAction({
+  name: "schedule_points_change",
+  title: "Change a bounty's points",
+  description:
+    "Schedules new points and a new cooldown (in hours) for any bounty, with an optional reason. It applies at the next Monday 00:00 Berlin at least 48h ahead, unless another member vetoes it first. A bounty has one change waiting at a time; this one replaces the week's open suggestion.",
+  consent: "Change how many points a chore is worth",
+  kind: "write",
+  risk: "confirm",
+  surfaces: ["ui"],
+  requires: "admin",
+  input: z.strictObject({
+    choreId: z.uuid("Pick a bounty."),
+    basePoints: BasePoints,
+    cooldownHours: CooldownHours,
+    reason: WeightChangeReason.optional(),
+  }),
+  async execute(ctx, input) {
+    // The chore's lock first, then its waiting suggestion: the order the
+    // weekly compute and the other weight writes keep.
+    const chore = await lockChoreRow(ctx.db, ctx.householdId, input.choreId);
+    if (!chore) return fail("NOT_FOUND", "That bounty was not found.");
+    if (chore.archivedAt) {
+      return fail(
+        "ARCHIVED_CHORE",
+        "That bounty is archived. Restore it on Edit chores first.",
+      );
+    }
+    const rule = await currentRule(ctx.db, chore.id, ctx.now);
+    if (!rule) {
+      return fail(
+        "NO_RULE_VERSION",
+        "That bounty has no points yet. Give it some on Edit chores.",
+      );
+    }
+    const cooldownMinutes = cooldownMinutesFromHours(input.cooldownHours);
+    if (
+      rule.basePoints === input.basePoints &&
+      rule.cooldownMinutes === cooldownMinutes
+    ) {
+      return fail(
+        "NO_CHANGE",
+        `${chore.name} is already worth ${rule.basePoints} pts with that cooldown.`,
+      );
+    }
+    const active = await lockActiveSuggestion(ctx.db, chore.id);
+    if (active?.status === "scheduled") {
+      return fail(
+        "CHANGE_PENDING",
+        `A change to ${chore.name} is already scheduled (${active.currentPoints} → ${active.scheduledPoints} pts, ${formatBerlinDateTime(active.appliesAt!)} Berlin time). Cancel it first, or let it land.`,
+      );
+    }
+    // An admin's numbers replace the week's open suggestion.
+    if (active) await supersedeSuggestion(ctx.db, active.id);
+    const reason = input.reason ? input.reason : null;
+    const row = await insertAdminChange(ctx.db, {
+      householdId: ctx.householdId,
+      choreId: chore.id,
+      currentPoints: rule.basePoints,
+      currentCooldownMinutes: rule.cooldownMinutes,
+      basePoints: input.basePoints,
+      cooldownMinutes,
+      reason,
+      // No 28-day spacing for an admin's change (issue #115).
+      appliesAt: weightChangeAppliesAt({ now: ctx.now, lastAppliedAt: null }),
+      scheduledBy: ctx.actor.memberId!,
+      now: ctx.now,
+    });
+    return {
+      ok: true,
+      data: decision(row),
+      audit: {
+        entity: "weight_suggestion",
+        entityId: row.id,
+        payload: {
+          choreId: chore.id,
+          fromPoints: rule.basePoints,
+          toPoints: input.basePoints,
+          fromCooldownMinutes: rule.cooldownMinutes,
+          toCooldownMinutes: cooldownMinutes,
+          reason,
+          appliesAt: row.appliesAt!.toISOString(),
+        },
+      },
     };
   },
 });
@@ -364,5 +473,63 @@ export const vetoWeight = defineAction({
       data: decision(row),
       audit: { entity: "weight_suggestion", entityId: row.id },
     };
+  },
+});
+
+/** One change on a bounty's points history. Times are ISO 8601. */
+export interface PointsHistoryView {
+  key: string;
+  choreId: string;
+  choreName: string;
+  source: PointsHistoryEntry["source"];
+  suggestionId: string | null;
+  proposedBy: HistoryMember | null;
+  proposedAt: string;
+  fromPoints: number | null;
+  fromCooldownMinutes: number | null;
+  toPoints: number;
+  toCooldownMinutes: number;
+  reason: string | null;
+  appliesAt: string;
+  outcome: PointsChangeOutcome;
+  decidedBy: HistoryMember | null;
+  decidedAt: string | null;
+}
+
+export function historyView(e: PointsHistoryEntry): PointsHistoryView {
+  return {
+    ...e,
+    proposedAt: e.proposedAt.toISOString(),
+    appliesAt: e.appliesAt.toISOString(),
+    decidedAt: e.decidedAt?.toISOString() ?? null,
+  };
+}
+
+export interface GetPointsHistoryData {
+  /** Newest first. */
+  changes: PointsHistoryView[];
+}
+
+export const getPointsHistory = defineAction({
+  name: "get_points_history",
+  title: "Points history",
+  description:
+    "Lists every change to the bounties' points, newest first, or one bounty's: who made or scheduled it, the points and cooldown before and after, the reason, when it was proposed and when it applies, and whether it landed, is waiting, was vetoed (by whom, when) or was cancelled.",
+  consent: "See how the bounties' points have changed",
+  kind: "read",
+  risk: "safe",
+  // Brain gets every member action (SPEC §12 decision 15).
+  surfaces: ["ui", "brain"],
+  requires: "member",
+  input: z.strictObject({
+    choreId: z.uuid("Pick a bounty.").optional(),
+  }),
+  async execute(ctx, input) {
+    const rows = await listPointsHistory(ctx.db, {
+      householdId: ctx.householdId,
+      ...(input.choreId ? { choreId: input.choreId } : {}),
+    });
+    const data: GetPointsHistoryData = { changes: rows.map(historyView) };
+    return { ok: true, data };
   },
 });

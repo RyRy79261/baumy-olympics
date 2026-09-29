@@ -75,6 +75,17 @@ export const weightSuggestionStatus = pgEnum("weight_suggestion_status", [
   "superseded",
 ]);
 
+/**
+ * Where a weight change came from (SPEC §4.4): the weekly `measured`
+ * suggestion, or an `admin` who set the points by hand (issue #115). An
+ * admin's change skips the measurement and the 28-day spacing, but not the
+ * 48h veto window.
+ */
+export const weightChangeOrigin = pgEnum("weight_change_origin", [
+  "measured",
+  "admin",
+]);
+
 /** v1 implements `points` only (SPEC §4.5); the others are kept for later. */
 export const prizeMode = pgEnum("prize_mode", [
   "points",
@@ -685,6 +696,11 @@ export const choreRuleVersions = pgTable(
  * `sample_intervals` are the winsorised gaps in minutes, oldest first (the
  * panel's sparkline). `scheduled_points`/`scheduled_cooldown_minutes` are what
  * the admin scheduled ("Edit & schedule" may differ from the suggestion).
+ *
+ * An `admin` row (issue #115) is a change an admin made by hand, any day: it
+ * has no measurement, is `scheduled` from the start (with its optional
+ * `reason`), lands the same way and can be vetoed or cancelled the same way.
+ * These rows and `chore_rule_versions` are the points history.
  */
 export const weightSuggestions = pgTable(
   "weight_suggestions",
@@ -696,17 +712,21 @@ export const weightSuggestions = pgTable(
     choreId: uuid("chore_id")
       .notNull()
       .references(() => chores.id),
+    origin: weightChangeOrigin("origin").notNull().default("measured"),
     weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
     computedAt: timestamp("computed_at", { withTimezone: true }).notNull(),
-    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
-    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
-    sampleIntervals: integer("sample_intervals").array().notNull(),
-    medianIntervalMinutes: integer("median_interval_minutes").notNull(),
-    rawPoints: doublePrecision("raw_points").notNull(),
+    // The measurement: set on every `measured` row, null on an `admin` one.
+    windowStart: timestamp("window_start", { withTimezone: true }),
+    windowEnd: timestamp("window_end", { withTimezone: true }),
+    sampleIntervals: integer("sample_intervals").array(),
+    medianIntervalMinutes: integer("median_interval_minutes"),
+    rawPoints: doublePrecision("raw_points"),
     currentPoints: integer("current_points").notNull(),
     currentCooldownMinutes: integer("current_cooldown_minutes").notNull(),
-    suggestedPoints: integer("suggested_points").notNull(),
-    suggestedCooldownMinutes: integer("suggested_cooldown_minutes").notNull(),
+    suggestedPoints: integer("suggested_points"),
+    suggestedCooldownMinutes: integer("suggested_cooldown_minutes"),
+    /** Why an admin set these points (issue #115); optional. */
+    reason: text("reason"),
     status: weightSuggestionStatus("status").notNull().default("open"),
     scheduledPoints: integer("scheduled_points"),
     scheduledCooldownMinutes: integer("scheduled_cooldown_minutes"),
@@ -720,7 +740,11 @@ export const weightSuggestions = pgTable(
     appliedAt: timestamp("applied_at", { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex("weight_suggestions_chore_week_uq").on(t.choreId, t.weekStart),
+    // One measured suggestion per chore and Berlin week; an admin's change
+    // has a week too, but may come any day.
+    uniqueIndex("weight_suggestions_chore_week_uq")
+      .on(t.choreId, t.weekStart)
+      .where(sql`${t.origin} = 'measured'`),
     // One suggestion per chore is waiting on people at a time.
     uniqueIndex("weight_suggestions_one_active_per_chore_uq")
       .on(t.choreId)
@@ -748,6 +772,19 @@ export const weightSuggestions = pgTable(
     check(
       "weight_suggestions_open_unscheduled",
       sql`${t.status} <> 'open' OR ${t.appliesAt} IS NULL`,
+    ),
+    check(
+      "weight_suggestions_measured_has_measurement",
+      sql`${t.origin} <> 'measured' OR (${t.windowStart} IS NOT NULL AND ${t.windowEnd} IS NOT NULL AND ${t.sampleIntervals} IS NOT NULL AND ${t.medianIntervalMinutes} IS NOT NULL AND ${t.rawPoints} IS NOT NULL AND ${t.suggestedPoints} IS NOT NULL AND ${t.suggestedCooldownMinutes} IS NOT NULL)`,
+    ),
+    // An admin's change is scheduled as it is made, so it is never open.
+    check(
+      "weight_suggestions_admin_scheduled",
+      sql`${t.origin} <> 'admin' OR (${t.status} <> 'open' AND ${t.scheduledAt} IS NOT NULL)`,
+    ),
+    check(
+      "weight_suggestions_reason_length",
+      sql`${t.reason} IS NULL OR char_length(${t.reason}) BETWEEN 1 AND 280`,
     ),
     check(
       "weight_suggestions_dismissed",

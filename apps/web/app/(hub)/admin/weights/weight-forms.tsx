@@ -4,14 +4,16 @@ import {
   BASE_POINTS_MAX,
   BASE_POINTS_MIN,
   COOLDOWN_HOURS_MAX,
+  WEIGHT_CHANGE_REASON_MAX,
 } from "@baumy/types";
-import { Button, Field, FormMessage, Input } from "@baumy/ui";
+import { Button, Field, FormMessage, Input, Textarea } from "@baumy/ui";
 import { useActionForm, type FormAction } from "@/components/use-action-form";
 import type { WeightDecisionData } from "@/lib/actions/weights";
 import { toast } from "@/lib/ui/toast";
 import { appliesLabel, hoursField } from "@/lib/weights/view";
 import {
   dismissWeightAction,
+  schedulePointsChangeAction,
   scheduleWeightAction,
   vetoWeightAction,
 } from "./actions";
@@ -113,6 +115,104 @@ export function ScheduleWeightForm({
           <FormMessage tone="error">{state.message}</FormMessage>
         </div>
       ) : null}
+    </form>
+  );
+}
+
+const pointsReporting = reporting(
+  schedulePointsChangeAction,
+  (d) => appliesLabel(d.appliesAt!),
+  false,
+);
+
+/**
+ * An admin's own points for a bounty (issue #115): any points and cooldown,
+ * and an optional reason for the history. The fields start at `points` and
+ * `cooldownMinutes` (the week's suggestion, or what the bounty has now).
+ */
+export function SchedulePointsForm({
+  choreId,
+  choreName,
+  points,
+  cooldownMinutes,
+}: {
+  choreId: string;
+  choreName: string;
+  points: number;
+  cooldownMinutes: number;
+}) {
+  const { state, formAction, pending, requestId, errors } =
+    useActionForm(pointsReporting);
+  const id = `points-${choreId}`;
+  return (
+    <form
+      action={formAction}
+      noValidate
+      className="flex flex-col gap-3"
+      aria-label={`Change ${choreName}'s points`}
+    >
+      <input type="hidden" name="requestId" value={requestId} />
+      <input type="hidden" name="choreId" value={choreId} />
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="w-32">
+          <Field id={`${id}-points`} label="Points" errors={errors.basePoints}>
+            {(control) => (
+              <Input
+                {...control}
+                name="basePoints"
+                type="number"
+                inputMode="numeric"
+                min={BASE_POINTS_MIN}
+                max={BASE_POINTS_MAX}
+                defaultValue={points}
+                required
+              />
+            )}
+          </Field>
+        </div>
+        <div className="w-40">
+          <Field
+            id={`${id}-cooldown`}
+            label="Cooldown (hours)"
+            errors={errors.cooldownHours}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                name="cooldownHours"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={COOLDOWN_HOURS_MAX}
+                step="any"
+                defaultValue={hoursField(cooldownMinutes)}
+                required
+              />
+            )}
+          </Field>
+        </div>
+      </div>
+      <Field
+        id={`${id}-reason`}
+        label="Reason (optional)"
+        hint="Shown in the points history."
+        errors={errors.reason}
+      >
+        {(control) => (
+          <Textarea
+            {...control}
+            name="reason"
+            maxLength={WEIGHT_CHANGE_REASON_MAX}
+            rows={2}
+          />
+        )}
+      </Field>
+      {state && !state.ok && state.code !== "INVALID_INPUT" ? (
+        <FormMessage tone="error">{state.message}</FormMessage>
+      ) : null}
+      <Button type="submit" disabled={pending} className="self-start">
+        {pending ? "Scheduling..." : "Schedule change"}
+      </Button>
     </form>
   );
 }

@@ -5,12 +5,14 @@ import type { ChoreView } from "@/lib/actions/list-chores";
 // /chores for an admin and for a member (issue #109): the admin gets New
 // bounty and an Edit button per bounty, and the page reads the waiting
 // weight suggestions for Change points; a member gets neither, and the
-// suggestions are not read.
+// suggestions are not read. Everyone gets the link to the points history
+// (issue #115); only an admin's page reads it, for the edit dialogs.
 
 const me = vi.hoisted(() => ({
   current: { memberId: "m-1", role: "admin", displayName: "Ryan" },
 }));
 const listActiveSuggestions = vi.hoisted(() => vi.fn());
+const ran = vi.hoisted(() => [] as string[]);
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -21,7 +23,12 @@ vi.mock("@/lib/auth", () => ({
 }));
 vi.mock("@/lib/actions/ui", () => ({ uiRequestCtx: async () => ({}) }));
 vi.mock("@/lib/actions/registry", () => ({
-  runAction: async () => ({ ok: true, data: { chores: [chore] } }),
+  runAction: async (name: string) => {
+    ran.push(name);
+    return name === "get_points_history"
+      ? { ok: true, data: { changes: [] } }
+      : { ok: true, data: { chores: [chore] } };
+  },
 }));
 vi.mock("@baumy/db", () => ({ createHttpDb: () => ({}) }));
 vi.mock("@baumy/db/members", () => ({
@@ -38,6 +45,7 @@ vi.mock("@/app/(hub)/admin/weights/actions", () => ({
   scheduleWeightAction: vi.fn(),
   dismissWeightAction: vi.fn(),
   vetoWeightAction: vi.fn(),
+  schedulePointsChangeAction: vi.fn(),
 }));
 
 const chore: ChoreView = {
@@ -68,6 +76,7 @@ const { default: ChoresPage } = await import("./page");
 beforeEach(() => {
   listActiveSuggestions.mockReset();
   listActiveSuggestions.mockResolvedValue([]);
+  ran.length = 0;
 });
 
 async function render() {
@@ -82,6 +91,8 @@ describe("/chores", () => {
     expect(html).toContain(">New bounty</button>");
     expect(html).toContain('aria-label="Edit Trash"');
     expect(listActiveSuggestions).toHaveBeenCalledOnce();
+    expect(ran).toEqual(["list_chores", "get_points_history"]);
+    expect(html).toContain('href="/chores/history"');
   });
 
   it("gives a member the board with neither", async () => {
@@ -91,5 +102,7 @@ describe("/chores", () => {
     expect(html).not.toContain("New bounty");
     expect(html).not.toContain("Edit Trash");
     expect(listActiveSuggestions).not.toHaveBeenCalled();
+    expect(ran).toEqual(["list_chores"]);
+    expect(html).toContain('href="/chores/history"');
   });
 });

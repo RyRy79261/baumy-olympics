@@ -19,6 +19,7 @@ import {
   gt,
   gte,
   inArray,
+  isNotNull,
   isNull,
   lte,
   max,
@@ -34,6 +35,7 @@ import {
   chores,
   completions,
   disputes,
+  members,
   weightSuggestions,
 } from "./schema";
 import { findSeason } from "./seasons";
@@ -49,6 +51,10 @@ import { findSeason } from "./seasons";
 //   unique `chore_rule_versions.suggestion_id`).
 // - The admin writes (`schedule_weight`, `dismiss_weight`) and `veto_weight`
 //   lock the suggestion row and compare-and-set its status.
+// - An admin may also set any points by hand (`schedule_points_change`,
+//   issue #115): an `admin` row, scheduled at once, which lands, is vetoed or
+//   is cancelled like a scheduled suggestion. `listPointsHistory` reads the
+//   whole story back from these rows and `chore_rule_versions`.
 //
 // Every function takes the caller's handle and writes neither `audit_events`
 // nor `action_requests`.
@@ -103,7 +109,10 @@ export async function loadIntervalSamples(
     .map((r) => r.occurredAt);
 }
 
-/** The median the chore's latest stored suggestion measured, if any. */
+/**
+ * The median the chore's latest measured suggestion found, if any. An
+ * admin's change measured nothing, so it is skipped.
+ */
 async function previousMedian(
   db: Queryable,
   choreId: string,
@@ -111,7 +120,12 @@ async function previousMedian(
   const [row] = await db
     .select({ m: weightSuggestions.medianIntervalMinutes })
     .from(weightSuggestions)
-    .where(eq(weightSuggestions.choreId, choreId))
+    .where(
+      and(
+        eq(weightSuggestions.choreId, choreId),
+        eq(weightSuggestions.origin, "measured"),
+      ),
+    )
     .orderBy(desc(weightSuggestions.computedAt))
     .limit(1);
   return row?.m ?? null;
@@ -199,7 +213,7 @@ export interface ComputeSuggestionsResult {
 /**
  * The weekly recompute (SPEC §4.4). For every chore that is not archived, in
  * id order, under its row lock: skip it if it already has this Berlin week's
- * suggestion or a scheduled change; otherwise supersede its open suggestion
+ * measured suggestion or a scheduled change (an admin's too); otherwise supersede its open suggestion
  * (the numbers are a week old) and store a new one if the weight should move.
  * Every household unless `scope.householdId` narrows it (tests).
  */
@@ -237,7 +251,10 @@ export async function computeSuggestions(
         and(
           eq(weightSuggestions.choreId, id),
           or(
-            eq(weightSuggestions.weekStart, weekStart),
+            and(
+              eq(weightSuggestions.origin, "measured"),
+              eq(weightSuggestions.weekStart, weekStart),
+            ),
             eq(weightSuggestions.status, "scheduled"),
           ),
         ),
@@ -276,6 +293,7 @@ export async function computeSuggestions(
       })
       .onConflictDoNothing({
         target: [weightSuggestions.choreId, weightSuggestions.weekStart],
+        where: sql`${weightSuggestions.origin} = 'measured'`,
       })
       .returning();
     if (row) suggested.push(row);
@@ -296,9 +314,10 @@ export interface AppliedSuggestion {
  * a `suggestion` rule version effective from `now`, so no completion that has
  * already happened changes score, then the suggestion becomes `applied`.
  * Claimed with `FOR UPDATE SKIP LOCKED`, so two runs never apply one twice; a
- * vetoed or dismissed suggestion is never selected. A change that would land
- * within 28 days of the chore's last one stays scheduled (the schedule
- * already pushes `applies_at` past that, so this is only a backstop).
+ * vetoed or dismissed suggestion is never selected. A measured change that
+ * would land within 28 days of the chore's last one stays scheduled (the
+ * schedule already pushes `applies_at` past that, so this is only a
+ * backstop); an admin's change is not spaced (issue #115).
  */
 export async function applyDueSuggestions(
   db: Queryable,
@@ -341,6 +360,7 @@ export async function applyDueSuggestions(
       .for("update", { skipLocked: true });
     if (!s) continue;
     if (
+      s.origin === "measured" &&
       !changeSpacingOk({
         appliesAt: s.appliesAt!,
         lastAppliedAt: await lastAppliedAt(db, s.choreId),
@@ -445,6 +465,87 @@ export async function currentRule(
   now: Date,
 ): Promise<RuleVersion | null> {
   return ruleNow(await loadRuleVersions(db, choreId), now);
+}
+
+/**
+ * The chore's suggestion waiting on people (open or scheduled), row-locked.
+ * Lock the chore first (the order every weight write keeps).
+ */
+export async function lockActiveSuggestion(
+  db: Queryable,
+  choreId: string,
+): Promise<WeightSuggestionRow | null> {
+  const [row] = await db
+    .select()
+    .from(weightSuggestions)
+    .where(
+      and(
+        eq(weightSuggestions.choreId, choreId),
+        inArray(weightSuggestions.status, ["open", "scheduled"]),
+      ),
+    )
+    .for("update");
+  return row ?? null;
+}
+
+/** Compare-and-set `open` → `superseded`: an admin's change replaces it. */
+export async function supersedeSuggestion(
+  db: Queryable,
+  suggestionId: string,
+): Promise<WeightSuggestionRow | null> {
+  const [row] = await db
+    .update(weightSuggestions)
+    .set({ status: "superseded" })
+    .where(
+      and(
+        eq(weightSuggestions.id, suggestionId),
+        eq(weightSuggestions.status, "open"),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/**
+ * An admin's points change (issue #115), stored `scheduled` from the start.
+ * The partial unique index keeps it the chore's only open or scheduled one:
+ * the caller holds the chore's lock and has superseded an open suggestion.
+ */
+export async function insertAdminChange(
+  db: Queryable,
+  input: {
+    householdId: string;
+    choreId: string;
+    currentPoints: number;
+    currentCooldownMinutes: number;
+    basePoints: number;
+    cooldownMinutes: number;
+    reason: string | null;
+    appliesAt: Date;
+    scheduledBy: string;
+    now: Date;
+  },
+): Promise<WeightSuggestionRow> {
+  const [row] = await db
+    .insert(weightSuggestions)
+    .values({
+      householdId: input.householdId,
+      choreId: input.choreId,
+      origin: "admin",
+      weekStart: startOfBerlinWeek(input.now),
+      computedAt: input.now,
+      currentPoints: input.currentPoints,
+      currentCooldownMinutes: input.currentCooldownMinutes,
+      reason: input.reason,
+      status: "scheduled",
+      scheduledPoints: input.basePoints,
+      scheduledCooldownMinutes: input.cooldownMinutes,
+      appliesAt: input.appliesAt,
+      scheduledBy: input.scheduledBy,
+      scheduledAt: input.now,
+    })
+    .returning();
+  return row!;
 }
 
 /** Compare-and-set `open` → `scheduled`. Null if it was no longer open. */
@@ -615,4 +716,152 @@ export async function listScheduledChanges(
     )
     .orderBy(asc(weightSuggestions.appliesAt), asc(chores.name));
   return rows.map((r) => ({ ...r.s, choreName: r.choreName }));
+}
+
+/** Who a history entry names. */
+export interface HistoryMember {
+  memberId: string;
+  displayName: string;
+}
+
+/**
+ * What became of a change: `pending` (scheduled, vetoable until
+ * `appliesAt`), `landed`, `vetoed` or `cancelled` (by an admin).
+ */
+export type PointsChangeOutcome = "pending" | "landed" | "vetoed" | "cancelled";
+
+/**
+ * One change on a bounty's points history (issue #115). `source` is `seed`
+ * (the starting points), `manual` (set at once on the admin chores page or by
+ * `update_bounty`), `measured` (the weekly suggestion, scheduled by an admin)
+ * or `admin` (points an admin chose, scheduled).
+ */
+export interface PointsHistoryEntry {
+  /** `v:<rule version id>` for a change that landed, else `s:<id>`. */
+  key: string;
+  choreId: string;
+  choreName: string;
+  source: "seed" | "manual" | "measured" | "admin";
+  /** The scheduled change's id, which a veto or a cancel takes. */
+  suggestionId: string | null;
+  proposedBy: HistoryMember | null;
+  proposedAt: Date;
+  /** Null for a bounty's first points. */
+  fromPoints: number | null;
+  fromCooldownMinutes: number | null;
+  toPoints: number;
+  toCooldownMinutes: number;
+  reason: string | null;
+  /** When it lands, landed, or would have landed. */
+  appliesAt: Date;
+  outcome: PointsChangeOutcome;
+  /** Who vetoed or cancelled it, and when. */
+  decidedBy: HistoryMember | null;
+  decidedAt: Date | null;
+}
+
+/**
+ * Every change to the household's bounties' points, newest first, or one
+ * bounty's with `choreId` (issue #115). Built from `chore_rule_versions`
+ * (what landed, and from what) and the scheduled `weight_suggestions` (who
+ * proposed it and why, and who vetoed or cancelled it); a suggestion nobody
+ * scheduled was never a change, so it is left out. Archived bounties too.
+ */
+export async function listPointsHistory(
+  db: Queryable,
+  input: { householdId: string; choreId?: string },
+): Promise<PointsHistoryEntry[]> {
+  const people = await db
+    .select({ memberId: members.id, displayName: members.displayName })
+    .from(members)
+    .where(eq(members.householdId, input.householdId));
+  const who = new Map(people.map((p) => [p.memberId, p]));
+  const person = (id: string | null) => (id ? (who.get(id) ?? null) : null);
+
+  const versions = await db
+    .select({ v: choreRuleVersions, choreName: chores.name })
+    .from(choreRuleVersions)
+    .innerJoin(chores, eq(chores.id, choreRuleVersions.choreId))
+    .where(
+      and(
+        eq(chores.householdId, input.householdId),
+        input.choreId ? eq(chores.id, input.choreId) : undefined,
+      ),
+    )
+    .orderBy(
+      asc(choreRuleVersions.choreId),
+      asc(choreRuleVersions.effectiveFrom),
+    );
+  const scheduled = await db
+    .select({ s: weightSuggestions, choreName: chores.name })
+    .from(weightSuggestions)
+    .innerJoin(chores, eq(chores.id, weightSuggestions.choreId))
+    .where(
+      and(
+        eq(weightSuggestions.householdId, input.householdId),
+        input.choreId
+          ? eq(weightSuggestions.choreId, input.choreId)
+          : undefined,
+        isNotNull(weightSuggestions.scheduledAt),
+      ),
+    );
+  const suggestionOf = new Map(scheduled.map((r) => [r.s.id, r.s]));
+
+  const out: PointsHistoryEntry[] = [];
+  let previous: (typeof versions)[number]["v"] | null = null;
+  for (const { v, choreName } of versions) {
+    const from = previous?.choreId === v.choreId ? previous : null;
+    previous = v;
+    const s = v.suggestionId ? suggestionOf.get(v.suggestionId) : undefined;
+    out.push({
+      key: `v:${v.id}`,
+      choreId: v.choreId,
+      choreName,
+      source: s ? s.origin : v.source === "seed" ? "seed" : "manual",
+      suggestionId: s?.id ?? null,
+      proposedBy: person(s ? s.scheduledBy : v.createdBy),
+      proposedAt: s ? s.scheduledAt! : v.createdAt,
+      fromPoints: from?.basePoints ?? null,
+      fromCooldownMinutes: from?.cooldownMinutes ?? null,
+      toPoints: v.basePoints,
+      toCooldownMinutes: v.cooldownMinutes,
+      reason: s?.reason ?? null,
+      appliesAt: v.effectiveFrom,
+      outcome: "landed",
+      decidedBy: null,
+      decidedAt: null,
+    });
+  }
+  for (const { s, choreName } of scheduled) {
+    if (s.status === "applied") continue; // listed with its rule version
+    out.push({
+      key: `s:${s.id}`,
+      choreId: s.choreId,
+      choreName,
+      source: s.origin,
+      suggestionId: s.id,
+      proposedBy: person(s.scheduledBy),
+      proposedAt: s.scheduledAt!,
+      fromPoints: s.currentPoints,
+      fromCooldownMinutes: s.currentCooldownMinutes,
+      toPoints: s.scheduledPoints!,
+      toCooldownMinutes: s.scheduledCooldownMinutes!,
+      reason: s.reason,
+      appliesAt: s.appliesAt!,
+      outcome:
+        s.status === "vetoed"
+          ? "vetoed"
+          : s.status === "dismissed"
+            ? "cancelled"
+            : "pending",
+      decidedBy: person(s.vetoedBy ?? s.dismissedBy),
+      decidedAt: s.vetoedAt ?? s.dismissedAt,
+    });
+  }
+  return out.sort(
+    (a, b) =>
+      b.proposedAt.getTime() - a.proposedAt.getTime() ||
+      b.appliesAt.getTime() - a.appliesAt.getTime() ||
+      a.key.localeCompare(b.key),
+  );
 }
