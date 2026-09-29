@@ -149,8 +149,11 @@ Telegram user (30 writes or 120 reads a minute by default); and
 2. Tapping **Start** in Telegram sends `/start link_<code>` from the member's
    own DM; brain treats it exactly like `/link <code>`, which stays the manual
    fallback (Settings shows it under the QR code). Both are DM only.
-3. Settings re-reads itself every 3 seconds (and on focus) until the code
-   expires, so it says "Linked" once brain has redeemed the code.
+3. Settings asks `get_telegram_link_status` every 3 seconds (and on focus)
+   while the code waits, so it says "Linked" once brain has redeemed the code,
+   even when the member relinks the Telegram account they had, and says the
+   link expired, with a button for a new one, once the server's clock passes
+   the code's 10 minutes (issue #118).
 4. Brain calls `POST /api/v1/actions/link_telegram` with `{"code": "<code>"}`,
    the sender in `X-Baumy-Actor` and a fresh `Idempotency-Key`. This is the
    ONE action an unlinked Telegram user may call; the member comes from the

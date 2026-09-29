@@ -5,6 +5,7 @@ import { actionForm } from "@/lib/actions/ui";
 import type { ActionResult } from "@/lib/actions/result";
 import type { SetKioskPinData } from "@/lib/actions/set-kiosk-pin";
 import type { TelegramLinkCodeData } from "@/lib/actions/create-telegram-link-code";
+import type { TelegramLinkStatus } from "@/lib/actions/get-telegram-link-status";
 import type { UpdateAvatarData } from "@/lib/actions/update-avatar";
 
 // /settings' server actions: thin wrappers around the registry (SPEC §6.3).
@@ -33,4 +34,11 @@ export async function createTelegramLinkCodeAction(
   form: FormData,
 ): Promise<ActionResult<TelegramLinkCodeData>> {
   return actionForm("create_telegram_link_code", form);
+}
+
+/** What the Telegram card polls while a link code is on screen (issue #118). */
+export async function telegramLinkStatusAction(): Promise<
+  ActionResult<TelegramLinkStatus>
+> {
+  return actionForm("get_telegram_link_status", new FormData());
 }

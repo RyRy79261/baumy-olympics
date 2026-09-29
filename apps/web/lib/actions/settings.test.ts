@@ -8,7 +8,10 @@ import {
   members,
   telegramLinkCodes,
 } from "@baumy/db/schema";
-import { hashTelegramLinkCode } from "@baumy/db/telegram-link-codes";
+import {
+  TELEGRAM_LINK_CODE_TTL_MS,
+  hashTelegramLinkCode,
+} from "@baumy/db/telegram-link-codes";
 import { useTestDb } from "@baumy/db/test-harness";
 import { verifyKioskPin } from "@baumy/auth/kiosk-pin";
 import {
@@ -217,7 +220,14 @@ describe("create_telegram_link_code", () => {
     // A replay of the same request cannot show it again.
     await expect(
       runAction("create_telegram_link_code", {}, ctx),
-    ).resolves.toEqual({ ok: true, data: { code: null, expiresAt } });
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        code: null,
+        expiresAt,
+        expiresInSeconds: TELEGRAM_LINK_CODE_TTL_MS / 1000,
+      },
+    });
     expect(await t.db().select().from(telegramLinkCodes)).toHaveLength(1);
   });
 
@@ -240,5 +250,103 @@ describe("create_telegram_link_code", () => {
       ),
     ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
     expect(await t.db().select().from(telegramLinkCodes)).toHaveLength(0);
+  });
+});
+
+describe("get_telegram_link_status", () => {
+  const TG = 5_000_000_301;
+  const TTL_S = TELEGRAM_LINK_CODE_TTL_MS / 1000;
+  const status = (memberId: string, now = FIXED_NOW) =>
+    runAction(
+      "get_telegram_link_status",
+      {},
+      ctxFor(sessionActor(memberId), { now }),
+    );
+  const makeCode = async (memberId: string, now = FIXED_NOW) => {
+    const res = await runAction(
+      "create_telegram_link_code",
+      {},
+      ctxFor(sessionActor(memberId), { now }),
+    );
+    if (!res.ok || !res.data.code) throw new Error("no code");
+    return res.data.code;
+  };
+  const redeem = (code: string, now: Date) =>
+    runAction(
+      "link_telegram",
+      { code },
+      ctxFor(
+        { kind: "service", tokenName: "baumy-brain", telegramUserId: TG },
+        { source: "brain", now },
+      ),
+    );
+  const at = (ms: number) => new Date(FIXED_NOW.getTime() + ms);
+
+  it("says not linked, and no code, before the member makes one", async () => {
+    const me = await seedMember(db());
+    await expect(status(me)).resolves.toEqual({
+      ok: true,
+      data: { linked: false, code: null },
+    });
+  });
+
+  it("counts the new code down in the server's seconds, then expires it", async () => {
+    const me = await seedMember(db());
+    await makeCode(me);
+    await expect(status(me, at(90_000 + 400))).resolves.toEqual({
+      ok: true,
+      data: {
+        linked: false,
+        code: { state: "waiting", secondsLeft: TTL_S - 90 },
+      },
+    });
+    await expect(status(me, at(TELEGRAM_LINK_CODE_TTL_MS))).resolves.toEqual({
+      ok: true,
+      data: { linked: false, code: { state: "expired", secondsLeft: 0 } },
+    });
+  });
+
+  it("says used when the member relinks the Telegram account they had", async () => {
+    const me = await seedMember(db());
+    const first = await makeCode(me);
+    await expect(redeem(first, at(MIN))).resolves.toMatchObject({ ok: true });
+    await expect(status(me, at(MIN))).resolves.toEqual({
+      ok: true,
+      data: { linked: true, code: { state: "used", secondsLeft: 0 } },
+    });
+
+    // Already linked to TG: a new code waits, then the same TG uses it. The
+    // Telegram id never changes, and the code still reads as used.
+    const second = await makeCode(me, at(2 * MIN));
+    await expect(status(me, at(2 * MIN))).resolves.toMatchObject({
+      data: { linked: true, code: { state: "waiting", secondsLeft: TTL_S } },
+    });
+    await expect(redeem(second, at(3 * MIN))).resolves.toMatchObject({
+      ok: true,
+    });
+    expect((await row(me)).telegramUserId).toBe(TG);
+    await expect(status(me, at(3 * MIN))).resolves.toEqual({
+      ok: true,
+      data: { linked: true, code: { state: "used", secondsLeft: 0 } },
+    });
+  });
+
+  it("a kiosk, MCP or brain actor gets FORBIDDEN, and a missing member NOT_FOUND", async () => {
+    const me = await seedMember(db());
+    for (const [actor] of await otherActors(me)) {
+      await expect(
+        runAction("get_telegram_link_status", {}, ctxFor(actor)),
+      ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    }
+    await expect(
+      runAction(
+        "get_telegram_link_status",
+        {},
+        ctxFor(kioskActor(me), { source: "kiosk" }),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
+    await expect(
+      status("00000000-0000-4000-8000-000000000000"),
+    ).resolves.toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
 });

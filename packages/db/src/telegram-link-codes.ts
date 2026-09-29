@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNull } from "drizzle-orm";
 import type { Queryable } from "./index";
 import { telegramLinkCodes } from "./schema";
 
@@ -58,4 +58,47 @@ export async function claimTelegramLinkCode(
     )
     .returning({ memberId: telegramLinkCodes.memberId });
   return row ?? null;
+}
+
+/** Where a member's newest link code stands (issue #118). */
+export type TelegramLinkCodeState = "waiting" | "used" | "expired";
+
+/**
+ * The member's newest link code, as Settings watches it (issue #118):
+ * - `used` once it, or any older code of theirs, was redeemed after it was
+ *   made, so "Linked" shows even when the member relinks the Telegram
+ *   account they already had;
+ * - `expired` from its expiry on (claimTelegramLinkCode's own boundary);
+ * - else `waiting`, with the milliseconds it has left by the server's clock.
+ * Null when the member never made a code.
+ */
+export async function latestTelegramLinkCodeState(
+  db: Queryable,
+  input: { memberId: string; now: Date },
+): Promise<{ state: TelegramLinkCodeState; msLeft: number } | null> {
+  const [latest] = await db
+    .select({
+      createdAt: telegramLinkCodes.createdAt,
+      expiresAt: telegramLinkCodes.expiresAt,
+    })
+    .from(telegramLinkCodes)
+    .where(eq(telegramLinkCodes.memberId, input.memberId))
+    .orderBy(desc(telegramLinkCodes.createdAt))
+    .limit(1);
+  if (!latest) return null;
+  const [used] = await db
+    .select({ usedAt: telegramLinkCodes.usedAt })
+    .from(telegramLinkCodes)
+    .where(
+      and(
+        eq(telegramLinkCodes.memberId, input.memberId),
+        gte(telegramLinkCodes.usedAt, latest.createdAt),
+      ),
+    )
+    .limit(1);
+  if (used) return { state: "used", msLeft: 0 };
+  const msLeft = latest.expiresAt.getTime() - input.now.getTime();
+  return msLeft > 0
+    ? { state: "waiting", msLeft }
+    : { state: "expired", msLeft: 0 };
 }

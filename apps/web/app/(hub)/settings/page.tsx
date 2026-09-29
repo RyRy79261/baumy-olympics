@@ -6,6 +6,8 @@ import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { members } from "@baumy/db/schema";
 import { Card, FormMessage, PageHeading } from "@baumy/ui";
 import { avatarFor } from "@baumy/types";
+import { runAction } from "@/lib/actions/registry";
+import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { activeCharacters } from "@/lib/members/characters";
 import { telegramBotUsername } from "@/lib/telegram/deep-link";
@@ -26,10 +28,14 @@ export default async function SettingsPage() {
     .select({
       kioskPinHash: members.kioskPinHash,
       kioskPinLockedAt: members.kioskPinLockedAt,
-      telegramUserId: members.telegramUserId,
     })
     .from(members)
     .where(eq(members.id, me.memberId));
+  const telegram = await runAction(
+    "get_telegram_link_status",
+    {},
+    (await uiRequestCtx(undefined))!,
+  );
 
   return (
     <>
@@ -65,7 +71,7 @@ export default async function SettingsPage() {
         </Card>
         <KioskPinForm hasPin={Boolean(row?.kioskPinHash)} />
         <TelegramLinkForm
-          telegramUserId={row?.telegramUserId ?? null}
+          linked={telegram.ok && telegram.data.linked}
           botUsername={telegramBotUsername()}
         />
         <Card
