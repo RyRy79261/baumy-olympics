@@ -40,7 +40,7 @@ const STATE_LABEL = {
 export default async function AdminMembersPage() {
   const me = await requireAdminPage();
   const db = createHttpDb() as unknown as Queryable;
-  const [people, codes, devices, { characters, images }] = await Promise.all([
+  const [people, codes, devices, { characters, sprites }] = await Promise.all([
     listMembers(db, HOUSEHOLD_ID),
     listInviteCodes(db, HOUSEHOLD_ID),
     listKioskDevices(db, HOUSEHOLD_ID),
@@ -71,7 +71,7 @@ export default async function AdminMembersPage() {
                 isMe={m.id === me.memberId}
                 telegramUserId={m.telegramUserId}
                 character={characters.get(m.id)}
-                image={images.get(m.id)}
+                sprites={sprites.get(m.id)}
               />
             ))}
           </ul>

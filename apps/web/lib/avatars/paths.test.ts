@@ -23,14 +23,27 @@ describe("avatar paths", () => {
     }
   });
 
-  it("draws a stored sprite through the proxy only", () => {
-    expect(
-      avatarImageView({ pathname: "avatars/x/y.png", width: 28, height: 56 }),
-    ).toEqual({
-      src: "/api/blob?pathname=avatars%2Fx%2Fy.png",
+  it("draws a stored set through the proxy only, missing poses null", () => {
+    const pose = (n: string) => ({
+      pathname: `avatars/x/${n}.png`,
       width: 28,
       height: 56,
     });
+    const view = (n: string) => ({
+      src: `/api/blob?pathname=avatars%2Fx%2F${n}.png`,
+      width: 28,
+      height: 56,
+    });
+    expect(avatarImageView({ poses: { idle: pose("i") } })).toEqual({
+      idle: view("i"),
+      walk: null,
+      emote: null,
+    });
+    expect(
+      avatarImageView({
+        poses: { idle: pose("i"), walk: pose("w"), emote: pose("e") },
+      }),
+    ).toEqual({ idle: view("i"), walk: view("w"), emote: view("e") });
     expect(avatarImageView(null)).toBeNull();
   });
 });

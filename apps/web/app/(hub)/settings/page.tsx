@@ -63,7 +63,7 @@ export default async function SettingsPage() {
             options={live.map((a) => ({
               id: a.id,
               name: a.name,
-              image: avatarImageView(a)!,
+              sprites: avatarImageView(a)!,
             }))}
             picked={row?.avatarImageId ?? ""}
             archivedName={worn?.archivedAt ? worn.name : undefined}

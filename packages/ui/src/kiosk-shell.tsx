@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cx } from "./cx";
-import type { AvatarImage } from "@baumy/types";
+import type { AvatarSprites } from "@baumy/types";
 import { MemberCharacter } from "./member-character";
 import { Sprite } from "./sprite";
 
@@ -84,8 +84,10 @@ export interface AvatarButtonProps extends ButtonHTMLAttributes<HTMLButtonElemen
    */
   avatar?: unknown;
   /** Their gallery sprite (issue #111), drawn instead when they picked one. */
-  image?: AvatarImage | null;
+  sprites?: AvatarSprites | null;
   memberId?: string;
+  /** Drawn instead of the character (the acting member's score emote). */
+  character?: ReactNode;
   /** This member is the one acting now. */
   selected?: boolean;
 }
@@ -97,8 +99,9 @@ export function AvatarButton({
   color,
   selected = false,
   avatar,
-  image,
+  sprites,
   memberId,
+  character,
   className,
   type = "button",
   ...props
@@ -117,9 +120,11 @@ export function AvatarButton({
       style={selected ? { ["--pf" as string]: color } : undefined}
       {...props}
     >
-      {memberId ? (
+      {character ? (
+        character
+      ) : memberId ? (
         <MemberCharacter
-          image={image}
+          sprites={sprites}
           avatar={avatar}
           memberId={memberId}
           scale={2}

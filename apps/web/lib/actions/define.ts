@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type { Queryable } from "@baumy/db";
-import type { Surface } from "@baumy/types";
+import type { AvatarPose, Surface } from "@baumy/types";
 import type { Actor } from "@/lib/auth";
 import type { ActionFailure } from "./result";
 
@@ -131,20 +131,21 @@ export interface RequestCtx {
    */
   photo?: { completionId: string; pathname: string };
   /**
-   * The image the avatar upload route (app/api/uploads/avatar) just received,
-   * for `preview_avatar` to clean. Only that route sets it, after checking
-   * its type and size; it never comes from an action's input.
+   * The files the avatar upload route (app/api/uploads/avatar) just received
+   * (one sheet, or one file per pose), for `preview_avatar` to clean. Only
+   * that route sets it, after checking their type and size; they never come
+   * from an action's input.
    */
-  avatarUpload?: { bytes: Uint8Array };
+  avatarUpload?: { files: Uint8Array[] };
   /**
-   * The cleaned sprite that route has just stored in Blob, for `add_avatar`
-   * to record. Like `photo`, no other surface can name one.
+   * The cleaned poses of a set that route has just stored in Blob, for
+   * `add_avatar` to record. Like `photo`, no other surface can name one.
    */
   avatarImage?: {
     avatarId: string;
-    pathname: string;
-    width: number;
-    height: number;
+    poses: Partial<
+      Record<AvatarPose, { pathname: string; width: number; height: number }>
+    >;
   };
   /** From lib/clock.ts, never `new Date()`. */
   now: Date;

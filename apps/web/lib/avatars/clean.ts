@@ -28,8 +28,11 @@ import "server-only";
 // loops over one RGBA buffer, so it is deterministic: the preview and the
 // save of the same file give the same sprite.
 
-/** The height a gallery sprite is sampled to (the issue's ~56px). */
-export const AVATAR_HEIGHT_PX = 56;
+/**
+ * The height a gallery set is sampled to by default: 64, as these sprites
+ * are more detailed than Baumy (owner ruling 2026-09-29; 48 and 56 on offer).
+ */
+export const AVATAR_HEIGHT_PX = 64;
 
 /** The most colours a gallery sprite keeps. */
 export const AVATAR_COLOURS = 24;
@@ -256,104 +259,6 @@ export function backgroundMask(
   return bg;
 }
 
-export interface Box {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
-
-/**
- * 1 for every pixel of the character: the largest 8-connected shape that is
- * not background, and every other shape that overlaps its box and is not a
- * speck (hair or a prop drawn apart from the body). A watermark in a corner
- * and stray pixels go. Null when nothing is left.
- */
-export function subjectMask(
-  width: number,
-  height: number,
-  bg: Uint8Array,
-): { mask: Uint8Array; box: Box } | null {
-  const size = width * height;
-  const label = new Int32Array(size).fill(-1);
-  const shapes: (Box & { n: number })[] = [];
-  const stack = new Int32Array(size);
-  for (let start = 0; start < size; start++) {
-    if (bg[start] || label[start]! >= 0) continue;
-    const id = shapes.length;
-    const shape = { x0: width, y0: height, x1: -1, y1: -1, n: 0 };
-    label[start] = id;
-    stack[0] = start;
-    let top = 1;
-    while (top > 0) {
-      const i = stack[--top]!;
-      const x = i % width;
-      const y = (i - x) / width;
-      shape.n += 1;
-      if (x < shape.x0) shape.x0 = x;
-      if (x > shape.x1) shape.x1 = x;
-      if (y < shape.y0) shape.y0 = y;
-      if (y > shape.y1) shape.y1 = y;
-      for (let dy = -1; dy <= 1; dy++) {
-        const ny = y + dy;
-        if (ny < 0 || ny >= height) continue;
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx;
-          if (nx < 0 || nx >= width) continue;
-          const j = ny * width + nx;
-          if (!bg[j] && label[j]! < 0) {
-            label[j] = id;
-            stack[top++] = j;
-          }
-        }
-      }
-    }
-    shapes.push(shape);
-  }
-  if (shapes.length === 0) return null;
-  const main = shapes.reduce((a, b) => (b.n > a.n ? b : a));
-  const speck = Math.max(4, main.n * 0.001);
-  const keep = shapes.map(
-    (s) =>
-      s === main ||
-      (s.n >= speck &&
-        s.x0 <= main.x1 &&
-        s.x1 >= main.x0 &&
-        s.y0 <= main.y1 &&
-        s.y1 >= main.y0),
-  );
-  const mask = new Uint8Array(size);
-  const box = { x0: width, y0: height, x1: -1, y1: -1 };
-  shapes.forEach((s, id) => {
-    if (!keep[id]) return;
-    box.x0 = Math.min(box.x0, s.x0);
-    box.y0 = Math.min(box.y0, s.y0);
-    box.x1 = Math.max(box.x1, s.x1);
-    box.y1 = Math.max(box.y1, s.y1);
-  });
-  for (let i = 0; i < size; i++) if (keep[label[i]!]) mask[i] = 1;
-  return { mask, box };
-}
-
-/** The character alone, trimmed to its box, alpha all-or-nothing. */
-export function cutOut(img: RgbaImage, mask: Uint8Array, box: Box): RgbaImage {
-  const width = box.x1 - box.x0 + 1;
-  const height = box.y1 - box.y0 + 1;
-  const data = new Uint8Array(width * height * 4);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (box.y0 + y) * img.width + box.x0 + x;
-      if (!mask[i]) continue;
-      const o = (y * width + x) * 4;
-      data[o] = img.data[i * 4]!;
-      data[o + 1] = img.data[i * 4 + 1]!;
-      data[o + 2] = img.data[i * 4 + 2]!;
-      data[o + 3] = 255;
-    }
-  }
-  return { data, width, height };
-}
-
 /**
  * The size of one art pixel when the image is an exact whole-number blow-up
  * of a smaller sprite: the largest k (2 to 64) that divides both sides and
@@ -399,74 +304,189 @@ export function gridSize(img: RgbaImage): number {
   return 1;
 }
 
+export interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** One character found in an image: its pixels (`mask`) and their box. */
+export interface Figure {
+  mask: Uint8Array;
+  box: Box;
+}
+
 /**
- * Nearest-neighbour resample to `width` × `height`, each output pixel taken
- * from the centre of the source area it covers (so an exact k× blow-up comes
- * back pixel for pixel).
+ * The characters in an image, left to right: at most `max` of them. Every
+ * 8-connected shape that is not background is labelled; the largest shapes
+ * (each at least 15% of the biggest) are the characters, and every smaller
+ * shape that is not a speck and overlaps one of their boxes (hair, a hand
+ * drawn apart from the body) joins the first it overlaps. A watermark in a
+ * corner, and stray pixels, join nothing and go.
  */
-export function sample(
-  img: RgbaImage,
+export function findFigures(
   width: number,
   height: number,
-): RgbaImage {
+  bg: Uint8Array,
+  max: number,
+): Figure[] {
+  const size = width * height;
+  const label = new Int32Array(size).fill(-1);
+  const shapes: (Box & { n: number })[] = [];
+  const stack = new Int32Array(size);
+  for (let start = 0; start < size; start++) {
+    if (bg[start] || label[start]! >= 0) continue;
+    const id = shapes.length;
+    const shape = { x0: width, y0: height, x1: -1, y1: -1, n: 0 };
+    label[start] = id;
+    stack[0] = start;
+    let top = 1;
+    while (top > 0) {
+      const i = stack[--top]!;
+      const x = i % width;
+      const y = (i - x) / width;
+      shape.n += 1;
+      if (x < shape.x0) shape.x0 = x;
+      if (x > shape.x1) shape.x1 = x;
+      if (y < shape.y0) shape.y0 = y;
+      if (y > shape.y1) shape.y1 = y;
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = y + dy;
+        if (ny < 0 || ny >= height) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          if (nx < 0 || nx >= width) continue;
+          const j = ny * width + nx;
+          if (!bg[j] && label[j]! < 0) {
+            label[j] = id;
+            stack[top++] = j;
+          }
+        }
+      }
+    }
+    shapes.push(shape);
+  }
+  if (shapes.length === 0) return [];
+  const biggest = Math.max(...shapes.map((s) => s.n));
+  const mains = shapes
+    .map((s, id) => ({ s, id }))
+    .filter(({ s }) => s.n >= biggest * 0.15)
+    .sort((a, b) => b.s.n - a.s.n)
+    .slice(0, max)
+    .sort((a, b) => a.s.x0 - b.s.x0);
+  const figureOf = new Int32Array(shapes.length).fill(-1);
+  const boxes = mains.map(({ s, id }) => {
+    figureOf[id] = mains.findIndex((m) => m.id === id);
+    return { x0: s.x0, y0: s.y0, x1: s.x1, y1: s.y1 };
+  });
+  const speck = Math.max(4, biggest * 0.001);
+  const pad = Math.round(Math.max(width, height) * 0.01);
+  shapes.forEach((s, id) => {
+    if (figureOf[id]! >= 0 || s.n < speck) return;
+    const f = mains.findIndex(
+      ({ s: m }) =>
+        s.x0 <= m.x1 + pad &&
+        s.x1 >= m.x0 - pad &&
+        s.y0 <= m.y1 + pad &&
+        s.y1 >= m.y0 - pad,
+    );
+    if (f < 0) return;
+    figureOf[id] = f;
+    const b = boxes[f]!;
+    b.x0 = Math.min(b.x0, s.x0);
+    b.y0 = Math.min(b.y0, s.y0);
+    b.x1 = Math.max(b.x1, s.x1);
+    b.y1 = Math.max(b.y1, s.y1);
+  });
+  return boxes.map((box, f) => {
+    const mask = new Uint8Array(size);
+    for (let i = 0; i < size; i++) {
+      if (label[i]! >= 0 && figureOf[label[i]!] === f) mask[i] = 1;
+    }
+    return { mask, box };
+  });
+}
+
+/** One character alone, trimmed to its box, alpha all-or-nothing. */
+export function cutOut(img: RgbaImage, figure: Figure): RgbaImage {
+  const { box, mask } = figure;
+  const width = box.x1 - box.x0 + 1;
+  const height = box.y1 - box.y0 + 1;
   const data = new Uint8Array(width * height * 4);
-  const sx = img.width / width;
-  const sy = img.height / height;
   for (let y = 0; y < height; y++) {
-    const from = Math.min(img.height - 1, Math.floor((y + 0.5) * sy));
     for (let x = 0; x < width; x++) {
-      const fx = Math.min(img.width - 1, Math.floor((x + 0.5) * sx));
-      const s = (from * img.width + fx) * 4;
+      const i = (box.y0 + y) * img.width + box.x0 + x;
+      if (!mask[i]) continue;
       const o = (y * width + x) * 4;
-      data[o] = img.data[s]!;
-      data[o + 1] = img.data[s + 1]!;
-      data[o + 2] = img.data[s + 2]!;
-      data[o + 3] = img.data[s + 3]!;
+      data[o] = img.data[i * 4]!;
+      data[o + 1] = img.data[i * 4 + 1]!;
+      data[o + 2] = img.data[i * 4 + 2]!;
+      data[o + 3] = 255;
     }
   }
   return { data, width, height };
 }
 
-/** Snap to the art's own grid, or sample down to `target` rows. */
-export function snapToGrid(img: RgbaImage, target: number): RgbaImage {
-  const k = gridSize(img);
-  let out = k > 1 ? sample(img, img.width / k, img.height / k) : img;
-  if (out.height > target) {
-    const width = Math.max(1, Math.round((out.width * target) / out.height));
-    out = sample(out, width, target);
-  }
-  return out;
-}
+/** RGB of pixel `i` as one number. */
+const rgbAt = (img: RgbaImage, i: number) =>
+  (img.data[i * 4]! << 16) | (img.data[i * 4 + 1]! << 8) | img.data[i * 4 + 2]!;
+
+const channel = (c: number, ch: number) => (c >> (16 - 8 * ch)) & 255;
 
 /**
- * At most `colours` colours, by median cut over the opaque pixels: the box
- * of colours with the widest spread is split at its median, along its widest
- * channel, until there are enough boxes; each pixel then takes the average
- * of its box. No dithering, so flat areas stay flat. (sharp's palette option
- * only sets a bit depth, so 24 would really mean 256.)
+ * At most `colours` colours for all of `imgs` together, by median cut over
+ * their opaque pixels: the box of colours with the widest spread is split at
+ * its median, along its widest channel, until there are enough; each box's
+ * colour is its pixels' average. When the images have few enough colours
+ * already, those exact colours. Past a few thousand distinct colours (a
+ * photo, JPEG noise) the colours are first grouped 5 bits a channel, so the
+ * cut stays quick. (sharp's palette option only sets a bit depth, so 24
+ * would really mean 256.)
  */
-export function limitPalette(img: RgbaImage, colours: number): RgbaImage {
-  const counts = new Map<number, number>();
-  const n = img.width * img.height;
-  const rgb = (i: number) =>
-    (img.data[i * 4]! << 16) |
-    (img.data[i * 4 + 1]! << 8) |
-    img.data[i * 4 + 2]!;
-  for (let i = 0; i < n; i++) {
-    if (img.data[i * 4 + 3]) counts.set(rgb(i), (counts.get(rgb(i)) ?? 0) + 1);
+export function sharedPalette(
+  imgs: readonly RgbaImage[],
+  colours: number,
+): number[] {
+  const exact = new Map<number, number>();
+  for (const img of imgs) {
+    for (let i = 0; i < img.width * img.height; i++) {
+      if (img.data[i * 4 + 3]) {
+        const c = rgbAt(img, i);
+        exact.set(c, (exact.get(c) ?? 0) + 1);
+      }
+    }
   }
-  if (counts.size <= colours) return img;
+  if (exact.size <= colours) return [...exact.keys()];
 
-  type ColourBox = { c: number[]; spread: number; channel: number };
-  const channel = (c: number, ch: number) => (c >> (16 - 8 * ch)) & 255;
-  const measure = (c: number[]): ColourBox => {
+  // Bins of similar colours: their count and the sum of their colours.
+  type Bin = { n: number; r: number; g: number; b: number; key: number };
+  const bins = new Map<number, Bin>();
+  const grouped = exact.size > 4096;
+  for (const [c, n] of exact) {
+    const key = grouped
+      ? ((channel(c, 0) >> 3) << 10) |
+        ((channel(c, 1) >> 3) << 5) |
+        (channel(c, 2) >> 3)
+      : c;
+    const bin = bins.get(key) ?? { n: 0, r: 0, g: 0, b: 0, key };
+    bin.n += n;
+    bin.r += channel(c, 0) * n;
+    bin.g += channel(c, 1) * n;
+    bin.b += channel(c, 2) * n;
+    bins.set(key, bin);
+  }
+  const mean = (b: Bin, ch: number) => [b.r, b.g, b.b][ch]! / b.n;
+
+  type ColourBox = { bins: Bin[]; spread: number; channel: number };
+  const measure = (list: Bin[]): ColourBox => {
     let spread = -1;
     let widest = 0;
     for (let ch = 0; ch < 3; ch++) {
       let lo = 255;
       let hi = 0;
-      for (const x of c) {
-        const v = channel(x, ch);
+      for (const b of list) {
+        const v = mean(b, ch);
         if (v < lo) lo = v;
         if (v > hi) hi = v;
       }
@@ -475,20 +495,21 @@ export function limitPalette(img: RgbaImage, colours: number): RgbaImage {
         widest = ch;
       }
     }
-    return { c, spread, channel: widest };
+    return { bins: list, spread, channel: widest };
   };
-  const boxes: ColourBox[] = [measure([...counts.keys()])];
+  const boxes: ColourBox[] = [measure([...bins.values()])];
   while (boxes.length < colours) {
     const box = boxes.reduce((a, b) => (b.spread > a.spread ? b : a));
-    const sorted = [...box.c].sort(
-      (a, b) => channel(a, box.channel) - channel(b, box.channel) || a - b,
+    if (box.bins.length < 2) break;
+    const sorted = [...box.bins].sort(
+      (a, b) => mean(a, box.channel) - mean(b, box.channel) || a.key - b.key,
     );
     // The median by pixel count, always leaving both halves a colour.
-    const total = sorted.reduce((s, c) => s + counts.get(c)!, 0);
+    const total = sorted.reduce((s, b) => s + b.n, 0);
     let seen = 0;
     let cut = 1;
     for (; cut < sorted.length - 1; cut++) {
-      seen += counts.get(sorted[cut - 1]!)!;
+      seen += sorted[cut - 1]!.n;
       if (seen >= total / 2) break;
     }
     boxes.splice(
@@ -498,50 +519,210 @@ export function limitPalette(img: RgbaImage, colours: number): RgbaImage {
       measure(sorted.slice(cut)),
     );
   }
-
-  const mapped = new Map<number, number[]>();
-  for (const box of boxes) {
-    const sum = [0, 0, 0];
-    let weight = 0;
-    for (const c of box.c) {
-      const w = counts.get(c)!;
-      for (let ch = 0; ch < 3; ch++) sum[ch]! += channel(c, ch) * w;
-      weight += w;
+  return boxes.map((box) => {
+    const s = [0, 0, 0];
+    let n = 0;
+    for (const b of box.bins) {
+      s[0]! += b.r;
+      s[1]! += b.g;
+      s[2]! += b.b;
+      n += b.n;
     }
-    const mean = sum.map((v) => Math.round(v / weight));
-    for (const c of box.c) mapped.set(c, mean);
-  }
-  const data = new Uint8Array(img.data);
-  for (let i = 0; i < n; i++) {
-    if (!data[i * 4 + 3]) continue;
-    data.set(mapped.get(rgb(i))!, i * 4);
-  }
-  return { data, width: img.width, height: img.height };
+    const [r, g, b] = s.map((v) => Math.round(v / n)) as [
+      number,
+      number,
+      number,
+    ];
+    return (r << 16) | (g << 8) | b;
+  });
 }
 
-export type CleanResult =
-  | { ok: true; png: Buffer; width: number; height: number }
+/**
+ * Each pixel of `img` as the index of its nearest palette colour, or -1 for
+ * a transparent one.
+ */
+export function toIndices(
+  img: RgbaImage,
+  palette: readonly number[],
+): Int16Array {
+  const out = new Int16Array(img.width * img.height);
+  const cache = new Map<number, number>();
+  for (let i = 0; i < out.length; i++) {
+    if (!img.data[i * 4 + 3]) {
+      out[i] = -1;
+      continue;
+    }
+    const c = rgbAt(img, i);
+    let best = cache.get(c);
+    if (best === undefined) {
+      let dist = Infinity;
+      best = 0;
+      for (let p = 0; p < palette.length; p++) {
+        const d =
+          (channel(c, 0) - channel(palette[p]!, 0)) ** 2 +
+          (channel(c, 1) - channel(palette[p]!, 1)) ** 2 +
+          (channel(c, 2) - channel(palette[p]!, 2)) ** 2;
+        if (d < dist) {
+          dist = d;
+          best = p;
+        }
+      }
+      cache.set(c, best);
+    }
+    out[i] = best;
+  }
+  return out;
+}
+
+/** Below this (the brightest channel), a pixel counts as an outline's. */
+export const DARK_MAX = 72;
+
+/**
+ * Sample `img` down to `width` × `height`. Each output pixel looks at the
+ * middle half of the source area it covers: opaque when most of it is, and
+ * then the commonest colour there (colours grouped 4 bits a channel, the
+ * group's average taken), so JPEG noise stays out and flat areas stay flat.
+ * If a third of that middle is dark, the commonest DARK colour wins: thin
+ * outlines are what makes a small sprite read, and they are the first thing
+ * plain sampling loses. An exact k× blow-up comes back pixel for pixel.
+ */
+export function sampleCells(
+  img: RgbaImage,
+  width: number,
+  height: number,
+): RgbaImage {
+  const { width: w, height: h } = img;
+  const data = new Uint8Array(width * height * 4);
+  const sx = w / width;
+  const sy = h / height;
+  const groups = new Map<number, number[]>();
+  for (let y = 0; y < height; y++) {
+    const ya = Math.floor(y * sy + sy / 4);
+    const yb = Math.min(h, Math.max(ya + 1, Math.ceil((y + 1) * sy - sy / 4)));
+    for (let x = 0; x < width; x++) {
+      const xa = Math.floor(x * sx + sx / 4);
+      const xb = Math.min(
+        w,
+        Math.max(xa + 1, Math.ceil((x + 1) * sx - sx / 4)),
+      );
+      groups.clear();
+      let clear = 0;
+      let dark = 0;
+      let all = 0;
+      for (let yy = ya; yy < yb; yy++) {
+        for (let xx = xa; xx < xb; xx++) {
+          const i = (yy * w + xx) * 4;
+          all += 1;
+          if (img.data[i + 3]! < 128) {
+            clear += 1;
+            continue;
+          }
+          const r = img.data[i]!;
+          const g = img.data[i + 1]!;
+          const b = img.data[i + 2]!;
+          if (Math.max(r, g, b) <= DARK_MAX) dark += 1;
+          const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+          const sum = groups.get(key) ?? [0, 0, 0, 0];
+          sum[0]! += r;
+          sum[1]! += g;
+          sum[2]! += b;
+          sum[3]! += 1;
+          groups.set(key, sum);
+        }
+      }
+      if (clear * 2 > all) continue;
+      const wantDark = dark * 3 >= all - clear;
+      let best: number[] | null = null;
+      let bestKey = -1;
+      for (const [key, sum] of groups) {
+        const isDark =
+          Math.max(sum[0]!, sum[1]!, sum[2]!) / sum[3]! <= DARK_MAX;
+        if (wantDark && !isDark) continue;
+        if (
+          !best ||
+          sum[3]! > best[3]! ||
+          (sum[3] === best[3] && key < bestKey)
+        ) {
+          best = sum;
+          bestKey = key;
+        }
+      }
+      const o = (y * width + x) * 4;
+      data[o] = Math.round(best![0]! / best![3]!);
+      data[o + 1] = Math.round(best![1]! / best![3]!);
+      data[o + 2] = Math.round(best![2]! / best![3]!);
+      data[o + 3] = 255;
+    }
+  }
+  return { data, width, height };
+}
+
+/** Indexed pixels back to RGBA through `palette`. */
+function fromIndices(
+  src: Int16Array,
+  width: number,
+  height: number,
+  palette: readonly number[],
+): RgbaImage {
+  const data = new Uint8Array(width * height * 4);
+  for (let i = 0; i < src.length; i++) {
+    const v = src[i]!;
+    if (v < 0) continue;
+    const c = palette[v]!;
+    data[i * 4] = channel(c, 0);
+    data[i * 4 + 1] = channel(c, 1);
+    data[i * 4 + 2] = channel(c, 2);
+    data[i * 4 + 3] = 255;
+  }
+  return { data, width, height };
+}
+
+/**
+ * The size each character of a set is drawn at, all at ONE scale so their
+ * heights stay in proportion: when every one is an exact blow-up by the
+ * same k, their own pixels; else the tallest is sampled to `target` rows
+ * (or kept, when already no taller) and the rest by the same factor.
+ */
+export function setSizes(
+  cuts: readonly RgbaImage[],
+  target: number,
+): { width: number; height: number }[] {
+  const ks = cuts.map(gridSize);
+  const k = ks[0]!;
+  const tallest = Math.max(...cuts.map((c) => c.height));
+  if (k > 1 && ks.every((x) => x === k) && tallest / k <= target * 1.5) {
+    return cuts.map((c) => ({ width: c.width / k, height: c.height / k }));
+  }
+  const s = Math.min(1, target / tallest);
+  return cuts.map((c) => ({
+    width: Math.max(1, Math.round(c.width * s)),
+    height: Math.max(1, Math.round(c.height * s)),
+  }));
+}
+
+export interface CleanedFigure {
+  png: Buffer;
+  width: number;
+  height: number;
+}
+
+export type CleanSetResult =
+  | { ok: true; figures: CleanedFigure[] }
   | { ok: false; reason: "unreadable" | "empty" };
 
-/** Upload bytes in, a small palette PNG with true transparency out. */
-export async function cleanAvatar(
+type Sharp = (typeof import("sharp"))["default"];
+
+async function decode(
+  sharp: Sharp,
   bytes: Uint8Array,
-  options: { height?: number; colours?: number } = {},
-): Promise<CleanResult> {
-  const target = options.height ?? AVATAR_HEIGHT_PX;
-  // Loaded here, not at the top: the action registry imports this module on
-  // every route, and only an avatar upload needs the native image library.
-  const { default: sharp } = await import("sharp");
-  let img: RgbaImage;
+): Promise<RgbaImage | null> {
   try {
     const input = sharp(bytes, {
       limitInputPixels: INPUT_MAX_PIXELS,
       failOn: "error",
     });
     const meta = await input.metadata();
-    if (!meta.format || !FORMATS.has(meta.format)) {
-      return { ok: false, reason: "unreadable" };
-    }
+    if (!meta.format || !FORMATS.has(meta.format)) return null;
     const { data, info } = await input
       .rotate()
       .resize({
@@ -554,28 +735,85 @@ export async function cleanAvatar(
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
-    img = {
+    return {
       data: new Uint8Array(data.buffer, data.byteOffset, data.length),
       width: info.width,
       height: info.height,
     };
   } catch {
-    return { ok: false, reason: "unreadable" };
+    return null;
+  }
+}
+
+/** The most characters one sheet may hold: idle, walk, emote. */
+export const SHEET_MAX_FIGURES = 3;
+
+/**
+ * A character SET in, its poses out, as small PNGs with true transparency.
+ * One file is a sheet of one to three characters side by side, returned
+ * left to right; several files are one character each, in their order.
+ * Every figure is cleaned at one scale, on one palette.
+ */
+export async function cleanAvatarSet(
+  files: readonly Uint8Array[],
+  options: { height?: number; colours?: number; maxFigures?: number } = {},
+): Promise<CleanSetResult> {
+  const target = options.height ?? AVATAR_HEIGHT_PX;
+  // Loaded here, not at the top: the action registry imports this module on
+  // every route, and only an avatar upload needs the native image library.
+  const { default: sharp } = await import("sharp");
+  const cuts: RgbaImage[] = [];
+  const sheet = files.length === 1;
+  for (const bytes of files) {
+    const img = await decode(sharp, bytes);
+    if (!img) return { ok: false, reason: "unreadable" };
+    const bg = backgroundMask(img, backgroundKeys(img));
+    const figures = findFigures(
+      img.width,
+      img.height,
+      bg,
+      sheet ? (options.maxFigures ?? SHEET_MAX_FIGURES) : 1,
+    );
+    if (figures.length === 0) return { ok: false, reason: "empty" };
+    for (const f of figures) cuts.push(cutOut(img, f));
   }
 
-  const bg = backgroundMask(img, backgroundKeys(img));
-  const subject = subjectMask(img.width, img.height, bg);
-  if (!subject) return { ok: false, reason: "empty" };
-  const sprite = limitPalette(
-    snapToGrid(cutOut(img, subject.mask, subject.box), target),
-    options.colours ?? AVATAR_COLOURS,
+  // Sampled first, then the palette is chosen from the small sprites, so a
+  // thin dark line counts as much as it will show.
+  const sizes = setSizes(cuts, target);
+  const smalls = cuts.map((cut, n) =>
+    sampleCells(cut, sizes[n]!.width, sizes[n]!.height),
   );
+  const palette = sharedPalette(smalls, options.colours ?? AVATAR_COLOURS);
+  const figures: CleanedFigure[] = [];
+  for (const small of smalls) {
+    const { width, height } = small;
+    const sprite = fromIndices(
+      toIndices(small, palette),
+      width,
+      height,
+      palette,
+    );
+    // Lossless: the colours are already the set's own few.
+    const png = await sharp(Buffer.from(sprite.data), {
+      raw: { width, height, channels: 4 },
+    })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    figures.push({ png, width, height });
+  }
+  return { ok: true, figures };
+}
 
-  // Lossless: the colours are already the sprite's own few.
-  const png = await sharp(Buffer.from(sprite.data), {
-    raw: { width: sprite.width, height: sprite.height, channels: 4 },
-  })
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-  return { ok: true, png, width: sprite.width, height: sprite.height };
+export type CleanResult =
+  | ({ ok: true } & CleanedFigure)
+  | { ok: false; reason: "unreadable" | "empty" };
+
+/** One image of one character in, one small PNG out. */
+export async function cleanAvatar(
+  bytes: Uint8Array,
+  options: { height?: number; colours?: number } = {},
+): Promise<CleanResult> {
+  const r = await cleanAvatarSet([bytes], { ...options, maxFigures: 1 });
+  return r.ok ? { ok: true, ...r.figures[0]! } : r;
 }

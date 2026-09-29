@@ -21,7 +21,7 @@ function Tile({ a }: { a: AvatarRow }) {
       data-testid={`gallery-${a.name}`}
       className="pixel-frame flex flex-col items-center gap-2 bg-bm-ink p-3"
     >
-      <MemberCharacter image={avatarImageView(a)} scale={4} label={a.name} />
+      <MemberCharacter sprites={avatarImageView(a)} scale={4} label={a.name} />
       <span className="max-w-full truncate font-label text-xs font-bold uppercase">
         {a.name}
       </span>

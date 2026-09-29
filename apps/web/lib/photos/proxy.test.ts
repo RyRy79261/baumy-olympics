@@ -29,7 +29,8 @@ function deps(over: Partial<ProxyDeps> = {}): ProxyDeps {
     getActor: async () => member,
     householdId: HOUSE,
     findPhoto: async (h, id) => (h === HOUSE && id === ID ? PATH : undefined),
-    findAvatar: async (h, id) => (h === HOUSE && id === AVATAR ? SPRITE : null),
+    findAvatar: async (h, id, p) =>
+      h === HOUSE && id === AVATAR && p === SPRITE ? SPRITE : null,
     store: memoryBlobStore(),
     ...over,
   };

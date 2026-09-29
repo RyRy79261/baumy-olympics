@@ -9,9 +9,10 @@ import {
   AvatarRef,
   ChooseAvatar,
   NewAvatar,
-  type AvatarImage,
+  PreviewAvatar,
+  type AvatarSprites,
 } from "@baumy/types";
-import { cleanAvatar } from "@/lib/avatars/clean";
+import { cleanAvatarSet } from "@/lib/avatars/clean";
 import { avatarImageView, avatarPathAvatarId } from "@/lib/avatars/paths";
 import type { ActionCtx } from "./define";
 import { defineAction } from "./define";
@@ -50,8 +51,8 @@ export async function pickableAvatar(
 export interface ChooseAvatarData {
   memberId: string;
   avatarId: string | null;
-  /** The sprite now worn, or null for the drawn character. */
-  image: AvatarImage | null;
+  /** The set now worn, or null for the drawn character. */
+  sprites: AvatarSprites | null;
 }
 
 export const chooseAvatar = defineAction({
@@ -67,18 +68,18 @@ export const chooseAvatar = defineAction({
   input: ChooseAvatar,
   async execute(ctx, { avatarId }) {
     const memberId = ctx.actor.memberId!;
-    let image: AvatarImage | null = null;
+    let sprites: AvatarSprites | null = null;
     if (avatarId !== null) {
       const refused = await pickableAvatar(ctx, avatarId);
       if (refused) return refused;
-      image = avatarImageView(
+      sprites = avatarImageView(
         await findAvatar(ctx.db, ctx.householdId, avatarId),
       );
     }
     if (!(await setMemberAvatarImage(ctx.db, memberId, avatarId))) {
       return fail("NOT_FOUND", "Your member profile was not found.");
     }
-    const data: ChooseAvatarData = { memberId, avatarId, image };
+    const data: ChooseAvatarData = { memberId, avatarId, sprites };
     return {
       ok: true,
       data,
@@ -87,31 +88,38 @@ export const chooseAvatar = defineAction({
   },
 });
 
-export interface PreviewAvatarData {
-  /** The cleaned sprite as a `data:image/png;base64,…` URL. */
+export interface PreviewFigure {
+  /** The cleaned figure as a `data:image/png;base64,…` URL. */
   preview: string;
   width: number;
   height: number;
+}
+
+export interface PreviewAvatarData {
+  /** The height asked for, in the sprites' own pixels. */
+  height: number;
+  /** Left to right on a sheet, or one per file in their order. */
+  figures: PreviewFigure[];
 }
 
 export const PNG_DATA_URL = "data:image/png;base64,";
 
 export const previewAvatar = defineAction({
   name: "preview_avatar",
-  title: "Clean an uploaded character",
+  title: "Clean an uploaded character set",
   description:
-    "Cleans the image just uploaded to the avatar gallery (background removed, trimmed, snapped to a pixel grid, palette limited) and returns the result without keeping it. Admins only, from the app's upload route.",
+    "Cleans the files just uploaded to the avatar gallery (one sheet of up to three poses side by side, or one file per pose): background removed, figures found and trimmed, all sampled at one scale to the height asked for, one palette. Returns the figures without keeping them. Admins only, from the app's upload route.",
   consent: "Clean characters for the household's gallery",
   kind: "read",
   risk: "safe",
   surfaces: ["ui"],
   requires: "admin",
-  input: z.strictObject({}),
-  async execute(ctx) {
-    if (!ctx.avatarUpload) {
+  input: PreviewAvatar,
+  async execute(ctx, { height }) {
+    if (!ctx.avatarUpload || ctx.avatarUpload.files.length === 0) {
       return fail("AVATAR_IMAGE_MISSING", "Choose an image to upload first.");
     }
-    const cleaned = await cleanAvatar(ctx.avatarUpload.bytes);
+    const cleaned = await cleanAvatarSet(ctx.avatarUpload.files, { height });
     if (!cleaned.ok) {
       return fail(
         "AVATAR_IMAGE_UNREADABLE",
@@ -121,9 +129,12 @@ export const previewAvatar = defineAction({
       );
     }
     const data: PreviewAvatarData = {
-      preview: PNG_DATA_URL + cleaned.png.toString("base64"),
-      width: cleaned.width,
-      height: cleaned.height,
+      height,
+      figures: cleaned.figures.map((f) => ({
+        preview: PNG_DATA_URL + f.png.toString("base64"),
+        width: f.width,
+        height: f.height,
+      })),
     };
     return { ok: true, data };
   },
@@ -132,14 +143,14 @@ export const previewAvatar = defineAction({
 export interface AddAvatarData {
   avatarId: string;
   name: string;
-  image: AvatarImage;
+  sprites: AvatarSprites;
 }
 
 export const addAvatar = defineAction({
   name: "add_avatar",
   title: "Add a character to the gallery",
   description:
-    "Adds the character just uploaded and cleaned to the household's gallery, under a name. Admins only, from the app's upload route.",
+    "Adds the character set just uploaded and cleaned (its idle pose, and walk and emote if given) to the household's gallery, under a name. Admins only, from the app's upload route.",
   consent: "Add characters to the household's gallery",
   kind: "write",
   risk: "safe",
@@ -148,18 +159,26 @@ export const addAvatar = defineAction({
   input: NewAvatar,
   async execute(ctx, { name }) {
     const stored = ctx.avatarImage;
-    if (!stored || avatarPathAvatarId(stored.pathname) !== stored.avatarId) {
-      return fail("AVATAR_IMAGE_MISSING", "Choose an image to upload first.");
+    const idle = stored?.poses.idle;
+    if (
+      !stored ||
+      !idle ||
+      Object.values(stored.poses).some(
+        (p) => avatarPathAvatarId(p.pathname) !== stored.avatarId,
+      )
+    ) {
+      return fail(
+        "AVATAR_IMAGE_MISSING",
+        "Choose an image with the idle pose first.",
+      );
     }
     const row = await insertAvatar(ctx.db, {
       id: stored.avatarId,
       householdId: ctx.householdId,
       name,
-      pathname: stored.pathname,
-      width: stored.width,
-      height: stored.height,
       createdBy: ctx.actor.memberId!,
       createdAt: ctx.now,
+      poses: { ...stored.poses, idle },
     });
     if (!row) {
       return fail("INVALID_STATE", "That character is already in the gallery.");
@@ -167,7 +186,7 @@ export const addAvatar = defineAction({
     const data: AddAvatarData = {
       avatarId: row.id,
       name,
-      image: avatarImageView(row)!,
+      sprites: avatarImageView(row)!,
     };
     return {
       ok: true,
@@ -175,12 +194,7 @@ export const addAvatar = defineAction({
       audit: {
         entity: "avatar",
         entityId: row.id,
-        payload: {
-          name,
-          pathname: row.pathname,
-          width: row.width,
-          height: row.height,
-        },
+        payload: { name, poses: row.poses },
       },
     };
   },

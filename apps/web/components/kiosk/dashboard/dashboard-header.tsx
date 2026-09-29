@@ -220,7 +220,7 @@ function MessagesModule({
                 data-testid={`message-${m.title}`}
                 who={
                   <MemberCharacter
-                    image={who.member?.image}
+                    sprites={who.member?.sprites}
                     avatar={who.member?.avatar}
                     memberId={m.authorId}
                     scale={4}

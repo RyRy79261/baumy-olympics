@@ -2,7 +2,7 @@ import type { Queryable } from "@baumy/db";
 import { listActiveMembers } from "@baumy/db/members";
 import {
   rosterAvatars,
-  type AvatarImage,
+  type AvatarSprites,
   type MemberAvatar,
 } from "@baumy/types";
 import { SHIRT_COLOURS } from "@baumy/ui";
@@ -42,13 +42,13 @@ export async function activeRoster(
   householdId: string,
 ): Promise<{
   characters: Map<string, MemberAvatar>;
-  images: Map<string, AvatarImage>;
+  sprites: Map<string, AvatarSprites>;
 }> {
   const people = await listActiveMembers(db, householdId);
-  const images = new Map<string, AvatarImage>();
+  const sprites = new Map<string, AvatarSprites>();
   for (const p of people) {
     const image = avatarImageView(p.avatarImage);
-    if (image) images.set(p.id, image);
+    if (image) sprites.set(p.id, image);
   }
-  return { characters: rosterAvatars(people), images };
+  return { characters: rosterAvatars(people), sprites };
 }

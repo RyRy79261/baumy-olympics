@@ -366,13 +366,12 @@ export const members = pgTable(
 );
 
 /**
- * The gallery of pre-generated pixel characters (issue #111). The owner makes
- * each one elsewhere and uploads it at /admin/avatars; the app only cleans it
- * (apps/web lib/avatars/clean.ts) and stores the result in the PRIVATE Blob
- * store at `pathname` (`avatars/{id}/{rand}.png`), served only through
- * /api/blob. `width` and `height` are the cleaned sprite's own pixels, so
- * every screen can draw it at a whole-number scale. Archived ones leave the
- * gallery but stay on whoever already picked them; rows are never deleted.
+ * The gallery of pre-generated pixel characters (issue #111), one row per
+ * character SET (its poses are `avatar_poses`). The owner makes each one
+ * elsewhere and uploads it at /admin/avatars; the app only cleans it (apps/web
+ * lib/avatars/clean.ts) and stores the poses in the PRIVATE Blob store,
+ * served only through /api/blob. Archived ones leave the gallery but stay on
+ * whoever already picked them; rows are never deleted.
  */
 export const avatars = pgTable(
   "avatars",
@@ -382,9 +381,6 @@ export const avatars = pgTable(
       .notNull()
       .references(() => households.id),
     name: text("name").notNull(),
-    pathname: text("pathname").notNull().unique(),
-    width: integer("width").notNull(),
-    height: integer("height").notNull(),
     createdBy: uuid("created_by")
       .notNull()
       .references((): AnyPgColumn => members.id),
@@ -393,9 +389,35 @@ export const avatars = pgTable(
       .defaultNow(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
+  (t) => [index("avatars_household_id_idx").on(t.householdId)],
+);
+
+/**
+ * The poses of one gallery character (owner ruling 2026-09-29): `idle`
+ * (standing, three-quarter; every set has it), `walk` and `emote`. All the
+ * poses of a set were cleaned together at one scale and on one palette.
+ * `pathname` is `avatars/{avatarId}/{rand}.png`; `width` and `height` are
+ * the sprite's own pixels.
+ */
+export const avatarPose = pgEnum("avatar_pose", ["idle", "walk", "emote"]);
+
+export const avatarPoses = pgTable(
+  "avatar_poses",
+  {
+    avatarId: uuid("avatar_id")
+      .notNull()
+      .references(() => avatars.id),
+    pose: avatarPose("pose").notNull(),
+    pathname: text("pathname").notNull().unique(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+  },
   (t) => [
-    index("avatars_household_id_idx").on(t.householdId),
-    check("avatars_size_positive", sql`${t.width} > 0 AND ${t.height} > 0`),
+    primaryKey({ columns: [t.avatarId, t.pose] }),
+    check(
+      "avatar_poses_size_positive",
+      sql`${t.width} > 0 AND ${t.height} > 0`,
+    ),
   ],
 );
 

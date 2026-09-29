@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
+import { insertAvatar } from "@baumy/db/avatars";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import {
   actionRequests,
@@ -330,19 +331,27 @@ describe("picking a gallery character on /join (issue #111)", () => {
   async function galleryAvatar(archived = false) {
     const admin = await seedMember(db(), { role: "admin" });
     const id = randomUUID();
-    await t
-      .db()
-      .insert(avatars)
-      .values({
-        id,
-        householdId: HOUSEHOLD_ID,
-        name: "Knight",
-        pathname: `avatars/${id}/a1b2c3d4e5f60718.png`,
-        width: 28,
-        height: 56,
-        createdBy: admin,
-        archivedAt: archived ? FIXED_NOW : null,
-      });
+    await insertAvatar(db(), {
+      id,
+      householdId: HOUSEHOLD_ID,
+      name: "Knight",
+      createdBy: admin,
+      createdAt: FIXED_NOW,
+      poses: {
+        idle: {
+          pathname: `avatars/${id}/a1b2c3d4e5f60718.png`,
+          width: 28,
+          height: 56,
+        },
+      },
+    });
+    if (archived) {
+      await t
+        .db()
+        .update(avatars)
+        .set({ archivedAt: FIXED_NOW })
+        .where(eq(avatars.id, id));
+    }
     return id;
   }
 

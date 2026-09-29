@@ -47,6 +47,7 @@ describe("useTestDb", () => {
       "action_requests",
       "ai_usage",
       "audit_events",
+      "avatar_poses",
       "avatars",
       "chore_rule_versions",
       "chores",

@@ -49,3 +49,32 @@ export interface AvatarImage {
   width: number;
   height: number;
 }
+
+/** A character's poses (owner ruling 2026-09-29), in sheet order. */
+export const AVATAR_POSES = ["idle", "walk", "emote"] as const;
+export type AvatarPose = (typeof AVATAR_POSES)[number];
+
+/** How tall a set is cleaned to, in its own pixels; the admin picks. */
+export const AVATAR_HEIGHTS = [48, 56, 64] as const;
+export const DEFAULT_AVATAR_HEIGHT = 64;
+
+/** `preview_avatar`: the height to clean the set to. */
+export const PreviewAvatar = z.strictObject({
+  height: z.coerce
+    .number()
+    .refine((h) => (AVATAR_HEIGHTS as readonly number[]).includes(h), {
+      message: "Pick 48, 56 or 64 pixels tall.",
+    })
+    .default(DEFAULT_AVATAR_HEIGHT)
+    .describe("The height to clean the character to, in its own pixels."),
+});
+
+/**
+ * A gallery character as a screen draws it: idle always; walk and emote
+ * when the set has them.
+ */
+export interface AvatarSprites {
+  idle: AvatarImage;
+  walk?: AvatarImage | null;
+  emote?: AvatarImage | null;
+}

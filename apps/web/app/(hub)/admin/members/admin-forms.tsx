@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AVATAR_SPRITES, type AvatarImage } from "@baumy/types";
+import { AVATAR_SPRITES, type AvatarSprites } from "@baumy/types";
 import {
   Button,
   Card,
@@ -127,7 +127,7 @@ export interface MemberRowProps {
    */
   character?: unknown;
   /** Their gallery sprite (issue #111), if they picked one. */
-  image?: AvatarImage | null;
+  sprites?: AvatarSprites | null;
 }
 
 /** One member: role, active or not, and how they look (manage_members). */
@@ -176,7 +176,7 @@ export function MemberControls(props: MemberRowProps) {
     >
       <div className="flex flex-wrap items-center gap-3">
         <MemberCharacter
-          image={props.image}
+          sprites={props.sprites}
           avatar={props.character}
           memberId={props.id}
           scale={2}

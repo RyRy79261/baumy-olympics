@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Queryable } from "@baumy/db";
-import { avatars, auditEvents, members } from "@baumy/db/schema";
+import { auditEvents, avatarPoses, avatars, members } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
 import { avatarPathname } from "@/lib/avatars/paths";
 import { photoProxyUrl } from "@/lib/photos/paths";
@@ -54,12 +54,15 @@ async function upload(): Promise<Uint8Array> {
   );
 }
 
-function stored(id = randomUUID()) {
+function stored(id = randomUUID(), walk = false) {
+  const pose = (n: string) => ({
+    pathname: avatarPathname(id, `a1b2c3d4e5f6071${n}`),
+    width: 28,
+    height: 56,
+  });
   return {
     avatarId: id,
-    pathname: avatarPathname(id, "a1b2c3d4e5f60718"),
-    width: 1,
-    height: 1,
+    poses: walk ? { idle: pose("0"), walk: pose("1") } : { idle: pose("0") },
   };
 }
 
@@ -84,17 +87,33 @@ async function wearing(memberId: string) {
 }
 
 describe("preview_avatar", () => {
-  it("cleans the uploaded image for an admin and keeps nothing", async () => {
+  it("cleans the uploaded files for an admin at the height asked, keeping nothing", async () => {
     const r = await runAction(
       "preview_avatar",
-      {},
-      adminCtx({ avatarUpload: { bytes: await upload() } }),
+      { height: "48" },
+      adminCtx({ avatarUpload: { files: [await upload(), await upload()] } }),
     );
-    // One flat colour: the largest grid that fits is 8px, so 2 × 3.
-    expect(r).toMatchObject({ ok: true, data: { width: 2, height: 3 } });
+    // One flat colour: the largest grid that fits is 8px, so 2 × 3, twice.
+    expect(r).toMatchObject({
+      ok: true,
+      data: {
+        height: 48,
+        figures: [
+          { width: 2, height: 3 },
+          { width: 2, height: 3 },
+        ],
+      },
+    });
     if (!r.ok) return;
-    expect(r.data.preview.startsWith(PNG_DATA_URL)).toBe(true);
+    expect(r.data.figures[0]!.preview.startsWith(PNG_DATA_URL)).toBe(true);
     expect(await t.db().select().from(avatars)).toEqual([]);
+    expect(
+      await runAction(
+        "preview_avatar",
+        { height: 50 },
+        adminCtx({ avatarUpload: { files: [await upload()] } }),
+      ),
+    ).toMatchObject({ ok: false, code: "INVALID_INPUT" });
   });
 
   it("needs an image from the upload route, and a readable one", async () => {
@@ -106,7 +125,7 @@ describe("preview_avatar", () => {
       await runAction(
         "preview_avatar",
         {},
-        adminCtx({ avatarUpload: { bytes: new Uint8Array([1, 2, 3]) } }),
+        adminCtx({ avatarUpload: { files: [new Uint8Array([1, 2, 3])] } }),
       ),
     ).toMatchObject({
       ok: false,
@@ -124,55 +143,64 @@ describe("preview_avatar", () => {
       await runAction(
         "preview_avatar",
         {},
-        adminCtx({ avatarUpload: { bytes: blank } }),
+        adminCtx({ avatarUpload: { files: [blank] } }),
       ),
     ).toMatchObject({ ok: false, code: "AVATAR_IMAGE_UNREADABLE" });
   });
 
   it("is for admins on the UI only", async () => {
-    const bytes = await upload();
+    const files = [await upload()];
     expect(
       await runAction(
         "preview_avatar",
         {},
-        ctxFor(sessionActor(ryan), { avatarUpload: { bytes } }),
+        ctxFor(sessionActor(ryan), { avatarUpload: { files } }),
       ),
     ).toMatchObject({ ok: false, code: "FORBIDDEN" });
     expect(
       await runAction(
         "preview_avatar",
         {},
-        adminCtx({ source: "ai", avatarUpload: { bytes } }),
+        adminCtx({ source: "ai", avatarUpload: { files } }),
       ),
     ).toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
   });
 });
 
 describe("add_avatar", () => {
-  it("records the stored sprite under its name, audited", async () => {
-    const image = stored();
+  it("records the stored set under its name, audited", async () => {
+    const image = stored(randomUUID(), true);
     const r = await runAction(
       "add_avatar",
       { name: " Knight " },
-      adminCtx({ avatarImage: { ...image, width: 28, height: 56 } }),
+      adminCtx({ avatarImage: image }),
     );
+    const view = (p: { pathname: string }) => ({
+      src: photoProxyUrl(p.pathname),
+      width: 28,
+      height: 56,
+    });
     expect(r).toEqual({
       ok: true,
       data: {
         avatarId: image.avatarId,
         name: "Knight",
-        image: { src: photoProxyUrl(image.pathname), width: 28, height: 56 },
+        sprites: {
+          idle: view(image.poses.idle),
+          walk: view(image.poses.walk!),
+          emote: null,
+        },
       },
     });
     const [row] = await t.db().select().from(avatars);
     expect(row).toMatchObject({
       id: image.avatarId,
       name: "Knight",
-      pathname: image.pathname,
       createdBy: admin,
       createdAt: FIXED_NOW,
       archivedAt: null,
     });
+    expect(await t.db().select().from(avatarPoses)).toHaveLength(2);
     const [audit] = await t
       .db()
       .select()
@@ -190,11 +218,24 @@ describe("add_avatar", () => {
       await runAction("add_avatar", { name: "Knight" }, adminCtx()),
     ).toMatchObject({ ok: false, code: "AVATAR_IMAGE_MISSING" });
     const image = stored();
+    // Another set's pathname, or no idle pose.
     expect(
       await runAction(
         "add_avatar",
         { name: "Knight" },
         adminCtx({ avatarImage: { ...image, avatarId: randomUUID() } }),
+      ),
+    ).toMatchObject({ ok: false, code: "AVATAR_IMAGE_MISSING" });
+    expect(
+      await runAction(
+        "add_avatar",
+        { name: "Knight" },
+        adminCtx({
+          avatarImage: {
+            avatarId: image.avatarId,
+            poses: { walk: image.poses.idle },
+          },
+        }),
       ),
     ).toMatchObject({ ok: false, code: "AVATAR_IMAGE_MISSING" });
     expect(await t.db().select().from(avatars)).toEqual([]);
@@ -301,7 +342,11 @@ describe("choose_avatar", () => {
     );
     expect(r).toMatchObject({
       ok: true,
-      data: { memberId: ryan, avatarId: id, image: { width: 1, height: 1 } },
+      data: {
+        memberId: ryan,
+        avatarId: id,
+        sprites: { idle: { width: 28, height: 56 } },
+      },
     });
     expect(await wearing(ryan)).toBe(id);
     // Two members may wear the same one.
@@ -322,7 +367,7 @@ describe("choose_avatar", () => {
       ),
     ).toEqual({
       ok: true,
-      data: { memberId: ryan, avatarId: null, image: null },
+      data: { memberId: ryan, avatarId: null, sprites: null },
     });
     expect(await wearing(ryan)).toBeNull();
     const [audit] = await t

@@ -14,7 +14,9 @@ import {
 } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
+import { StandingName } from "@/components/scores/standing-name";
 import { requireMemberPage } from "@/lib/auth";
+import { activeRoster } from "@/lib/members/characters";
 import {
   breakdownLabel,
   disputeLabel,
@@ -63,6 +65,10 @@ export default async function ScoresPage() {
     data.disputesThisMonth.members.map((d) => [d.memberId, d]),
   );
   const leader = data.standings.find((s) => s.memberId === data.leaderId);
+  const roster = await activeRoster(
+    createHttpDb() as unknown as Queryable,
+    ctx.householdId,
+  );
   const members = isAdmin
     ? await listActiveMembers(
         createHttpDb() as unknown as Queryable,
@@ -98,7 +104,14 @@ export default async function ScoresPage() {
               {data.standings.map((s) => (
                 <tr key={s.memberId} data-testid={`standing-${s.displayName}`}>
                   <Td numeric>{s.rank}</Td>
-                  <Td>{s.displayName}</Td>
+                  <Td>
+                    <StandingName
+                      memberId={s.memberId}
+                      name={s.displayName}
+                      leader={s.memberId === data.leaderId}
+                      roster={roster}
+                    />
+                  </Td>
                   <Td numeric>
                     <Points points={s.points} provisional={s.provisionalPts} />
                   </Td>

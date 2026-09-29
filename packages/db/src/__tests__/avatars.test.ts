@@ -7,18 +7,21 @@ import {
   findAvatarPathname,
   insertAvatar,
   listAvatars,
+  posesFor,
   setAvatarArchived,
   setMemberAvatarImage,
+  type PoseRefs,
 } from "../avatars";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import { listActiveMembers } from "../members";
 import { listActiveReminders } from "../reminders";
-import { members } from "../schema";
+import { avatarPoses, members } from "../schema";
 import { useTestDb } from "./_harness";
 
-// The avatar gallery (issue #111): add, list, archive and restore, and the
-// member's pick showing up in the rosters every screen reads.
+// The avatar gallery (issue #111): sets of poses; add, list, archive and
+// restore, and the member's pick showing up in the rosters every screen
+// reads.
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -42,38 +45,50 @@ beforeEach(async () => {
   admin = row!.id;
 });
 
-async function add(name: string, at = NOW) {
+const pose = (id: string, name: string, height = 64) => ({
+  pathname: `avatars/${id}/${name}000000000000.png`,
+  width: 30,
+  height,
+});
+
+async function add(name: string, at = NOW, full = false) {
   const id = randomUUID();
+  const poses: PoseRefs = full
+    ? {
+        idle: pose(id, "idle"),
+        walk: pose(id, "walk", 63),
+        emote: pose(id, "emot", 62),
+      }
+    : { idle: pose(id, "idle") };
   const row = await insertAvatar(db(), {
     id,
     householdId: HOUSEHOLD_ID,
     name,
-    pathname: `avatars/${id}/abcdefgh12345678.png`,
-    width: 28,
-    height: 56,
     createdBy: admin,
     createdAt: at,
+    poses,
   });
   return row!;
 }
 
 describe("insertAvatar and listAvatars", () => {
-  it("adds sprites and lists them oldest first, with who wears them", async () => {
+  it("adds sets with their poses and lists them oldest first, with who wears them", async () => {
     const a = await add("Knight", new Date("2026-09-29T09:00:00Z"));
-    const b = await add("Mage");
-    expect(a).toEqual({
-      id: a.id,
-      pathname: `avatars/${a.id}/abcdefgh12345678.png`,
-      width: 28,
-      height: 56,
-    });
+    const b = await add("Harper", NOW, true);
+    expect(a.poses).toEqual({ idle: pose(a.id, "idle") });
     await setMemberAvatarImage(db(), admin, b.id);
     const listed = await listAvatars(db(), HOUSEHOLD_ID);
     expect(listed.map((r) => [r.name, r.wornBy])).toEqual([
       ["Knight", 0],
-      ["Mage", 1],
+      ["Harper", 1],
     ]);
-    expect(listed[0]).toMatchObject({ archivedAt: null, width: 28 });
+    expect(listed[1]!.poses).toEqual(b.poses);
+    expect(Object.keys(listed[1]!.poses).sort()).toEqual([
+      "emote",
+      "idle",
+      "walk",
+    ]);
+    expect(listed[0]).toMatchObject({ archivedAt: null });
     expect(await countLiveAvatars(db(), HOUSEHOLD_ID)).toBe(2);
   });
 
@@ -83,32 +98,38 @@ describe("insertAvatar and listAvatars", () => {
       id: a.id,
       householdId: HOUSEHOLD_ID,
       name: "Other",
-      pathname: "avatars/x/other.png",
-      width: 1,
-      height: 1,
       createdBy: admin,
       createdAt: NOW,
+      poses: { idle: pose(a.id, "othr") },
     });
     expect(again).toBeNull();
     expect((await listAvatars(db(), HOUSEHOLD_ID)).map((r) => r.name)).toEqual([
       "Knight",
     ]);
   });
+
+  it("posesFor skips a set with no idle pose, and nothing asked is nothing", async () => {
+    const a = await add("Knight");
+    await t.db().delete(avatarPoses).where(eq(avatarPoses.avatarId, a.id));
+    expect((await posesFor(db(), [a.id])).size).toBe(0);
+    expect((await posesFor(db(), [])).size).toBe(0);
+    expect(await listAvatars(db(), HOUSEHOLD_ID)).toEqual([]);
+  });
 });
 
 describe("setAvatarArchived", () => {
-  it("archives a live sprite and restores it, compare-and-set", async () => {
+  it("archives a live set and restores it, compare-and-set", async () => {
     const a = await add("Knight");
     const live = await add("Mage");
-
-    expect(
-      await setAvatarArchived(db(), {
+    const set = (archived: boolean) =>
+      setAvatarArchived(db(), {
         householdId: HOUSEHOLD_ID,
         avatarId: a.id,
-        archived: true,
+        archived,
         now: NOW,
-      }),
-    ).toEqual({ ok: true, name: "Knight" });
+      });
+
+    expect(await set(true)).toEqual({ ok: true, name: "Knight" });
     expect(
       (await listAvatars(db(), HOUSEHOLD_ID, false)).map((r) => r.id),
     ).toEqual([live.id]);
@@ -119,37 +140,14 @@ describe("setAvatarArchived", () => {
     expect((await findAvatar(db(), HOUSEHOLD_ID, a.id))?.archivedAt).toEqual(
       NOW,
     );
-
     // Archiving it again lost the race.
-    expect(
-      await setAvatarArchived(db(), {
-        householdId: HOUSEHOLD_ID,
-        avatarId: a.id,
-        archived: true,
-        now: NOW,
-      }),
-    ).toEqual({ ok: false, code: "STALE" });
-
-    expect(
-      await setAvatarArchived(db(), {
-        householdId: HOUSEHOLD_ID,
-        avatarId: a.id,
-        archived: false,
-        now: NOW,
-      }),
-    ).toEqual({ ok: true, name: "Knight" });
-    expect(
-      await setAvatarArchived(db(), {
-        householdId: HOUSEHOLD_ID,
-        avatarId: a.id,
-        archived: false,
-        now: NOW,
-      }),
-    ).toEqual({ ok: false, code: "STALE" });
+    expect(await set(true)).toEqual({ ok: false, code: "STALE" });
+    expect(await set(false)).toEqual({ ok: true, name: "Knight" });
+    expect(await set(false)).toEqual({ ok: false, code: "STALE" });
     expect(await countLiveAvatars(db(), HOUSEHOLD_ID)).toBe(2);
   });
 
-  it("is NOT_FOUND for a sprite that does not exist", async () => {
+  it("is NOT_FOUND for a set that does not exist", async () => {
     expect(
       await setAvatarArchived(db(), {
         householdId: HOUSEHOLD_ID,
@@ -162,9 +160,8 @@ describe("setAvatarArchived", () => {
 });
 
 describe("a member's pick", () => {
-  it("shows in the rosters, and comes off again", async () => {
-    const a = await add("Knight");
-    const ref = { id: a.id, pathname: a.pathname, width: 28, height: 56 };
+  it("shows in the rosters with every pose, and comes off again", async () => {
+    const a = await add("Harper", NOW, true);
     expect((await listActiveMembers(db(), HOUSEHOLD_ID))[0]).toMatchObject({
       id: admin,
       avatarImage: null,
@@ -173,11 +170,11 @@ describe("a member's pick", () => {
     expect(await setMemberAvatarImage(db(), admin, a.id)).toBe(true);
     expect((await listActiveMembers(db(), HOUSEHOLD_ID))[0]).toMatchObject({
       id: admin,
-      avatarImage: ref,
+      avatarImage: a,
     });
     expect(
       (await listActiveReminders(db(), HOUSEHOLD_ID)).members[0],
-    ).toMatchObject({ id: admin, avatarImage: ref });
+    ).toMatchObject({ id: admin, avatarImage: a });
 
     // Archived, it stays on whoever wears it.
     await setAvatarArchived(db(), {
@@ -188,15 +185,9 @@ describe("a member's pick", () => {
     });
     expect(
       (await listActiveMembers(db(), HOUSEHOLD_ID))[0]?.avatarImage,
-    ).toEqual(ref);
+    ).toEqual(a);
 
     expect(await setMemberAvatarImage(db(), admin, null)).toBe(true);
-    const [row] = await t
-      .db()
-      .select({ id: members.avatarImageId })
-      .from(members)
-      .where(eq(members.id, admin));
-    expect(row?.id).toBeNull();
     expect(
       (await listActiveReminders(db(), HOUSEHOLD_ID)).members[0]?.avatarImage,
     ).toBeNull();
@@ -206,12 +197,13 @@ describe("a member's pick", () => {
     expect(await setMemberAvatarImage(db(), randomUUID(), null)).toBe(false);
   });
 
-  it("finds a sprite's pathname for the proxy, in its household only", async () => {
-    const a = await add("Knight");
-    expect(await findAvatarPathname(db(), HOUSEHOLD_ID, a.id)).toBe(a.pathname);
-    expect(
-      await findAvatarPathname(db(), HOUSEHOLD_ID, randomUUID()),
-    ).toBeNull();
+  it("finds a pose's pathname for the proxy, in its set and household only", async () => {
+    const a = await add("Harper", NOW, true);
+    const b = await add("Knight");
+    const walk = a.poses.walk!.pathname;
+    expect(await findAvatarPathname(db(), HOUSEHOLD_ID, a.id, walk)).toBe(walk);
+    expect(await findAvatarPathname(db(), HOUSEHOLD_ID, b.id, walk)).toBeNull();
+    expect(await findAvatarPathname(db(), randomUUID(), a.id, walk)).toBeNull();
     expect(await findAvatar(db(), HOUSEHOLD_ID, randomUUID())).toBeNull();
   });
 });

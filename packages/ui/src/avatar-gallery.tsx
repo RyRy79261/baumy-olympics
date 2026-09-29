@@ -1,4 +1,4 @@
-import type { AvatarImage } from "@baumy/types";
+import type { AvatarSprites } from "@baumy/types";
 import type { ReactNode } from "react";
 import { cx } from "./cx";
 import { MemberCharacter } from "./member-character";
@@ -11,7 +11,7 @@ import { MemberCharacter } from "./member-character";
 export interface GalleryOption {
   id: string;
   name: string;
-  image: AvatarImage;
+  sprites: AvatarSprites;
 }
 
 const tile =
@@ -41,7 +41,7 @@ export function AvatarGallery({
     ...options.map((o) => ({
       id: o.id,
       name: o.name,
-      picture: <MemberCharacter image={o.image} scale={4} />,
+      picture: <MemberCharacter sprites={o.sprites} scale={4} />,
     })),
   ];
   return (
