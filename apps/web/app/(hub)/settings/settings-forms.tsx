@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   buttonClass,
@@ -13,8 +13,18 @@ import {
 import { PixelQr } from "@/components/account/pixel-qr";
 import { useActionForm } from "@/components/use-action-form";
 import { telegramLinkDeepLink } from "@/lib/telegram/deep-link";
-import { createTelegramLinkCodeAction, setKioskPinAction } from "./actions";
-import { useLinkWatch } from "./use-link-watch";
+import {
+  createTelegramLinkCodeAction,
+  setKioskPinAction,
+  telegramLinkStatusAction,
+} from "./actions";
+import { useLinkWatch, type LinkCheck } from "./use-link-watch";
+
+/** get_telegram_link_status, as the link watch reads it. */
+const checkTelegramLink: LinkCheck = async () => {
+  const result = await telegramLinkStatusAction();
+  return result.ok ? result.data.code : null;
+};
 
 /** set_kiosk_pin: a 4 to 6 digit PIN, typed twice. */
 export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
@@ -113,38 +123,38 @@ export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
 /**
  * create_telegram_link_code as one tap (issue #108): the code becomes a
  * Telegram deep link (Open Telegram, or its QR code from a laptop), and the
- * page re-reads itself until the bot has linked the account. `/link <code>`
- * stays as the fallback.
+ * card asks the server until the bot has used the code (issue #118: "Linked"
+ * even when the member relinks the account they had) or it has expired.
+ * `/link <code>` stays as the fallback.
  */
 export function TelegramLinkForm({
-  telegramUserId,
+  linked,
   botUsername,
 }: {
-  /** The member's linked Telegram id, from the page's own read. */
-  telegramUserId: number | null;
+  /** The member has a Telegram id, from get_telegram_link_status. */
+  linked: boolean;
   botUsername: string;
 }) {
   const router = useRouter();
   const { state, formAction, pending, requestId } = useActionForm(
     createTelegramLinkCodeAction,
   );
-  // The link as it was when the code was made: a change means the bot
-  // redeemed it (a relink moves the id, so "linked" alone is not enough).
-  const [before, setBefore] = useState<number | null | undefined>(undefined);
   const code = state?.ok ? state.data.code : null;
-  const justLinked =
-    code !== null &&
-    before !== undefined &&
-    telegramUserId !== null &&
-    telegramUserId !== before;
-  const expiresAt = state?.ok ? Date.parse(state.data.expiresAt) : 0;
-  useLinkWatch({
-    active: code !== null && !justLinked,
-    until: expiresAt,
-    refresh: router.refresh,
+  const phase = useLinkWatch({
+    code,
+    secondsLeft: state?.ok ? state.data.expiresInSeconds : 0,
+    check: checkTelegramLink,
   });
-  const linked = telegramUserId !== null;
-  const deepLink = code ? telegramLinkDeepLink(code, botUsername) : null;
+  const justLinked = phase === "used";
+  // Once, so the card's description (and anything else) says linked.
+  useEffect(() => {
+    if (justLinked) router.refresh();
+  }, [justLinked, router]);
+  const expiresAt = state?.ok ? Date.parse(state.data.expiresAt) : 0;
+  const deepLink =
+    code && phase === "waiting"
+      ? telegramLinkDeepLink(code, botUsername)
+      : null;
 
   return (
     <Card
@@ -155,11 +165,7 @@ export function TelegramLinkForm({
           : "Link your Telegram account so the Baumy bot knows who you are."
       }
     >
-      <form
-        action={formAction}
-        onSubmit={() => setBefore(telegramUserId)}
-        className="flex flex-col gap-4"
-      >
+      <form action={formAction} className="flex flex-col gap-4">
         <input type="hidden" name="requestId" value={requestId} />
         {justLinked ? (
           <FormMessage tone="success">
@@ -196,6 +202,10 @@ export function TelegramLinkForm({
               Waiting for Telegram...
             </p>
           </div>
+        ) : phase === "expired" ? (
+          <FormMessage tone="error">
+            That link has expired. Make a new one.
+          </FormMessage>
         ) : state?.ok ? (
           <FormMessage tone="error">
             That link was already shown. Make a new one.
@@ -206,7 +216,7 @@ export function TelegramLinkForm({
         {justLinked ? null : (
           <Button
             type="submit"
-            variant={code ? "secondary" : "primary"}
+            variant={deepLink ? "secondary" : "primary"}
             className="self-start"
             disabled={pending}
           >

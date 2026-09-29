@@ -27,6 +27,7 @@ export const ACTION_NAMES = [
   "manage_members",
   "set_kiosk_pin",
   "create_telegram_link_code",
+  "get_telegram_link_status",
   "link_telegram",
   "approve_login",
   "deny_login",

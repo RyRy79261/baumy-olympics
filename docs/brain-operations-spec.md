@@ -2152,6 +2152,7 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `manage_members`: An admin action: UI only (SPEC §12 decision 10).
 - `set_kiosk_pin`: The member's own account settings: only in the app, signed in.
 - `create_telegram_link_code`: The member's own account settings: only in the app, signed in.
+- `get_telegram_link_status`: The member's own account settings: only in the app, signed in.
 - `authorize_mcp_client`: The member's own account settings: only in the app, signed in.
 - `list_mcp_connections`: The member's own account settings: only in the app, signed in.
 - `revoke_mcp_connection`: The member's own account settings: only in the app, signed in.

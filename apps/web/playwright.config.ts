@@ -14,6 +14,7 @@ const SHARED_CLOCK_SPECS = [
   "**/claims.spec.ts",
   "**/kiosk-night.spec.ts",
   "**/kiosk-dashboard-clock.spec.ts",
+  "**/telegram-link-expiry.spec.ts",
 ];
 
 export default defineConfig({
