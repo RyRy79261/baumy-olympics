@@ -427,6 +427,85 @@ export function snapToGrid(img: RgbaImage, target: number): RgbaImage {
   return out;
 }
 
+/**
+ * At most `colours` colours, by median cut over the opaque pixels: the box
+ * of colours with the widest spread is split at its median, along its widest
+ * channel, until there are enough boxes; each pixel then takes the average
+ * of its box. No dithering, so flat areas stay flat. (sharp's palette option
+ * only sets a bit depth, so 24 would really mean 256.)
+ */
+export function limitPalette(img: RgbaImage, colours: number): RgbaImage {
+  const counts = new Map<number, number>();
+  const n = img.width * img.height;
+  const rgb = (i: number) =>
+    (img.data[i * 4]! << 16) | (img.data[i * 4 + 1]! << 8) | img.data[i * 4 + 2]!;
+  for (let i = 0; i < n; i++) {
+    if (img.data[i * 4 + 3]) counts.set(rgb(i), (counts.get(rgb(i)) ?? 0) + 1);
+  }
+  if (counts.size <= colours) return img;
+
+  type ColourBox = { c: number[]; spread: number; channel: number };
+  const channel = (c: number, ch: number) => (c >> (16 - 8 * ch)) & 255;
+  const measure = (c: number[]): ColourBox => {
+    let spread = -1;
+    let widest = 0;
+    for (let ch = 0; ch < 3; ch++) {
+      let lo = 255;
+      let hi = 0;
+      for (const x of c) {
+        const v = channel(x, ch);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      if (hi - lo > spread) {
+        spread = hi - lo;
+        widest = ch;
+      }
+    }
+    return { c, spread, channel: widest };
+  };
+  const boxes: ColourBox[] = [measure([...counts.keys()])];
+  while (boxes.length < colours) {
+    const box = boxes.reduce((a, b) => (b.spread > a.spread ? b : a));
+    const sorted = [...box.c].sort(
+      (a, b) => channel(a, box.channel) - channel(b, box.channel) || a - b,
+    );
+    // The median by pixel count, always leaving both halves a colour.
+    const total = sorted.reduce((s, c) => s + counts.get(c)!, 0);
+    let seen = 0;
+    let cut = 1;
+    for (; cut < sorted.length - 1; cut++) {
+      seen += counts.get(sorted[cut - 1]!)!;
+      if (seen >= total / 2) break;
+    }
+    boxes.splice(
+      boxes.indexOf(box),
+      1,
+      measure(sorted.slice(0, cut)),
+      measure(sorted.slice(cut)),
+    );
+  }
+
+  const mapped = new Map<number, number[]>();
+  for (const box of boxes) {
+    const sum = [0, 0, 0];
+    let weight = 0;
+    for (const c of box.c) {
+      const w = counts.get(c)!;
+      for (let ch = 0; ch < 3; ch++) sum[ch]! += channel(c, ch) * w;
+      weight += w;
+    }
+    const mean = sum.map((v) => Math.round(v / weight));
+    for (const c of box.c) mapped.set(c, mean);
+  }
+  const data = new Uint8Array(img.data);
+  for (let i = 0; i < n; i++) {
+    if (!data[i * 4 + 3]) continue;
+    data.set(mapped.get(rgb(i))!, i * 4);
+  }
+  return { data, width: img.width, height: img.height };
+}
+
 export type CleanResult =
   | { ok: true; png: Buffer; width: number; height: number }
   | { ok: false; reason: "unreadable" | "empty" };
@@ -474,17 +553,16 @@ export async function cleanAvatar(
   const bg = backgroundMask(img, backgroundKeys(img));
   const subject = subjectMask(img.width, img.height, bg);
   if (!subject) return { ok: false, reason: "empty" };
-  const sprite = snapToGrid(cutOut(img, subject.mask, subject.box), target);
+  const sprite = limitPalette(
+    snapToGrid(cutOut(img, subject.mask, subject.box), target),
+    options.colours ?? AVATAR_COLOURS,
+  );
 
+  // Lossless: the colours are already the sprite's own few.
   const png = await sharp(Buffer.from(sprite.data), {
     raw: { width: sprite.width, height: sprite.height, channels: 4 },
   })
-    .png({
-      palette: true,
-      colours: options.colours ?? AVATAR_COLOURS,
-      dither: 0,
-      compressionLevel: 9,
-    })
+    .png({ compressionLevel: 9 })
     .toBuffer();
   return { ok: true, png, width: sprite.width, height: sprite.height };
 }
