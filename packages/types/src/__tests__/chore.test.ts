@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   BasePoints,
+  CHORE_ICONS,
   CHORE_KINDS,
   CHORE_NAME_MAX,
+  ChoreIcon,
   ChoreKind,
   COMPLETION_NOTE_MAX,
   ChoreName,
@@ -45,6 +47,15 @@ describe("ChoreKind", () => {
     expect(ChoreKind.safeParse("errand").error?.issues[0]?.message).toBe(
       "Pick consumable or maintenance.",
     );
+  });
+});
+
+describe("ChoreIcon", () => {
+  it("accepts each offered icon and refuses any other", () => {
+    for (const icon of CHORE_ICONS) expect(ChoreIcon.parse(icon)).toBe(icon);
+    const bad = ChoreIcon.safeParse("trash");
+    expect(bad.success).toBe(false);
+    expect(bad.error?.issues[0]?.message).toBe("Pick one of the icons.");
   });
 });
 

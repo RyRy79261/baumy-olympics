@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AVATAR_SPRITES, type AvatarSprites } from "@baumy/types";
+import type { AvatarSprites } from "@baumy/types";
 import {
   Button,
   Card,
@@ -11,6 +12,8 @@ import {
   Input,
   MemberCharacter,
   Select,
+  SwatchPicker,
+  memberColourOptions,
 } from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
 import { toast } from "@/lib/ui/toast";
@@ -19,6 +22,7 @@ import {
   mintInviteAction,
   revokeInviteAction,
 } from "./actions";
+import { TelegramIdField } from "./telegram-id-field";
 
 /** mint_invite: role, uses and expiry; shows the new code once minted. */
 export function MintInviteForm() {
@@ -115,7 +119,6 @@ export function RevokeInviteButton({ code }: { code: string }) {
 export interface MemberRowProps {
   id: string;
   displayName: string;
-  avatarSprite: string;
   color: string;
   role: "admin" | "member";
   active: boolean;
@@ -126,8 +129,43 @@ export interface MemberRowProps {
    * a member who has left is drawn from their id.
    */
   character?: unknown;
-  /** Their gallery sprite (issue #111), if they picked one. */
+  /** Their gallery character (issue #111), if they picked one. */
   sprites?: AvatarSprites | null;
+}
+
+/**
+ * A member's colour as swatches (issue #106): the offered colours by name,
+ * and their own first if it is one the list does not offer.
+ */
+function MemberColourField({
+  memberId,
+  initial,
+  errors,
+}: {
+  memberId: string;
+  initial: string;
+  errors?: string[];
+}) {
+  const [color, setColor] = useState(initial.toLowerCase());
+  const [options] = useState(() => memberColourOptions(initial));
+  const errorId = errors?.length ? `color-${memberId}-error` : undefined;
+  return (
+    <div className="flex flex-col gap-1">
+      <SwatchPicker
+        legend="Colour"
+        name="color"
+        value={color}
+        onChange={setColor}
+        describedBy={errorId}
+        options={options}
+      />
+      {errorId ? (
+        <p id={errorId} className="text-base text-bm-red">
+          {errors!.join(" ")}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /** One member: role, active or not, and how they look (manage_members). */
@@ -137,6 +175,7 @@ export function MemberControls(props: MemberRowProps) {
   const edit = useActionForm(manageMembersAction);
   const telegram = useActionForm(manageMembersAction);
   const [confirming, setConfirming] = useState(false);
+  const [telegramValid, setTelegramValid] = useState(true);
 
   useEffect(() => {
     if (status.state && !status.state.ok) toast.error(status.state.message);
@@ -239,11 +278,11 @@ export function MemberControls(props: MemberRowProps) {
 
       <details>
         <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm underline">
-          Edit name, colour and avatar
+          Edit name and colour
         </summary>
         <form
           action={edit.formAction}
-          className="mt-3 grid gap-4 sm:grid-cols-4"
+          className="mt-3 flex max-w-md flex-col gap-4"
         >
           <input type="hidden" name="requestId" value={edit.requestId} />
           <input type="hidden" name="op" value="edit" />
@@ -262,39 +301,40 @@ export function MemberControls(props: MemberRowProps) {
               />
             )}
           </Field>
-          <Field
-            id={`color-${props.id}`}
-            label="Colour"
+          <MemberColourField
+            memberId={props.id}
+            initial={props.color}
             errors={edit.errors.color}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                name="color"
-                type="color"
-                defaultValue={props.color}
-              />
-            )}
-          </Field>
-          <Field
-            id={`avatar-${props.id}`}
-            label="Avatar"
-            errors={edit.errors.avatarSprite}
-          >
-            {(control) => (
-              <Select
-                {...control}
-                name="avatarSprite"
-                defaultValue={props.avatarSprite}
-              >
-                {AVATAR_SPRITES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
+          />
+          <div className="flex flex-col gap-2">
+            <p className="font-label text-sm font-bold tracking-wide text-bm-text uppercase">
+              Character
+            </p>
+            <div className="flex items-center gap-3">
+              <span className="pixel-frame inline-flex bg-bm-ink p-2">
+                <MemberCharacter
+                  sprites={props.sprites}
+                  avatar={props.character}
+                  memberId={props.id}
+                  scale={3}
+                  label={`${props.displayName}'s character`}
+                />
+              </span>
+              {props.isMe ? (
+                <Link
+                  href="/settings#character"
+                  className="inline-flex min-h-11 items-center text-sm underline"
+                >
+                  Change your character
+                </Link>
+              ) : (
+                <p className="text-sm text-bm-muted">
+                  Only {props.displayName} can change their character, in their
+                  Settings.
+                </p>
+              )}
+            </div>
+          </div>
           <div className="flex items-end">
             <Button type="submit" disabled={edit.pending}>
               Save
@@ -314,28 +354,21 @@ export function MemberControls(props: MemberRowProps) {
         </summary>
         <form
           action={telegram.formAction}
-          className="mt-3 flex flex-wrap items-end gap-3"
+          className="mt-3 flex max-w-md flex-col items-start gap-3"
         >
           <input type="hidden" name="requestId" value={telegram.requestId} />
           <input type="hidden" name="op" value="set_telegram" />
           <input type="hidden" name="memberId" value={props.id} />
-          <Field
-            id={`telegram-${props.id}`}
-            label="Telegram user id"
-            hint="Leave it empty to unlink. Members can also link themselves with /link in Telegram."
-            errors={telegram.errors.telegramUserId}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                name="telegramUserId"
-                inputMode="numeric"
-                autoComplete="off"
-                defaultValue={props.telegramUserId ?? ""}
-              />
-            )}
-          </Field>
-          <Button type="submit" disabled={telegram.pending}>
+          <TelegramIdField
+            memberId={props.id}
+            displayName={props.displayName}
+            initial={
+              props.telegramUserId === null ? "" : String(props.telegramUserId)
+            }
+            serverErrors={telegram.errors.telegramUserId}
+            onValidity={setTelegramValid}
+          />
+          <Button type="submit" disabled={telegram.pending || !telegramValid}>
             Save Telegram id
           </Button>
           {telegram.state?.ok ? (

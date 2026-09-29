@@ -13,7 +13,13 @@ import {
   members,
 } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
-import { MEMBER_COLORS } from "@baumy/types";
+import {
+  AVATAR_HAIR_COLORS,
+  AVATAR_HAIR_STYLES,
+  AVATAR_SHIRT_COLORS,
+  AVATAR_SKIN_TONES,
+  MEMBER_COLORS,
+} from "@baumy/types";
 import {
   FIXED_NOW,
   accountActor,
@@ -34,6 +40,11 @@ const db = () => t.db() as unknown as Queryable;
 const HOUR = 60 * 60_000;
 
 beforeEach(() => __resetMemoryRateLimits());
+
+function ok<T>(r: { ok: true; data: T } | { ok: false }): T {
+  if (!r.ok) throw new Error(`expected ok, got ${JSON.stringify(r)}`);
+  return r.data;
+}
 afterEach(() => vi.unstubAllEnvs());
 
 async function code(
@@ -138,6 +149,49 @@ describe("redeem_invite", () => {
     });
     expect(MEMBER_COLORS).toContain(row!.color);
     expect(defaultColorFor("u_colour")).toBe(defaultColorFor("u_colour"));
+  });
+
+  it("stores the character picked on the join form, or none (the default)", async () => {
+    await code("look-code", { maxUses: 2 });
+    const look = {
+      hairStyle: AVATAR_HAIR_STYLES[2],
+      hairColor: AVATAR_HAIR_COLORS[3],
+      skinTone: AVATAR_SKIN_TONES[4],
+      shirtColor: AVATAR_SHIRT_COLORS[5],
+    };
+    ok(await join("u_look", { code: "look-code", ...look }));
+    expect((await memberOf("u_look"))!.avatar).toEqual(look);
+    ok(await join("u_plain", { code: "look-code" }));
+    expect((await memberOf("u_plain"))!.avatar).toBeNull();
+  });
+
+  it("refuses part of a character, or an id the art does not have", async () => {
+    await code("part-code");
+    const part = await join("u_part", {
+      code: "part-code",
+      hairStyle: AVATAR_HAIR_STYLES[0],
+    });
+    expect(part).toMatchObject({
+      ok: false,
+      code: "INVALID_INPUT",
+      issues: [
+        {
+          path: ["hairStyle"],
+          message:
+            "Pick your whole character: hair style, hair colour, skin and shirt.",
+        },
+      ],
+    });
+    const odd = await join("u_part", {
+      code: "part-code",
+      hairStyle: "mohawk",
+      hairColor: AVATAR_HAIR_COLORS[0],
+      skinTone: AVATAR_SKIN_TONES[0],
+      shirtColor: AVATAR_SHIRT_COLORS[0],
+    });
+    expect(odd).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    expect(await memberOf("u_part")).toBeUndefined();
+    expect(await uses("part-code")).toBe(0);
   });
 
   it("says why an unusable code does not work, and creates nobody", async () => {
@@ -287,6 +341,39 @@ describe("join_as_founder", () => {
         ctxFor(accountActor("u_ryan", { email: "ryan@example.com" })),
       ),
     ).resolves.toMatchObject({ ok: false, code: "ALREADY_MEMBER" });
+  });
+
+  it("stores the founder's picked character, and refuses part of one", async () => {
+    vi.stubEnv("FOUNDER_EMAILS", "ryan@example.com, jo@example.com");
+    const look = {
+      hairStyle: AVATAR_HAIR_STYLES[1],
+      hairColor: AVATAR_HAIR_COLORS[1],
+      skinTone: AVATAR_SKIN_TONES[1],
+      shirtColor: AVATAR_SHIRT_COLORS[1],
+    };
+    const ctx = ctxFor(
+      accountActor("u_ryan", {
+        email: "ryan@example.com",
+        emailVerified: true,
+      }),
+    );
+    ok(
+      await runAction("join_as_founder", { displayName: "Ryan", ...look }, ctx),
+    );
+    expect((await memberOf("u_ryan"))!.avatar).toEqual(look);
+    await expect(
+      runAction(
+        "join_as_founder",
+        { displayName: "Jo", shirtColor: AVATAR_SHIRT_COLORS[0] },
+        ctxFor(
+          accountActor("u_jo", {
+            email: "jo@example.com",
+            emailVerified: true,
+          }),
+        ),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    expect(await memberOf("u_jo")).toBeUndefined();
   });
 
   it("refuses an unverified founder address, and anyone not on the list", async () => {

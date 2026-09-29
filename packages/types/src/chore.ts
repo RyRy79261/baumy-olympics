@@ -37,6 +37,31 @@ export const ChoreKind = z.enum(CHORE_KINDS, {
 });
 export type ChoreKind = z.infer<typeof ChoreKind>;
 
+/**
+ * The icons an admin can give a chore (issue #106): what `chores.sprite`
+ * stores when one is picked. Each is a glyph of the same name in the pixel
+ * kit (packages/ui pixel/glyphs.ts), which draws it.
+ */
+export const CHORE_ICONS = [
+  "bin",
+  "soap",
+  "tp",
+  "plant",
+  "vacuum",
+  "litter",
+  "catfood",
+  "fridge",
+  "kettle",
+  "coffee",
+  "cart",
+  "wrench",
+] as const;
+
+export const ChoreIcon = z.enum(CHORE_ICONS, {
+  error: "Pick one of the icons.",
+});
+export type ChoreIcon = z.infer<typeof ChoreIcon>;
+
 export const BASE_POINTS_MIN = 1;
 export const BASE_POINTS_MAX = 200;
 
