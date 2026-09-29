@@ -58,8 +58,19 @@ export async function mintCode(page: Page, uses = 1): Promise<string> {
   return code;
 }
 
+/** A made-up private address, one per browser context. */
+export function uniqueAddress(): string {
+  const byte = () => Math.floor(Math.random() * 254) + 1;
+  return `10.${byte()}.${byte()}.${byte()}`;
+}
+
 export async function newAccount(browser: Browser, label: string) {
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    // Its own address, so redeem_invite's 30 tries per address per 15
+    // minutes counts this account alone, not every member the whole suite
+    // joins from localhost.
+    extraHTTPHeaders: { "x-forwarded-for": uniqueAddress() },
+  });
   const page = await context.newPage();
   await signUp(page, freshEmail(label));
   return { context, page };

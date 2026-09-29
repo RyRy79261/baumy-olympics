@@ -1891,6 +1891,9 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `set_first_password`: The member's own account settings: only in the app, signed in.
 - `pair_kiosk`: An admin action: UI only (SPEC §12 decision 10).
 - `revoke_kiosk`: An admin action: UI only (SPEC §12 decision 10).
+- `create_service_token`: An admin action: UI only (SPEC §12 decision 10).
+- `rotate_service_token`: An admin action: UI only (SPEC §12 decision 10).
+- `revoke_service_token`: An admin action: UI only (SPEC §12 decision 10).
 - `check_kiosk_pin`: Checks a PIN typed on the kitchen screen; only the kiosk has one.
 - `manage_chore`: An admin action: UI only (SPEC §12 decision 10).
 - `resolve_dispute`: An admin action: UI only (SPEC §12 decision 10).
