@@ -24,6 +24,7 @@ import {
   dismissSuggestion,
   findSuggestion,
   lastAppliedAt,
+  listActiveSuggestions,
   listScheduledChanges,
   listWeightPanel,
   lockSuggestion,
@@ -726,5 +727,40 @@ describe("listWeightPanel", () => {
       active: null,
       live: { verdict: { kind: "insufficient_data", sampleSize: 0 } },
     });
+  });
+});
+
+describe("listActiveSuggestions", () => {
+  it("lists the open and scheduled suggestions of the household only", async () => {
+    const { ryan, choreId, suggestion } = await e7();
+    await expect(listActiveSuggestions(db(), HOUSEHOLD_ID)).resolves.toEqual([
+      expect.objectContaining({ id: suggestion.id, choreId, status: "open" }),
+    ]);
+    await tx((q) =>
+      scheduleSuggestion(q, {
+        suggestionId: suggestion.id,
+        basePoints: 27,
+        cooldownMinutes: 80 * 60,
+        appliesAt: new Date(NOW.getTime() + 7 * DAY),
+        scheduledBy: ryan,
+        now: NOW,
+      }),
+    );
+    await expect(listActiveSuggestions(db(), HOUSEHOLD_ID)).resolves.toEqual([
+      expect.objectContaining({ id: suggestion.id, status: "scheduled" }),
+    ]);
+    await expect(
+      listActiveSuggestions(db(), "00000000-0000-4000-8000-000000000000"),
+    ).resolves.toEqual([]);
+    await tx((q) =>
+      dismissSuggestion(q, {
+        suggestionId: suggestion.id,
+        dismissedBy: ryan,
+        now: NOW,
+      }),
+    );
+    await expect(listActiveSuggestions(db(), HOUSEHOLD_ID)).resolves.toEqual(
+      [],
+    );
   });
 });

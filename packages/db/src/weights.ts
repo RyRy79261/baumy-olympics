@@ -529,6 +529,25 @@ export async function vetoSuggestion(
   return row ?? null;
 }
 
+/**
+ * The suggestions waiting on people (open or scheduled), at most one per
+ * chore: the Bounties page's Change points reads these (issue #109).
+ */
+export async function listActiveSuggestions(
+  db: Queryable,
+  householdId: string,
+): Promise<WeightSuggestionRow[]> {
+  return db
+    .select()
+    .from(weightSuggestions)
+    .where(
+      and(
+        eq(weightSuggestions.householdId, householdId),
+        inArray(weightSuggestions.status, ["open", "scheduled"]),
+      ),
+    );
+}
+
 /** One chore's row on the weights panel (`/admin/weights`). */
 export interface WeightPanelRow {
   choreId: string;
@@ -556,15 +575,7 @@ export async function listWeightPanel(
       and(eq(chores.householdId, input.householdId), isNull(chores.archivedAt)),
     )
     .orderBy(asc(sql`lower(${chores.name})`), asc(chores.id));
-  const active = await db
-    .select()
-    .from(weightSuggestions)
-    .where(
-      and(
-        eq(weightSuggestions.householdId, input.householdId),
-        inArray(weightSuggestions.status, ["open", "scheduled"]),
-      ),
-    );
+  const active = await listActiveSuggestions(db, input.householdId);
   const activeOf = new Map(active.map((s) => [s.choreId, s]));
   const out: WeightPanelRow[] = [];
   for (const c of rows) {
