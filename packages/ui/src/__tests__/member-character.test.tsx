@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import { AvatarGallery } from "../avatar-gallery";
 import { AvatarButton } from "../kiosk-shell";
 import {
+  BUST_FRACTION,
+  BUST_MAX_PX,
   HOUSEMATE_HEIGHT_PX,
   MemberCharacter,
   spriteFactor,
+  spriteFit,
 } from "../member-character";
 
 // A member's gallery sprite (issue #111), drawn crisp at whole-number
@@ -28,6 +31,38 @@ describe("spriteFactor", () => {
     expect(spriteFactor(56, HOUSEMATE_HEIGHT_PX * 7)).toBe(2); // 119 → 112
     expect(spriteFactor(56, HOUSEMATE_HEIGHT_PX)).toBe(1 / 3); // 17 → 19
     expect(spriteFactor(14, 400)).toBe(8); // capped
+  });
+});
+
+describe("spriteFit (the bust in small slots)", () => {
+  it("draws a 64px set whole where it is taller than 32px, else its top 45%", () => {
+    // Dashboard (scale 4): whole, at 1×.
+    expect(spriteFit(64, HOUSEMATE_HEIGHT_PX * 4)).toEqual({
+      f: 1,
+      rows: null,
+    });
+    // Kitchen bar (scale 2): whole would be 32px, so the bust (29 rows) at 1×.
+    expect(spriteFit(64, HOUSEMATE_HEIGHT_PX * 2)).toEqual({ f: 1, rows: 29 });
+    // Header (scale 1): the bust at 1/2 rather than the body at 1/4.
+    expect(spriteFit(64, HOUSEMATE_HEIGHT_PX)).toEqual({ f: 1 / 2, rows: 29 });
+    expect(Math.ceil(64 * BUST_FRACTION)).toBe(29);
+    expect(64 / 2).toBeLessThanOrEqual(BUST_MAX_PX);
+  });
+
+  it("crops the drawn image to the bust, the whole image kept inside", () => {
+    const set = { idle: { src: "/i.png", width: 21, height: 64 } };
+    const html = renderToStaticMarkup(
+      <MemberCharacter sprites={set} scale={2} />,
+    );
+    expect(html).toContain('data-bust="true"');
+    expect(html).toContain("overflow-hidden");
+    expect(html).toContain("width:21px;height:29px");
+    expect(html).toContain('height="64"');
+    const whole = renderToStaticMarkup(
+      <MemberCharacter sprites={set} scale={4} />,
+    );
+    expect(whole).toContain("data-member-sprite");
+    expect(whole).not.toContain("data-bust");
   });
 });
 

@@ -26,6 +26,29 @@ export const HOUSEMATE_HEIGHT_PX = 17;
 const FACTORS = [1 / 4, 1 / 3, 1 / 2, 1, 2, 3, 4, 5, 6, 7, 8];
 
 /**
+ * Small slots show a bust, not the whole body: when the whole idle pose
+ * would be drawn no taller than this, the top `BUST_FRACTION` of it (head
+ * and shoulders) is drawn instead, bigger. It is the same cleaned image,
+ * cropped as it is drawn; nothing new is stored or drawn.
+ */
+export const BUST_MAX_PX = 32;
+export const BUST_FRACTION = 0.45;
+
+/**
+ * How a set is drawn in a slot `target` pixels tall: the factor, and the
+ * rows of each pose to show (null for all of them, else the bust's).
+ */
+export function spriteFit(
+  height: number,
+  target: number,
+): { f: number; rows: number | null } {
+  const full = spriteFactor(height, target);
+  if (height * full > BUST_MAX_PX) return { f: full, rows: null };
+  const rows = Math.ceil(height * BUST_FRACTION);
+  return { f: spriteFactor(rows, target), rows };
+}
+
+/**
  * The factor to draw a sprite `height` pixels tall at, for a slot `target`
  * pixels tall: of 1/4 … 8, the one whose result is closest in ratio.
  */
@@ -117,7 +140,10 @@ export function MemberCharacter({
       />
     );
   }
-  const f = spriteFactor(sprites.idle.height, HOUSEMATE_HEIGHT_PX * scale);
+  const { f, rows } = spriteFit(
+    sprites.idle.height,
+    HOUSEMATE_HEIGHT_PX * scale,
+  );
   const held = (pose !== "idle" && sprites[pose]) || sprites.idle;
   const heldPose: AvatarPose = held === sprites.idle ? "idle" : pose;
   const extra =
@@ -129,24 +155,35 @@ export function MemberCharacter({
   return (
     <span
       data-member-sprite
+      data-bust={rows !== null ? true : undefined}
       data-moment={extra ? moment : undefined}
       className={cx(
         "relative inline-block shrink-0",
+        rows !== null && "overflow-hidden",
         bob && "motion-safe:animate-pixel-bob",
         className,
       )}
-      style={style}
+      style={
+        rows !== null
+          ? {
+              width: Math.max(1, Math.round(sprites.idle.width * f)),
+              height: Math.max(1, Math.round(rows * f)),
+              ...style,
+            }
+          : style
+      }
     >
       <Pose
         image={held}
         f={f}
         label={label}
         pose={heldPose}
-        className={
-          moment === "walk-in" && extra
-            ? "motion-safe:animate-pose-after-walk"
-            : undefined
-        }
+        className={cx(
+          rows !== null && "max-w-none",
+          moment === "walk-in" &&
+            extra &&
+            "motion-safe:animate-pose-after-walk",
+        )}
       />
       {extra ? (
         <Pose
@@ -154,7 +191,8 @@ export function MemberCharacter({
           f={f}
           pose={moment === "emote" ? "emote" : "walk"}
           className={cx(
-            "absolute bottom-0 left-0 max-w-none",
+            "absolute left-0 max-w-none",
+            rows !== null ? "top-0" : "bottom-0",
             moment === "emote"
               ? "animate-pose-flash"
               : "hidden motion-safe:block motion-safe:animate-pose-walk-in",
