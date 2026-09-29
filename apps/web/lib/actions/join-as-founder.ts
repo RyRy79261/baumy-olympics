@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { isFounderEmail } from "@baumy/auth/env";
 import { insertMember } from "@baumy/db/members";
-import { AvatarSprite, DisplayName, MemberColor } from "@baumy/types";
+import {
+  AvatarSprite,
+  DisplayName,
+  JoinAvatarId,
+  MemberColor,
+} from "@baumy/types";
+import { pickableAvatar } from "./avatars";
 import { defineAction } from "./define";
 import {
   ALREADY_JOINED,
@@ -28,6 +34,9 @@ const input = z
     color: MemberColor.optional().describe("Your colour, as #rrggbb."),
     avatarSprite: AvatarSprite.optional().describe("Your avatar."),
     ...JOIN_CHARACTER,
+    avatarImageId: JoinAvatarId.describe(
+      "A character from the household's gallery, if you picked one.",
+    ),
   })
   .refine(wholeCharacterOrNone, PART_CHARACTER);
 
@@ -47,9 +56,16 @@ export const joinAsFounder = defineAction({
   surfaces: ["ui"],
   requires: "account",
   input,
-  async execute(ctx, { displayName, color, avatarSprite, ...look }) {
+  async execute(
+    ctx,
+    { displayName, color, avatarSprite, avatarImageId, ...look },
+  ) {
     const actor = await joiningAccount(ctx);
     if (isFailure(actor)) return actor;
+    if (avatarImageId) {
+      const refused = await pickableAvatar(ctx, avatarImageId);
+      if (refused) return refused;
+    }
 
     if (!isFounderEmail(process.env, actor.email)) {
       return fail(
@@ -70,6 +86,7 @@ export const joinAsFounder = defineAction({
       displayName,
       avatarSprite: avatarSprite ?? DEFAULT_AVATAR,
       avatar: joinCharacter(look),
+      avatarImageId: avatarImageId ?? null,
       color: color ?? defaultColorFor(actor.userId),
       role: "admin",
       createdAt: ctx.now,

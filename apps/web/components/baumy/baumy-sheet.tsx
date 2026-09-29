@@ -44,6 +44,7 @@ import {
   PIN_PROMPT_CODES,
 } from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
+import { announceScore } from "@/lib/ui/scored";
 import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
 import { SuggestionCards } from "./suggestion-cards";
 import { useBaumyMood } from "./use-mood";
@@ -226,6 +227,7 @@ export function BaumySheet({
         earned.current += points;
         const key = Date.now();
         setPop({ key, points });
+        announceScore(points);
         setTimeout(() => setPop((p) => (p?.key === key ? null : p)), POP_MS);
       }
       router.refresh();

@@ -5,6 +5,7 @@ import { rosterAvatars } from "@baumy/types";
 import type { Queryable } from "@baumy/db";
 import { listActiveMembers } from "@baumy/db/members";
 import type { RequestCtx } from "@/lib/actions/define";
+import { avatarImageView } from "@/lib/avatars/paths";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import type { NoteView } from "@/lib/actions/notes";
 import { runAction } from "@/lib/actions/registry";
@@ -83,6 +84,7 @@ export async function loadDashboard(
       id: m.id,
       displayName: m.displayName,
       avatar: roster.get(m.id),
+      sprites: avatarImageView(m.avatarImage),
     })),
     chores,
     events,

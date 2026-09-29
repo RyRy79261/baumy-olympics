@@ -30,6 +30,7 @@ import {
   streakLabel,
   type BountyFilter,
 } from "@/lib/chores/view";
+import { announceScore } from "@/lib/ui/scored";
 import { toast } from "@/lib/ui/toast";
 
 // The bounty board (SPEC §3.2; ADR 0005 §2): chores presented as bounties,
@@ -158,6 +159,7 @@ export function ChoreGrid({
     const d = result.data;
     if (d.totalPts !== null) {
       setPop({ key: Date.now(), points: d.totalPts });
+      announceScore(d.totalPts);
       toast.success(
         `Logged ${d.choreName} for ${d.doneByName}: +${d.totalPts}.`,
       );

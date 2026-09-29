@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 import { FormMessage, PageHeading, Points, Table, Td, Th } from "@baumy/ui";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { runAction } from "@/lib/actions/registry";
+import { createHttpDb, type Queryable } from "@baumy/db";
+import { StandingName } from "@/components/scores/standing-name";
 import { getKioskActor } from "@/lib/auth";
+import { activeRoster } from "@/lib/members/characters";
 import { gapLabel } from "@/lib/scores/view";
 
 // The season's standings on the kitchen iPad (SPEC §3.2, ADR 0005 §1: the
@@ -28,6 +31,10 @@ export default async function KioskScoresPage() {
   }
   const data = standings.data;
   const leader = data.standings.find((s) => s.memberId === data.leaderId);
+  const roster = await activeRoster(
+    createHttpDb() as unknown as Queryable,
+    ctx.householdId,
+  );
   return (
     <>
       <PageHeading
@@ -52,7 +59,15 @@ export default async function KioskScoresPage() {
           {data.standings.map((s) => (
             <tr key={s.memberId} data-testid={`standing-${s.displayName}`}>
               <Td numeric>{s.rank}</Td>
-              <Td>{s.displayName}</Td>
+              <Td>
+                <StandingName
+                  memberId={s.memberId}
+                  name={s.displayName}
+                  leader={s.memberId === data.leaderId}
+                  roster={roster}
+                  scale={3}
+                />
+              </Td>
               <Td numeric>
                 <Points points={s.points} provisional={s.provisionalPts} />
               </Td>
