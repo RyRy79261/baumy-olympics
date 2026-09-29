@@ -177,3 +177,27 @@ describe("ReminderScreen", () => {
     expect(onCancelDismiss).toHaveBeenCalledOnce();
   });
 });
+
+describe("ReminderScreen's emote (issue #111)", () => {
+  const img = (src: string) => ({ src, width: 20, height: 64 });
+  const SET = { idle: img("/idle.png"), emote: img("/emote.png") };
+  const faces = (jo: boolean): ReminderFace[] => [
+    { ...FACES[0]!, sprites: SET, seen: true },
+    { ...FACES[1]!, sprites: SET, seen: jo },
+  ];
+  const sprite = (id: string) =>
+    div.querySelector(`[data-face="${id}"] [data-member-sprite]`);
+
+  it("plays only for the face that just tapped, not for who had seen it", () => {
+    const props = mount({ faces: faces(false) });
+    // Ryan had seen it before: drawn, but no emote.
+    expect(sprite("m1")).not.toBeNull();
+    expect(sprite("m1")!.getAttribute("data-moment")).toBeNull();
+    act(() => button("I've seen it, Jo")!.click());
+    expect(props.onSeen).toHaveBeenCalledWith("m2");
+    // The screen hears back that Jo has seen it.
+    act(() => root!.render(<ReminderScreen {...props} faces={faces(true)} />));
+    expect(sprite("m2")!.getAttribute("data-moment")).toBe("emote");
+    expect(sprite("m1")!.getAttribute("data-moment")).toBeNull();
+  });
+});

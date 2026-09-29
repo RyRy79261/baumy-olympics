@@ -1,8 +1,11 @@
-import { avatarFor } from "@baumy/types";
-import type { CSSProperties } from "react";
+"use client";
+
+import { avatarFor, type AvatarSprites } from "@baumy/types";
+import { useState, type CSSProperties } from "react";
 import { BaumyCat } from "./baumy-cat";
 import { cx } from "./cx";
-import { Housemate, SHIRT_COLOURS } from "./housemate";
+import { SHIRT_COLOURS } from "./housemate";
+import { MemberCharacter } from "./member-character";
 import { Glyph } from "./pixel/glyph";
 
 // The kitchen screen's full-screen reminder (ADR 0005 §4), the approved
@@ -24,6 +27,8 @@ export interface ReminderFace {
    * name, their seen card and their dismiss button take its shirt colour.
    */
   avatar: unknown;
+  /** Their gallery sprite (issue #111), drawn instead when they picked one. */
+  sprites?: AvatarSprites | null;
   seen: boolean;
 }
 
@@ -100,6 +105,9 @@ export function ReminderScreen({
   message?: string;
 }) {
   const seen = faces.filter((f) => f.seen).length;
+  // Only the face that was just tapped plays its emote (issue #111), not
+  // everyone who had seen it already when the screen came up.
+  const [tapped, setTapped] = useState<string | null>(null);
   return (
     <div
       role="dialog"
@@ -234,7 +242,9 @@ export function ReminderScreen({
                     : undefined
                 }
               >
-                <Housemate
+                <MemberCharacter
+                  moment={f.seen && f.id === tapped ? "emote" : undefined}
+                  sprites={f.sprites}
                   avatar={f.avatar}
                   memberId={f.id}
                   scale={7}
@@ -260,7 +270,10 @@ export function ReminderScreen({
                     ? `${f.displayName} has seen it`
                     : `I've seen it, ${f.displayName}`
                 }
-                onClick={() => onSeen(f.id)}
+                onClick={() => {
+                  setTapped(f.id);
+                  onSeen(f.id);
+                }}
                 className={cx(
                   "h-[72px] w-full font-display text-[14px] leading-tight uppercase",
                   "active:translate-y-px disabled:cursor-default",

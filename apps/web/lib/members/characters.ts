@@ -1,7 +1,12 @@
 import type { Queryable } from "@baumy/db";
 import { listActiveMembers } from "@baumy/db/members";
-import { rosterAvatars, type MemberAvatar } from "@baumy/types";
+import {
+  rosterAvatars,
+  type AvatarSprites,
+  type MemberAvatar,
+} from "@baumy/types";
 import { SHIRT_COLOURS } from "@baumy/ui";
+import { avatarImageView } from "@/lib/avatars/paths";
 
 // Every member's character and colour, from ONE place (ADR 0005 §5): the
 // character they chose, or the roster's default (packages/types
@@ -24,5 +29,26 @@ export async function activeCharacters(
   db: Queryable,
   householdId: string,
 ): Promise<Map<string, MemberAvatar>> {
-  return rosterAvatars(await listActiveMembers(db, householdId));
+  return (await activeRoster(db, householdId)).characters;
+}
+
+/**
+ * The active members' characters and, for those who picked one, their
+ * gallery sprite (issue #111), which is drawn instead. Their colour is
+ * still the character's shirt.
+ */
+export async function activeRoster(
+  db: Queryable,
+  householdId: string,
+): Promise<{
+  characters: Map<string, MemberAvatar>;
+  sprites: Map<string, AvatarSprites>;
+}> {
+  const people = await listActiveMembers(db, householdId);
+  const sprites = new Map<string, AvatarSprites>();
+  for (const p of people) {
+    const image = avatarImageView(p.avatarImage);
+    if (image) sprites.set(p.id, image);
+  }
+  return { characters: rosterAvatars(people), sprites };
 }

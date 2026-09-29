@@ -8,7 +8,11 @@ import { buildAuthOptions } from "@baumy/auth";
 import { LAST_LOGIN_METHOD_COOKIE, SECURITY_COOKIES } from "@baumy/auth/env";
 import PrivacyPage from "@/app/privacy/page";
 import { REFRESH_COOKIE } from "@/lib/hub/refresh";
-import { KIOSK_COOKIE, KIOSK_MEMBER_COOKIE } from "@/lib/kiosk/cookies";
+import {
+  KIOSK_COOKIE,
+  KIOSK_MEMBER_COOKIE,
+  KIOSK_WALK_IN_COOKIE,
+} from "@/lib/kiosk/cookies";
 import { LOGIN_COOKIE } from "@/lib/login-approval/flow";
 
 // Issues #87 and #89: the privacy page must name every cookie the app sets.
@@ -34,6 +38,10 @@ const SCANNED = [
 const KNOWN: Record<string, string> = {
   KIOSK_COOKIE,
   KIOSK_MEMBER_COOKIE,
+  // Set by the tap that picks a member; cleared by the dashboard
+  // (components/kiosk/forget-cookie.tsx), which only ever deletes it.
+  KIOSK_WALK_IN_COOKIE,
+  "`${KIOSK_WALK_IN_COOKIE}=": KIOSK_WALK_IN_COOKIE,
   "refreshCookieLine()": REFRESH_COOKIE,
   // Sign in with Baumy's routes (lib/login-approval/flow.ts): its own cookie
   // (loginCookie), and Better Auth's session cookies passed through.

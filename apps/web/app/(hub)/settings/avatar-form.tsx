@@ -14,9 +14,15 @@ import { updateAvatarAction } from "./actions";
 
 export function AvatarForm({
   initial,
+  secondary = false,
 }: {
   /** Their character now (their default one if they never chose). */
   initial: MemberAvatar;
+  /**
+   * Under the gallery (issue #111): the drawn character is then only what
+   * they wear while they have not picked a gallery one.
+   */
+  secondary?: boolean;
 }) {
   const { state, formAction, pending, requestId } =
     useActionForm(updateAvatarAction);
@@ -24,8 +30,12 @@ export function AvatarForm({
 
   return (
     <Card
-      title="Your character"
-      description="How you look on the kitchen screen and in the header."
+      title={secondary ? "Your drawn character" : "Your character"}
+      description={
+        secondary
+          ? "What you wear while you have not picked one from the gallery."
+          : "How you look on the kitchen screen and in the header."
+      }
     >
       <form
         id="character"
