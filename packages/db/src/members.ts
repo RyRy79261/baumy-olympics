@@ -1,5 +1,6 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import type { MemberAvatar } from "@baumy/types";
+import { withAvatarImages, type AvatarImageRef } from "./avatars";
 import { createHttpDb, type Queryable } from "./index";
 import { members } from "./schema";
 
@@ -62,6 +63,8 @@ export interface NewMember {
   avatarSprite: string;
   /** The character picked on the join form; null or left out: the default. */
   avatar?: MemberAvatar | null;
+  /** The gallery character picked on /join (issue #111), if any. */
+  avatarImageId?: string | null;
   color: string;
   role: "admin" | "member";
   createdAt: Date;
@@ -260,6 +263,8 @@ export interface KioskMember {
 export interface KioskMemberWithAvatar extends KioskMember {
   /** As stored: `avatarFor` (packages/types) reads it; null is the default. */
   avatar: unknown;
+  /** The gallery character they picked (issue #111), or null. */
+  avatarImage: AvatarImageRef | null;
 }
 
 /** The active members, in the order they joined: the kiosk's avatar bar. */
@@ -267,19 +272,21 @@ export async function listActiveMembers(
   db: Queryable,
   householdId: string,
 ): Promise<KioskMemberWithAvatar[]> {
-  return db
+  const rows = await db
     .select({
       id: members.id,
       displayName: members.displayName,
       avatarSprite: members.avatarSprite,
       color: members.color,
       avatar: members.avatar,
+      avatarImageId: members.avatarImageId,
     })
     .from(members)
     .where(
       and(eq(members.householdId, householdId), isNull(members.deactivatedAt)),
     )
     .orderBy(asc(members.createdAt), asc(members.id));
+  return withAvatarImages(db, rows);
 }
 
 /** One active member of the household, or null. */

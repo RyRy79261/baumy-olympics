@@ -3,7 +3,10 @@ import {
   KIOSK_COOKIE_MAX_AGE_S,
   generateKioskToken,
   isMemberId,
+  KIOSK_WALK_IN_MAX_AGE_S,
   kioskCookieOptions,
+  walkInCookieOptions,
+  walksIn,
 } from "./cookies";
 import { PIN_PROMPT_CODES } from "./constants";
 import { formatKioskPairingCode } from "./format";
@@ -40,5 +43,24 @@ describe("kiosk display helpers", () => {
   it("opens the PIN pad for the attestation codes only", () => {
     expect(PIN_PROMPT_CODES.has("ATTESTATION_REQUIRED")).toBe(true);
     expect(PIN_PROMPT_CODES.has("PIN_LOCKED")).toBe(false);
+  });
+});
+
+describe("the walk-in cookie (issue #111)", () => {
+  it("walks in only the member the tap just picked", () => {
+    expect(walksIn("m1", "m1")).toBe(true);
+    expect(walksIn(undefined, "m1")).toBe(false);
+    expect(walksIn("m2", "m1")).toBe(false);
+    expect(walksIn(undefined, undefined)).toBe(false);
+  });
+
+  it("lives a minute and the screen may clear it", () => {
+    expect(walkInCookieOptions()).toEqual({
+      httpOnly: false,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+      maxAge: KIOSK_WALK_IN_MAX_AGE_S,
+    });
   });
 });

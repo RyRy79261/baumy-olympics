@@ -14,6 +14,13 @@ import {
 import { addPotContribution } from "./add-pot-contribution";
 import { adjustPoints } from "./adjust-points";
 import { attachCompletionPhoto } from "./attach-completion-photo";
+import {
+  addAvatar,
+  archiveAvatar,
+  chooseAvatar,
+  previewAvatar,
+  restoreAvatar,
+} from "./avatars";
 import { createBounty, updateBounty } from "./bounties";
 import { createEvent, deleteEvent, listEvents, updateEvent } from "./calendar";
 import { checkKioskPin } from "./check-kiosk-pin";
@@ -91,6 +98,11 @@ export const REGISTRY = {
   whoami,
   update_my_profile: updateMyProfile,
   update_avatar: updateAvatar,
+  choose_avatar: chooseAvatar,
+  preview_avatar: previewAvatar,
+  add_avatar: addAvatar,
+  archive_avatar: archiveAvatar,
+  restore_avatar: restoreAvatar,
   redeem_invite: redeemInvite,
   join_as_founder: joinAsFounder,
   mint_invite: mintInvite,

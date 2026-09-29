@@ -2184,6 +2184,11 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 
 - `update_my_profile`: The member's own account settings: only in the app, signed in.
 - `update_avatar`: The member's own account settings: only in the app, signed in.
+- `choose_avatar`: The member's own account settings: only in the app, signed in.
+- `preview_avatar`: An admin action: UI only (SPEC §12 decision 10).
+- `add_avatar`: An admin action: UI only (SPEC §12 decision 10).
+- `archive_avatar`: An admin action: UI only (SPEC §12 decision 10).
+- `restore_avatar`: An admin action: UI only (SPEC §12 decision 10).
 - `redeem_invite`: Joining the household: only in the app, signed in.
 - `join_as_founder`: Joining the household: only in the app, signed in.
 - `mint_invite`: An admin action: UI only (SPEC §12 decision 10).

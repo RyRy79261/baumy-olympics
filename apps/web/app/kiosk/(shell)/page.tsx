@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { berlinDateKey } from "@baumy/core";
 import { createHttpDb, type Queryable } from "@baumy/db";
-import { ActingChip, Housemate, actingDoneClass } from "@baumy/ui";
+import { ActingChip, actingDoneClass } from "@baumy/ui";
+import { cookies } from "next/headers";
+import { ForgetWalkIn } from "@/components/kiosk/forget-cookie";
+import { ScoreEmote } from "@/components/members/score-emote";
+import { KIOSK_WALK_IN_COOKIE, walksIn } from "@/lib/kiosk/cookies";
 import { AutoRefresh } from "@/components/hub/auto-refresh";
 import { DashboardHeader } from "@/components/kiosk/dashboard/dashboard-header";
 import { MonthCalendar } from "@/components/kiosk/dashboard/month-calendar";
@@ -36,6 +40,11 @@ export default async function KioskHomePage({
 }) {
   const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
+  // Walk in only for the tap that just picked them (issue #111).
+  const walkIn = walksIn(
+    (await cookies()).get(KIOSK_WALK_IN_COOKIE)?.value,
+    kiosk.memberId,
+  );
   const ctx = (await kioskRequestCtx(undefined, undefined))!;
   const today = berlinDateKey(ctx.now);
   const params = await searchParams;
@@ -86,7 +95,11 @@ export default async function KioskHomePage({
             <ActingChip
               name={kiosk.displayName ?? ""}
               who={
-                <Housemate
+                <ScoreEmote
+                  moment={walkIn ? "walk-in" : undefined}
+                  sprites={
+                    data.members.find((m) => m.id === kiosk.memberId)?.sprites
+                  }
                   avatar={
                     data.members.find((m) => m.id === kiosk.memberId)?.avatar
                   }
@@ -106,6 +119,7 @@ export default async function KioskHomePage({
         }
       />
       <AutoRefresh />
+      {walkIn ? <ForgetWalkIn /> : null}
     </div>
   );
 }

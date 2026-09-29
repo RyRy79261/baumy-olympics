@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { AvatarSprites } from "@baumy/types";
 import {
   Button,
   Card,
@@ -9,8 +10,8 @@ import {
   Field,
   FormMessage,
   Input,
+  MemberCharacter,
   Select,
-  Housemate,
   SwatchPicker,
   memberColourOptions,
 } from "@baumy/ui";
@@ -128,6 +129,8 @@ export interface MemberRowProps {
    * a member who has left is drawn from their id.
    */
   character?: unknown;
+  /** Their gallery character (issue #111), if they picked one. */
+  sprites?: AvatarSprites | null;
 }
 
 /**
@@ -211,7 +214,8 @@ export function MemberControls(props: MemberRowProps) {
       data-testid={`member-${props.displayName}`}
     >
       <div className="flex flex-wrap items-center gap-3">
-        <Housemate
+        <MemberCharacter
+          sprites={props.sprites}
           avatar={props.character}
           memberId={props.id}
           scale={2}
@@ -308,7 +312,8 @@ export function MemberControls(props: MemberRowProps) {
             </p>
             <div className="flex items-center gap-3">
               <span className="pixel-frame inline-flex bg-bm-ink p-2">
-                <Housemate
+                <MemberCharacter
+                  sprites={props.sprites}
                   avatar={props.character}
                   memberId={props.id}
                   scale={3}
