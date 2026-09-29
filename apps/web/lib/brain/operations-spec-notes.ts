@@ -63,10 +63,14 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
   link_telegram: {
     purpose:
       "Links the sender's Telegram account to the member who created the code in Olympics' Settings.",
-    when: "Only for `/link <code>` sent in a DM. Refuse it in the group: anyone who reads a code there could claim it first.",
+    when: "Only for `/link <code>` sent in a DM, or `/start link_<code>` (the Settings deep link, the same thing). Refuse it in the group: anyone who reads a code there could claim it first.",
     examples: [
       {
         say: "/link K7PQ2MX9RT",
+        call: 'link_telegram {"code": "K7PQ2MX9RT"}',
+      },
+      {
+        say: "/start link_K7PQ2MX9RT",
         call: 'link_telegram {"code": "K7PQ2MX9RT"}',
       },
     ],
