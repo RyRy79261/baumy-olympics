@@ -234,6 +234,7 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 | [`add_pot_contribution`](#add_pot_contribution-add-to-the-pot) | write | confirm | always | no, only themself |
 | [`get_weights`](#get_weights-weights) | read | safe | never | yes |
 | [`veto_weight`](#veto_weight-veto-a-weight-change) | write | confirm | always | yes |
+| [`get_points_history`](#get_points_history-points-history) | read | safe | never | yes |
 | [`list_events`](#list_events-calendar) | read | safe | never | yes |
 | [`create_event`](#create_event-add-a-calendar-event) | write | confirm | always | yes |
 | [`update_event`](#update_event-change-a-calendar-event) | write | confirm | always | yes |
@@ -1307,6 +1308,49 @@ Vetoes a scheduled weight change before it applies. Only a member other than the
 
 **Say back:** "Vetoed. <chore> keeps its points."
 
+### `get_points_history`: Points history
+
+Every change to the bounties' points, newest first: who set or scheduled it, the points and cooldown before and after, the reason, when it applies, and whether it landed, is waiting, was vetoed (by whom, when) or was cancelled.
+
+| | |
+| --- | --- |
+| Kind | `read` |
+| Risk | `safe`: runs straight away, on anyone's behalf too |
+| Who may | any linked member |
+| On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` |
+| `Idempotency-Key` | not needed |
+| Rate limit | 120 per Telegram user and 300 per IP in a minute |
+
+**When to use it.** For "who changed the trash points?" or "why is the bathroom worth 50 now?". Give `choreId` (from list_chores) for one bounty; leave it out for all of them.
+
+**Tool description** (the registry's, verbatim): Lists every change to the bounties' points, newest first, or one bounty's: who made or scheduled it, the points and cooldown before and after, the reason, when it was proposed and when it applies, and whether it landed, is waiting, was vetoed (by whom, when) or was cancelled.
+
+**Examples.**
+
+- "who changed the bathroom points?" → `get_points_history {"choreId": "<from list_chores>"}`
+
+**Input** (JSON Schema of the body):
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "choreId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+**Returns** (`data`): `changes`, newest first: `choreName`, `source` (seed, manual, measured, admin), `proposedBy`, `proposedAt`, `fromPoints` → `toPoints` and the cooldowns in minutes, `reason`, `appliesAt`, `outcome` (landed, pending, vetoed, cancelled), `decidedBy` and `decidedAt`.
+
+**Its errors:** none of its own. Every call can also get the endpoint's codes (above).
+
+**Say back:** "<name> changed <chore> from <old> to <new> points on <Berlin date> (<reason>); <vetoer> vetoed it." One line per change, newest first.
+
 ### `list_events`: Calendar
 
 The house calendar between two Berlin days.
@@ -2169,6 +2213,7 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `adjust_points`: An admin action: UI only (SPEC §12 decision 10).
 - `set_prize_mode`: An admin action: UI only (SPEC §12 decision 10).
 - `schedule_weight`: An admin action: UI only (SPEC §12 decision 10).
+- `schedule_points_change`: An admin action: UI only (SPEC §12 decision 10).
 - `dismiss_weight`: An admin action: UI only (SPEC §12 decision 10).
 - `add_shopping_items`: The shopping list is brain's own (`baumy_list_items`); brain changes it directly, and Olympics calls brain to do the same.
 - `check_off_shopping_items`: The shopping list is brain's own; brain ticks items off directly.
