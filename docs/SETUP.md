@@ -160,6 +160,7 @@ BRAIN_BASE_URL=
 KITCHEN_API_TOKEN=
 KIOSK_NIGHT_HOURS=
 SIGN_IN_WITH_BAUMY=
+TELEGRAM_BOT_USERNAME=
 ```
 
 In baumy-brain's `.env.example`, add `KITCHEN_API_TOKEN=`,
@@ -200,7 +201,8 @@ too; the lines are in brain's SETUP.md and the PR bodies).
       token you copied) and `OLYMPICS_BASE_URL` (the custom domain, one that does
       not redirect), redeploy, run `scripts/set-commands.ts` and
       `pnpm test:scenarios:live`.
-- [ ] **Link Telegram:** Settings → Create a link code → `/link <code>` to
+- [ ] **Link Telegram:** Settings → Link Telegram → Open Telegram (or scan
+      the QR code) → Start. The fallback is sending `/link <code>` to
       `@baumy_bot`. Then add "milk" in the Telegram group and see it on the
       kiosk within a minute.
       Details: [Shopping list](#shopping-list-issue-26),
@@ -903,6 +905,32 @@ Telegram group. No migration.
 - [ ] **Look and feel is deferred to issue #7.** The tap-to-check rows are
       neutral placeholders in `packages/ui/src/check-list.tsx`.
 
+## One-tap Telegram linking (issue #108)
+
+Settings → **Link Telegram** makes the one-time link code as before and shows
+it as a Telegram deep link, `https://t.me/baumy_bot?start=link_<code>`: an
+**Open Telegram** button and a QR code of the same link (for linking from a
+phone while on a laptop). Tapping **Start** in Telegram sends the bot
+`/start link_<code>`, which brain redeems like `/link <code>`; Settings then
+says "Linked" on its own. `/link <code>` stays as the fallback.
+
+- [ ] **Merge and deploy the brain side:** the baumy-brain PR that handles
+      `/start link_<code>` (linked from Olympics PR for issue #108). Until it
+      is deployed, Start only shows brain's intro and the member uses the
+      `/link <code>` line under the QR code instead.
+- [ ] **Nothing to set** for the live bot: the username defaults to
+      `baumy_bot`. Set `TELEGRAM_BOT_USERNAME` in Vercel only for another bot
+      (a test bot, say); a value that is not a Telegram username falls back
+      to `baumy_bot`.
+- [ ] **Add this line to `.env.example`** by hand (it is in turbo
+      `globalEnv`):
+
+      ```
+      # One-tap Telegram linking (issue #108): the bot Settings' "Link Telegram"
+      # deep link opens. Unset means baumy_bot.
+      TELEGRAM_BOT_USERNAME=
+      ```
+
 ## Sign in with Baumy (issue #80)
 
 "Sign in with Baumy" signs a member in by tapping, in a Telegram DM from
@@ -972,8 +1000,9 @@ tokens against Docker Postgres.
       app's production URL (the names issue #28 gives brain's client), then
       redeploy brain once that client exists.
 - [ ] **Link your own Telegram account** once brain is deployed: Settings →
-      Create a link code, then send `/link <code>` to `@baumy_bot`. Or, as an
-      admin, type a member's Telegram user id on `/admin/members`.
+      Link Telegram → Open Telegram (or scan its QR code with your phone) →
+      Start. Or send `/link <code>` to `@baumy_bot`, or, as an admin, type a
+      member's Telegram user id on `/admin/members`.
 - [ ] **Check it** with a curl from your machine (the example at the end of
       brain-integration.md): with `X-Baumy-Confirmed: 1` the event appears on
       `/calendar`; without it the answer is 428 `CONFIRMATION_REQUIRED`.

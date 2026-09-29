@@ -15,7 +15,7 @@
   {
     "name": "link_telegram",
     "title": "Link a Telegram account",
-    "description": "Links the calling Telegram user to the household member who created the one-time link code in Baumy's Settings. Call it when someone sends /link <code>.",
+    "description": "Links the calling Telegram user to the household member who created the one-time link code in Baumy's Settings. Call it when someone sends /link <code>, or /start link_<code> from the Settings deep link.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

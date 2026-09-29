@@ -1,9 +1,20 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button, Card, Field, FormMessage, Input } from "@baumy/ui";
+import {
+  Button,
+  buttonClass,
+  Card,
+  Field,
+  FormMessage,
+  Input,
+} from "@baumy/ui";
+import { PixelQr } from "@/components/account/pixel-qr";
 import { useActionForm } from "@/components/use-action-form";
+import { telegramLinkDeepLink } from "@/lib/telegram/deep-link";
 import { createTelegramLinkCodeAction, setKioskPinAction } from "./actions";
+import { useLinkWatch } from "./use-link-watch";
 
 /** set_kiosk_pin: a 4 to 6 digit PIN, typed twice. */
 export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
@@ -99,42 +110,113 @@ export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
   );
 }
 
-/** create_telegram_link_code: a one-time code to send to the Baumy bot. */
-export function TelegramLinkForm({ linked }: { linked: boolean }) {
+/**
+ * create_telegram_link_code as one tap (issue #108): the code becomes a
+ * Telegram deep link (Open Telegram, or its QR code from a laptop), and the
+ * page re-reads itself until the bot has linked the account. `/link <code>`
+ * stays as the fallback.
+ */
+export function TelegramLinkForm({
+  telegramUserId,
+  botUsername,
+}: {
+  /** The member's linked Telegram id, from the page's own read. */
+  telegramUserId: number | null;
+  botUsername: string;
+}) {
+  const router = useRouter();
   const { state, formAction, pending, requestId } = useActionForm(
     createTelegramLinkCodeAction,
   );
+  // The link as it was when the code was made: a change means the bot
+  // redeemed it (a relink moves the id, so "linked" alone is not enough).
+  const [before, setBefore] = useState<number | null | undefined>(undefined);
+  const code = state?.ok ? state.data.code : null;
+  const justLinked =
+    code !== null &&
+    before !== undefined &&
+    telegramUserId !== null &&
+    telegramUserId !== before;
+  const expiresAt = state?.ok ? Date.parse(state.data.expiresAt) : 0;
+  useLinkWatch({
+    active: code !== null && !justLinked,
+    until: expiresAt,
+    refresh: router.refresh,
+  });
+  const linked = telegramUserId !== null;
+  const deepLink = code ? telegramLinkDeepLink(code, botUsername) : null;
+
   return (
     <Card
       title="Telegram"
       description={
         linked
-          ? "Your Telegram account is linked. Create a code to link a different one."
+          ? "Your Telegram account is linked. Link again to switch to a different one."
           : "Link your Telegram account so the Baumy bot knows who you are."
       }
     >
-      <form action={formAction} className="flex flex-col gap-4">
+      <form
+        action={formAction}
+        onSubmit={() => setBefore(telegramUserId)}
+        className="flex flex-col gap-4"
+      >
         <input type="hidden" name="requestId" value={requestId} />
-        {state?.ok && state.data.code ? (
+        {justLinked ? (
           <FormMessage tone="success">
-            Send{" "}
-            <code data-testid="telegram-link-code">
-              /link {state.data.code}
-            </code>{" "}
-            to the Baumy bot before{" "}
-            {new Date(state.data.expiresAt).toLocaleTimeString()}. It works
-            once.
+            Linked. @{botUsername} knows who you are now.
           </FormMessage>
+        ) : deepLink && code ? (
+          <div className="flex flex-col gap-4">
+            <p className="text-base">
+              Tap <strong>Open Telegram</strong>, then <strong>Start</strong>.
+              On a laptop, scan the code with your phone instead.
+            </p>
+            <a
+              href={deepLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClass("primary", "default", "self-start")}
+              data-testid="telegram-deep-link"
+            >
+              Open Telegram
+            </a>
+            <PixelQr
+              value={deepLink}
+              label={`QR code that opens @${botUsername} in Telegram`}
+            />
+            <p className="text-sm text-bm-muted">
+              No luck? Send{" "}
+              <code data-testid="telegram-link-code" className="select-all">
+                /link {code}
+              </code>{" "}
+              to @{botUsername} instead. The link works once, until{" "}
+              {new Date(expiresAt).toLocaleTimeString()}.
+            </p>
+            <p role="status" className="text-sm text-bm-muted">
+              Waiting for Telegram...
+            </p>
+          </div>
         ) : state?.ok ? (
           <FormMessage tone="error">
-            That code was already shown. Create a new one.
+            That link was already shown. Make a new one.
           </FormMessage>
         ) : state ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}
-        <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? "Creating..." : "Create a link code"}
-        </Button>
+        {justLinked ? null : (
+          <Button
+            type="submit"
+            variant={code ? "secondary" : "primary"}
+            className="self-start"
+            disabled={pending}
+          >
+            {pending
+              ? "Making a link..."
+              : code
+                ? "Make a new link"
+                : "Link Telegram"}
+          </Button>
+        )}
       </form>
     </Card>
   );
