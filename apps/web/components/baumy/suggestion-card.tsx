@@ -140,11 +140,14 @@ function DropButton({
   row,
   onDrop,
   busy,
+  kiosk,
   className,
 }: {
   row: ReviewRow;
   onDrop: () => void;
   busy: boolean;
+  /** Kiosk touch targets are at least 56px. */
+  kiosk: boolean;
   className?: string;
 }) {
   return (
@@ -155,7 +158,8 @@ function DropButton({
       disabled={busy}
       onClick={onDrop}
       className={cx(
-        "flex size-11 shrink-0 items-center justify-center font-label text-xl leading-none disabled:opacity-50",
+        "flex shrink-0 items-center justify-center font-label text-xl leading-none disabled:opacity-50",
+        kiosk ? "size-14" : "size-11",
         className,
       )}
     >
@@ -231,7 +235,9 @@ export function SuggestionCard({
             {state}
           </span>
         </span>
-        {open ? <DropButton row={row} onDrop={onDrop} busy={busy} /> : null}
+        {open ? (
+          <DropButton row={row} onDrop={onDrop} busy={busy} kiosk={kiosk} />
+        ) : null}
       </li>
     );
   }
@@ -248,6 +254,7 @@ export function SuggestionCard({
               row={row}
               onDrop={onDrop}
               busy={busy}
+              kiosk={kiosk}
               className="-mt-2 -mr-2 text-bm-muted"
             />
           ) : null}
