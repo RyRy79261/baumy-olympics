@@ -139,15 +139,23 @@ Telegram user (30 writes or 120 reads a minute by default); and
 
 ## Linking a Telegram account (`/link`)
 
-1. The member opens **Settings** in Olympics and taps **Create a link code**.
-   The code (10 characters, valid 10 minutes, single use) is shown once;
-   only its hash is stored.
-2. They send `/link <code>` to the Baumy bot.
-3. Brain calls `POST /api/v1/actions/link_telegram` with `{"code": "<code>"}`,
+1. The member opens **Settings** in Olympics and taps **Link Telegram**
+   (`create_telegram_link_code`). The code (10 characters, valid 10 minutes,
+   single use) is shown once; only its hash is stored. Settings turns it into
+   the deep link `https://t.me/<bot>?start=link_<code>` (issue #108), shown as
+   an **Open Telegram** button and a QR code of the same link for a phone.
+   `<bot>` is `TELEGRAM_BOT_USERNAME` (default `baumy_bot`;
+   `lib/telegram/deep-link.ts`).
+2. Tapping **Start** in Telegram sends `/start link_<code>` from the member's
+   own DM; brain treats it exactly like `/link <code>`, which stays the manual
+   fallback (Settings shows it under the QR code). Both are DM only.
+3. Settings re-reads itself every 3 seconds (and on focus) until the code
+   expires, so it says "Linked" once brain has redeemed the code.
+4. Brain calls `POST /api/v1/actions/link_telegram` with `{"code": "<code>"}`,
    the sender in `X-Baumy-Actor` and a fresh `Idempotency-Key`. This is the
    ONE action an unlinked Telegram user may call; the member comes from the
    code, not from the header.
-4. Olympics claims the code with one `UPDATE … RETURNING` (unused and
+5. Olympics claims the code with one `UPDATE … RETURNING` (unused and
    unexpired), sets `members.telegram_user_id` and audits it with
    `source=brain`. The answer is `{memberId, displayName}`, so brain can say
    "Linked you as Ryan".
