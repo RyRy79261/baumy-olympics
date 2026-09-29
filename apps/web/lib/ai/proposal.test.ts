@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { PotAmountCents } from "@baumy/types";
 import { describeFields, humanize } from "./proposal";
 
 // The editable fields of a proposal come from the tool's own JSON Schema.
@@ -78,6 +79,33 @@ describe("describeFields", () => {
       },
       { name: "notes", label: "Notes", required: true, kind: "textarea" },
       { name: "tags", label: "Tags", required: false, kind: "readonly" },
+    ]);
+  });
+
+  it("types a text-or-number amount (the pot's euros) as text", () => {
+    const schema = z.toJSONSchema(
+      z.strictObject({
+        amount: PotAmountCents,
+        either: z.union([z.string(), z.boolean()]),
+      }),
+      { io: "input" },
+    ) as Record<string, unknown>;
+    expect(describeFields(schema, choices)).toEqual([
+      { name: "amount", label: "Amount", required: true, kind: "text" },
+      { name: "either", label: "Either", required: true, kind: "readonly" },
+    ]);
+    // The same union written as anyOf.
+    expect(
+      describeFields(
+        {
+          properties: {
+            euros: { anyOf: [{ type: "string" }, { type: "integer" }] },
+          },
+        },
+        choices,
+      ),
+    ).toEqual([
+      { name: "euros", label: "Euros", required: false, kind: "text" },
     ]);
   });
 

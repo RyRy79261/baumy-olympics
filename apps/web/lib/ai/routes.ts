@@ -214,6 +214,7 @@ export async function handleCommand(
       actor: {
         id: ctx.actor.memberId!,
         displayName: me?.displayName ?? "the acting member",
+        admin: ctx.actor.kind === "member" && ctx.actor.role === "admin",
       },
       device: ctx.actor.kind === "kiosk" ? "kiosk" : "phone",
       members: household.members,

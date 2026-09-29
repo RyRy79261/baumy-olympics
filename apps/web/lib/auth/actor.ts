@@ -111,6 +111,13 @@ export interface ServiceActor {
   telegramUserId?: number;
   memberId?: string;
   /**
+   * The linked member's role, read with the Telegram mapping on every call.
+   * Only set when brain acts in that member's own name (never on someone's
+   * behalf): `requireAdmin` lets a linked admin run the admin actions
+   * offered to brain (issue #107).
+   */
+  role?: MemberRole;
+  /**
    * Set only for `X-Baumy-On-Behalf-Of` (issue #70): the linked member who
    * asked, while `memberId` is the housemate the action is done for.
    * `runAction` records it on the audit row as `initiated_by_member_id`.

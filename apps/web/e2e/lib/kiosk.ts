@@ -69,11 +69,12 @@ export async function pairedKiosk(
   return { context, page };
 }
 
-export async function typePin(dialog: Locator, pin: string) {
+/** Type a PIN on the pad and press its submit, "OK" unless the form names it. */
+export async function typePin(dialog: Locator, pin: string, submit = "OK") {
   for (const digit of pin) {
     await dialog.getByRole("button", { name: digit, exact: true }).click();
   }
-  await dialog.getByRole("button", { name: "OK" }).click();
+  await dialog.getByRole("button", { name: submit }).click();
 }
 
 /** Go to a page by the kiosk's footer nav (Home, Bounties, Calendar, ...). */

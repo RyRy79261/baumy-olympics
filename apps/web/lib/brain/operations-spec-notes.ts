@@ -267,6 +267,24 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
     reply:
       'Amounts in euros ("€120.00"), and who would take it now, or that nobody leads outright.',
   },
+  add_pot_contribution: {
+    purpose:
+      "Records money paid into the season's pot (a ledger; the money moves at the bank).",
+    when: "Only when an admin says they (or a named housemate) paid into the pot. A non-admin gets FORBIDDEN: say an admin records it. Leave `month` out for this month; set `contributedBy` to a member id when someone else paid.",
+    examples: [
+      {
+        say: "put €20 in the pot",
+        call: 'add_pot_contribution {"amount": "20"}',
+      },
+      {
+        say: "Anna paid 25 for August",
+        call: 'add_pot_contribution {"amount": "25", "month": "2026-08", "contributedBy": "<Anna\'s member id>"}',
+      },
+    ],
+    returns: "`contributionId`, `month`, `amountCents`, `contributedBy`.",
+    errors: ["NOT_FOUND", "FUTURE", "SEASON_CLOSED"],
+    reply: '"Added €<amount> to the pot for <month>."',
+  },
   get_weights: {
     purpose:
       "Each chore's points and cooldown, how often it is really done, and the weight changes scheduled for next Monday.",
@@ -296,6 +314,38 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
     returns: "`suggestionId`, `choreId`, `status` (vetoed).",
     errors: ["NOT_FOUND", "INVALID_STATE", "WINDOW_CLOSED", "SELF_VETO"],
     reply: '"Vetoed. <chore> keeps its points."',
+  },
+  create_bounty: {
+    purpose:
+      "Adds a bounty (a chore that scores points) to the board, as an admin.",
+    when: "Only when an admin asks for a new bounty. A non-admin gets FORBIDDEN: say an admin adds it. Give a name and points; the rest has defaults (maintenance, 24 h cooldown, no photo, counts at once).",
+    examples: [
+      {
+        say: "add a bounty for recycling paper, 15 points",
+        call: 'create_bounty {"name": "Recycling (paper)", "points": 15}',
+      },
+      {
+        say: "new bounty: buy dish soap, 10 points",
+        call: 'create_bounty {"name": "Dish soap", "kind": "consumable", "points": 10}',
+      },
+    ],
+    returns: "`choreId` and `name` of the new bounty.",
+    errors: ["CHORE_NAME_TAKEN"],
+    reply: '"Added the <name> bounty: <points> points."',
+  },
+  update_bounty: {
+    purpose:
+      "Edits a bounty as an admin: only the fields sent change. A new weight counts from now.",
+    when: "Only when an admin asks to change a bounty's name, kind, points, cooldown, photo or confirm rule. Find the `choreId` with list_chores. Archiving is done in the app.",
+    examples: [
+      {
+        say: "make the trash worth 30 points",
+        call: 'update_bounty {"choreId": "<from list_chores>", "points": 30}',
+      },
+    ],
+    returns: "`choreId`, `name` and `weightChanged`.",
+    errors: ["NOT_FOUND", "ARCHIVED_CHORE", "CHORE_NAME_TAKEN"],
+    reply: '"Done: <name> is now <what changed>."',
   },
   list_events: {
     purpose: "The house calendar between two Berlin days.",

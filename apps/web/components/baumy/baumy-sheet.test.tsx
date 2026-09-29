@@ -114,6 +114,30 @@ async function settle(ms = 0) {
   });
 }
 
+/** Set a React-controlled input's value, as typing would. */
+async function typeInto(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+/** Type to Baumy in the sheet and send it. */
+async function typeAndSend(text: string) {
+  await typeInto(
+    document.querySelector<HTMLInputElement>("#baumy-text")!,
+    text,
+  );
+  const send = [...document.querySelectorAll("button")].find(
+    (b) => b.textContent?.trim() === "Send",
+  )!;
+  await act(async () => send.click());
+  await settle();
+}
+
 describe("BaumySheet voice", () => {
   it("offers the microphone with a transcriber and a browser that records", () => {
     mount(true);
@@ -345,7 +369,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(button("Start talking")).toBeDefined();
   });
 
-  it("listens, shows what it understood, and does it on Yes", async () => {
+  it("listens, shows what it understood, and does it on Confirm all", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
     await act(async () => cat().click());
@@ -364,7 +388,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(bubble()!.dataset.mode).toBe("answer");
     expect(bubble()!.textContent).toContain("Got it! I'll do this:");
     expect(bubble()!.textContent).toContain("Log Bins for Ryan: +10");
-    await act(async () => button("Yes, do it").click());
+    await act(async () => button("Confirm all").click());
     await settle(10);
     expect(fetchMock.mock.calls.at(-1)![0]).toBe("/api/actions/run");
     expect(refresh).toHaveBeenCalled();
@@ -466,7 +490,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(document.body.textContent).not.toContain("I did the bins");
   });
 
-  it("does nothing on No, and Type instead opens the sheet", async () => {
+  it("does nothing on Cancel, and Type instead opens the sheet", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
     await act(async () => cat().click());
@@ -474,7 +498,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     await act(async () => button("Done talking").click());
     await settle();
     await settle();
-    await act(async () => button("No").click());
+    await act(async () => button("Cancel").click());
     expect(bubble()).toBeNull();
     expect(fetchMock.mock.calls.map((c) => c[0])).not.toContain(
       "/api/actions/run",
@@ -503,6 +527,180 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(bubble()!.textContent).toContain("Ryan is winning.");
     await act(async () => button("OK").click());
     expect(bubble()).toBeNull();
+  });
+
+  it("confirms every valid card in order, with the PIN only where needed, never the invalid one (issue #107)", async () => {
+    const pinned = {
+      ...proposal,
+      proposalId: "p2",
+      preview: "Log Bins for Sam: +10",
+      needsPin: true,
+    };
+    const invalid = {
+      ...proposal,
+      proposalId: "p3",
+      name: "create_bounty",
+      preview: "New bounty: Recycling · maintenance · 15 pts",
+      valid: false,
+      error: "This can only be done signed in on your own phone or computer.",
+    };
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/actions/run"
+        ? json({ ok: true, data: { totalPts: 10 } })
+        : json({
+            ok: true,
+            data: {
+              reply: "Lined up.",
+              proposals: [proposal, pinned, invalid],
+              choices: { members: [], chores: [] },
+            },
+          }),
+    );
+    mountCat({ actingName: "Ryan", voice: false });
+    act(() => cat().click());
+    const input = document.querySelector<HTMLInputElement>("#baumy-text")!;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      set.call(input, "bins for me and Sam, and a bounty");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => button("Send").click());
+    await settle();
+    expect(document.body.textContent).toContain(invalid.error);
+    await act(async () => button("Confirm all").click());
+    // One PIN for the acting member, before anything runs.
+    expect(fetchMock.mock.calls.map((c) => c[0])).not.toContain(
+      "/api/actions/run",
+    );
+    for (const d of ["4", "3", "2", "1"]) {
+      await act(async () => button(d).click());
+    }
+    const pad = document.querySelector<HTMLFormElement>(
+      'form[aria-label="Ryan\'s PIN"]',
+    )!;
+    await act(async () => pad.requestSubmit());
+    await settle(10);
+    const runs = fetchMock.mock.calls
+      .filter((c) => c[0] === "/api/actions/run")
+      .map((c) => JSON.parse((c[1] as RequestInit).body as string));
+    expect(runs).toEqual([
+      expect.objectContaining({ requestId: "p1", surface: "kiosk" }),
+      expect.objectContaining({ requestId: "p2", pin: "4321" }),
+    ]);
+    expect(runs[0]).not.toHaveProperty("pin");
+    expect(
+      [...document.querySelectorAll("li[data-testid^=suggestion-]")].map((li) =>
+        li.getAttribute("data-state"),
+      ),
+    ).toEqual(["saved", "saved", "pending"]);
+    expect(document.body.textContent).toContain("Saved: +10 points.");
+  });
+
+  it("sends a wrong PIN once, never to every card that needs it", async () => {
+    // Five cards vouch for someone, one does not. A PIN try counts against
+    // the member's PIN (5 per 15 minutes): one typo must cost one try.
+    const pinned = (n: number) => ({
+      ...proposal,
+      proposalId: `pin${n}`,
+      name: "confirm_completion",
+      preview: `Confirm claim ${n}`,
+      needsPin: true,
+    });
+    const free = { ...proposal, proposalId: "free" };
+    const cards = [pinned(1), pinned(2), free, pinned(3), pinned(4), pinned(5)];
+    fetchMock.mockImplementation(
+      async (url: string, init: RequestInit | undefined) => {
+        if (url !== "/api/actions/run") {
+          return json({
+            ok: true,
+            data: {
+              reply: "Lined up.",
+              proposals: cards,
+              choices: { members: [], chores: [] },
+            },
+          });
+        }
+        const b = JSON.parse(String(init!.body)) as {
+          requestId: string;
+          pin?: string;
+        };
+        if (!b.requestId.startsWith("pin") || b.pin === "4321") {
+          return json({ ok: true, data: { totalPts: 10 } });
+        }
+        return json(
+          b.pin === undefined
+            ? {
+                ok: false,
+                code: "ATTESTATION_REQUIRED",
+                message: "Enter your PIN.",
+              }
+            : {
+                ok: false,
+                code: "ATTESTATION_FAILED",
+                message: "That PIN is not right.",
+              },
+        );
+      },
+    );
+    const runs = () =>
+      fetchMock.mock.calls
+        .filter((c) => c[0] === "/api/actions/run")
+        .map(
+          (c) =>
+            JSON.parse(String((c[1] as RequestInit).body)) as {
+              requestId: string;
+              pin?: string;
+            },
+        );
+    const states = () =>
+      [...document.querySelectorAll("[data-testid^=suggestion-]")].map((li) =>
+        li.getAttribute("data-state"),
+      );
+    async function confirmWithPin(pin: string) {
+      await act(async () => button("Confirm all").click());
+      for (const d of pin) await act(async () => button(d).click());
+      await act(async () =>
+        document
+          .querySelector<HTMLFormElement>('form[aria-label="Ryan\'s PIN"]')!
+          .requestSubmit(),
+      );
+      await settle(10);
+    }
+
+    mountCat({ actingName: "Ryan", voice: false });
+    act(() => cat().click());
+    await typeAndSend("confirm them all");
+    expect(states()).toHaveLength(6);
+
+    await confirmWithPin("1111");
+    // One try with the wrong PIN; the card that needs none still saved.
+    expect(runs().filter((r) => r.pin !== undefined)).toEqual([
+      expect.objectContaining({ requestId: "pin1", pin: "1111" }),
+    ]);
+    expect(runs().map((r) => r.requestId)).toEqual(["pin1", "free"]);
+    expect(states()).toEqual([
+      "pending",
+      "pending",
+      "saved",
+      "pending",
+      "pending",
+      "pending",
+    ]);
+    expect(document.body.textContent).toContain("That PIN is not right.");
+    // Every card that needs the PIN still says so.
+    expect(document.body.textContent!.match(/Needs your PIN/g)).toHaveLength(5);
+
+    // The right PIN, typed again, saves the rest: one request each.
+    await confirmWithPin("4321");
+    expect(
+      runs()
+        .filter((r) => r.pin === "4321")
+        .map((r) => r.requestId),
+    ).toEqual(["pin1", "pin2", "pin3", "pin4", "pin5"]);
+    expect(states().every((s) => s === "saved")).toBe(true);
   });
 
   it("opens the sheet at once without a microphone, and always asks who", async () => {
@@ -539,15 +737,133 @@ describe("BaumySheet on the kitchen dashboard", () => {
     });
     await act(async () => button("Send").click());
     await settle();
-    await act(async () => button("Approve").click());
+    await act(async () => button("Confirm all").click());
     await settle();
     expect(refresh).toHaveBeenCalled();
     // Nothing is said while the sheet is open.
     expect(bubble()).toBeNull();
-    await act(async () => button("Close").click());
+    await act(async () => button("Done").click());
     expect(bubble()!.textContent).toBe("Purrfect. +10 for Ryan ✦");
     // Opening it again clears it.
     act(() => cat().click());
     expect(bubble()).toBeNull();
+  });
+});
+
+// Editing a card while Confirm all could run (PR #110 review): the edit
+// replaces the card under a new proposal id, so running both would save the
+// same thing twice (€20 plain, then €20 edited).
+describe("BaumySheet editing a card", () => {
+  const pot = (id: string, amount: string) => ({
+    proposalId: id,
+    name: "add_pot_contribution",
+    title: "Add to the pot",
+    input: { amount },
+    preview: `Add €${amount} to the pot`,
+    risk: "confirm",
+    valid: true,
+    needsPin: false,
+    fields: [{ name: "amount", label: "Amount", kind: "text", required: true }],
+  });
+  const buttonNamed = (name: string) =>
+    [...document.querySelectorAll("button")].find(
+      (b) => b.textContent?.trim() === name,
+    );
+  const confirmAll = () => buttonNamed("Confirm all")!;
+  const runs = () =>
+    fetchMock.mock.calls
+      .filter((c) => c[0] === "/api/actions/run")
+      .map(
+        (c) =>
+          (
+            JSON.parse(String((c[1] as RequestInit).body)) as {
+              requestId: string;
+            }
+          ).requestId,
+      );
+
+  /** Baumy answers with €20; the re-check (held until `recheck`) with €25. */
+  function answering() {
+    let recheck: () => void = () => undefined;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/ai/proposal") {
+        return new Promise<Response>((resolve) => {
+          recheck = () => resolve(json({ ok: true, data: pot("p2", "25") }));
+        });
+      }
+      if (url === "/api/actions/run") return json({ ok: true, data: {} });
+      return json({
+        ok: true,
+        data: {
+          reply: "Pot it is.",
+          proposals: [pot("p1", "20")],
+          choices: { members: [], chores: [] },
+        },
+      });
+    });
+    return { recheck: () => recheck() };
+  }
+
+  async function editTo(amount: string) {
+    await act(async () => buttonNamed("Edit")!.click());
+    await typeInto(
+      document.querySelector<HTMLInputElement>("#p1-amount")!,
+      amount,
+    );
+    await act(async () => buttonNamed("Check it")!.click());
+  }
+
+  it("holds Confirm all while a card's edit is open", async () => {
+    answering();
+    mount(false);
+    await typeAndSend("put 20 in the pot");
+    expect(confirmAll().disabled).toBe(false);
+    await act(async () => buttonNamed("Edit")!.click());
+    expect(confirmAll().disabled).toBe(true);
+    expect(document.body.textContent).toContain(
+      "Finish the edit (Check it, or Back) before Confirm all.",
+    );
+    await act(async () => buttonNamed("Back")!.click());
+    expect(confirmAll().disabled).toBe(false);
+    expect(document.body.textContent).not.toContain("Finish the edit");
+  });
+
+  it("holds it while the edit is checked, then saves only the edited card", async () => {
+    const { recheck } = answering();
+    mount(false);
+    await typeAndSend("put 20 in the pot");
+    await editTo("25");
+    expect(buttonNamed("Checking…")).toBeDefined();
+    expect(confirmAll().disabled).toBe(true);
+    await act(async () => confirmAll().click());
+    expect(runs()).toEqual([]);
+
+    await act(async () => recheck());
+    await settle();
+    expect(document.body.textContent).toContain("Add €25 to the pot");
+    expect(document.body.textContent).not.toContain("Add €20 to the pot");
+    expect(confirmAll().disabled).toBe(false);
+    await act(async () => confirmAll().click());
+    await settle();
+    expect(runs()).toEqual(["p2"]);
+  });
+
+  it("never brings back a card dropped while its edit was checked", async () => {
+    const { recheck } = answering();
+    mount(false);
+    await typeAndSend("put 20 in the pot");
+    await editTo("25");
+    const drop = document.querySelector<HTMLButtonElement>(
+      'button[aria-label="Drop: Add €20 to the pot"]',
+    )!;
+    await act(async () => drop.click());
+    expect(document.body.textContent).not.toContain("Add €20 to the pot");
+
+    await act(async () => recheck());
+    await settle();
+    // The re-check came back, but the card stays dropped.
+    expect(document.body.textContent).toContain("Pot it is.");
+    expect(document.body.textContent).not.toContain("Add €25 to the pot");
+    expect(runs()).toEqual([]);
   });
 });

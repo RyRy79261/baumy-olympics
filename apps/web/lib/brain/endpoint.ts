@@ -8,6 +8,7 @@ import {
 import { REQUEST_ID_PATTERN } from "@/lib/actions/run";
 import type { ToolSpec } from "@/lib/actions/tool-specs";
 import type { ServiceActor } from "@/lib/auth";
+import { ADMIN_ON_BEHALF } from "@/lib/auth/gates";
 import { getClientIp, type RateLimiter } from "@/lib/rate-limit";
 import { BRAIN_SCOPE } from "@baumy/db/service-tokens";
 import { TelegramUserId } from "@baumy/types";
@@ -60,7 +61,9 @@ export interface BrainEndpointDeps {
   /** The live service token with this plaintext, or null. */
   verifyToken: (token: string) => Promise<ServiceCaller | null>;
   /** The active member linked to this Telegram user id, or null. */
-  findMember: (telegramUserId: number) => Promise<{ id: string } | null>;
+  findMember: (
+    telegramUserId: number,
+  ) => Promise<{ id: string; role?: "admin" | "member" } | null>;
   /** The active member of this household with this id, or null. */
   findHousemate: (memberId: string) => Promise<{ id: string } | null>;
   /** `toolSpecs("brain")`: admin and UI-only actions already dropped. */
@@ -303,6 +306,9 @@ async function onBehalfOf(
   // refusals below are about acting for someone else.
   if (target.id === asker.id) return { ok: true, target: null };
   if (name === LINK_ACTION) return issue(linking);
+  if (spec.admin_only) {
+    return fail("FORBIDDEN", ADMIN_ON_BEHALF);
+  }
   if (spec.own_word_only) {
     // Before the confirm check: no point asking for a tap that cannot help.
     return fail(
@@ -416,7 +422,10 @@ export async function handleBrainAction(
       ...(target
         ? { memberId: target.id, initiatorMemberId: member!.id }
         : member
-          ? { memberId: member.id }
+          ? {
+              memberId: member.id,
+              ...(member.role ? { role: member.role } : {}),
+            }
           : {}),
     };
     const result = await deps.runAction(name, body.input, {
