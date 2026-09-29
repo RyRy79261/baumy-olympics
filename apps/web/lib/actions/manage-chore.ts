@@ -49,11 +49,15 @@ const input = z.discriminatedUnion(
       // Without one, the chore's sprite is its name's slug (spriteFor).
       sprite: ChoreIcon.optional(),
     }),
-    // A kind or an icon left out is kept as it is.
+    // A kind or an icon left out is kept as it is. So is the weight when
+    // both points and cooldown are left out: the Bounties page changes
+    // points only through a scheduled weight change (issue #109).
     z.strictObject({
       op: z.literal("update"),
       choreId,
       ...settings,
+      basePoints: BasePoints.optional(),
+      cooldownHours: CooldownHours.optional(),
       kind: ChoreKind.optional(),
       sprite: ChoreIcon.optional(),
     }),
@@ -141,6 +145,25 @@ export const manageChore = defineAction({
     let data: ManageChoreData;
     if (change.op === "update") {
       if (
+        (change.basePoints === undefined) !==
+        (change.cooldownHours === undefined)
+      ) {
+        const message =
+          "Give the points and the cooldown together, or leave both out.";
+        return fail("INVALID_INPUT", message, {
+          issues: [
+            {
+              path: [
+                change.basePoints === undefined
+                  ? "basePoints"
+                  : "cooldownHours",
+              ],
+              message,
+            },
+          ],
+        });
+      }
+      if (
         await choreNameTaken(ctx.db, {
           householdId: ctx.householdId,
           name: change.name,
@@ -160,10 +183,13 @@ export const manageChore = defineAction({
           confirmMode: change.confirmMode,
           effortFactorPct: change.effortFactorPct,
         },
-        weight: {
-          basePoints: change.basePoints,
-          cooldownMinutes: cooldownMinutesFromHours(change.cooldownHours),
-        },
+        weight:
+          change.basePoints !== undefined && change.cooldownHours !== undefined
+            ? {
+                basePoints: change.basePoints,
+                cooldownMinutes: cooldownMinutesFromHours(change.cooldownHours),
+              }
+            : undefined,
         createdBy: admin,
         now: ctx.now,
       });
