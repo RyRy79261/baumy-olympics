@@ -68,6 +68,7 @@ function post(body: unknown, headers: Record<string, string> = {}): Request {
 
 /** Who is asking, per surface: Ryan's phone, or the kiosk with someone. */
 let phoneMember: string | undefined;
+let phoneRole: "admin" | "member" = "member";
 let kioskMember: string | undefined;
 const requestCtx: RunRouteDeps["requestCtx"] = async (
   surface,
@@ -82,11 +83,15 @@ const requestCtx: RunRouteDeps["requestCtx"] = async (
     });
   }
   if (phoneMember === undefined) return null;
-  return ctxFor(sessionActor(phoneMember), { requestId, now: new Date() });
+  return ctxFor(sessionActor(phoneMember, phoneRole), {
+    requestId,
+    now: new Date(),
+  });
 };
 
 beforeEach(() => {
   phoneMember = ryan;
+  phoneRole = "member";
   kioskMember = ryan;
 });
 
@@ -336,6 +341,20 @@ describe("POST /api/ai/command", () => {
     const system = create.mock.calls[0]![0].system as { text: string }[];
     expect(system[1]!.text).toContain(`"id":"${sam}","name":"Sam"`);
     expect(system[1]!.text).toContain("kitchen iPad");
+    expect(system[1]!.text).toContain("The acting member is not an admin.");
+  });
+
+  it("tells Claude when the phone's member is an admin (issue #107)", async () => {
+    const create = vi.fn(fakeClaude);
+    phoneRole = "admin";
+    await handleCommand(
+      post({ text: "hello" }),
+      commandDeps({ claude: () => ({ ok: true, kind: "fake", create }) }),
+    );
+    const system = create.mock.calls[0]![0].system as { text: string }[];
+    expect(system[1]!.text).toContain(
+      "The acting member is a household admin.",
+    );
   });
 });
 

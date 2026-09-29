@@ -330,9 +330,17 @@ export async function findActiveMemberByTelegramUserId(
   db: Queryable,
   householdId: string,
   telegramUserId: number,
-): Promise<{ id: string; displayName: string } | null> {
+): Promise<{
+  id: string;
+  displayName: string;
+  role: "admin" | "member";
+} | null> {
   const [row] = await db
-    .select({ id: members.id, displayName: members.displayName })
+    .select({
+      id: members.id,
+      displayName: members.displayName,
+      role: members.role,
+    })
     .from(members)
     .where(
       and(

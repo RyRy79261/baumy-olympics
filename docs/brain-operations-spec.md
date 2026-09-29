@@ -15,7 +15,9 @@ they are exactly what the endpoint enforces. The short contract is
    (`delete_event`, `delete_note`). A `confirm` or `destructive` action always
    waits for the asker's inline confirm button; a read, or a `safe` write for
    the asker, does not (section 3). Admin actions stay in the Olympics app only
-   (SPEC §12 decision 10).
+   (SPEC §12 decision 10), except adding and editing a bounty and recording
+   money in the pot (amended 2026-09-29, issue #107): those only for a linked
+   admin, in their own name, behind the confirm button.
 2. **Baumy can act on behalf of housemates.** With `X-Baumy-On-Behalf-Of` the
    action runs as that housemate; the audit trail records both the housemate
    and the linked member who asked. Any write on someone's behalf needs the
@@ -147,7 +149,11 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   the honesty layer (nobody confirms their own claim) would mean nothing.
   Tell the asker the housemate has to do it. Notes, reminders, calendar
   events and the rest do work on a housemate's behalf.
-- Admin actions stay unavailable, on anyone's behalf.
+- Admin actions stay unavailable, on anyone's behalf. The three admin writes
+  brain gets (`create_bounty`, `update_bounty`, `add_pot_contribution`) run
+  only for a linked admin in their own name (`admin_only` in the tool list):
+  a member gets 403 `FORBIDDEN`, and `X-Baumy-On-Behalf-Of` is refused with
+  403 "Admin changes can't be made on someone's behalf."
 - To turn a name into a member id, read the roster: `list_reminders` answers
   `members` (id, name) for every active member; `get_standings` lists them
   with their points. Match the name to exactly one member, or ask.
@@ -155,7 +161,9 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 ## 5. The household, as Olympics models it
 
 - **Members.** Each housemate is a member with a display name, a colour and a
-  16-bit character. One or more are admins; admin work happens in the app.
+  16-bit character. One or more are admins; admin work happens in the app,
+  except adding or editing a bounty and recording pot money, which an admin
+  may ask Baumy for.
   Nobody is hard-coded: always read names from Olympics.
 - **Bounties are chores.** Each chore has a `kind`: `consumable` (buy or
   refill: toilet paper, dish soap) or `maintenance` (clean or fix: trash,
@@ -209,6 +217,8 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 | [`deny_login`](#deny_login-deny-a-sign-in) | write | safe | never | no, only themself |
 | [`list_chores`](#list_chores-list-chores) | read | safe | never | yes |
 | [`log_completion`](#log_completion-log-a-chore) | write | confirm | always | no, use `doneBy` |
+| [`create_bounty`](#create_bounty-add-a-bounty) | write | confirm | always | no, only themself |
+| [`update_bounty`](#update_bounty-edit-a-bounty) | write | confirm | always | no, only themself |
 | [`get_pending_confirmations`](#get_pending_confirmations-claims-waiting-for-an-ok) | read | safe | never | yes |
 | [`confirm_completion`](#confirm_completion-confirm-a-chore) | write | confirm | always | no, only themself |
 | [`dispute_completion`](#dispute_completion-dispute-a-chore) | write | confirm | always | no, only themself |
@@ -218,6 +228,7 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 | [`get_standings`](#get_standings-get-the-standings) | read | safe | never | yes |
 | [`get_streaks`](#get_streaks-get-the-streaks) | read | safe | never | yes |
 | [`get_pot`](#get_pot-get-the-pot) | read | safe | never | yes |
+| [`add_pot_contribution`](#add_pot_contribution-add-to-the-pot) | write | confirm | always | no, only themself |
 | [`get_weights`](#get_weights-weights) | read | safe | never | yes |
 | [`veto_weight`](#veto_weight-veto-a-weight-change) | write | confirm | always | yes |
 | [`list_events`](#list_events-calendar) | read | safe | never | yes |
@@ -526,6 +537,198 @@ Logs that someone did a chore, and scores it.
 **Its errors:** `COOLDOWN` (422), `FUTURE` (422), `BACKDATE_TOO_FAR` (422), `OUT_OF_ORDER` (422), `SEASON_CLOSED` (422), `PHOTO_REQUIRED` (422), `ARCHIVED_CHORE` (422), `NO_RULE_VERSION` (422), `NOT_FOUND` (404). Every call can also get the endpoint's codes (above).
 
 **Say back:** "Logged <choreName> for <doneByName>: +<totalPts> (streak <streakLen>)", plus "and broke <brokenMemberName>'s streak of <brokenLen> for +<breakPts>" when there was a break, or "it counts once someone confirms it" when `counted` is false. On COOLDOWN say when it can be logged again (`retryAt`, in Berlin time). On PHOTO_REQUIRED: "that one needs a photo, log it in the app".
+
+### `create_bounty`: Add a bounty
+
+Adds a bounty (a chore that scores points) to the board, as an admin.
+
+| | |
+| --- | --- |
+| Kind | `write` |
+| Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
+| Who may | a linked admin, in their own name only (a member gets 403 `FORBIDDEN`) |
+| On a housemate's behalf | no (403 `FORBIDDEN`): an admin change is only ever made in the admin's own name |
+| `Idempotency-Key` | required; the same key again replays |
+| Rate limit | 30 per Telegram user and 120 per IP in a minute |
+
+**When to use it.** Only when an admin asks for a new bounty. A non-admin gets FORBIDDEN: say an admin adds it. Give a name and points; the rest has defaults (maintenance, 24 h cooldown, no photo, counts at once).
+
+**Tool description** (the registry's, verbatim): Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none), confirm mode (default optimistic) and effort factor (default 100). Only a household admin may do this, in their own name.
+
+**Examples.**
+
+- "add a bounty for recycling paper, 15 points" → `create_bounty {"name": "Recycling (paper)", "points": 15}`
+- "new bounty: buy dish soap, 10 points" → `create_bounty {"name": "Dish soap", "kind": "consumable", "points": 10}`
+
+**Input** (JSON Schema of the body):
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40,
+      "description": "What the bounty is called, e.g. Recycling."
+    },
+    "kind": {
+      "default": "maintenance",
+      "type": "string",
+      "enum": [
+        "consumable",
+        "maintenance"
+      ],
+      "description": "consumable (something to buy or refill) or maintenance (something to clean or fix)."
+    },
+    "points": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200,
+      "description": "Base points for doing it, 1 to 200."
+    },
+    "cooldownHours": {
+      "default": 24,
+      "type": "number",
+      "minimum": 0,
+      "maximum": 720,
+      "description": "Hours before it scores again (0 to 720)."
+    },
+    "proofMode": {
+      "default": "none",
+      "type": "string",
+      "enum": [
+        "none",
+        "optional",
+        "required"
+      ],
+      "description": "Whether a proof photo is none, optional or required."
+    },
+    "confirmMode": {
+      "default": "optimistic",
+      "type": "string",
+      "enum": [
+        "optimistic",
+        "partner"
+      ],
+      "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
+    },
+    "effortFactorPct": {
+      "default": 100,
+      "type": "integer",
+      "minimum": 50,
+      "maximum": 300,
+      "description": "The effort factor in percent (100 is normal)."
+    }
+  },
+  "required": [
+    "name",
+    "points"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Returns** (`data`): `choreId` and `name` of the new bounty.
+
+**Its errors:** `CHORE_NAME_TAKEN` (422). Every call can also get the endpoint's codes (above).
+
+**Say back:** "Added the <name> bounty: <points> points."
+
+### `update_bounty`: Edit a bounty
+
+Edits a bounty as an admin: only the fields sent change. A new weight counts from now.
+
+| | |
+| --- | --- |
+| Kind | `write` |
+| Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
+| Who may | a linked admin, in their own name only (a member gets 403 `FORBIDDEN`) |
+| On a housemate's behalf | no (403 `FORBIDDEN`): an admin change is only ever made in the admin's own name |
+| `Idempotency-Key` | required; the same key again replays |
+| Rate limit | 30 per Telegram user and 120 per IP in a minute |
+
+**When to use it.** Only when an admin asks to change a bounty's name, kind, points, cooldown, photo or confirm rule. Find the `choreId` with list_chores. Archiving is done in the app.
+
+**Tool description** (the registry's, verbatim): Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, confirm mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.
+
+**Examples.**
+
+- "make the trash worth 30 points" → `update_bounty {"choreId": "<from list_chores>", "points": 30}`
+
+**Input** (JSON Schema of the body):
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "choreId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40,
+      "description": "What the bounty is called, e.g. Recycling."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "consumable",
+        "maintenance"
+      ],
+      "description": "consumable (something to buy or refill) or maintenance (something to clean or fix)."
+    },
+    "points": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200,
+      "description": "Base points for doing it, 1 to 200."
+    },
+    "cooldownHours": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 720,
+      "description": "Hours before it scores again (0 to 720)."
+    },
+    "proofMode": {
+      "type": "string",
+      "enum": [
+        "none",
+        "optional",
+        "required"
+      ],
+      "description": "Whether a proof photo is none, optional or required."
+    },
+    "confirmMode": {
+      "type": "string",
+      "enum": [
+        "optimistic",
+        "partner"
+      ],
+      "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
+    },
+    "effortFactorPct": {
+      "type": "integer",
+      "minimum": 50,
+      "maximum": 300,
+      "description": "The effort factor in percent (100 is normal)."
+    }
+  },
+  "required": [
+    "choreId"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Returns** (`data`): `choreId`, `name` and `weightChanged`.
+
+**Its errors:** `NOT_FOUND` (404), `ARCHIVED_CHORE` (422), `CHORE_NAME_TAKEN` (422). Every call can also get the endpoint's codes (above).
+
+**Say back:** "Done: <name> is now <what changed>."
 
 ### `get_pending_confirmations`: Claims waiting for an OK
 
@@ -950,6 +1153,67 @@ The season's savings pot (a ledger; money moves at the bank).
 **Its errors:** `PRIZE_MODE_NOT_SUPPORTED` (422). Every call can also get the endpoint's codes (above).
 
 **Say back:** Amounts in euros ("€120.00"), and who would take it now, or that nobody leads outright.
+
+### `add_pot_contribution`: Add to the pot
+
+Records money paid into the season's pot (a ledger; the money moves at the bank).
+
+| | |
+| --- | --- |
+| Kind | `write` |
+| Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
+| Who may | a linked admin, in their own name only (a member gets 403 `FORBIDDEN`) |
+| On a housemate's behalf | no (403 `FORBIDDEN`): an admin change is only ever made in the admin's own name |
+| `Idempotency-Key` | required; the same key again replays |
+| Rate limit | 30 per Telegram user and 120 per IP in a minute |
+
+**When to use it.** Only when an admin says they (or a named housemate) paid into the pot. A non-admin gets FORBIDDEN: say an admin records it. Leave `month` out for this month; set `contributedBy` to a member id when someone else paid.
+
+**Tool description** (the registry's, verbatim): Records a monthly contribution to the season's savings pot: the amount in euros, the month (YYYY-MM, default: this month), who paid it (a member id, default: you) and an optional note. Only a household admin may do this, in their own name.
+
+**Examples.**
+
+- "put €20 in the pot" → `add_pot_contribution {"amount": "20"}`
+- "Anna paid 25 for August" → `add_pot_contribution {"amount": "25", "month": "2026-08", "contributedBy": "<Anna's member id>"}`
+
+**Input** (JSON Schema of the body):
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "month": {
+      "type": "string",
+      "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+    },
+    "amount": {
+      "type": [
+        "string",
+        "number"
+      ]
+    },
+    "contributedBy": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 200
+    }
+  },
+  "required": [
+    "amount"
+  ],
+  "additionalProperties": false
+}
+```
+
+**Returns** (`data`): `contributionId`, `month`, `amountCents`, `contributedBy`.
+
+**Its errors:** `NOT_FOUND` (404), `FUTURE` (422), `SEASON_CLOSED` (422). Every call can also get the endpoint's codes (above).
+
+**Say back:** "Added €<amount> to the pot for <month>."
 
 ### `get_weights`: Weights
 
@@ -1899,7 +2163,6 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `resolve_dispute`: An admin action: UI only (SPEC §12 decision 10).
 - `attach_completion_photo`: A proof photo arrives only through the app's upload route, which stores the file first; brain cannot send one. Tell the person to attach it in the app.
 - `adjust_points`: An admin action: UI only (SPEC §12 decision 10).
-- `add_pot_contribution`: An admin action: UI only (SPEC §12 decision 10).
 - `set_prize_mode`: An admin action: UI only (SPEC §12 decision 10).
 - `schedule_weight`: An admin action: UI only (SPEC §12 decision 10).
 - `dismiss_weight`: An admin action: UI only (SPEC §12 decision 10).

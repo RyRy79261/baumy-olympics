@@ -44,6 +44,8 @@ export const ACTION_NAMES = [
   "list_chores",
   "log_completion",
   "manage_chore",
+  "create_bounty",
+  "update_bounty",
   "get_pending_confirmations",
   "confirm_completion",
   "dispute_completion",
@@ -90,7 +92,8 @@ export const ACTION_NAME_PATTERN = /^[a-z0-9_]{1,64}$/;
  *   `surfaces` includes "kiosk";
  * - `display`: `member`, or, for a read offered on the kiosk, the paired
  *   kiosk with nobody picked (the kitchen screen's hub widgets);
- * - `admin`: an admin with a real session;
+ * - `admin`: an admin with a real session, or brain speaking in a linked
+ *   admin's own name (issue #107);
  * - `attested`: the member themself (a session, MCP or brain is its own
  *   member; the kiosk must send that member's PIN with the request);
  * - `session`: a real cookie or bearer session, never the kiosk, MCP or brain;
@@ -183,6 +186,11 @@ export interface RateLimitSpec {
   windowMs: number;
 }
 
+/** A preview's answer when the input cannot run as it stands. */
+export interface PreviewRefusal {
+  invalid: string;
+}
+
 export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
   /** snake_case, `^[a-z0-9_]{1,64}$`. */
   name: N;
@@ -193,7 +201,10 @@ export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
   consent: string;
   kind: ActionKind;
   risk: ActionRisk;
-  /** Admin-only actions are `["ui"]`. */
+  /**
+   * Admin-only actions are `["ui"]`, except the bounty and pot writes, which
+   * the AI command and brain may also propose (SPEC §12 decision 10).
+   */
   surfaces: readonly Surface[];
   /** A gate, or a function of the parsed input that picks one. */
   requires: Gate | ((ctx: RequestCtx, input: z.output<I>) => Gate);
@@ -226,8 +237,16 @@ export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
    * password): an unsalted sha256 of a 4-digit PIN is no secret at all.
    */
   fingerprint?: (input: z.output<I>) => unknown;
-  /** One line a human approves, e.g. "Log Trash for Ryan: +25 (streak 2)". */
-  preview?(ctx: ActionCtx, input: z.output<I>): Promise<string>;
+  /**
+   * One line a human approves, e.g. "Log Trash for Ryan: +25 (streak 2)".
+   * Or `{ invalid }` when the input cannot run as it stands (a bounty that
+   * is gone): the proposal is then shown greyed, with that sentence, and
+   * is never run (lib/actions/propose.ts).
+   */
+  preview?(
+    ctx: ActionCtx,
+    input: z.output<I>,
+  ): Promise<string | PreviewRefusal>;
   execute(ctx: ActionCtx, input: z.output<I>): Promise<ExecuteResult<O>>;
 }
 

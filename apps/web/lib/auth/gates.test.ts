@@ -199,13 +199,36 @@ describe("requireAdmin", () => {
       ok: false,
       message: "Only a household admin can do this.",
     });
-    // An admin at the kiosk, through MCP or brain, is still not an admin.
+    // An admin at the kiosk or through MCP is still not an admin; nor is a
+    // brain actor whose linked member's role was not read as admin.
     for (const a of [kiosk, brain, mcpWrite, account]) {
       expect(requireAdmin(ctx(a))).toMatchObject({
         ok: false,
         code: "FORBIDDEN",
       });
     }
+  });
+
+  it("accepts brain in a linked admin's own name, never on someone's behalf (issue #107)", () => {
+    const brainAdmin: Actor = { ...brain, role: "admin" } as Actor;
+    expect(requireAdmin(ctx(brainAdmin))).toEqual({ ok: true });
+    expect(requireAdmin(ctx({ ...brain, role: "member" } as Actor))).toEqual({
+      ok: false,
+      code: "FORBIDDEN",
+      message: "Only a household admin can do this.",
+    });
+    // Acting for a housemate: even an admin asker may not.
+    expect(
+      requireAdmin(ctx({ ...brainAdmin, initiatorMemberId: "m9" } as Actor)),
+    ).toEqual({
+      ok: false,
+      code: "FORBIDDEN",
+      message:
+        "Admin changes can't be made on someone's behalf. Ask an admin to do it themself.",
+    });
+    expect(
+      requireAdmin(ctx({ ...brainUnlinked, role: "admin" } as Actor)),
+    ).toMatchObject({ ok: false, code: "FORBIDDEN" });
   });
 });
 

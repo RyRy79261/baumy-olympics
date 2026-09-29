@@ -84,13 +84,13 @@ test("hold to speak on the phone: the transcript goes to Baumy", async ({
     timeout: 8_000,
   });
 
-  // Typing still works beside it, and an approved row that scores makes
+  // Typing still works beside it, and a confirmed card that scores makes
   // Baumy happy with the "+N" pop.
   await sheet.getByLabel("Message to Baumy").fill(`I cleaned the ${chore}`);
   await sheet.getByRole("button", { name: "Send" }).click();
-  const row = sheet.getByTestId("proposal-log_completion");
+  const row = sheet.getByTestId("suggestion-log_completion");
   await expect(row).toContainText(`Log ${chore}`);
-  await row.getByRole("button", { name: "Approve" }).click();
+  await sheet.getByRole("button", { name: "Confirm all" }).click();
   await expect(row.getByTestId("proposal-state")).toHaveText("Done");
   await expect(sheet.getByTestId("score-pop")).toHaveText("+15");
   await expect(sprite(sheet)).toHaveAttribute("data-state", "happy");
@@ -143,7 +143,7 @@ test("on the kitchen dashboard, the cat listens and answers in its bubble", asyn
   await expect(bubble).toHaveCount(0);
 
   // "I cleaned the kettle" (this browser's clips say so): Baumy proposes
-  // logging it in the bubble, and "Yes, do it" does.
+  // logging it as a card in the bubble, and "Confirm all" does.
   await ipad.context.addCookies([
     {
       name: "baumy_e2e_transcript",
@@ -156,10 +156,11 @@ test("on the kitchen dashboard, the cat listens and answers in its bubble", asyn
   await kiosk.waitForTimeout(900);
   await bubble.getByRole("button", { name: "Done talking" }).click();
   await expect(bubble).toContainText("Got it! I'll do this:");
-  await expect(bubble.getByTestId("cat-row-log_completion")).toContainText(
+  await expect(bubble.getByTestId("suggestion-log_completion")).toContainText(
     `Log ${chore} for ${founder}: +12`,
   );
-  await bubble.getByRole("button", { name: "Yes, do it" }).click();
+  await expect(bubble.getByRole("button", { name: "Cancel" })).toBeVisible();
+  await bubble.getByRole("button", { name: "Confirm all" }).click();
   await expect(bubble).toContainText(
     new RegExp(`Purrfect\\. \\+12 for ${founder}|Saved`),
   );

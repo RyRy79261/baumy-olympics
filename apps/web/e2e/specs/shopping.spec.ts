@@ -210,19 +210,19 @@ test("'Baumy, add milk and eggs' is one proposal with both items", async ({
     .fill(`Baumy, add ${milk} and ${eggs}`);
   await sheet.getByRole("button", { name: "Send" }).click();
 
-  const proposal = sheet.getByTestId("proposal-add_shopping_items");
+  const proposal = sheet.getByTestId("suggestion-add_shopping_items");
   await expect(proposal).toHaveCount(1);
   await expect(proposal).toContainText(
     `Add ${milk} and ${eggs} to the shopping list`,
   );
   // Nothing is on the list until it is approved.
   expect(await telegram(page.request)).not.toContain(milk);
-  await proposal.getByRole("button", { name: "Approve" }).click();
+  await sheet.getByRole("button", { name: "Confirm all" }).click();
   await expect(proposal.getByTestId("proposal-state")).toHaveText("Done");
   expect(await telegram(page.request)).toEqual(
     expect.arrayContaining([milk, eggs]),
   );
-  await sheet.getByRole("button", { name: "Close" }).click();
+  await sheet.getByRole("button", { name: "Done" }).click();
   await page.goto("/shopping");
   await expect(row(page, milk)).toBeVisible();
   await expect(row(page, eggs)).toBeVisible();
