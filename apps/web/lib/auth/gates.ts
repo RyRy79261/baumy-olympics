@@ -104,6 +104,10 @@ export function requireAccount(ctx: RequestCtx): GateResult {
 
 const ADMINS_ONLY = fail("FORBIDDEN", "Only a household admin can do this.");
 
+/** Why brain may not make an admin change for someone else (issue #107). */
+export const ADMIN_ON_BEHALF =
+  "Admin changes can't be made on someone's behalf. Ask an admin to do it themself.";
+
 /**
  * An admin, signed in with a real session; or brain speaking in a linked
  * admin's own name, never on someone's behalf (issue #107). Only the admin
@@ -114,9 +118,8 @@ export function requireAdmin(ctx: RequestCtx): GateResult {
   const { actor } = ctx;
   if (actor.kind === "service") {
     if (!actor.memberId) return NOT_A_MEMBER;
-    return actor.role === "admin" && !actor.initiatorMemberId
-      ? OK
-      : ADMINS_ONLY;
+    if (actor.initiatorMemberId) return fail("FORBIDDEN", ADMIN_ON_BEHALF);
+    return actor.role === "admin" ? OK : ADMINS_ONLY;
   }
   const session = requireSession(ctx);
   if (!session.ok) return session;

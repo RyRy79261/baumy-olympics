@@ -57,7 +57,8 @@ export const addPotContribution = defineAction({
       );
       parts.push(payer ? `from ${payer.displayName}` : "from someone unknown");
     }
-    return parts.join(" ");
+    const note = input.note?.trim();
+    return note ? `${parts.join(" ")} (note: ${note})` : parts.join(" ");
   },
   async execute(ctx, raw) {
     const input = { ...raw, month: raw.month ?? berlinMonthKey(ctx.now) };

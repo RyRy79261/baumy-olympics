@@ -151,8 +151,9 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   events and the rest do work on a housemate's behalf.
 - Admin actions stay unavailable, on anyone's behalf. The three admin writes
   brain gets (`create_bounty`, `update_bounty`, `add_pot_contribution`) run
-  only for a linked admin in their own name: a member gets 403 `FORBIDDEN`,
-  and `X-Baumy-On-Behalf-Of` is refused with 403.
+  only for a linked admin in their own name (`admin_only` in the tool list):
+  a member gets 403 `FORBIDDEN`, and `X-Baumy-On-Behalf-Of` is refused with
+  403 "Admin changes can't be made on someone's behalf."
 - To turn a name into a member id, read the roster: `list_reminders` answers
   `members` (id, name) for every active member; `get_standings` lists them
   with their points. Match the name to exactly one member, or ask.

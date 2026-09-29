@@ -151,8 +151,9 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   events and the rest do work on a housemate's behalf.
 - Admin actions stay unavailable, on anyone's behalf. The three admin writes
   brain gets (`create_bounty`, `update_bounty`, `add_pot_contribution`) run
-  only for a linked admin in their own name: a member gets 403 `FORBIDDEN`,
-  and `X-Baumy-On-Behalf-Of` is refused with 403.
+  only for a linked admin in their own name (`admin_only` in the tool list):
+  a member gets 403 `FORBIDDEN`, and `X-Baumy-On-Behalf-Of` is refused with
+  403 "Admin changes can't be made on someone's behalf."
 - To turn a name into a member id, read the roster: `list_reminders` answers
   `members` (id, name) for every active member; `get_standings` lists them
   with their points. Match the name to exactly one member, or ask.
@@ -546,7 +547,7 @@ Adds a bounty (a chore that scores points) to the board, as an admin.
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
 | Who may | a linked admin, in their own name only (a member gets 403 `FORBIDDEN`) |
-| On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
+| On a housemate's behalf | no (403 `FORBIDDEN`): an admin change is only ever made in the admin's own name |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
 
@@ -643,7 +644,7 @@ Edits a bounty as an admin: only the fields sent change. A new weight counts fro
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
 | Who may | a linked admin, in their own name only (a member gets 403 `FORBIDDEN`) |
-| On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
+| On a housemate's behalf | no (403 `FORBIDDEN`): an admin change is only ever made in the admin's own name |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
 
@@ -1162,7 +1163,7 @@ Records money paid into the season's pot (a ledger; the money moves at the bank)
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
 | Who may | a linked admin, in their own name only (a member gets 403 `FORBIDDEN`) |
-| On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
+| On a housemate's behalf | no (403 `FORBIDDEN`): an admin change is only ever made in the admin's own name |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
 

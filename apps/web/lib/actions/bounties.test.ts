@@ -463,13 +463,47 @@ describe("update_bounty", () => {
       valid: true,
       preview: `Edit bounty: ${TRASH.name} → rename to Bins, 30 pts, photo required`,
     });
+  });
+
+  it("is proposed as not valid for a bounty that is gone or archived", async () => {
+    const gone = { choreId: "00000000-0000-4000-8000-00000000beef", points: 3 };
+    await expect(
+      propose("update_bounty", gone, asAdmin({ source: "ai" }), choices),
+    ).resolves.toMatchObject({
+      valid: false,
+      preview: "Edit a bounty",
+      error: "That bounty was not found.",
+    });
+    // Someone who may not edit bounties at all hears that first.
     await expect(
       propose(
         "update_bounty",
-        { choreId: "00000000-0000-4000-8000-00000000beef", points: 3 },
+        gone,
+        ctxFor(sessionActor(member), { source: "ai" }),
+        choices,
+      ),
+    ).resolves.toMatchObject({
+      valid: false,
+      error: "Only a household admin can do this.",
+    });
+    const { choreId: dishes } = await seedChore(db(), SEED_CHORES.dishes);
+    ok(
+      await runAction(
+        "manage_chore",
+        { op: "archive", choreId: dishes },
+        asAdmin(),
+      ),
+    );
+    await expect(
+      propose(
+        "update_bounty",
+        { choreId: dishes, points: 9 },
         asAdmin({ source: "ai" }),
         choices,
       ),
-    ).resolves.toMatchObject({ preview: "That bounty was not found." });
+    ).resolves.toMatchObject({
+      valid: false,
+      error: `${SEED_CHORES.dishes.name} is archived. Restore it on the admin page first.`,
+    });
   });
 });

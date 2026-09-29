@@ -98,9 +98,15 @@ export function createProposer(
         ? def.requires(ctx, parsed.data)
         : def.requires;
     let preview = def.title;
+    let refused: string | undefined;
     if (def.preview) {
       try {
-        preview = await def.preview({ ...ctx, db: deps.readDb() }, parsed.data);
+        const said = await def.preview(
+          { ...ctx, db: deps.readDb() },
+          parsed.data,
+        );
+        if (typeof said === "string") preview = said;
+        else refused = said.invalid;
       } catch (err) {
         deps.logError(`[propose:${name}] preview failed`, err);
       }
@@ -114,6 +120,11 @@ export function createProposer(
       if (!allowed.ok) {
         return { ...common, preview, valid: false, error: allowed.message };
       }
+    }
+    // The action itself says this input cannot run now (after the gate:
+    // someone who may not do it at all hears that first).
+    if (refused !== undefined) {
+      return { ...common, preview, valid: false, error: refused };
     }
     return {
       ...common,
