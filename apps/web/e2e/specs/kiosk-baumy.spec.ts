@@ -95,7 +95,7 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   await expectKioskTargets(sheet);
 
   // A wrong PIN saves nothing.
-  await typePin(pad, "1397");
+  await typePin(pad, "1397", "Confirm all");
   await expect(confirm.getByText("That PIN is not right.")).toBeVisible();
   await expect(confirm.getByTestId("proposal-state")).toHaveText(
     "Waiting for you",
@@ -104,7 +104,7 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   // The right one confirms it.
   await sheet.getByRole("button", { name: "Confirm all" }).click();
   pad = sheet.getByRole("group", { name: `${partner}'s PIN` });
-  await typePin(pad, PIN);
+  await typePin(pad, PIN, "Confirm all");
   await expect(confirm.getByTestId("proposal-state")).toHaveText("Done");
 
   await ipad.context.close();
