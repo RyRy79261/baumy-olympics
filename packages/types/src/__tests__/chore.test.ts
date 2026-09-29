@@ -15,6 +15,8 @@ import {
   DisputeReason,
   EffortFactorPct,
   ProofMode,
+  WEIGHT_CHANGE_REASON_MAX,
+  WeightChangeReason,
   cooldownMinutesFromHours,
 } from "../chore";
 
@@ -98,6 +100,20 @@ describe("DisputeReason", () => {
     expect(DisputeReason.safeParse(undefined).success).toBe(false);
     expect(
       DisputeReason.safeParse("x".repeat(DISPUTE_REASON_MAX + 1)).success,
+    ).toBe(false);
+  });
+});
+
+describe("WeightChangeReason", () => {
+  it("trims a reason, lets a blank one through as blank, and keeps it short", () => {
+    expect(WeightChangeReason.parse("  takes ages ")).toBe("takes ages");
+    expect(WeightChangeReason.parse("   ")).toBe("");
+    expect(
+      WeightChangeReason.parse("x".repeat(WEIGHT_CHANGE_REASON_MAX)),
+    ).toHaveLength(WEIGHT_CHANGE_REASON_MAX);
+    expect(
+      WeightChangeReason.safeParse("x".repeat(WEIGHT_CHANGE_REASON_MAX + 1))
+        .success,
     ).toBe(false);
   });
 });
