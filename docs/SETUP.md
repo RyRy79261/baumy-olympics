@@ -1045,7 +1045,8 @@ later as a new set.
    one scale with one palette of 24 colours, and the idle pose shown at the app's sizes. Pick
    48, 56 or 64 pixels tall (64 by default), check each figure's pose (change it, or skip one),
    name it and **Save to gallery**.
-4. Everyone picks theirs in **Settings → Your character** (or when joining at `/join`). Two
+4. Everyone picks theirs in **Settings → Your character** (a founder can also pick on
+   `/join`; someone joining with a code is taken to Settings to pick). Two
    housemates may pick the same one; tell an agent if you want that refused. Until the gallery
    has a character, Settings keeps the drawn (hair/skin/shirt) character, and anyone who has not
    picked still wears theirs.

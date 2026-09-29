@@ -5,8 +5,8 @@ import { kioskNav, pairedKiosk } from "../lib/kiosk";
 
 // Issue #111: an admin uploads a character SET to the gallery (one sheet
 // with three poses side by side, cleaned on the way in; before, after and
-// the app's sizes shown; the poses reassigned), a new member picks it on
-// /join, and it is what the hub's header, Settings and the kitchen screen's
+// the app's sizes shown; the poses reassigned), a new member joins with a
+// code and picks it in Settings, and it is what the hub's header, Settings and the kitchen screen's
 // avatar bar draw, through /api/blob. Archiving it leaves it on the member.
 
 /** Three 10 × 14 figures (one a pixel shorter), 8× blown up, on black. */

@@ -172,8 +172,8 @@ export default function PrivacyPage() {
             Proof photos and avatar images are stored in Vercel Blob in
             Frankfurt (fra1). The store is private: an image is only shown
             through the app, to household members and the paired kitchen screen
-            (avatar images also to someone signed in who is joining, so they can
-            pick one).
+            (avatar images also to a founder setting up the household, so they
+            can pick one).
           </li>
           <li>
             Calendar events live in the house&apos;s Google Calendar; the app
