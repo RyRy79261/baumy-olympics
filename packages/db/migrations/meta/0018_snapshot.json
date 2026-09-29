@@ -1,6 +1,6 @@
 {
-  "id": "364adf23-2280-4e05-8e5d-263f5fbf9d5a",
-  "prevId": "e858fcee-29fb-4a69-86f0-25656fb63891",
+  "id": "f8526246-48d4-4a9e-bcfb-1755a93e3c52",
+  "prevId": "364adf23-2280-4e05-8e5d-263f5fbf9d5a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -513,6 +513,179 @@
           "tableTo": "members",
           "columnsFrom": [
             "initiated_by_member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.avatar_poses": {
+      "name": "avatar_poses",
+      "schema": "",
+      "columns": {
+        "avatar_id": {
+          "name": "avatar_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pose": {
+          "name": "pose",
+          "type": "avatar_pose",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pathname": {
+          "name": "pathname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "avatar_poses_avatar_id_avatars_id_fk": {
+          "name": "avatar_poses_avatar_id_avatars_id_fk",
+          "tableFrom": "avatar_poses",
+          "tableTo": "avatars",
+          "columnsFrom": [
+            "avatar_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "avatar_poses_avatar_id_pose_pk": {
+          "name": "avatar_poses_avatar_id_pose_pk",
+          "columns": [
+            "avatar_id",
+            "pose"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "avatar_poses_pathname_unique": {
+          "name": "avatar_poses_pathname_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "pathname"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "avatar_poses_size_positive": {
+          "name": "avatar_poses_size_positive",
+          "value": "\"avatar_poses\".\"width\" > 0 AND \"avatar_poses\".\"height\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.avatars": {
+      "name": "avatars",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "household_id": {
+          "name": "household_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "avatars_household_id_idx": {
+          "name": "avatars_household_id_idx",
+          "columns": [
+            {
+              "expression": "household_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "avatars_household_id_households_id_fk": {
+          "name": "avatars_household_id_households_id_fk",
+          "tableFrom": "avatars",
+          "tableTo": "households",
+          "columnsFrom": [
+            "household_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "avatars_created_by_members_id_fk": {
+          "name": "avatars_created_by_members_id_fk",
+          "tableFrom": "avatars",
+          "tableTo": "members",
+          "columnsFrom": [
+            "created_by"
           ],
           "columnsTo": [
             "id"
@@ -2175,6 +2348,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "avatar_image_id": {
+          "name": "avatar_image_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "color": {
           "name": "color",
           "type": "text",
@@ -2245,6 +2424,19 @@
           "tableTo": "households",
           "columnsFrom": [
             "household_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "members_avatar_image_id_avatars_id_fk": {
+          "name": "members_avatar_image_id_avatars_id_fk",
+          "tableFrom": "members",
+          "tableTo": "avatars",
+          "columnsFrom": [
+            "avatar_image_id"
           ],
           "columnsTo": [
             "id"
@@ -4027,6 +4219,15 @@
       "values": [
         "anthropic",
         "groq"
+      ]
+    },
+    "public.avatar_pose": {
+      "name": "avatar_pose",
+      "schema": "public",
+      "values": [
+        "idle",
+        "walk",
+        "emote"
       ]
     },
     "public.chore_kind": {

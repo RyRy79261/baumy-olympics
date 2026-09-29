@@ -1334,8 +1334,9 @@ export const mcpAccessTokens = pgTable(
 
 /**
  * Tokens a trusted service (baumy-brain) sends as `Authorization: Bearer`
- * to `/api/v1/actions` (SPEC §6.3, §6.6, issue #27). Minted by
- * `packages/db/scripts/service-token.ts`, which prints the token once; only
+ * to `/api/v1/actions` (SPEC §6.3, §6.6, issue #27). Minted on
+ * /admin/connections (issue #104) or by `packages/db/scripts/service-token.ts`,
+ * both of which show the token once; only
  * its sha256 is stored, so the plaintext lives in brain's env and never in
  * ours. `scopes` names what the token may do (`brain`: the brain surface).
  * Revoking sets `revoked_at`; a revoked token is never found again. One
@@ -1353,6 +1354,11 @@ export const serviceTokens = pgTable(
       .notNull()
       .defaultNow(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /**
+     * When brain last called with it, recorded at most every
+     * SERVICE_TOKEN_TOUCH_EVERY_MS (issue #104: /admin/connections shows it).
+     */
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   },
   (t) => [
     // One live token per name; a revoked name may be minted again (rotation).

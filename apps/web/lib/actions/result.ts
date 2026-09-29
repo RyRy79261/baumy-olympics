@@ -115,7 +115,9 @@ export type DomainErrorCode =
   /** The upload is not a readable image, or nothing is left once cleaned. */
   | "AVATAR_IMAGE_UNREADABLE"
   /** That gallery character is archived, so it cannot be picked now. */
-  | "AVATAR_ARCHIVED";
+  | "AVATAR_ARCHIVED"
+  /** `create_service_token` for a name that already has a live token. */
+  | "SERVICE_TOKEN_EXISTS";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 
