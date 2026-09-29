@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount } from "../lib/household";
 import { pickTile, tileRadio } from "../lib/pickers";
+import { TELEGRAM_ID_MESSAGE } from "@baumy/types";
 
 // Issue #106: pickers show the thing, not its name. A newcomer picks a
 // colour swatch and a character on /join (tap and keyboard), the character
@@ -95,6 +96,89 @@ test("a newcomer picks a colour and a character on /join, then a hair style in S
   await jo.context.close();
 });
 
+// React resets a form after every action, which puts radios back to their
+// page-load choice while the tiles still show the pick (issue #106 review).
+// Each form here is submitted twice without a reload; the second submit
+// must still send what the tiles show.
+test("picks survive a failed join and a second save", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.setTimeout(180_000);
+  const name = `Twice ${Math.random().toString(36).slice(2, 8)}`;
+  await founderAdmin(page, project);
+  const code = await mintCode(page, 1);
+  const posted = (p: typeof page) =>
+    p.waitForResponse((r) => r.request().method() === "POST");
+
+  // A wrong code first, then the right one: the join keeps the colour and
+  // character picked before the failure.
+  const jo = await newAccount(browser, `twice-${project}`);
+  const form = jo.page.locator("form").filter({
+    has: jo.page.getByRole("button", { name: "Join the household" }),
+  });
+  await form.getByLabel("Invite code").fill("NOPENOPE1");
+  await form.getByLabel("Your name").fill(name);
+  await pickTile(form, "Colour", "Rose");
+  await pickTile(form, "Hair style", "Spiky");
+  await pickTile(form, "Shirt", "Yellow");
+  await form.getByRole("button", { name: "Join the household" }).click();
+  await expect(form.getByText("That invite code doesn't exist")).toBeVisible();
+  await expect(tileRadio(form, "Colour", "Rose")).toBeChecked();
+  await expect(tileRadio(form, "Hair style", "Spiky")).toBeChecked();
+  await expect(tileRadio(form, "Shirt", "Yellow")).toBeChecked();
+  await form.getByLabel("Invite code").fill(code);
+  await form.getByLabel("Your name").fill(name);
+  await form.getByRole("button", { name: "Join the household" }).click();
+  await expect(jo.page).toHaveURL(/\/$/);
+
+  // Settings, saved twice without a reload: the second save changes only
+  // the shirt, and the hair style from the first save stays.
+  await jo.page.goto("/settings");
+  const settings = jo.page.getByTestId("avatar-form");
+  await expect(tileRadio(settings, "Hair style", "Spiky")).toBeChecked();
+  await expect(tileRadio(settings, "Shirt", "Yellow")).toBeChecked();
+  const saveCharacter = settings.getByRole("button", {
+    name: "Save character",
+  });
+  await pickTile(settings, "Hair style", "Long");
+  let done = posted(jo.page);
+  await saveCharacter.click();
+  await done;
+  await expect(settings.getByText("Character saved.")).toBeVisible();
+  await pickTile(settings, "Shirt", "Teal");
+  done = posted(jo.page);
+  await saveCharacter.click();
+  await done;
+  await expect(settings.getByText("Character saved.")).toBeVisible();
+  await jo.page.reload();
+  const reread = jo.page.getByTestId("avatar-form");
+  await expect(tileRadio(reread, "Hair style", "Long")).toBeChecked();
+  await expect(tileRadio(reread, "Shirt", "Teal")).toBeChecked();
+  await jo.context.close();
+
+  // The admin card: Rose from the join; a new colour saved twice stays.
+  await page.goto("/admin/members");
+  const card = page.getByTestId(`member-${name}`);
+  await card.getByText("Edit name and colour").click();
+  await expect(tileRadio(card, "Colour", "Rose")).toBeChecked();
+  await pickTile(card, "Colour", "Green");
+  const save = card.getByRole("button", { name: "Save", exact: true });
+  done = posted(page);
+  await save.click();
+  await done;
+  await expect(card.getByText("Saved.", { exact: true })).toBeVisible();
+  done = posted(page);
+  await save.click();
+  await done;
+  await expect(card.getByText("Saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  const again = page.getByTestId(`member-${name}`);
+  await again.getByText("Edit name and colour").click();
+  await expect(tileRadio(again, "Colour", "Green")).toBeChecked();
+});
+
 test("the admin's own card links to Settings and helps find a Telegram id", async ({
   page,
 }, testInfo) => {
@@ -116,9 +200,7 @@ test("the admin's own card links to Settings and helps find a Telegram id", asyn
   const id = mine.getByLabel("Telegram user id", { exact: true });
   const save = mine.getByRole("button", { name: "Save Telegram id" });
   await id.fill("@me");
-  await expect(
-    mine.getByText("Use the Telegram user id: digits only."),
-  ).toBeVisible();
+  await expect(mine.getByText(TELEGRAM_ID_MESSAGE)).toBeVisible();
   await expect(save).toBeDisabled();
   await id.fill("");
   await expect(save).toBeEnabled();
