@@ -19,6 +19,9 @@ import { SuggestionCard } from "./suggestion-card";
 //   order; the cards show "Done" or the sentence it failed with. On the
 //   kiosk, when any of them vouches for someone, it first opens the PinPad
 //   once for the acting member, and that PIN goes with those requests.
+// - While a card's edit is open or being checked, Confirm all waits: the
+//   edit replaces the card under a new proposal id, and running both would
+//   save it twice.
 // - Cancel rejects them all and closes.
 // - Once nothing is left to run, one "Done" closes.
 
@@ -51,12 +54,27 @@ export function SuggestionCards({
 }: SuggestionCardsProps) {
   const [pinOpen, setPinOpen] = useState(false);
   const [pinAttempt, setPinAttempt] = useState(0);
+  // The cards with their edit form open, or their edit being checked.
+  const [editingIds, setEditingIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const shown = visibleRows(rows);
   const targets = confirmAllTargets(rows);
   const anySaved = rows.some((r) => r.state === "saved");
+  const editing = editingIds.size > 0;
   const size = kiosk ? "kiosk" : "default";
 
+  const setEditing = (id: string, active: boolean) =>
+    setEditingIds((ids) => {
+      if (ids.has(id) === active) return ids;
+      const next = new Set(ids);
+      if (active) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
   const confirm = () => {
+    if (editing) return;
     if (confirmNeedsPin(rows, kiosk)) setPinOpen(true);
     else onConfirmAll();
   };
@@ -89,7 +107,7 @@ export function SuggestionCards({
       <>
         <Button
           size={size}
-          disabled={busy || targets.length === 0}
+          disabled={busy || editing || targets.length === 0}
           onClick={confirm}
         >
           {label}
@@ -119,10 +137,16 @@ export function SuggestionCards({
             bubble={bubble}
             busy={busy}
             onDrop={() => onDrop(row)}
+            onEditing={(active) => setEditing(row.proposal.proposalId, active)}
             {...(onEdit ? { onEdit: (input) => onEdit(row, input) } : {})}
           />
         ))}
       </ul>
+      {editing && !busy ? (
+        <p role="status" className="text-sm text-bm-muted">
+          Finish the edit (Check it, or Back) before Confirm all.
+        </p>
+      ) : null}
       {pinOpen ? (
         <form
           aria-label={pinLabel}

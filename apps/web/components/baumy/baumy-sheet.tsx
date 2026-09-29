@@ -27,8 +27,11 @@ import type { HistoryTurn } from "@/lib/ai/command";
 import type { Proposal } from "@/lib/ai/proposal";
 import {
   asksForPin,
+  canApprove,
   cancelAll,
   confirmAllTargets,
+  isOpen,
+  stopsPin,
   nextHistory,
   rowsFor,
   savedMessage,
@@ -209,8 +212,8 @@ export function BaumySheet({
     await send(result.data.text);
   }
 
-  /** Approve one row; true when it saved. */
-  async function approve(row: ReviewRow, pin?: string): Promise<boolean> {
+  /** Approve one row: null when it saved, else the failure's code. */
+  async function approve(row: ReviewRow, pin?: string): Promise<string | null> {
     const id = row.proposal.proposalId;
     update(id, { state: "saving", message: undefined });
     const result = await runProposal(row.proposal, surface, pin);
@@ -226,24 +229,42 @@ export function BaumySheet({
         setTimeout(() => setPop((p) => (p?.key === key ? null : p)), POP_MS);
       }
       router.refresh();
-      return true;
+      return null;
     }
     if (kiosk && asksForPin(result, PIN_PROMPT_CODES)) {
       update(id, { state: "pending", needsPin: true, message: result.message });
-      return false;
+      return result.code;
     }
     update(id, { state: "failed", message: result.message });
     feel({ type: "error" });
-    return false;
+    return result.code;
   }
 
-  /** Run every valid card, in order; the PIN goes with those that need it. */
+  /**
+   * Run every valid card, in order; the PIN goes with those that need it.
+   * Once the PIN is refused (wrong, resting or locked) it is sent no more:
+   * each try counts against the member's PIN, so the rest stay waiting for
+   * the PIN typed again rather than burning the attempts.
+   */
   async function confirmAll(pin?: string) {
     setBulk(true);
+    let pinLeft = pin;
     try {
       // One at a time, so the cards that saved stay saved if one fails.
-      for (const row of confirmAllTargets(rowsRef.current)) {
-        await approve(row, row.needsPin ? pin : undefined);
+      for (const target of confirmAllTargets(rowsRef.current)) {
+        // Read it again: it may have changed since the list was taken.
+        const row = rowsRef.current.find(
+          (r) => r.proposal.proposalId === target.proposal.proposalId,
+        );
+        if (!row || !canApprove(row)) continue;
+        if (row.needsPin && pin !== undefined && pinLeft === undefined) {
+          continue;
+        }
+        const sent = row.needsPin ? pinLeft : undefined;
+        const code = await approve(row, sent);
+        if (sent !== undefined && code !== null && stopsPin(code)) {
+          pinLeft = undefined;
+        }
       }
     } finally {
       setBulk(false);
@@ -254,16 +275,24 @@ export function BaumySheet({
     update(row.proposal.proposalId, { state: "rejected", message: undefined });
   }
 
+  /**
+   * Check an edited card again. The new proposal replaces the card only if
+   * it is still waiting (or failed): one that saved, or was dropped, while
+   * the check ran stays as it is, so nothing is ever saved twice.
+   */
   async function edit(row: ReviewRow, input: Record<string, unknown>) {
+    const id = row.proposal.proposalId;
     const result = await recheckProposal(row.proposal.name, input, surface);
+    const still = (r: ReviewRow) => r.proposal.proposalId === id && isOpen(r);
     if (!result.ok) {
-      update(row.proposal.proposalId, { message: result.message });
+      const { message } = result;
+      setRows((rs) => rs.map((r) => (still(r) ? { ...r, message } : r)));
       return;
     }
     const next: Proposal = result.data;
     setRows((rs) =>
       rs.map((r) =>
-        r.proposal.proposalId === row.proposal.proposalId
+        still(r)
           ? { proposal: next, state: "pending", needsPin: next.needsPin }
           : r,
       ),
