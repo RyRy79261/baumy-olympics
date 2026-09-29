@@ -7,6 +7,7 @@ import {
   claimTelegramLinkCode,
   hashTelegramLinkCode,
   insertTelegramLinkCode,
+  latestTelegramLinkCodeState,
 } from "../telegram-link-codes";
 import { useTestDb } from "./_harness";
 
@@ -122,5 +123,131 @@ describe("claimTelegramLinkCode", () => {
     ).resolves.toBeNull();
     const [row] = await t.db().select().from(telegramLinkCodes);
     expect(row).toMatchObject({ usedAt: null, usedByTg: null });
+  });
+});
+
+describe("latestTelegramLinkCodeState", () => {
+  const db = () => t.db() as unknown as Queryable;
+  const TG = 5_000_000_003;
+  const MIN = 60_000;
+  const at = (ms: number) => new Date(NOW.getTime() + ms);
+
+  async function member(name: string) {
+    const [m] = await t
+      .db()
+      .insert(members)
+      .values({
+        householdId: HOUSEHOLD_ID,
+        displayName: name,
+        avatarSprite: "cat",
+        color: "#112233",
+      })
+      .returning({ id: members.id });
+    return m!.id;
+  }
+
+  it("is null before the member makes a code", async () => {
+    const memberId = await member("Ryan");
+    await expect(
+      latestTelegramLinkCodeState(db(), { memberId, now: NOW }),
+    ).resolves.toBeNull();
+  });
+
+  it("waits with the server's time left, then expires at expiresAt", async () => {
+    const memberId = await member("Ryan");
+    await insertTelegramLinkCode(db(), {
+      code: "WAIT0001",
+      memberId,
+      now: NOW,
+    });
+    await expect(
+      latestTelegramLinkCodeState(db(), { memberId, now: at(MIN) }),
+    ).resolves.toEqual({
+      state: "waiting",
+      msLeft: TELEGRAM_LINK_CODE_TTL_MS - MIN,
+    });
+    await expect(
+      latestTelegramLinkCodeState(db(), {
+        memberId,
+        now: at(TELEGRAM_LINK_CODE_TTL_MS - 1),
+      }),
+    ).resolves.toEqual({ state: "waiting", msLeft: 1 });
+    // The claim's own boundary: from expiresAt on, nothing can use it.
+    await expect(
+      latestTelegramLinkCodeState(db(), {
+        memberId,
+        now: at(TELEGRAM_LINK_CODE_TTL_MS),
+      }),
+    ).resolves.toEqual({ state: "expired", msLeft: 0 });
+  });
+
+  it("is used once the newest code is claimed, whoever held the link before", async () => {
+    const memberId = await member("Ryan");
+    // Linked already, to the same Telegram id that redeems the new code.
+    await insertTelegramLinkCode(db(), {
+      code: "OLD00001",
+      memberId,
+      now: NOW,
+    });
+    await claimTelegramLinkCode(db(), {
+      code: "OLD00001",
+      telegramUserId: TG,
+      now: at(MIN),
+    });
+    await insertTelegramLinkCode(db(), {
+      code: "NEW00001",
+      memberId,
+      now: at(2 * MIN),
+    });
+    // The earlier use does not count for the new code.
+    await expect(
+      latestTelegramLinkCodeState(db(), { memberId, now: at(3 * MIN) }),
+    ).resolves.toMatchObject({ state: "waiting" });
+    await claimTelegramLinkCode(db(), {
+      code: "NEW00001",
+      telegramUserId: TG,
+      now: at(4 * MIN),
+    });
+    // Used stays used, even past the code's expiry.
+    await expect(
+      latestTelegramLinkCodeState(db(), { memberId, now: at(60 * MIN) }),
+    ).resolves.toEqual({ state: "used", msLeft: 0 });
+  });
+
+  it("counts an older live code redeemed after the newest was made", async () => {
+    const memberId = await member("Ryan");
+    const other = await member("Alex");
+    await insertTelegramLinkCode(db(), {
+      code: "FIRST001",
+      memberId,
+      now: NOW,
+    });
+    await insertTelegramLinkCode(db(), {
+      code: "SECOND01",
+      memberId,
+      now: at(MIN),
+    });
+    // Another member's use is not this member's.
+    await insertTelegramLinkCode(db(), {
+      code: "ALEX0001",
+      memberId: other,
+      now: at(MIN),
+    });
+    await claimTelegramLinkCode(db(), {
+      code: "ALEX0001",
+      telegramUserId: TG + 1,
+      now: at(2 * MIN),
+    });
+    await expect(
+      latestTelegramLinkCodeState(db(), { memberId, now: at(2 * MIN) }),
+    ).resolves.toMatchObject({ state: "waiting" });
+    await claimTelegramLinkCode(db(), {
+      code: "FIRST001",
+      telegramUserId: TG,
+      now: at(2 * MIN),
+    });
+    await expect(
+      latestTelegramLinkCodeState(db(), { memberId, now: at(2 * MIN) }),
+    ).resolves.toEqual({ state: "used", msLeft: 0 });
   });
 });

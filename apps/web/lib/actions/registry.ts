@@ -34,6 +34,7 @@ import {
 } from "./confirmations";
 import { createTelegramLinkCode } from "./create-telegram-link-code";
 import { getPendingConfirmations } from "./get-pending-confirmations";
+import { getTelegramLinkStatus } from "./get-telegram-link-status";
 import { joinAsFounder } from "./join-as-founder";
 import { linkTelegram } from "./link-telegram";
 import { approveLogin, denyLogin } from "./login-approval";
@@ -108,6 +109,7 @@ export const REGISTRY = {
   manage_members: manageMembers,
   set_kiosk_pin: setKioskPin,
   create_telegram_link_code: createTelegramLinkCode,
+  get_telegram_link_status: getTelegramLinkStatus,
   link_telegram: linkTelegram,
   approve_login: approveLogin,
   deny_login: denyLogin,

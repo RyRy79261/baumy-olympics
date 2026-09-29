@@ -124,6 +124,36 @@ test("brain links a member by code, then adds a confirmed calendar event once", 
   );
   expect((await reused.json()).code).toBe("LINK_CODE_INVALID");
 
+  // Issue #118: relinking the same Telegram account says Linked too, though
+  // the member's Telegram id does not change.
+  await page.reload();
+  await expect(
+    page.getByText("Your Telegram account is linked."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Link Telegram" }).click();
+  const relink = new URL(
+    (await page
+      .getByRole("link", { name: "Open Telegram" })
+      .getAttribute("href"))!,
+  ).searchParams.get("start")!;
+  expect(relink).not.toBe(`link_${code}`);
+  await expect(
+    page.getByRole("status").filter({ hasText: "Waiting for Telegram" }),
+  ).toBeVisible();
+  const relinked = await call(
+    brain,
+    "link_telegram",
+    { code: relink.slice("link_".length) },
+    { ...actor, "idempotency-key": `link-${rand()}-again` },
+  );
+  expect(relinked.status()).toBe(200);
+  await expect(
+    page.getByText("Linked. @baumy_bot knows who you are now."),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Telegram" })).toHaveCount(
+    0,
+  );
+
   const me = await call(brain, "whoami", {}, actor);
   expect(me.status()).toBe(200);
   expect((await me.json()).data.actorKind).toBe("service");
