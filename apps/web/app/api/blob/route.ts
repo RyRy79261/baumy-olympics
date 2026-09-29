@@ -1,3 +1,4 @@
+import { isFounderEmail } from "@baumy/auth/env";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { findAvatarPathname } from "@baumy/db/avatars";
 import { findCompletionPhoto } from "@baumy/db/confirmations";
@@ -15,6 +16,10 @@ export const dynamic = "force-dynamic";
 export function GET(req: Request): Promise<Response> {
   return handleBlobProxy(req, {
     getActor,
+    mayJoinAsFounder: (actor) =>
+      actor.kind === "member" &&
+      actor.emailVerified &&
+      isFounderEmail(process.env, actor.email),
     householdId: HOUSEHOLD_ID,
     findPhoto: (householdId, completionId) =>
       findCompletionPhoto(

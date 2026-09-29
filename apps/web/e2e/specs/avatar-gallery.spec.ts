@@ -88,7 +88,8 @@ test("an admin adds a character, a new member picks it, every screen draws it", 
   await expect(tile).toContainText("Nobody wears it");
   await expectLoadedSprite(tile);
 
-  // A new member picks it on /join.
+  // A new member joins with a code: the gallery (real housemates) is not
+  // on /join for them; the code takes them to Settings to pick.
   const invite = await mintCode(page, 1);
   const member = await newAccount(browser, `gallery-${project}`);
   const join = member.page.locator("form").filter({
@@ -96,19 +97,24 @@ test("an admin adds a character, a new member picks it, every screen draws it", 
   });
   await join.getByLabel("Invite code").fill(invite);
   await join.getByLabel("Your name").fill(name);
-  const pick = join.locator(`[data-avatar]`).filter({ hasText: character });
+  await expect(join.getByTestId("invite-character")).toBeVisible();
+  await expect(join.locator("[data-avatar]")).toHaveCount(0);
+  await join.getByRole("button", { name: "Join the household" }).click();
+  await expect(member.page).toHaveURL(/\/settings/);
+  const gallery = member.page.getByTestId("gallery-form");
+  const pick = gallery.locator("[data-avatar]").filter({ hasText: character });
   await expect(pick).toHaveAttribute("data-picked", "false");
   await pick.click();
   await expect(pick).toHaveAttribute("data-picked", "true");
-  await join.getByRole("button", { name: "Join the household" }).click();
-  await expect(member.page).toHaveURL(/\/$/);
+  await gallery.getByRole("button", { name: "Wear this character" }).click();
+  await expect(member.page.getByText("You wear it now.")).toBeVisible();
 
-  // The header draws the sprite, not the drawn character.
+  // The header draws the sprite, not the drawn character, and it stays
+  // picked after a reload.
+  await member.page.goto("/");
   const menu = member.page.getByTestId("account-menu");
   await expectLoadedSprite(menu);
   await expect(menu.locator("[data-housemate]")).toHaveCount(0);
-
-  // Settings shows it picked.
   await member.page.goto("/settings");
   await expect(
     member.page

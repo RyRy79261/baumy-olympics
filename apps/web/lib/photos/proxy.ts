@@ -24,11 +24,15 @@ import { isPhotoType, photoPathCompletionId } from "./paths";
 //
 // It serves the avatar gallery's sprites too (issue #111), under the same
 // rules, at exactly `avatars/{id}/{name}.png`: the sprite must be in the
-// household and stored at that pathname. One difference: a signed-in account
-// that has not joined yet may see them, because /join offers the gallery.
+// household and stored at that pathname. The gallery depicts real
+// housemates, so beyond members and the kiosk only one account that has not
+// joined yet may see it: a verified founder on /join (`mayJoinAsFounder`).
+// Someone with an invite code sees it once the code has made them a member.
 
 export interface ProxyDeps {
   getActor: () => Promise<Actor | null>;
+  /** A verified address on FOUNDER_EMAILS: may join without a code. */
+  mayJoinAsFounder: (actor: Actor) => boolean;
   householdId: string;
   /** `findCompletionPhoto` (packages/db). */
   findPhoto: (
@@ -56,14 +60,18 @@ function text(body: string, status: number): Response {
 }
 
 /**
- * A member's session, or a paired kiosk, may look; for a gallery sprite, any
- * signed-in account too (someone choosing theirs on /join).
+ * A member's session, or a paired kiosk, may look; for a gallery sprite, a
+ * founder about to join too (they pick theirs on /join).
  */
-function mayView(actor: Actor | null, sprite: boolean): boolean {
+function mayView(
+  actor: Actor | null,
+  sprite: boolean,
+  deps: ProxyDeps,
+): boolean {
   if (!actor) return false;
   if (actor.kind === "kiosk") return true;
-  if (sprite && actor.kind === "member") return true;
-  return actor.memberId !== undefined;
+  if (actor.memberId !== undefined) return true;
+  return sprite && deps.mayJoinAsFounder(actor);
 }
 
 export async function handleBlobProxy(
@@ -76,7 +84,7 @@ export async function handleBlobProxy(
   const avatarId = completionId ? null : avatarPathAvatarId(pathname);
   if (!completionId && !avatarId) return text("Not found", 404);
 
-  if (!mayView(await deps.getActor(), avatarId !== null)) {
+  if (!mayView(await deps.getActor(), avatarId !== null, deps)) {
     return text("Unauthorized", 401);
   }
 
