@@ -4,7 +4,7 @@ import { berlinDateKey } from "@baumy/core";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { ActingChip, actingDoneClass } from "@baumy/ui";
 import { cookies } from "next/headers";
-import { ForgetCookie } from "@/components/kiosk/forget-cookie";
+import { ForgetWalkIn } from "@/components/kiosk/forget-cookie";
 import { ScoreEmote } from "@/components/members/score-emote";
 import { KIOSK_WALK_IN_COOKIE, walksIn } from "@/lib/kiosk/cookies";
 import { AutoRefresh } from "@/components/hub/auto-refresh";
@@ -119,7 +119,7 @@ export default async function KioskHomePage({
         }
       />
       <AutoRefresh />
-      {walkIn ? <ForgetCookie name={KIOSK_WALK_IN_COOKIE} /> : null}
+      {walkIn ? <ForgetWalkIn /> : null}
     </div>
   );
 }

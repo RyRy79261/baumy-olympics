@@ -20,6 +20,8 @@ import {
   KIOSK_COOKIE_MAX_AGE_S,
   KIOSK_MEMBER_COOKIE,
   KIOSK_MEMBER_MAX_AGE_S,
+  KIOSK_WALK_IN_COOKIE,
+  KIOSK_WALK_IN_MAX_AGE_S,
 } from "@/lib/kiosk/cookies";
 import {
   LOGIN_REQUEST_RETENTION_MS,
@@ -326,6 +328,12 @@ export default function PrivacyPage() {
             <code>{KIOSK_MEMBER_COOKIE}</code>: on the kitchen iPad, who tapped
             their avatar (a member id, never a PIN), for at most{" "}
             {KIOSK_MEMBER_MIN} minutes.
+          </li>
+          <li>
+            <code>{KIOSK_WALK_IN_COOKIE}</code>: on the kitchen iPad, the member
+            who just tapped their avatar (a member id), so their character walks
+            in once; the screen clears it straight away, and it lasts{" "}
+            {KIOSK_WALK_IN_MAX_AGE_S} seconds at most.
           </li>
           <li>
             <code>{REFRESH_COOKIE}</code>: set by the kitchen screen for{" "}
