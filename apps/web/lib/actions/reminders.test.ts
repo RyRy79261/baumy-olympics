@@ -221,14 +221,14 @@ describe("list_reminders", () => {
             { id: ryan, avatar: null },
             { id: jo, avatar: chosen },
           ]).get(ryan),
-          image: null,
+          sprites: null,
         },
         {
           id: jo,
           displayName: "Jo",
           color: "#336699",
           avatar: chosen,
-          image: null,
+          sprites: null,
         },
       ],
       reminders: [

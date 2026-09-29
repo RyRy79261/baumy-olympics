@@ -6,7 +6,10 @@ import {
   AVATAR_HEIGHT_PX,
   backgroundKeys,
   cleanAvatar,
+  cleanAvatarSet,
   gridSize,
+  sampleCells,
+  sharedPalette,
   type RgbaImage,
 } from "./clean";
 
@@ -266,7 +269,147 @@ describe("cleanAvatar", () => {
   });
 });
 
+describe("cleanAvatarSet (a set of poses)", () => {
+  /** Several blown-up sprites side by side on one flat canvas. */
+  function sheet(
+    parts: { img: RgbaImage; left: number; top: number }[],
+    k: number,
+    bg: Rgba,
+  ): RgbaImage {
+    const width = 420;
+    const height = 200;
+    const data = new Uint8Array(width * height * 4);
+    for (let i = 0; i < width * height; i++) data.set(bg, i * 4);
+    for (const { img, left, top } of parts) {
+      const one = compose(
+        img,
+        k,
+        { width: img.width * k, height: img.height * k, left: 0, top: 0 },
+        () => [0, 0, 0, 0],
+      );
+      for (let y = 0; y < one.height; y++) {
+        for (let x = 0; x < one.width; x++) {
+          const o = (y * one.width + x) * 4;
+          if (one.data[o + 3]) {
+            data.set(
+              one.data.subarray(o, o + 4),
+              ((top + y) * width + left + x) * 4,
+            );
+          }
+        }
+      }
+    }
+    return { data, width, height };
+  }
+
+  // Three poses of different heights: a short one, the sprite, a wide one.
+  const SHORT = SPRITE.slice(2);
+  const WIDE = SPRITE.map((row) => row + "K");
+
+  it("splits a sheet into its figures, left to right, at one scale", async () => {
+    // Placed out of order: the right-most is the wide one.
+    const input = sheet(
+      [
+        { img: grid(WIDE), left: 300, top: 20 },
+        { img: grid(SPRITE), left: 20, top: 20 },
+        { img: grid(SHORT), left: 160, top: 36 },
+      ],
+      8,
+      [0, 0, 0, 255],
+    );
+    const r = await cleanAvatarSet([await png(input)]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Every figure back to its own pixels: one grid, so one scale.
+    expect(r.figures.map((f) => [f.width, f.height])).toEqual([
+      [10, 14],
+      [10, 12],
+      [11, 14],
+    ]);
+    expect(await decode(r.figures[0]!.png)).toEqual(grid(SPRITE));
+    expect(await decode(r.figures[1]!.png)).toEqual(grid(SHORT));
+  });
+
+  it("samples a set with no exact grid by the tallest figure, keeping proportions", async () => {
+    // 5× and a sheet sampled to 7 rows: the short one ends up 6 rows.
+    const input = sheet(
+      [
+        { img: grid(SPRITE), left: 20, top: 20 },
+        { img: grid(SHORT), left: 200, top: 30 },
+      ],
+      5,
+      [0, 255, 0, 255],
+    );
+    const r = await cleanAvatarSet([await png(input)], { height: 7 });
+    expect(r.ok && r.figures.map((f) => f.height)).toEqual([7, 6]);
+  });
+
+  it("takes one figure from each of several files, in their order", async () => {
+    const one = compose(grid(SHORT), 6, CANVAS, () => [0, 255, 0, 255]);
+    const two = compose(grid(SPRITE), 6, CANVAS, () => [255, 255, 255, 255]);
+    const r = await cleanAvatarSet([await png(one), await png(two)]);
+    expect(r.ok && r.figures.map((f) => [f.width, f.height])).toEqual([
+      [10, 12],
+      [10, 14],
+    ]);
+  });
+
+  it("refuses a set where any file is unreadable, or holds nothing", async () => {
+    const good = await png(
+      compose(grid(SPRITE), 4, CANVAS, () => [0, 0, 0, 255]),
+    );
+    const blank = await png(
+      compose(grid(["."]), 1, CANVAS, () => [0, 255, 0, 255]),
+    );
+    expect(await cleanAvatarSet([good, new Uint8Array([1])])).toEqual({
+      ok: false,
+      reason: "unreadable",
+    });
+    expect(await cleanAvatarSet([good, blank])).toEqual({
+      ok: false,
+      reason: "empty",
+    });
+  });
+});
+
 describe("the pieces", () => {
+  it("sampleCells keeps a thin dark line that plain sampling would lose", () => {
+    // A 27 × 27 light square with a 2px dark line down columns 11-12,
+    // sampled to 3 × 3 (9px cells): the line is 2 of the 5 middle columns
+    // of the middle cell, a minority that still wins.
+    const data = new Uint8Array(27 * 27 * 4);
+    for (let y = 0; y < 27; y++) {
+      for (let x = 0; x < 27; x++) {
+        data.set(
+          x === 11 || x === 12 ? [20, 10, 30, 255] : [230, 200, 160, 255],
+          (y * 27 + x) * 4,
+        );
+      }
+    }
+    const out = sampleCells({ data, width: 27, height: 27 }, 3, 3);
+    expect(Array.from(out.data.subarray(4, 8))).toEqual([20, 10, 30, 255]);
+    expect(Array.from(out.data.subarray(0, 4))).toEqual([230, 200, 160, 255]);
+    // Mostly transparent cells stay transparent.
+    const clear = sampleCells(
+      { data: new Uint8Array(8 * 8 * 4), width: 8, height: 8 },
+      2,
+      2,
+    );
+    expect(clear.data.every((v) => v === 0)).toBe(true);
+  });
+
+  it("sharedPalette keeps few colours exactly, and cuts many down", () => {
+    const few = grid(SPRITE);
+    expect(sharedPalette([few], 24).length).toBe(5);
+    const data = new Uint8Array(100 * 100 * 4);
+    for (let i = 0; i < 10000; i++) {
+      data.set([i % 256, (i * 7) % 256, (i * 13) % 256, 255], i * 4);
+    }
+    expect(sharedPalette([{ data, width: 100, height: 100 }], 24).length).toBe(
+      24,
+    );
+  });
+
   it("backgroundKeys finds a backdrop's colour, and none on a varied border", () => {
     const solid = compose(grid(SPRITE), 2, CANVAS, () => [0, 255, 0, 255]);
     expect(backgroundKeys(solid).map((k) => k.c)).toEqual([[0, 255, 0]]);

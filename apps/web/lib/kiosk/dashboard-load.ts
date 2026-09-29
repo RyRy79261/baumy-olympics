@@ -84,7 +84,7 @@ export async function loadDashboard(
       id: m.id,
       displayName: m.displayName,
       avatar: roster.get(m.id),
-      image: avatarImageView(m.avatarImage),
+      sprites: avatarImageView(m.avatarImage),
     })),
     chores,
     events,

@@ -1,4 +1,4 @@
-import { avatarFor, type AvatarImage } from "@baumy/types";
+import { avatarFor, type AvatarSprites } from "@baumy/types";
 import type { CSSProperties } from "react";
 import { BaumyCat } from "./baumy-cat";
 import { cx } from "./cx";
@@ -26,7 +26,7 @@ export interface ReminderFace {
    */
   avatar: unknown;
   /** Their gallery sprite (issue #111), drawn instead when they picked one. */
-  image?: AvatarImage | null;
+  sprites?: AvatarSprites | null;
   seen: boolean;
 }
 
@@ -238,7 +238,8 @@ export function ReminderScreen({
                 }
               >
                 <MemberCharacter
-                  image={f.image}
+                  moment={f.seen ? "emote" : undefined}
+                  sprites={f.sprites}
                   avatar={f.avatar}
                   memberId={f.id}
                   scale={7}

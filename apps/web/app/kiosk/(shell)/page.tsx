@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { berlinDateKey } from "@baumy/core";
 import { createHttpDb, type Queryable } from "@baumy/db";
-import { ActingChip, MemberCharacter, actingDoneClass } from "@baumy/ui";
+import { ActingChip, actingDoneClass } from "@baumy/ui";
+import { ScoreEmote } from "@/components/members/score-emote";
 import { AutoRefresh } from "@/components/hub/auto-refresh";
 import { DashboardHeader } from "@/components/kiosk/dashboard/dashboard-header";
 import { MonthCalendar } from "@/components/kiosk/dashboard/month-calendar";
@@ -86,9 +87,10 @@ export default async function KioskHomePage({
             <ActingChip
               name={kiosk.displayName ?? ""}
               who={
-                <MemberCharacter
-                  image={
-                    data.members.find((m) => m.id === kiosk.memberId)?.image
+                <ScoreEmote
+                  moment="walk-in"
+                  sprites={
+                    data.members.find((m) => m.id === kiosk.memberId)?.sprites
                   }
                   avatar={
                     data.members.find((m) => m.id === kiosk.memberId)?.avatar

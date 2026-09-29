@@ -36,7 +36,11 @@ export interface ProxyDeps {
     completionId: string,
   ) => Promise<string | null | undefined>;
   /** `findAvatarPathname` (packages/db). */
-  findAvatar: (householdId: string, avatarId: string) => Promise<string | null>;
+  findAvatar: (
+    householdId: string,
+    avatarId: string,
+    pathname: string,
+  ) => Promise<string | null>;
   store: BlobStore;
 }
 
@@ -78,7 +82,7 @@ export async function handleBlobProxy(
 
   const stored = completionId
     ? await deps.findPhoto(deps.householdId, completionId)
-    : await deps.findAvatar(deps.householdId, avatarId!);
+    : await deps.findAvatar(deps.householdId, avatarId!, pathname);
   if (stored !== pathname) return text("Not found", 404);
 
   const got = await deps.store.get(pathname);

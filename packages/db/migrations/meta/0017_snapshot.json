@@ -1,5 +1,5 @@
 {
-  "id": "1ac029cf-09a9-40d5-9e91-f8c05bde9a02",
+  "id": "fa9bfb8c-936f-4f28-9a6c-afe486db6ff2",
   "prevId": "e858fcee-29fb-4a69-86f0-25656fb63891",
   "version": "7",
   "dialect": "postgresql",
@@ -527,6 +527,85 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.avatar_poses": {
+      "name": "avatar_poses",
+      "schema": "",
+      "columns": {
+        "avatar_id": {
+          "name": "avatar_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pose": {
+          "name": "pose",
+          "type": "avatar_pose",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pathname": {
+          "name": "pathname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "avatar_poses_avatar_id_avatars_id_fk": {
+          "name": "avatar_poses_avatar_id_avatars_id_fk",
+          "tableFrom": "avatar_poses",
+          "tableTo": "avatars",
+          "columnsFrom": [
+            "avatar_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "avatar_poses_avatar_id_pose_pk": {
+          "name": "avatar_poses_avatar_id_pose_pk",
+          "columns": [
+            "avatar_id",
+            "pose"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "avatar_poses_pathname_unique": {
+          "name": "avatar_poses_pathname_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "pathname"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "avatar_poses_size_positive": {
+          "name": "avatar_poses_size_positive",
+          "value": "\"avatar_poses\".\"width\" > 0 AND \"avatar_poses\".\"height\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.avatars": {
       "name": "avatars",
       "schema": "",
@@ -547,24 +626,6 @@
         "name": {
           "name": "name",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pathname": {
-          "name": "pathname",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "width": {
-          "name": "width",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "height": {
-          "name": "height",
-          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -634,22 +695,9 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "avatars_pathname_unique": {
-          "name": "avatars_pathname_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "pathname"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "avatars_size_positive": {
-          "name": "avatars_size_positive",
-          "value": "\"avatars\".\"width\" > 0 AND \"avatars\".\"height\" > 0"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.chore_rule_versions": {
@@ -4165,6 +4213,15 @@
       "values": [
         "anthropic",
         "groq"
+      ]
+    },
+    "public.avatar_pose": {
+      "name": "avatar_pose",
+      "schema": "public",
+      "values": [
+        "idle",
+        "walk",
+        "emote"
       ]
     },
     "public.chore_kind": {

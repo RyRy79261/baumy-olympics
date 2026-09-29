@@ -7,7 +7,7 @@ import {
 import {
   avatarFor,
   isCalendarDate,
-  type AvatarImage,
+  type AvatarSprites,
   type ChoreKind,
 } from "@baumy/types";
 import { HOUSE_COLOUR, SHIRT_COLOURS } from "@baumy/ui";
@@ -36,7 +36,7 @@ export interface DashboardMember {
    */
   avatar: unknown;
   /** Their gallery sprite (issue #111), drawn instead when they picked one. */
-  image?: AvatarImage | null;
+  sprites?: AvatarSprites | null;
 }
 
 /** The house's colour (the kit's `--color-bm-house`), which no shirt uses. */

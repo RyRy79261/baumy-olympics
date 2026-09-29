@@ -34,7 +34,13 @@ export {
   ChooseAvatar,
   JoinAvatarId,
   NewAvatar,
+  AVATAR_HEIGHTS,
+  AVATAR_POSES,
+  DEFAULT_AVATAR_HEIGHT,
+  PreviewAvatar,
   type AvatarImage,
+  type AvatarPose,
+  type AvatarSprites,
 } from "./avatars";
 export {
   KIOSK_DEVICE_NAME_MAX,

@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import type { Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { avatars, members } from "@baumy/db/schema";
+import { insertAvatar } from "@baumy/db/avatars";
+import { members } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
 import { rosterAvatars } from "@baumy/types";
 import { SHIRT_COLOURS } from "@baumy/ui";
@@ -52,14 +53,13 @@ describe("activeRoster", () => {
     const jo = await seedMember(db(), { displayName: "Jo" });
     const id = randomUUID();
     const pathname = `avatars/${id}/a1b2c3d4e5f60718.png`;
-    await t.db().insert(avatars).values({
+    await insertAvatar(db(), {
       id,
       householdId: HOUSEHOLD_ID,
       name: "Knight",
-      pathname,
-      width: 28,
-      height: 56,
       createdBy: ryan,
+      createdAt: new Date(),
+      poses: { idle: { pathname, width: 28, height: 56 } },
     });
     await t
       .db()
@@ -67,14 +67,14 @@ describe("activeRoster", () => {
       .set({ avatarImageId: id })
       .where(eq(members.id, jo));
 
-    const { characters, images } = await activeRoster(db(), HOUSEHOLD_ID);
+    const { characters, sprites } = await activeRoster(db(), HOUSEHOLD_ID);
     expect([...characters.keys()].sort()).toEqual([ryan, jo].sort());
-    expect(images.get(jo)).toEqual({
-      src: photoProxyUrl(pathname),
-      width: 28,
-      height: 56,
+    expect(sprites.get(jo)).toEqual({
+      idle: { src: photoProxyUrl(pathname), width: 28, height: 56 },
+      walk: null,
+      emote: null,
     });
-    expect(images.has(ryan)).toBe(false);
+    expect(sprites.has(ryan)).toBe(false);
   });
 });
 

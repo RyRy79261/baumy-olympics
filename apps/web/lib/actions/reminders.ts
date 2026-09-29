@@ -14,7 +14,7 @@ import {
   ReminderRef,
   avatarFor,
   rosterAvatars,
-  type AvatarImage,
+  type AvatarSprites,
   type MemberAvatar,
 } from "@baumy/types";
 import { avatarImageView } from "@/lib/avatars/paths";
@@ -59,7 +59,7 @@ export interface ReminderMemberView {
   /** Their chosen character, or the default for their id. */
   avatar: MemberAvatar;
   /** Their gallery sprite (issue #111), through the proxy, or null. */
-  image: AvatarImage | null;
+  sprites: AvatarSprites | null;
 }
 
 function reminderView(r: ReminderRow, people: ReminderMember[]): ReminderView {
@@ -90,7 +90,7 @@ function memberView(
     color: m.color,
     // The same character everywhere: chosen, or the roster's default.
     avatar: roster.get(m.id) ?? avatarFor(m),
-    image: avatarImageView(m.avatarImage),
+    sprites: avatarImageView(m.avatarImage),
   };
 }
 

@@ -1,11 +1,7 @@
 import { and, asc, eq, inArray, isNull, lte, notExists } from "drizzle-orm";
-import {
-  avatarImageColumns,
-  avatarImageOf,
-  type AvatarImageRef,
-} from "./avatars";
+import { withAvatarImages, type AvatarImageRef } from "./avatars";
 import type { Queryable } from "./index";
-import { avatars, members, reminderAcks, reminders } from "./schema";
+import { members, reminderAcks, reminders } from "./schema";
 
 // Reminders (ADR 0005 §4, SPEC §5 `reminders`, `reminder_acks`). Every
 // function takes the caller's handle (the action's transaction for writes),
@@ -186,7 +182,8 @@ export async function listActiveReminders(
   db: Queryable,
   householdId: string,
 ): Promise<ActiveReminders> {
-  const people = (
+  const people = await withAvatarImages(
+    db,
     await db
       .select({
         id: members.id,
@@ -194,26 +191,17 @@ export async function listActiveReminders(
         color: members.color,
         avatar: members.avatar,
         createdAt: members.createdAt,
-        ...avatarImageColumns,
+        avatarImageId: members.avatarImageId,
       })
       .from(members)
-      .leftJoin(avatars, eq(avatars.id, members.avatarImageId))
       .where(
         and(
           eq(members.householdId, householdId),
           isNull(members.deactivatedAt),
         ),
       )
-      .orderBy(asc(members.createdAt), asc(members.id))
-  ).map(({ imageId, imagePathname, imageWidth, imageHeight, ...m }) => ({
-    ...m,
-    avatarImage: avatarImageOf({
-      imageId,
-      imagePathname,
-      imageWidth,
-      imageHeight,
-    }),
-  }));
+      .orderBy(asc(members.createdAt), asc(members.id)),
+  );
   const open = await withAcks(
     db,
     await db

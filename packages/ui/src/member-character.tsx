@@ -1,18 +1,24 @@
-import type { AvatarImage } from "@baumy/types";
+import type { AvatarImage, AvatarPose, AvatarSprites } from "@baumy/types";
 import type { CSSProperties } from "react";
 import { cx } from "./cx";
 import { Housemate } from "./housemate";
 
-// How a member is drawn, everywhere (issue #111): the gallery sprite they
+// How a member is drawn, everywhere (issue #111): the gallery character they
 // picked, or, until they pick one, their parametric Housemate. One
 // component, so the header, the kiosk's avatar bar and acting chip, the
-// reminder faces, the dashboard and the admin pages all agree.
+// reminder faces, the dashboard, the scoreboard and the admin pages agree.
 //
 // `scale` means what it means for the Housemate (a 17px-tall character
-// drawn `scale` times), so a slot keeps its size whichever is drawn. A
-// sprite is drawn at the whole-number multiple (or whole-number fraction)
-// of its own pixels that comes closest to that height, with
-// `image-rendering: pixelated`, so its pixels stay square and crisp.
+// drawn `scale` times), so a slot keeps its size whichever is drawn. A set
+// is drawn at the whole-number multiple (or whole-number fraction) of its
+// idle pose's pixels that comes closest to that height, the same factor for
+// every pose, with `image-rendering: pixelated`, so its pixels stay square.
+//
+// A set has an idle pose and maybe walk and emote (owner ruling
+// 2026-09-29). `pose` picks one to hold (the scoreboard's leader emotes);
+// `moment` plays one once as it mounts, over idle: "emote" for 2 seconds (a
+// score, a "seen it"), or "walk-in" (someone taps in on the kiosk), which
+// under reduced motion is just idle. A pose the set lacks is idle.
 
 /** The Housemate's height in its own pixels (packages/ui housemate.tsx). */
 export const HOUSEMATE_HEIGHT_PX = 17;
@@ -36,18 +42,52 @@ export function spriteFactor(height: number, target: number): number {
   return best;
 }
 
-export function MemberCharacter({
+export type CharacterMoment = "emote" | "walk-in";
+
+function Pose({
   image,
+  f,
+  label,
+  className,
+  pose,
+}: {
+  image: AvatarImage;
+  f: number;
+  label?: string;
+  className?: string;
+  pose: AvatarPose;
+}) {
+  return (
+    // A plain <img>: the proxy is same-origin and cookie-gated, and a small
+    // sprite must not be resampled.
+    <img
+      src={image.src}
+      data-pose={pose}
+      width={Math.max(1, Math.round(image.width * f))}
+      height={Math.max(1, Math.round(image.height * f))}
+      alt={label ?? ""}
+      aria-hidden={label ? undefined : true}
+      draggable={false}
+      className={cx("block", className)}
+      style={{ imageRendering: "pixelated" }}
+    />
+  );
+}
+
+export function MemberCharacter({
+  sprites,
   avatar,
   memberId = "",
   scale = 3,
   label,
   bob = false,
+  pose = "idle",
+  moment,
   className,
   style,
 }: {
-  /** Their gallery sprite, or null/undefined for the drawn character. */
-  image?: AvatarImage | null;
+  /** Their gallery set, or null/undefined for the drawn character. */
+  sprites?: AvatarSprites | null;
   /** What `members.avatar` holds, for the drawn character. */
   avatar?: unknown;
   memberId?: string;
@@ -57,10 +97,14 @@ export function MemberCharacter({
   label?: string;
   /** Bob gently (the reminder's "not seen yet"); motion-safe only. */
   bob?: boolean;
+  /** The pose to hold; idle when the set has no such pose. */
+  pose?: AvatarPose;
+  /** A pose to play once as it mounts, over the one held. */
+  moment?: CharacterMoment;
   className?: string;
   style?: CSSProperties;
 }) {
-  if (!image) {
+  if (!sprites) {
     return (
       <Housemate
         avatar={avatar}
@@ -73,29 +117,50 @@ export function MemberCharacter({
       />
     );
   }
-  const f = spriteFactor(image.height, HOUSEMATE_HEIGHT_PX * scale);
+  const f = spriteFactor(sprites.idle.height, HOUSEMATE_HEIGHT_PX * scale);
+  const held = (pose !== "idle" && sprites[pose]) || sprites.idle;
+  const heldPose: AvatarPose = held === sprites.idle ? "idle" : pose;
+  const extra =
+    moment === "emote"
+      ? sprites.emote
+      : moment === "walk-in"
+        ? sprites.walk
+        : null;
   return (
     <span
       data-member-sprite
+      data-moment={extra ? moment : undefined}
       className={cx(
-        "inline-block shrink-0",
+        "relative inline-block shrink-0",
         bob && "motion-safe:animate-pixel-bob",
         className,
       )}
       style={style}
     >
-      {/* A plain <img>: the proxy is same-origin and cookie-gated, and a
-          56px sprite must not be resampled. */}
-      <img
-        src={image.src}
-        width={Math.max(1, Math.round(image.width * f))}
-        height={Math.max(1, Math.round(image.height * f))}
-        alt={label ?? ""}
-        aria-hidden={label ? undefined : true}
-        draggable={false}
-        className="block"
-        style={{ imageRendering: "pixelated" }}
+      <Pose
+        image={held}
+        f={f}
+        label={label}
+        pose={heldPose}
+        className={
+          moment === "walk-in" && extra
+            ? "motion-safe:animate-pose-after-walk"
+            : undefined
+        }
       />
+      {extra ? (
+        <Pose
+          image={extra}
+          f={f}
+          pose={moment === "emote" ? "emote" : "walk"}
+          className={cx(
+            "absolute bottom-0 left-0 max-w-none",
+            moment === "emote"
+              ? "animate-pose-flash"
+              : "hidden motion-safe:block motion-safe:animate-pose-walk-in",
+          )}
+        />
+      ) : null}
     </span>
   );
 }

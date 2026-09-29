@@ -1,11 +1,7 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
-import {
-  avatarImageColumns,
-  avatarImageOf,
-  type AvatarImageRef,
-} from "./avatars";
+import { withAvatarImages, type AvatarImageRef } from "./avatars";
 import { createHttpDb, type Queryable } from "./index";
-import { avatars, members } from "./schema";
+import { members } from "./schema";
 
 // Member reads and writes. `findActiveMemberByAuthUserId` runs on the request
 // path before any action (apps/web/lib/auth). The rest take the caller's
@@ -280,25 +276,14 @@ export async function listActiveMembers(
       avatarSprite: members.avatarSprite,
       color: members.color,
       avatar: members.avatar,
-      ...avatarImageColumns,
+      avatarImageId: members.avatarImageId,
     })
     .from(members)
-    .leftJoin(avatars, eq(avatars.id, members.avatarImageId))
     .where(
       and(eq(members.householdId, householdId), isNull(members.deactivatedAt)),
     )
     .orderBy(asc(members.createdAt), asc(members.id));
-  return rows.map(
-    ({ imageId, imagePathname, imageWidth, imageHeight, ...m }) => ({
-      ...m,
-      avatarImage: avatarImageOf({
-        imageId,
-        imagePathname,
-        imageWidth,
-        imageHeight,
-      }),
-    }),
-  );
+  return withAvatarImages(db, rows);
 }
 
 /** One active member of the household, or null. */

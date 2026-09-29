@@ -22,11 +22,12 @@ export function GET(req: Request): Promise<Response> {
         householdId,
         completionId,
       ),
-    findAvatar: (householdId, avatarId) =>
+    findAvatar: (householdId, avatarId, pathname) =>
       findAvatarPathname(
         createHttpDb() as unknown as Queryable,
         householdId,
         avatarId,
+        pathname,
       ),
     store: blobStore(),
   });

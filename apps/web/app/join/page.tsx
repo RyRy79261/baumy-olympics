@@ -32,7 +32,7 @@ export default async function JoinPage() {
       HOUSEHOLD_ID,
       false,
     )
-  ).map((a) => ({ id: a.id, name: a.name, image: avatarImageView(a)! }));
+  ).map((a) => ({ id: a.id, name: a.name, sprites: avatarImageView(a)! }));
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-4 py-10">

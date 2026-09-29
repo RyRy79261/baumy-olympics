@@ -1,18 +1,38 @@
-import { and, asc, count, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from "drizzle-orm";
 import type { Queryable } from "./index";
-import { avatars, members } from "./schema";
+import { avatarPoses, avatars, members } from "./schema";
 
-// The avatar gallery (issue #111). Every function takes the caller's handle
-// (the action's transaction for writes), and none writes an audit row:
-// runAction does that (AGENTS.md). Rows are never deleted: archiving hides
-// a sprite from the gallery, and whoever already wears it keeps it.
+// The avatar gallery (issue #111): character SETS, each with an idle pose
+// and, maybe, walk and emote. Every function takes the caller's handle (the
+// action's transaction for writes), and none writes an audit row: runAction
+// does that (AGENTS.md). Rows are never deleted: archiving hides a set from
+// the gallery, and whoever already wears it keeps it.
 
-/** What a screen needs to draw a member's sprite. */
-export interface AvatarImageRef {
-  id: string;
+export type AvatarPose = (typeof avatarPoses.$inferSelect)["pose"];
+
+/** One stored pose: where its PNG is, and its own size in pixels. */
+export interface PoseRef {
   pathname: string;
   width: number;
   height: number;
+}
+
+/** A set's poses: idle always, walk and emote when the owner made them. */
+export type PoseRefs = { idle: PoseRef } & Partial<Record<AvatarPose, PoseRef>>;
+
+/** What a screen needs to draw a member's character from the gallery. */
+export interface AvatarImageRef {
+  id: string;
+  poses: PoseRefs;
 }
 
 export interface AvatarRow extends AvatarImageRef {
@@ -30,16 +50,27 @@ const wornBy = sql<number>`(
   where m."avatar_image_id" = "avatars"."id" and m."deactivated_at" is null
 )`.mapWith(Number);
 
-const avatarColumns = {
-  id: avatars.id,
-  pathname: avatars.pathname,
-  width: avatars.width,
-  height: avatars.height,
-  name: avatars.name,
-  createdAt: avatars.createdAt,
-  archivedAt: avatars.archivedAt,
-  wornBy,
-};
+/** The poses of each of `avatarIds` that has an idle one. */
+export async function posesFor(
+  db: Queryable,
+  avatarIds: readonly string[],
+): Promise<Map<string, PoseRefs>> {
+  const out = new Map<string, PoseRefs>();
+  const ids = [...new Set(avatarIds)];
+  if (ids.length === 0) return out;
+  const rows = await db
+    .select()
+    .from(avatarPoses)
+    .where(inArray(avatarPoses.avatarId, ids));
+  const partial = new Map<string, Partial<Record<AvatarPose, PoseRef>>>();
+  for (const r of rows) {
+    const p = partial.get(r.avatarId) ?? {};
+    p[r.pose] = { pathname: r.pathname, width: r.width, height: r.height };
+    partial.set(r.avatarId, p);
+  }
+  for (const [id, p] of partial) if (p.idle) out.set(id, p as PoseRefs);
+  return out;
+}
 
 /**
  * The household's gallery, oldest first. `archived` picks which part: the
@@ -51,8 +82,14 @@ export async function listAvatars(
   householdId: string,
   archived?: boolean,
 ): Promise<AvatarRow[]> {
-  return db
-    .select(avatarColumns)
+  const rows = await db
+    .select({
+      id: avatars.id,
+      name: avatars.name,
+      createdAt: avatars.createdAt,
+      archivedAt: avatars.archivedAt,
+      wornBy,
+    })
     .from(avatars)
     .where(
       and(
@@ -65,23 +102,27 @@ export async function listAvatars(
       ),
     )
     .orderBy(asc(avatars.createdAt), asc(avatars.id));
+  const poses = await posesFor(
+    db,
+    rows.map((r) => r.id),
+  );
+  return rows.flatMap((r) => {
+    const p = poses.get(r.id);
+    return p ? [{ ...r, poses: p }] : [];
+  });
 }
 
-/** One sprite of the household, archived or not, or null. */
+/** One set of the household, archived or not, or null. */
 export async function findAvatar(
   db: Queryable,
   householdId: string,
   avatarId: string,
 ): Promise<AvatarRow | null> {
-  const [row] = await db
-    .select(avatarColumns)
-    .from(avatars)
-    .where(and(eq(avatars.id, avatarId), eq(avatars.householdId, householdId)))
-    .limit(1);
-  return row ?? null;
+  const rows = await listAvatars(db, householdId);
+  return rows.find((r) => r.id === avatarId) ?? null;
 }
 
-/** How many sprites the gallery offers now (not archived). */
+/** How many sets the gallery offers now (not archived). */
 export async function countLiveAvatars(
   db: Queryable,
   householdId: string,
@@ -99,42 +140,44 @@ export interface NewAvatar {
   id: string;
   householdId: string;
   name: string;
-  pathname: string;
-  width: number;
-  height: number;
   createdBy: string;
   createdAt: Date;
+  poses: PoseRefs;
 }
 
 /**
- * Add a sprite. Null, writing nothing, when that id (or pathname) is already
- * taken: the upload route picks a fresh id per file, so only a replay lands
+ * Add a set with its poses. Null, writing nothing, when that id is already
+ * taken: the upload route picks a fresh id per set, so only a replay lands
  * here.
  */
 export async function insertAvatar(
   db: Queryable,
   input: NewAvatar,
 ): Promise<AvatarImageRef | null> {
+  const { poses, ...set } = input;
   const [row] = await db
     .insert(avatars)
-    .values(input)
+    .values(set)
     .onConflictDoNothing()
-    .returning({
-      id: avatars.id,
-      pathname: avatars.pathname,
-      width: avatars.width,
-      height: avatars.height,
-    });
-  return row ?? null;
+    .returning({ id: avatars.id });
+  if (!row) return null;
+  await db.insert(avatarPoses).values(
+    Object.entries(poses).map(([pose, p]) => ({
+      avatarId: row.id,
+      pose: pose as AvatarPose,
+      ...p,
+    })),
+  );
+  return { id: row.id, poses };
 }
 
 export type ArchiveResult =
   { ok: true; name: string } | { ok: false; code: "NOT_FOUND" | "STALE" };
 
 /**
- * Archive (`archived: true`) or restore a sprite, compare-and-set on its
- * state: archiving an archived one, or restoring a live one, is `STALE`
- * (another admin got there first).
+ * Archive (`archived: true`) or restore a set, compare-and-set on its state:
+ * archiving an archived one, or restoring a live one, is `STALE` (another
+ * admin got there first).
  */
 export async function setAvatarArchived(
   db: Queryable,
@@ -159,27 +202,46 @@ export async function setAvatarArchived(
     )
     .returning({ name: avatars.name });
   if (row) return { ok: true, name: row.name };
-  const exists = await findAvatar(db, input.householdId, input.avatarId);
+  const [exists] = await db
+    .select({ id: avatars.id })
+    .from(avatars)
+    .where(
+      and(
+        eq(avatars.id, input.avatarId),
+        eq(avatars.householdId, input.householdId),
+      ),
+    );
   return { ok: false, code: exists ? "STALE" : "NOT_FOUND" };
 }
 
-/** Where a sprite's image is stored, for the /api/blob proxy, or null. */
+/**
+ * Whether `pathname` is one of the poses of that set of the household, for
+ * the /api/blob proxy: the pathname when it is, else null.
+ */
 export async function findAvatarPathname(
   db: Queryable,
   householdId: string,
   avatarId: string,
+  pathname: string,
 ): Promise<string | null> {
   const [row] = await db
-    .select({ pathname: avatars.pathname })
-    .from(avatars)
-    .where(and(eq(avatars.id, avatarId), eq(avatars.householdId, householdId)))
+    .select({ pathname: avatarPoses.pathname })
+    .from(avatarPoses)
+    .innerJoin(avatars, eq(avatars.id, avatarPoses.avatarId))
+    .where(
+      and(
+        eq(avatarPoses.avatarId, avatarId),
+        eq(avatarPoses.pathname, pathname),
+        eq(avatars.householdId, householdId),
+      ),
+    )
     .limit(1);
   return row?.pathname ?? null;
 }
 
 /**
- * Put a sprite on a member, or take theirs off (`avatarImageId: null`).
- * False when the member does not exist.
+ * Put a set on a member, or take theirs off (`avatarImageId: null`). False
+ * when the member does not exist.
  */
 export async function setMemberAvatarImage(
   db: Queryable,
@@ -195,29 +257,26 @@ export async function setMemberAvatarImage(
 }
 
 /**
- * The columns that give a member row its sprite, for a query that has
- * `LEFT JOIN avatars ON avatars.id = members.avatar_image_id`.
+ * Member rows with their `avatarImageId`, given their gallery character
+ * (`avatarImage`, null for none) from one more read.
  */
-export const avatarImageColumns = {
-  imageId: avatars.id,
-  imagePathname: avatars.pathname,
-  imageWidth: avatars.width,
-  imageHeight: avatars.height,
-};
-
-/** `avatarImageColumns` of one row, folded into a ref (null for none). */
-export function avatarImageOf(row: {
-  imageId: string | null;
-  imagePathname: string | null;
-  imageWidth: number | null;
-  imageHeight: number | null;
-}): AvatarImageRef | null {
-  return row.imageId === null
-    ? null
-    : {
-        id: row.imageId,
-        pathname: row.imagePathname!,
-        width: row.imageWidth!,
-        height: row.imageHeight!,
-      };
+export async function withAvatarImages<
+  T extends { avatarImageId: string | null },
+>(
+  db: Queryable,
+  rows: T[],
+): Promise<
+  (Omit<T, "avatarImageId"> & { avatarImage: AvatarImageRef | null })[]
+> {
+  const poses = await posesFor(
+    db,
+    rows.flatMap((r) => (r.avatarImageId ? [r.avatarImageId] : [])),
+  );
+  return rows.map(({ avatarImageId, ...rest }) => {
+    const p = avatarImageId ? poses.get(avatarImageId) : undefined;
+    return {
+      ...rest,
+      avatarImage: p ? { id: avatarImageId!, poses: p } : null,
+    };
+  });
 }

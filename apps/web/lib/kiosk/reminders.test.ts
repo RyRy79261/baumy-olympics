@@ -15,7 +15,7 @@ const member = (id: string, displayName: string) => ({
   displayName,
   color: "#4ff5e6",
   avatar: defaultAvatar(id),
-  image: null,
+  sprites: null,
 });
 
 const REMINDER: ReminderView = {
@@ -40,7 +40,7 @@ describe("reminderFaces", () => {
       id,
       displayName,
       avatar: defaultAvatar(id),
-      image: null,
+      sprites: null,
       seen,
     });
     expect(reminderFaces(DATA, REMINDER)).toEqual([

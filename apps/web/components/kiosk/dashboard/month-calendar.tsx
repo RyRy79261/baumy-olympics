@@ -166,7 +166,7 @@ function DaySheet({
                         who={
                           who.member ? (
                             <MemberCharacter
-                              image={who.member.image}
+                              sprites={who.member.sprites}
                               avatar={who.member.avatar}
                               memberId={who.member.id}
                               scale={2}
