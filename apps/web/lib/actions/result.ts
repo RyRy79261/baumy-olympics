@@ -106,6 +106,10 @@ export type DomainErrorCode =
   | "SELF_APPROVAL"
   /** The member who scheduled a weight change tried to veto it. */
   | "SELF_VETO"
+  /** A bounty already has a points change waiting (issue #115). */
+  | "CHANGE_PENDING"
+  /** The points and cooldown asked for are what the bounty has now. */
+  | "NO_CHANGE"
   /** `link_telegram`: the code is wrong, used or expired. */
   | "LINK_CODE_INVALID"
   /** That Telegram user id is already linked to another member. */

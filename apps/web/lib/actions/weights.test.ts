@@ -682,3 +682,385 @@ describe("the weight writes' surfaces and gates", () => {
     expect(data).toMatchObject({ suggestionId: id, status: "vetoed" });
   });
 });
+
+describe("schedule_points_change (issue #115)", () => {
+  const change = (over: Record<string, unknown> = {}) => ({
+    choreId: bathroom,
+    basePoints: 50,
+    cooldownHours: 48,
+    reason: "  It takes an hour  ",
+    ...over,
+  });
+
+  it("schedules any points for the next Monday at least 48h ahead, with its reason and an audit row", async () => {
+    const data = ok(
+      await runAction("schedule_points_change", change(), asAdmin(adminA)),
+    );
+    const appliesAt = weightChangeAppliesAt({
+      now: FIXED_NOW,
+      lastAppliedAt: null,
+    });
+    expect(data).toMatchObject({
+      choreId: bathroom,
+      status: "scheduled",
+      appliesAt: appliesAt.toISOString(),
+      basePoints: 50,
+      cooldownMinutes: 48 * 60,
+    });
+    expect(await suggestionRow(data.suggestionId)).toMatchObject({
+      origin: "admin",
+      currentPoints: 35,
+      currentCooldownMinutes: BATHROOM.cooldownMinutes,
+      scheduledPoints: 50,
+      reason: "It takes an hour",
+      scheduledBy: adminA,
+      scheduledAt: FIXED_NOW,
+    });
+    const [audit] = await t
+      .db()
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "schedule_points_change"));
+    expect(audit).toMatchObject({
+      actorMemberId: adminA,
+      entity: "weight_suggestion",
+      entityId: data.suggestionId,
+      payload: {
+        choreId: bathroom,
+        fromPoints: 35,
+        toPoints: 50,
+        reason: "It takes an hour",
+      },
+    });
+    // Not in effect yet: the bounty is still worth 35, and the change waits
+    // on another member's veto in get_weights.
+    const weights = ok(
+      await runAction("get_weights", { scheduledOnly: true }, as(partner)),
+    );
+    expect(weights.scheduled).toEqual([
+      expect.objectContaining({
+        id: data.suggestionId,
+        origin: "admin",
+        reason: "It takes an hour",
+        canVeto: true,
+        sampleIntervals: null,
+      }),
+    ]);
+    const [version] = await t
+      .db()
+      .select()
+      .from(choreRuleVersions)
+      .where(eq(choreRuleVersions.choreId, bathroom));
+    expect(version!.basePoints).toBe(35);
+  });
+
+  it("stores a blank reason as none", async () => {
+    const data = ok(
+      await runAction(
+        "schedule_points_change",
+        change({ reason: "   " }),
+        asAdmin(adminA),
+      ),
+    );
+    expect((await suggestionRow(data.suggestionId)).reason).toBeNull();
+  });
+
+  it("replaces the week's open suggestion, and skips the 28-day spacing", async () => {
+    const open = await e7Suggestion();
+    // A suggestion applied just now would hold the next one 28 days.
+    const scheduled = ok(
+      await runAction(
+        "schedule_weight",
+        { suggestionId: open },
+        asAdmin(adminA),
+      ),
+    );
+    const runAt = new Date(new Date(scheduled.appliesAt!).getTime() + HOUR);
+    await tx((q) => applyDueSuggestions(q, runAt));
+    const data = ok(
+      await runAction(
+        "schedule_points_change",
+        change({ basePoints: 40 }),
+        asAdmin(adminA, { now: runAt }),
+      ),
+    );
+    expect(new Date(data.appliesAt!)).toEqual(
+      weightChangeAppliesAt({ now: runAt, lastAppliedAt: null }),
+    );
+    expect(new Date(data.appliesAt!).getTime()).toBeLessThan(
+      runAt.getTime() + 28 * DAY,
+    );
+    const landed = await tx((q) =>
+      applyDueSuggestions(q, new Date(new Date(data.appliesAt!).getTime())),
+    );
+    expect(landed).toEqual([
+      expect.objectContaining({
+        suggestionId: data.suggestionId,
+        basePoints: 40,
+      }),
+    ]);
+  });
+
+  it("supersedes an open suggestion it replaces", async () => {
+    const open = await e7Suggestion();
+    const data = ok(
+      await runAction("schedule_points_change", change(), asAdmin(adminA)),
+    );
+    expect((await suggestionRow(open)).status).toBe("superseded");
+    expect((await suggestionRow(data.suggestionId)).status).toBe("scheduled");
+  });
+
+  it("refuses a second change while one waits, and the same points", async () => {
+    ok(await runAction("schedule_points_change", change(), asAdmin(adminA)));
+    await expect(
+      runAction(
+        "schedule_points_change",
+        change({ basePoints: 60 }),
+        asAdmin(adminB),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "CHANGE_PENDING",
+      message: expect.stringContaining(
+        "A change to Bathroom is already scheduled (35 → 50 pts",
+      ),
+    });
+    await expect(
+      runAction(
+        "schedule_points_change",
+        {
+          choreId: bathroom,
+          basePoints: 35,
+          cooldownHours: BATHROOM.cooldownMinutes / 60,
+        },
+        asAdmin(adminB),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "NO_CHANGE",
+      message: "Bathroom is already worth 35 pts with that cooldown.",
+    });
+  });
+
+  it("refuses an unknown, archived or pointless bounty, and bad input inline", async () => {
+    await expect(
+      runAction(
+        "schedule_points_change",
+        change({ choreId: "00000000-0000-4000-8000-000000000000" }),
+        asAdmin(adminA),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "NOT_FOUND" });
+    const { choreId: later } = await seedChore(db(), {
+      ...SEED_CHORES.dishes,
+      effectiveFrom: new Date(FIXED_NOW.getTime() + DAY),
+    });
+    await expect(
+      runAction(
+        "schedule_points_change",
+        change({ choreId: later }),
+        asAdmin(adminA),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "NO_RULE_VERSION" });
+    await t
+      .db()
+      .update(chores)
+      .set({ archivedAt: FIXED_NOW })
+      .where(eq(chores.id, bathroom));
+    await expect(
+      runAction("schedule_points_change", change(), asAdmin(adminA)),
+    ).resolves.toMatchObject({ ok: false, code: "ARCHIVED_CHORE" });
+    const bad = await runAction(
+      "schedule_points_change",
+      change({ basePoints: 0, reason: "x".repeat(281) }),
+      asAdmin(adminA),
+    );
+    expect(bad).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    expect(!bad.ok && bad.issues?.map((i) => i.path[0]).sort()).toEqual([
+      "basePoints",
+      "reason",
+    ]);
+  });
+
+  it("is an admin's, in the UI only", async () => {
+    await expect(
+      runAction("schedule_points_change", change(), as(partner)),
+    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    for (const [actor, source] of [
+      [kiosk(adminB), "kiosk"],
+      [sessionActor(adminB, "admin"), "ai"],
+      [mcp(adminB), "mcp"],
+      [brain(adminB), "brain"],
+    ] as [Actor, RequestCtx["source"]][]) {
+      await expect(
+        runAction(
+          "schedule_points_change",
+          change(),
+          ctxFor(actor, { source }),
+        ),
+      ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
+    }
+    expect(
+      await t
+        .db()
+        .select()
+        .from(weightSuggestions)
+        .where(eq(weightSuggestions.choreId, bathroom)),
+    ).toEqual([]);
+  });
+
+  it("is vetoed by another member, never by its admin, and a veto and a cancel race by compare-and-set", async () => {
+    const first = ok(
+      await runAction("schedule_points_change", change(), asAdmin(adminA)),
+    );
+    await expect(
+      runAction(
+        "veto_weight",
+        { suggestionId: first.suggestionId },
+        asAdmin(adminA),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "SELF_VETO" });
+    ok(
+      await runAction(
+        "veto_weight",
+        { suggestionId: first.suggestionId },
+        as(partner),
+      ),
+    );
+    // The cancel that lost the race gets a sentence, and changes nothing.
+    await expect(
+      runAction(
+        "dismiss_weight",
+        { suggestionId: first.suggestionId },
+        asAdmin(adminA),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "INVALID_STATE",
+      message: "That change was vetoed.",
+    });
+    expect(await suggestionRow(first.suggestionId)).toMatchObject({
+      status: "vetoed",
+      vetoedBy: partner,
+      dismissedBy: null,
+    });
+
+    // The other way round: cancelled first, then the veto loses.
+    const second = ok(
+      await runAction(
+        "schedule_points_change",
+        change({ basePoints: 45 }),
+        asAdmin(adminA),
+      ),
+    );
+    ok(
+      await runAction(
+        "dismiss_weight",
+        { suggestionId: second.suggestionId },
+        asAdmin(adminA),
+      ),
+    );
+    await expect(
+      runAction(
+        "veto_weight",
+        { suggestionId: second.suggestionId },
+        as(partner),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "INVALID_STATE",
+      message: "That suggestion was dismissed.",
+    });
+    // Neither ever applies.
+    expect(
+      await tx((q) =>
+        applyDueSuggestions(q, new Date(FIXED_NOW.getTime() + 60 * DAY)),
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("get_points_history (issue #115)", () => {
+  it("shows every member who changed what, from what, to what, and who vetoed it", async () => {
+    // The seed's createdAt is the database's clock; pin it before FIXED_NOW.
+    await t
+      .db()
+      .update(choreRuleVersions)
+      .set({ createdAt: new Date(FIXED_NOW.getTime() - DAY) })
+      .where(eq(choreRuleVersions.choreId, bathroom));
+    const vetoed = ok(
+      await runAction(
+        "schedule_points_change",
+        {
+          choreId: bathroom,
+          basePoints: 50,
+          cooldownHours: 48,
+          reason: "It takes an hour",
+        },
+        asAdmin(adminA),
+      ),
+    );
+    ok(
+      await runAction(
+        "veto_weight",
+        { suggestionId: vetoed.suggestionId },
+        as(partner, { now: new Date(FIXED_NOW.getTime() + HOUR) }),
+      ),
+    );
+    const data = ok(
+      await runAction("get_points_history", { choreId: bathroom }, as(partner)),
+    );
+    expect(data.changes).toEqual([
+      expect.objectContaining({
+        choreName: "Bathroom",
+        source: "admin",
+        proposedBy: { memberId: adminA, displayName: "Admin A" },
+        proposedAt: FIXED_NOW.toISOString(),
+        fromPoints: 35,
+        toPoints: 50,
+        toCooldownMinutes: 48 * 60,
+        reason: "It takes an hour",
+        outcome: "vetoed",
+        decidedBy: { memberId: partner, displayName: "Partner" },
+        decidedAt: new Date(FIXED_NOW.getTime() + HOUR).toISOString(),
+      }),
+      expect.objectContaining({
+        source: "seed",
+        outcome: "landed",
+        fromPoints: null,
+        toPoints: 35,
+        decidedAt: null,
+      }),
+    ]);
+    // Without a chore: every bounty's.
+    await seedChore(db(), SEED_CHORES.dishes);
+    const all = ok(await runAction("get_points_history", {}, as(partner)));
+    expect(all.changes.map((c) => c.choreName).sort()).toEqual([
+      "Bathroom",
+      "Bathroom",
+      "Dishes",
+    ]);
+  });
+
+  it("is any member's, in the UI and brain only, and checks its input", async () => {
+    await expect(
+      runAction("get_points_history", { choreId: "nope" }, as(partner)),
+    ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    const viaBrain = ok(
+      await runAction(
+        "get_points_history",
+        {},
+        ctxFor(brain(partner), { source: "brain" }),
+      ),
+    );
+    expect(viaBrain.changes.map((c) => c.choreName)).toEqual(["Bathroom"]);
+    for (const [actor, source] of [
+      [kiosk(partner), "kiosk"],
+      [sessionActor(partner), "ai"],
+      [mcp(partner), "mcp"],
+    ] as [Actor, RequestCtx["source"]][]) {
+      await expect(
+        runAction("get_points_history", {}, ctxFor(actor, { source })),
+      ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
+    }
+  });
+});

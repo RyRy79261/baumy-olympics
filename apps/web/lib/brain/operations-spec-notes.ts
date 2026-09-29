@@ -305,6 +305,22 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
     reply:
       '"<chore> goes from <old> to <new> points on <Berlin date>, unless someone vetoes it."',
   },
+  get_points_history: {
+    purpose:
+      "Every change to the bounties' points, newest first: who set or scheduled it, the points and cooldown before and after, the reason, when it applies, and whether it landed, is waiting, was vetoed (by whom, when) or was cancelled.",
+    when: 'For "who changed the trash points?" or "why is the bathroom worth 50 now?". Give `choreId` (from list_chores) for one bounty; leave it out for all of them.',
+    examples: [
+      {
+        say: "who changed the bathroom points?",
+        call: 'get_points_history {"choreId": "<from list_chores>"}',
+      },
+    ],
+    returns:
+      "`changes`, newest first: `choreName`, `source` (seed, manual, measured, admin), `proposedBy`, `proposedAt`, `fromPoints` → `toPoints` and the cooldowns in minutes, `reason`, `appliesAt`, `outcome` (landed, pending, vetoed, cancelled), `decidedBy` and `decidedAt`.",
+    errors: [],
+    reply:
+      '"<name> changed <chore> from <old> to <new> points on <Berlin date> (<reason>); <vetoer> vetoed it." One line per change, newest first.',
+  },
   veto_weight: {
     purpose:
       "Vetoes a scheduled weight change before it applies. Only a member other than the one who scheduled it may.",

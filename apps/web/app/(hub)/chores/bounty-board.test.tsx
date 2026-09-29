@@ -10,12 +10,12 @@ import {
   vi,
 } from "vitest";
 import type { ChoreView } from "@/lib/actions/list-chores";
-import type { SuggestionView } from "@/lib/actions/weights";
+import type { PointsHistoryView, SuggestionView } from "@/lib/actions/weights";
 
 // The Bounties page's edit dialog for an admin (issue #109): the same fields
 // as /admin/chores minus points and cooldown, which change only through
-// Change points (a scheduled weight change), and a link to /admin/chores for
-// archiving.
+// Change points (any points, scheduled: schedule_points_change, issue #115),
+// the bounty's points history, and a link to /admin/chores for archiving.
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -28,6 +28,7 @@ vi.mock("@/app/(hub)/admin/weights/actions", () => ({
   scheduleWeightAction: vi.fn(),
   dismissWeightAction: vi.fn(),
   vetoWeightAction: vi.fn(),
+  schedulePointsChangeAction: vi.fn(),
 }));
 
 const { BountyBoard } = await import("./bounty-board");
@@ -71,6 +72,7 @@ const chore: ChoreView = {
 const suggestion: SuggestionView = {
   id: "s-1",
   choreId: chore.id,
+  origin: "measured",
   status: "open",
   computedAt: "2026-09-28T02:00:00.000Z",
   sampleIntervals: [60, 60, 60, 60, 60, 60],
@@ -82,8 +84,28 @@ const suggestion: SuggestionView = {
   suggestedCooldownMinutes: 24 * 60,
   scheduledPoints: null,
   scheduledCooldownMinutes: null,
+  reason: null,
   appliesAt: null,
   scheduledBy: null,
+};
+
+const vetoed: PointsHistoryView = {
+  key: "s:s-0",
+  choreId: chore.id,
+  choreName: chore.name,
+  source: "admin",
+  suggestionId: "s-0",
+  proposedBy: { memberId: "m-1", displayName: "Ryan" },
+  proposedAt: "2026-09-21T08:00:00.000Z",
+  fromPoints: 40,
+  fromCooldownMinutes: 24 * 60,
+  toPoints: 60,
+  toCooldownMinutes: 24 * 60,
+  reason: "Twice the work",
+  appliesAt: "2026-09-27T22:00:00.000Z",
+  outcome: "vetoed",
+  decidedBy: { memberId: "m-2", displayName: "Partner" },
+  decidedAt: "2026-09-22T08:00:00.000Z",
 };
 
 let container: HTMLDivElement;
@@ -99,11 +121,14 @@ afterEach(() => {
   container.remove();
 });
 
-function render(suggestions: SuggestionView[] | null) {
+function render(
+  suggestions: SuggestionView[] | null,
+  history: PointsHistoryView[] = [],
+) {
   act(() =>
     root.render(
       <BountyBoard
-        admin={suggestions ? { suggestions } : null}
+        admin={suggestions ? { suggestions, history } : null}
         chores={[chore]}
         members={[{ id: "m-1", displayName: "Ryan" }]}
         actorId="m-1"
@@ -153,33 +178,65 @@ describe("BountyBoard", () => {
     expect(more?.textContent).toBe("More options");
   });
 
-  it("Change points offers the week's suggestion to schedule, explaining the veto", () => {
+  it("Change points starts at the week's suggestion, explaining the veto", () => {
     render([suggestion]);
     const dialog = openEdit();
-    expect(
-      dialog.querySelector('form[aria-label="Schedule Trash"]'),
-    ).toBeNull();
+    const formName = 'form[aria-label="Change Trash\'s points"]';
+    expect(dialog.querySelector(formName)).toBeNull();
     act(() => button("Change points", dialog)!.click());
-    const form = dialog.querySelector('form[aria-label="Schedule Trash"]');
+    const form = dialog.querySelector(formName);
     expect(form).not.toBeNull();
     expect(
       form!.querySelector<HTMLInputElement>('input[name="basePoints"]')!.value,
     ).toBe("30");
-    expect(dialog.textContent).toContain("40 → 30 pts");
-    expect(dialog.textContent).toContain("unless another member vetoes it");
+    expect(
+      form!.querySelector<HTMLInputElement>('input[name="choreId"]')!.value,
+    ).toBe(chore.id);
+    expect(form!.querySelector('textarea[name="reason"]')).not.toBeNull();
+    expect(
+      dialog.querySelector('[data-testid="open-suggestion"]')?.textContent,
+    ).toContain("40 → 30 pts");
+    expect(dialog.textContent).toContain("unless another member vetoes them");
     expect(button("Change points", dialog)).toBeUndefined();
   });
 
-  it("Change points says no change is due without a suggestion", () => {
+  it("Change points takes any points without a suggestion, starting at the current ones", () => {
     render([]);
     const dialog = openEdit();
     act(() => button("Change points", dialog)!.click());
+    const form = dialog.querySelector(
+      'form[aria-label="Change Trash\'s points"]',
+    );
+    expect(form).not.toBeNull();
     expect(
-      dialog.querySelector('[data-testid="no-suggestion"]')?.textContent,
-    ).toContain("No change is due yet.");
+      form!.querySelector<HTMLInputElement>('input[name="basePoints"]')!.value,
+    ).toBe("40");
     expect(
-      dialog.querySelector('form[aria-label="Schedule Trash"]'),
-    ).toBeNull();
+      form!.querySelector<HTMLInputElement>('input[name="cooldownHours"]')!
+        .value,
+    ).toBe("24");
+    expect(dialog.querySelector('[data-testid="open-suggestion"]')).toBeNull();
+  });
+
+  it("shows the bounty's points history, or that there is none", () => {
+    render([], [vetoed]);
+    const dialog = openEdit();
+    const history = dialog.querySelector(
+      '[data-testid="bounty-points-history"]',
+    )!;
+    const change = history.querySelector('[data-testid="points-change"]');
+    expect(change?.getAttribute("data-outcome")).toBe("vetoed");
+    expect(change?.textContent).toContain("40 → 60 pts");
+    expect(change?.textContent).toContain("Twice the work");
+    expect(change?.textContent).toContain("Vetoed by Partner");
+    act(() => button("Cancel", dialog)!.click());
+
+    render([]);
+    const empty = openEdit();
+    expect(
+      empty.querySelector('[data-testid="points-history-empty"]')?.textContent,
+    ).toBe("No changes yet.");
+    expect(empty.querySelector('[data-testid="points-change"]')).toBeNull();
   });
 
   it("shows a scheduled change with Cancel instead of Change points", () => {

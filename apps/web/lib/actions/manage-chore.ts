@@ -50,15 +50,18 @@ const input = z.discriminatedUnion(
       // Without one, the chore's sprite is its name's slug (spriteFor).
       sprite: ChoreIcon.optional(),
     }),
-    // A kind or an icon left out is kept as it is. So is the weight when
-    // both points and cooldown are left out: the Bounties page changes
-    // points only through a scheduled weight change (issue #109).
+    // A kind or an icon left out is kept as it is. The weight is kept only
+    // with `weight: "keep"` and neither points nor cooldown: the Bounties
+    // page changes points only through a scheduled change (issues #109 and
+    // #115). Without it both are required, so a form whose two fields were
+    // cleared says so instead of quietly keeping the old weight.
     z.strictObject({
       op: z.literal("update"),
       choreId,
       ...settings,
       basePoints: BasePoints.optional(),
       cooldownHours: CooldownHours.optional(),
+      weight: z.literal("keep").optional(),
       kind: ChoreKind.optional(),
       sprite: ChoreIcon.optional(),
     }),
@@ -167,12 +170,25 @@ export const manageChore = defineAction({
 
     let data: ManageChoreData;
     if (change.op === "update") {
+      const noWeight =
+        change.basePoints === undefined && change.cooldownHours === undefined;
+      if (change.weight === "keep" ? !noWeight : noWeight) {
+        const message =
+          change.weight === "keep"
+            ? "Leave the points and the cooldown out to keep them."
+            : "Required: give the points and the cooldown.";
+        return fail("INVALID_INPUT", message, {
+          issues: [
+            { path: ["basePoints"], message },
+            { path: ["cooldownHours"], message },
+          ],
+        });
+      }
       if (
         (change.basePoints === undefined) !==
         (change.cooldownHours === undefined)
       ) {
-        const message =
-          "Give the points and the cooldown together, or leave both out.";
+        const message = "Give the points and the cooldown together.";
         return fail("INVALID_INPUT", message, {
           issues: [
             {
