@@ -584,6 +584,25 @@
     "risk": "confirm"
   },
   {
+    "name": "get_points_history",
+    "title": "Points history",
+    "description": "Lists every change to the bounties' points, newest first, or one bounty's: who made or scheduled it, the points and cooldown before and after, the reason, when it was proposed and when it applies, and whether it landed, is waiting, was vetoed (by whom, when) or was cancelled.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "choreId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "kind": "read",
+    "risk": "safe"
+  },
+  {
     "name": "list_events",
     "title": "Calendar",
     "description": "Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM) and who added it (a member id). Private events are left out.",

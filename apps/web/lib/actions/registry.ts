@@ -76,7 +76,9 @@ import { updateAvatar } from "./update-avatar";
 import { updateMyProfile } from "./update-my-profile";
 import {
   dismissWeight,
+  getPointsHistory,
   getWeights,
+  schedulePointsChange,
   scheduleWeight,
   vetoWeight,
 } from "./weights";
@@ -136,8 +138,10 @@ export const REGISTRY = {
   set_prize_mode: setPrizeMode,
   get_weights: getWeights,
   schedule_weight: scheduleWeight,
+  schedule_points_change: schedulePointsChange,
   dismiss_weight: dismissWeight,
   veto_weight: vetoWeight,
+  get_points_history: getPointsHistory,
   list_events: listEvents,
   create_event: createEvent,
   update_event: updateEvent,

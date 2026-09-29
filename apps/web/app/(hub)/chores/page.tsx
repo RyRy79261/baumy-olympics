@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { listActiveMembers } from "@baumy/db/members";
@@ -20,7 +21,9 @@ import { BountyBoard } from "./bounty-board";
 //
 // An admin also gets New bounty and an Edit button per bounty (issue #109),
 // the same dialogs as /admin/chores; points change only through a scheduled
-// weight change. The actions refuse anyone else whatever the page shows.
+// weight change, which the dialog's points history (issue #115) shows with
+// every earlier one. Everyone gets the link to that history for all bounties
+// (/chores/history). The actions refuse anyone else whatever the page shows.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Bounties - Baumy Olympics" };
@@ -30,10 +33,11 @@ export default async function ChoresPage() {
   const ctx = (await uiRequestCtx(undefined))!;
   const admin = me.role === "admin";
   const db = createHttpDb() as unknown as Queryable;
-  const [listed, people, suggestions] = await Promise.all([
+  const [listed, people, suggestions, history] = await Promise.all([
     runAction("list_chores", {}, ctx),
     listActiveMembers(db, HOUSEHOLD_ID),
     admin ? listActiveSuggestions(db, HOUSEHOLD_ID) : [],
+    admin ? runAction("get_points_history", {}, ctx) : null,
   ]);
   return (
     <>
@@ -46,7 +50,12 @@ export default async function ChoresPage() {
       {listed.ok ? (
         <BountyBoard
           admin={
-            admin ? { suggestions: suggestions.map(suggestionView) } : null
+            admin
+              ? {
+                  suggestions: suggestions.map(suggestionView),
+                  history: history?.ok ? history.data.changes : [],
+                }
+              : null
           }
           chores={listed.data.chores}
           members={people.map((p) => ({
@@ -59,6 +68,15 @@ export default async function ChoresPage() {
       ) : (
         <FormMessage tone="error">{listed.message}</FormMessage>
       )}
+      <p className="mt-6 text-sm text-bm-muted">
+        <Link
+          href="/chores/history"
+          className="underline underline-offset-4 hover:text-bm-text"
+        >
+          Points history
+        </Link>
+        : every change to the bounties&apos; points, and who made or vetoed it.
+      </p>
     </>
   );
 }

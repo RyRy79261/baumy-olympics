@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Card, FormMessage, PageHeading, Sparkline } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
-import type { WeightRowView } from "@/lib/actions/weights";
+import { PointsHistory } from "@/components/chores/points-history";
+import type { PointsHistoryView, WeightRowView } from "@/lib/actions/weights";
 import { requireAdminPage } from "@/lib/auth";
 import {
   appliesLabel,
@@ -20,7 +21,8 @@ import { DismissWeightButton, ScheduleWeightForm } from "./weight-forms";
 // and a sparkline of them, and the week's suggestion to schedule (as it is
 // or edited) or dismiss. A scheduled change shows when it applies; another
 // member can veto it until then (here or on /inbox). Suggestions are
-// computed on Mondays by the daily job (issue #18).
+// computed on Mondays by the daily job (issue #18). Each chore folds out its
+// points history (issue #115): every change, and who vetoed or cancelled one.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Weights - Baumy Olympics" };
@@ -36,7 +38,13 @@ function Figure({ label, value }: { label: string; value: string }) {
   );
 }
 
-function WeightRow({ row }: { row: WeightRowView }) {
+function WeightRow({
+  row,
+  history,
+}: {
+  row: WeightRowView;
+  history: PointsHistoryView[];
+}) {
   const s = row.suggestion;
   const live = row.live;
   return (
@@ -88,14 +96,14 @@ function WeightRow({ row }: { row: WeightRowView }) {
           {s.status === "open" ? (
             <>
               <p className="text-sm">
-                This week&apos;s suggestion, from {s.sampleIntervals.length}{" "}
-                gaps (median {formatMinutes(s.medianIntervalMinutes)}, raw{" "}
+                This week&apos;s suggestion, from {s.sampleIntervals!.length}{" "}
+                gaps (median {formatMinutes(s.medianIntervalMinutes!)}, raw{" "}
                 {formatRaw(s.rawPoints)}):{" "}
                 {changeLabel({
                   fromPoints: s.currentPoints,
-                  toPoints: s.suggestedPoints,
+                  toPoints: s.suggestedPoints!,
                   fromCooldownMinutes: s.currentCooldownMinutes,
-                  toCooldownMinutes: s.suggestedCooldownMinutes,
+                  toCooldownMinutes: s.suggestedCooldownMinutes!,
                 })}
                 .
               </p>
@@ -103,8 +111,8 @@ function WeightRow({ row }: { row: WeightRowView }) {
                 <ScheduleWeightForm
                   suggestionId={s.id}
                   choreName={row.choreName}
-                  suggestedPoints={s.suggestedPoints}
-                  suggestedCooldownMinutes={s.suggestedCooldownMinutes}
+                  suggestedPoints={s.suggestedPoints!}
+                  suggestedCooldownMinutes={s.suggestedCooldownMinutes!}
                 />
                 <DismissWeightButton
                   suggestionId={s.id}
@@ -136,6 +144,14 @@ function WeightRow({ row }: { row: WeightRowView }) {
           )}
         </div>
       ) : null}
+      <details data-testid="weight-history">
+        <summary className="cursor-pointer text-sm text-bm-muted">
+          Points history ({history.length})
+        </summary>
+        <div className="pt-3">
+          <PointsHistory changes={history} />
+        </div>
+      </details>
     </li>
   );
 }
@@ -143,13 +159,20 @@ function WeightRow({ row }: { row: WeightRowView }) {
 export default async function AdminWeightsPage() {
   await requireAdminPage();
   const ctx = (await uiRequestCtx(undefined))!;
-  const listed = await runAction("get_weights", {}, ctx);
+  const [listed, history] = await Promise.all([
+    runAction("get_weights", {}, ctx),
+    runAction("get_points_history", {}, ctx),
+  ]);
+  const historyOf = new Map<string, PointsHistoryView[]>();
+  for (const e of history.ok ? history.data.changes : []) {
+    historyOf.set(e.choreId, [...(historyOf.get(e.choreId) ?? []), e]);
+  }
   return (
     <>
       <PageHeading
         eyebrow="Admin"
         title="Weights"
-        description="Points follow how often each chore is really done. Each Monday the formula suggests a change where the points are off. A scheduled change applies at the first Monday 00:00 at least two days away, and at least 28 days after the chore's last change, unless another member vetoes it first. Points already scored never change."
+        description="Points follow how often each chore is really done. Each Monday the formula suggests a change where the points are off. A scheduled suggestion applies at the first Monday 00:00 at least two days away, and at least 28 days after the chore's last change, unless another member vetoes it first. Points you set yourself on Bounties (Edit, Change points) apply at the first Monday 00:00 at least two days away, with the same veto. Points already scored never change."
       />
       {!listed.ok ? (
         <FormMessage tone="error">{listed.message}</FormMessage>
@@ -171,7 +194,11 @@ export default async function AdminWeightsPage() {
             ) : (
               <ul>
                 {listed.data.chores.map((row) => (
-                  <WeightRow key={row.choreId} row={row} />
+                  <WeightRow
+                    key={row.choreId}
+                    row={row}
+                    history={historyOf.get(row.choreId) ?? []}
+                  />
                 ))}
               </ul>
             )}

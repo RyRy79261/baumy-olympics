@@ -28,6 +28,12 @@ export function ScheduledChanges({
               toCooldownMinutes: c.scheduledCooldownMinutes!,
             })}
             . {appliesLabel(c.appliesAt!)}
+            {c.reason ? (
+              <>
+                {" "}
+                <span className="text-bm-muted">Reason:</span> {c.reason}
+              </>
+            ) : null}
           </span>
           {c.canVeto ? (
             <VetoWeightButton suggestionId={c.id} choreName={c.choreName} />
