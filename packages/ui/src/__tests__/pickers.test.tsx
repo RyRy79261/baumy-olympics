@@ -13,6 +13,7 @@ import {
   MEMBER_COLOR_NAMES,
   type MemberAvatar,
 } from "@baumy/types";
+import { ChoiceGroup } from "../chores";
 import { HAIR_COLOURS, SHIRT_COLOURS } from "../housemate";
 import {
   CHORE_ICON_LABELS,
@@ -309,5 +310,92 @@ describe("ChoreIconPicker", () => {
       <ChoreIconPicker value="" onChange={vi.fn()} />,
     );
     expect(fresh).toContain('aria-label="Automatic"');
+  });
+});
+
+// React 19 resets a form after its action; a reset puts radios back to their
+// page-load `checked`. The groups keep the pick in state, so the form must
+// still post it, or the next save quietly stores the old value.
+describe("after the form resets", () => {
+  async function resetForm(c: HTMLElement) {
+    await act(async () => {
+      c.querySelector("form")!.reset();
+    });
+  }
+
+  it("a TilePicker's form still posts the chosen tile", async () => {
+    function Harness() {
+      const [v, setV] = useState<string>(MEMBER_COLORS[0]);
+      return (
+        <form>
+          <SwatchPicker
+            legend="Colour"
+            name="color"
+            value={v}
+            onChange={setV}
+            options={memberColourOptions()}
+          />
+          <input name="note" defaultValue="kept" />
+        </form>
+      );
+    }
+    const c = await mount(<Harness />);
+    const rose = radio(c, MEMBER_COLOR_NAMES[MEMBER_COLORS[5]]);
+    await act(async () => tileOf(rose).click());
+    await resetForm(c);
+    const data = new FormData(c.querySelector("form")!);
+    expect(data.get("note")).toBe("kept");
+    expect(data.get("color")).toBe(MEMBER_COLORS[5]);
+    expect(rose.checked).toBe(true);
+    expect(radio(c, MEMBER_COLOR_NAMES[MEMBER_COLORS[0]]).checked).toBe(false);
+  });
+
+  it("a CharacterPicker's form still posts every chosen part", async () => {
+    function Harness() {
+      const [v, setV] = useState<MemberAvatar>(ME);
+      return (
+        <form>
+          <CharacterPicker avatar={v} onChange={setV} />
+        </form>
+      );
+    }
+    const c = await mount(<Harness />);
+    const style = radios(c, "hairStyle").find((r) => r.value !== ME.hairStyle)!;
+    const shirt = radios(c, "shirtColor").find(
+      (r) => r.value !== ME.shirtColor,
+    )!;
+    await act(async () => tileOf(style).click());
+    await act(async () => tileOf(shirt).click());
+    await resetForm(c);
+    const data = new FormData(c.querySelector("form")!);
+    expect(data.get("hairStyle")).toBe(style.value);
+    expect(data.get("shirtColor")).toBe(shirt.value);
+    expect(data.get("hairColor")).toBe(ME.hairColor);
+  });
+
+  it("a ChoiceGroup's form still posts the chosen option", async () => {
+    function Harness() {
+      const [v, setV] = useState("a");
+      return (
+        <form>
+          <ChoiceGroup
+            legend="Who did it?"
+            name="doneBy"
+            value={v}
+            onChange={setV}
+            options={[
+              { value: "a", label: "Ryan" },
+              { value: "b", label: "Partner" },
+            ]}
+          />
+        </form>
+      );
+    }
+    const c = await mount(<Harness />);
+    const b = radios(c, "doneBy").find((r) => r.value === "b")!;
+    await act(async () => b.closest("label")!.click());
+    expect(new FormData(c.querySelector("form")!).get("doneBy")).toBe("b");
+    await resetForm(c);
+    expect(new FormData(c.querySelector("form")!).get("doneBy")).toBe("b");
   });
 });

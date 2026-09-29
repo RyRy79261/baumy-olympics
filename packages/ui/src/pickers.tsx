@@ -19,6 +19,7 @@ import {
   SKIN_TONES,
 } from "./housemate";
 import { Glyph } from "./pixel/glyph";
+import { RadiosFollowReset } from "./radios-follow-reset";
 import type { GlyphName } from "./pixel/glyphs";
 
 // Pickers that show the thing itself, not its name (issue #106): a colour is
@@ -132,6 +133,7 @@ export function TilePicker({
           );
         })}
       </div>
+      <RadiosFollowReset name={name} value={value} />
     </fieldset>
   );
 }
