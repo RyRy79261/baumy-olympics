@@ -44,7 +44,6 @@ export default async function SettingsPage() {
           </FormMessage>
         ) : null}
         <AvatarForm
-          memberId={me.memberId}
           initial={
             (
               await activeCharacters(

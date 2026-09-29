@@ -1,4 +1,5 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import type { MemberAvatar } from "@baumy/types";
 import { createHttpDb, type Queryable } from "./index";
 import { members } from "./schema";
 
@@ -59,6 +60,8 @@ export interface NewMember {
   authUserId: string;
   displayName: string;
   avatarSprite: string;
+  /** The character picked on the join form; null or left out: the default. */
+  avatar?: MemberAvatar | null;
   color: string;
   role: "admin" | "member";
   createdAt: Date;
