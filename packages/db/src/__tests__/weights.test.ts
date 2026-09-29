@@ -1,5 +1,6 @@
 import {
   FREQUENCY_V1,
+  referenceIntervalMinutes,
   berlinWallTimeToUtc,
   startOfBerlinWeek,
   type WeightSuggestionStatus,
@@ -880,6 +881,33 @@ describe("an admin's points change (issue #115)", () => {
       weekStart: startOfBerlinWeek(NOW),
       suggestedPoints: 26,
     });
+  });
+
+  it("never takes the previous median from an admin's change, which measured nothing", async () => {
+    const { ryan, choreId, suggestion } = await e7();
+    const median = suggestion.medianIntervalMinutes!;
+    // The implied interval differs, so a fallback would show.
+    const implied = referenceIntervalMinutes({
+      previousMedianMinutes: null,
+      basePoints: 35,
+      effortFactorPct: 100,
+    });
+    expect(implied).not.toBe(median);
+    await tx((q) =>
+      dismissSuggestion(q, {
+        suggestionId: suggestion.id,
+        dismissedBy: ryan,
+        now: NOW,
+      }),
+    );
+    // The latest row is an admin's, with no median.
+    await adminChange(choreId, ryan, { now: new Date(NOW.getTime() + HOUR) });
+    const m = await measureChore(
+      db(),
+      { id: choreId, confirmMode: "optimistic", effortFactorPct: 100 },
+      new Date(NOW.getTime() + 2 * HOUR),
+    );
+    expect(m?.referenceMinutes).toBe(median);
   });
 
   it("applies without the 28-day spacing", async () => {
