@@ -102,15 +102,18 @@ test("the admin's own card links to Settings and helps find a Telegram id", asyn
   await page.goto("/admin/members");
   const mine = page
     .locator('[data-testid^="member-"]')
-    .filter({ hasText: "you" })
+    .filter({ hasText: "· you" })
     .first();
   await mine.getByText("Edit name and colour").click();
   await expect(
     mine.getByRole("link", { name: "Change your character" }),
   ).toHaveAttribute("href", "/settings#character");
 
-  await mine.getByText(/^Telegram/).click();
-  const id = mine.getByLabel("Telegram user id");
+  await mine
+    .locator("summary")
+    .filter({ hasText: /^Telegram/ })
+    .click();
+  const id = mine.getByLabel("Telegram user id", { exact: true });
   const save = mine.getByRole("button", { name: "Save Telegram id" });
   await id.fill("@me");
   await expect(
