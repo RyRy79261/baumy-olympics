@@ -22,7 +22,7 @@ function Tile({ a }: { a: AvatarRow }) {
       className="pixel-frame flex flex-col items-center gap-2 bg-bm-ink p-3"
     >
       <MemberCharacter sprites={avatarImageView(a)} scale={4} label={a.name} />
-      <span className="max-w-full truncate font-label text-xs font-bold uppercase">
+      <span className="max-w-full text-center leading-tight font-label text-xs font-bold break-words uppercase">
         {a.name}
       </span>
       <span className="text-xs text-bm-muted">
