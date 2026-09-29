@@ -171,6 +171,14 @@ describe.each([false, true])("SuggestionCards (bubble: %s)", (bubble) => {
     ]);
     const props = mount(rows, { bubble, kiosk: true });
     expect(document.body.textContent).toContain("Needs your PIN");
+    // Kiosk touch targets are 56px, the drop × included.
+    const drops = document.querySelectorAll('button[aria-label^="Drop: "]');
+    expect(drops.length).toBe(3);
+    for (const d of drops) expect(d.className).toContain("size-14");
+    // Kiosk touch targets are 56px, the × too.
+    const drop = document.querySelector('button[aria-label^="Drop: "]')!;
+    expect(drop.className).toContain("size-14");
+    expect(drop.className).not.toContain("size-11");
     act(() => button("Confirm all").click());
     expect(props.onConfirmAll).not.toHaveBeenCalled();
     const pad = document.querySelector<HTMLFormElement>(
