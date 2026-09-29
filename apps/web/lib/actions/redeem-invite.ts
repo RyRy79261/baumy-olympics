@@ -5,7 +5,13 @@ import {
   inviteCodeState,
 } from "@baumy/db/invite-codes";
 import { insertMember } from "@baumy/db/members";
-import { AvatarSprite, DisplayName, MemberColor } from "@baumy/types";
+import {
+  AvatarSprite,
+  DisplayName,
+  JoinAvatarId,
+  MemberColor,
+} from "@baumy/types";
+import { pickableAvatar } from "./avatars";
 import { defineAction } from "./define";
 import {
   ALREADY_JOINED,
@@ -33,6 +39,9 @@ const input = z.strictObject({
   displayName: DisplayName.describe("The name housemates will see."),
   color: MemberColor.optional().describe("Your colour, as #rrggbb."),
   avatarSprite: AvatarSprite.optional().describe("Your avatar."),
+  avatarImageId: JoinAvatarId.describe(
+    "A character from the household's gallery, if you picked one.",
+  ),
 });
 
 const ASK_AGAIN = "Ask a housemate for a new one.";
@@ -74,9 +83,13 @@ export const redeemInvite = defineAction({
   // Codes are guessable only by brute force; keep that slow.
   rateLimit: { perMember: 10, perIp: 30, windowMs: 15 * 60_000 },
   input,
-  async execute(ctx, { code, displayName, color, avatarSprite }) {
+  async execute(ctx, { code, displayName, color, avatarSprite, avatarImageId }) {
     const account = await joiningAccount(ctx);
     if (isFailure(account)) return account;
+    if (avatarImageId) {
+      const refused = await pickableAvatar(ctx, avatarImageId);
+      if (refused) return refused;
+    }
     const { userId } = account;
 
     const claimed = await claimInviteCode(ctx.db, code, ctx.now);
@@ -95,6 +108,7 @@ export const redeemInvite = defineAction({
       authUserId: userId,
       displayName,
       avatarSprite: avatarSprite ?? DEFAULT_AVATAR,
+      avatarImageId: avatarImageId ?? null,
       color: color ?? defaultColorFor(userId),
       role: claimed.role,
       createdAt: ctx.now,

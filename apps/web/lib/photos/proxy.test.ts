@@ -10,6 +10,8 @@ import { handleBlobProxy, type ProxyDeps } from "./proxy";
 const HOUSE = "00000000-0000-4000-8000-000000000001";
 const ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const PATH = `completions/${ID}/a1b2c3d4e5.webp`;
+const AVATAR = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
+const SPRITE = `avatars/${AVATAR}/a1b2c3d4e5f60718.png`;
 
 const member: Actor = {
   kind: "member",
@@ -27,6 +29,7 @@ function deps(over: Partial<ProxyDeps> = {}): ProxyDeps {
     getActor: async () => member,
     householdId: HOUSE,
     findPhoto: async (h, id) => (h === HOUSE && id === ID ? PATH : undefined),
+    findAvatar: async (h, id) => (h === HOUSE && id === AVATAR ? SPRITE : null),
     store: memoryBlobStore(),
     ...over,
   };
@@ -40,6 +43,7 @@ const req = (pathname: string | null) =>
 // The fake store is process-wide, as it is in the e2e server.
 beforeEach(async () => {
   await memoryBlobStore().del(PATH);
+  await memoryBlobStore().del(SPRITE);
 });
 
 async function withPhoto(type = "image/webp") {
@@ -156,5 +160,55 @@ describe("GET /api/blob", () => {
     expect(
       (await handleBlobProxy(req(PATH), deps({ store: down }))).status,
     ).toBe(404);
+  });
+});
+
+describe("GET /api/blob for a gallery sprite (issue #111)", () => {
+  async function withSprite(type = "image/png") {
+    const store = memoryBlobStore();
+    await store.put(SPRITE, new Blob([new Uint8Array([1])]), type);
+    return store;
+  }
+  const account: Actor = {
+    kind: "member",
+    userId: "u2",
+    email: "b@example.com",
+    name: "B",
+    emailVerified: true,
+    sessionCreatedAt: "2026-09-27T09:00:00.000Z",
+  };
+
+  it("serves the household's sprite to a member, a kiosk and an account joining", async () => {
+    for (const actor of [member, { kind: "kiosk", deviceId: "d" } as Actor, account]) {
+      const res = await handleBlobProxy(
+        req(SPRITE),
+        deps({ getActor: async () => actor, store: await withSprite() }),
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/png");
+    }
+  });
+
+  it("refuses an account a completion photo, and nobody a sprite", async () => {
+    const photo = await handleBlobProxy(
+      req(PATH),
+      deps({ getActor: async () => account, store: await withPhoto() }),
+    );
+    expect(photo.status).toBe(401);
+    const res = await handleBlobProxy(
+      req(SPRITE),
+      deps({ getActor: async () => null, store: await withSprite() }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("is 404 for a sprite not in the household, a wrong name or a non-PNG path", async () => {
+    const store = await withSprite();
+    const other = `avatars/${ID}/a1b2c3d4e5f60718.png`;
+    expect((await handleBlobProxy(req(other), deps({ store }))).status).toBe(404);
+    const renamed = `avatars/${AVATAR}/zzzzzzzzzzzzzzzz.png`;
+    expect((await handleBlobProxy(req(renamed), deps({ store }))).status).toBe(404);
+    const svg = `avatars/${AVATAR}/a1b2c3d4e5f60718.svg`;
+    expect((await handleBlobProxy(req(svg), deps({ store }))).status).toBe(404);
   });
 });
