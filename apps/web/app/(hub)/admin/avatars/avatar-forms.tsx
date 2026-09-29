@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AVATAR_HEIGHTS,
   AVATAR_NAME_MAX,
@@ -111,9 +111,15 @@ export function AvatarUploader() {
   const patch = (p: Partial<Draft>) =>
     setDraft((d) => (d ? { ...d, ...p } : d));
 
+  // Each clean() takes a ticket; an answer for an older ticket (another
+  // file or height chosen since) is dropped, so it can never overwrite
+  // the preview of what is on screen now.
+  const ticket = useRef(0);
   async function clean(files: File[], height: number) {
+    const mine = ++ticket.current;
     patch({ busy: true, error: null, height });
     const r = await send(files, { mode: "preview", height: String(height) });
+    if (mine !== ticket.current) return;
     const preview = r.ok ? (r.data as PreviewAvatarData) : null;
     patch({
       busy: false,
@@ -180,6 +186,7 @@ export function AvatarUploader() {
               type="file"
               accept="image/png,image/jpeg,image/webp"
               multiple
+              disabled={draft?.busy}
               className="text-sm"
               onChange={(e) => {
                 choose(e.currentTarget.files);
