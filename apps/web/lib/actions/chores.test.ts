@@ -1012,6 +1012,76 @@ describe("manage_chore", () => {
     });
   });
 
+  it("keeps the weight when points and cooldown are both left out, and refuses one alone", async () => {
+    const settingsOnly = {
+      op: "update",
+      choreId: trash,
+      name: "Bins",
+      proofMode: "none",
+      confirmMode: "optimistic",
+      effortFactorPct: "100",
+    };
+    const versions = () =>
+      t
+        .db()
+        .select({
+          base: choreRuleVersions.basePoints,
+          cooldown: choreRuleVersions.cooldownMinutes,
+        })
+        .from(choreRuleVersions)
+        .where(eq(choreRuleVersions.choreId, trash));
+    expect(await versions()).toEqual([
+      { base: TRASH.basePoints, cooldown: TRASH.cooldownMinutes },
+    ]);
+    await expect(
+      runAction("manage_chore", settingsOnly, adminCtx({ now: at(1) })),
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        choreId: trash,
+        name: "Bins",
+        archived: false,
+        weightChanged: false,
+      },
+    });
+    expect(await versions()).toEqual([
+      { base: TRASH.basePoints, cooldown: TRASH.cooldownMinutes },
+    ]);
+
+    for (const [half, field] of [
+      [{ basePoints: "30" }, "basePoints"],
+      [{ cooldownHours: "2" }, "cooldownHours"],
+    ] as const) {
+      await expect(
+        runAction(
+          "manage_chore",
+          { ...settingsOnly, name: "Other", ...half },
+          adminCtx({ now: at(2) }),
+        ),
+      ).resolves.toEqual({
+        ok: false,
+        code: "INVALID_INPUT",
+        message:
+          "Give the points and the cooldown together, or leave both out.",
+        issues: [
+          {
+            path: [field === "basePoints" ? "cooldownHours" : "basePoints"],
+            message:
+              "Give the points and the cooldown together, or leave both out.",
+          },
+        ],
+      });
+    }
+    // Refused, so nothing changed: the name is still Bins.
+    const [row] = await t
+      .db()
+      .select({ name: chores.name })
+      .from(chores)
+      .where(eq(chores.id, trash));
+    expect(row!.name).toBe("Bins");
+    expect(await versions()).toHaveLength(1);
+  });
+
   it("archives and restores, unless the name was taken meanwhile", async () => {
     await expect(
       runAction("manage_chore", { op: "archive", choreId: trash }, adminCtx()),
