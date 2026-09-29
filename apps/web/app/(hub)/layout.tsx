@@ -3,12 +3,13 @@ import type { ReactNode } from "react";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { findKioskPinLockedAt } from "@baumy/db/members";
-import { AppShell, FormMessage, Housemate, navItemClass } from "@baumy/ui";
+import { AppShell, FormMessage, navItemClass } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { memberOrVisitorPage } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
-import { activeCharacters } from "@/lib/members/characters";
+import { activeRoster } from "@/lib/members/characters";
+import { ScoreEmote } from "@/components/members/score-emote";
 import { HubMenu, InboxBadge, NavLinks, type NavItem } from "./nav-links";
 
 // The hub's shell (SPEC §7) around every page for household members. The
@@ -23,7 +24,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
   const me = await memberOrVisitorPage();
   if (!me) return children;
   // Their character as every screen draws it (lib/members/characters.ts).
-  const characters = await activeCharacters(
+  const { characters, sprites } = await activeRoster(
     createHttpDb() as unknown as Queryable,
     HOUSEHOLD_ID,
   );
@@ -64,6 +65,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     { href: "/admin/members", label: "Members" },
     { href: "/admin/chores", label: "Edit chores" },
     { href: "/admin/weights", label: "Weights" },
+    { href: "/admin/avatars", label: "Avatars" },
     { href: "/admin/connections", label: "Connections" },
   ];
   return (
@@ -79,7 +81,8 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
           <HubMenu
             label={
               <>
-                <Housemate
+                <ScoreEmote
+                  sprites={sprites.get(me.memberId)}
                   memberId={me.memberId}
                   avatar={characters.get(me.memberId) ?? me.avatar}
                   scale={1}

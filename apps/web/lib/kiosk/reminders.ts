@@ -1,3 +1,4 @@
+import type { AvatarSprites } from "@baumy/types";
 import type { ListRemindersData, ReminderView } from "@/lib/actions/reminders";
 import { isTestMode } from "@/lib/test-mode";
 
@@ -33,6 +34,8 @@ export interface ReminderFaceView {
   id: string;
   displayName: string;
   avatar: unknown;
+  /** Their gallery sprite, or null for the drawn character. */
+  sprites: AvatarSprites | null;
   seen: boolean;
 }
 
@@ -53,6 +56,7 @@ export function reminderFaces(
       id: m.id,
       displayName: m.displayName,
       avatar: m.avatar,
+      sprites: m.sprites,
       seen: seen.has(m.id),
     }));
 }

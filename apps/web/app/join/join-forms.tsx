@@ -2,14 +2,27 @@
 
 import { useState } from "react";
 import type { MemberAvatar } from "@baumy/types";
-import { Button, Card, Field, FormMessage, Input } from "@baumy/ui";
+import {
+  Button,
+  Card,
+  Field,
+  FormMessage,
+  Input,
+  type GalleryOption,
+} from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
 import { authClient } from "@/lib/auth-client";
 import { joinAsFounderAction, redeemInviteAction } from "./actions";
 import { ProfileFields } from "./profile-fields";
 
 /** Redeem an invite code (redeem_invite). */
-export function InviteForm({ initialAvatar }: { initialAvatar: MemberAvatar }) {
+export function InviteForm({
+  initialAvatar,
+  gallery,
+}: {
+  initialAvatar: MemberAvatar;
+  gallery: readonly GalleryOption[];
+}) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(redeemInviteAction);
   return (
@@ -37,6 +50,7 @@ export function InviteForm({ initialAvatar }: { initialAvatar: MemberAvatar }) {
           errors={errors}
           pending={pending}
           initialAvatar={initialAvatar}
+          gallery={gallery}
         />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>
@@ -54,10 +68,12 @@ export function FounderForm({
   email,
   emailVerified,
   initialAvatar,
+  gallery,
 }: {
   email: string;
   emailVerified: boolean;
   initialAvatar: MemberAvatar;
+  gallery: readonly GalleryOption[];
 }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(joinAsFounderAction);
@@ -109,6 +125,7 @@ export function FounderForm({
           errors={errors}
           pending={pending}
           initialAvatar={initialAvatar}
+          gallery={gallery}
         />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>

@@ -13,7 +13,9 @@ import { KeepScreenOn } from "@/components/kiosk/keep-screen-on";
 import { KioskFrame, KioskNav } from "@/components/kiosk/kiosk-frame";
 import { KioskOverlays } from "@/components/kiosk/overlays";
 import { RegisterServiceWorker } from "@/components/kiosk/service-worker";
+import { ScoreEmote } from "@/components/members/score-emote";
 import { getKioskActor } from "@/lib/auth";
+import { avatarImageView } from "@/lib/avatars/paths";
 import { runSweepAfterResponse } from "@/lib/background-work";
 import { now } from "@/lib/clock";
 import { voiceConfigured } from "@/lib/integrations/groq";
@@ -69,7 +71,19 @@ export default async function KioskLayout({
         sprite={p.avatarSprite}
         color={p.color}
         avatar={roster.get(p.id)}
+        sprites={avatarImageView(p.avatarImage)}
         memberId={p.id}
+        character={
+          p.id === kiosk.memberId ? (
+            // Whoever is acting emotes when they score (issue #111).
+            <ScoreEmote
+              sprites={avatarImageView(p.avatarImage)}
+              avatar={roster.get(p.id)}
+              memberId={p.id}
+              scale={2}
+            />
+          ) : undefined
+        }
         selected={p.id === kiosk.memberId}
       />
     </form>

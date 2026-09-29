@@ -114,6 +114,12 @@ export type DomainErrorCode =
   | "LINK_CODE_INVALID"
   /** That Telegram user id is already linked to another member. */
   | "TELEGRAM_ALREADY_LINKED"
+  /** `add_avatar` or `preview_avatar` without an image from the upload route. */
+  | "AVATAR_IMAGE_MISSING"
+  /** The upload is not a readable image, or nothing is left once cleaned. */
+  | "AVATAR_IMAGE_UNREADABLE"
+  /** That gallery character is archived, so it cannot be picked now. */
+  | "AVATAR_ARCHIVED"
   /** `create_service_token` for a name that already has a live token. */
   | "SERVICE_TOKEN_EXISTS";
 
