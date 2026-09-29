@@ -6,6 +6,7 @@ import type {
 import { cx } from "./cx";
 import { Glyph } from "./pixel/glyph";
 import { GLYPHS, type GlyphName } from "./pixel/glyphs";
+import { RadiosFollowReset } from "./radios-follow-reset";
 
 // The chores game in the pixel kit (SPEC §3.2, §7; ADR 0005): the chore
 // tile, the floating "+N", the "STREAK BROKEN" banner and a radio group big
@@ -228,6 +229,7 @@ export function ChoiceGroup({
           </label>
         ))}
       </div>
+      <RadiosFollowReset name={name} value={value} />
     </fieldset>
   );
 }

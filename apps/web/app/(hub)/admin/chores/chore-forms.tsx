@@ -11,6 +11,8 @@ import {
 import {
   BountyGlyph,
   Button,
+  ChoreIconPicker,
+  choreIconValue,
   Card,
   Dialog,
   Field,
@@ -34,6 +36,18 @@ export interface ChoreFormValues {
   proofMode: ChoreView["proofMode"];
   confirmMode: ChoreView["confirmMode"];
   effortFactorPct: number;
+  /** The chore's `chores.sprite`; undefined for a new chore. */
+  sprite?: string;
+}
+
+/** The chore's icon, picked from the glyphs themselves (issue #106). */
+function ChoreIconField({ sprite }: { sprite?: string }) {
+  const [icon, setIcon] = useState(() => choreIconValue(sprite));
+  return (
+    <div className="sm:col-span-2">
+      <ChoreIconPicker sprite={sprite} value={icon} onChange={setIcon} />
+    </div>
+  );
 }
 
 const NEW_CHORE: ChoreFormValues = {
@@ -63,6 +77,7 @@ function ChoreFields({
           <Input {...control} name="name" required defaultValue={values.name} />
         )}
       </Field>
+      <ChoreIconField sprite={values.sprite} />
       <Field
         id={`${prefix}-kind`}
         label="Kind"
@@ -243,6 +258,7 @@ function EditChoreDialog({
             proofMode: chore.proofMode,
             confirmMode: chore.confirmMode,
             effortFactorPct: chore.effortFactorPct,
+            sprite: chore.sprite,
           }}
           errors={errors}
         />

@@ -1,4 +1,5 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import type { MemberAvatar } from "@baumy/types";
 import { withAvatarImages, type AvatarImageRef } from "./avatars";
 import { createHttpDb, type Queryable } from "./index";
 import { members } from "./schema";
@@ -60,6 +61,8 @@ export interface NewMember {
   authUserId: string;
   displayName: string;
   avatarSprite: string;
+  /** The character picked on the join form; null or left out: the default. */
+  avatar?: MemberAvatar | null;
   /** The gallery character picked on /join (issue #111), if any. */
   avatarImageId?: string | null;
   color: string;
@@ -260,7 +263,7 @@ export interface KioskMember {
 export interface KioskMemberWithAvatar extends KioskMember {
   /** As stored: `avatarFor` (packages/types) reads it; null is the default. */
   avatar: unknown;
-  /** The gallery sprite they picked (issue #111), or null. */
+  /** The gallery character they picked (issue #111), or null. */
   avatarImage: AvatarImageRef | null;
 }
 

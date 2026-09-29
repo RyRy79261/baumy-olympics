@@ -6,7 +6,11 @@ import {
   AVATAR_SKIN_TONES,
   MemberAvatar,
   avatarFor,
+  MEMBER_COLORS,
+  MEMBER_COLOR_NAMES,
   defaultAvatar,
+  memberColorName,
+  newcomerAvatar,
   rosterAvatars,
 } from "../member";
 
@@ -134,5 +138,48 @@ describe("rosterAvatars", () => {
     const out = rosterAvatars(roster);
     expect(new Set(shirts(out)).size).toBe(AVATAR_SHIRT_COLORS.length);
     expect(out.get(ids[7]!)).toEqual(defaultAvatar(ids[7]!));
+  });
+});
+
+describe("newcomerAvatar", () => {
+  it("is the seed's default when its shirt is free", () => {
+    expect(newcomerAvatar(ids[0]!, [])).toEqual(defaultAvatar(ids[0]!));
+  });
+
+  it("keeps the seed's default but the shirt, which nobody wears", () => {
+    const seed = ids[10]!;
+    const taken = defaultAvatar(seed).shirtColor;
+    const roster = [{ id: ids[0]!, avatar: { ...CHOSEN, shirtColor: taken } }];
+    const out = newcomerAvatar(seed, roster);
+    expect(out.shirtColor).not.toBe(taken);
+    expect(out).toEqual({ ...defaultAvatar(seed), shirtColor: out.shirtColor });
+  });
+
+  it("avoids the shirts roster defaults wear too, and repeats once all are worn", () => {
+    const five = ids.slice(0, 5).map((id) => ({ id, avatar: null }));
+    const worn = new Set(
+      [...rosterAvatars(five).values()].map((a) => a.shirtColor),
+    );
+    const free = AVATAR_SHIRT_COLORS.filter((s) => !worn.has(s));
+    expect(free).toHaveLength(1);
+    expect(newcomerAvatar(ids[20]!, five).shirtColor).toBe(free[0]);
+    const six = ids.slice(0, 6).map((id) => ({ id, avatar: null }));
+    expect(newcomerAvatar(ids[20]!, six)).toEqual(defaultAvatar(ids[20]!));
+  });
+});
+
+describe("member colour names", () => {
+  it("names every offered colour, uniquely, and never by its hex", () => {
+    const names = MEMBER_COLORS.map((c) => memberColorName(c));
+    expect(names).toEqual(MEMBER_COLORS.map((c) => MEMBER_COLOR_NAMES[c]));
+    expect(new Set(names).size).toBe(MEMBER_COLORS.length);
+    for (const n of names) expect(n).not.toMatch(/#/);
+  });
+
+  it("reads any case, and calls a colour it does not offer custom", () => {
+    expect(memberColorName(MEMBER_COLORS[0].toUpperCase())).toBe(
+      MEMBER_COLOR_NAMES[MEMBER_COLORS[0]],
+    );
+    expect(memberColorName("#123456")).toBe("Custom colour");
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { MemberAvatar } from "@baumy/types";
 import {
   Button,
   Card,
@@ -15,7 +16,13 @@ import { joinAsFounderAction, redeemInviteAction } from "./actions";
 import { ProfileFields } from "./profile-fields";
 
 /** Redeem an invite code (redeem_invite). */
-export function InviteForm({ gallery }: { gallery: readonly GalleryOption[] }) {
+export function InviteForm({
+  initialAvatar,
+  gallery,
+}: {
+  initialAvatar: MemberAvatar;
+  gallery: readonly GalleryOption[];
+}) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(redeemInviteAction);
   return (
@@ -42,6 +49,7 @@ export function InviteForm({ gallery }: { gallery: readonly GalleryOption[] }) {
           prefix="invite"
           errors={errors}
           pending={pending}
+          initialAvatar={initialAvatar}
           gallery={gallery}
         />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
@@ -59,10 +67,12 @@ export function InviteForm({ gallery }: { gallery: readonly GalleryOption[] }) {
 export function FounderForm({
   email,
   emailVerified,
+  initialAvatar,
   gallery,
 }: {
   email: string;
   emailVerified: boolean;
+  initialAvatar: MemberAvatar;
   gallery: readonly GalleryOption[];
 }) {
   const { state, formAction, pending, requestId, errors } =
@@ -114,6 +124,7 @@ export function FounderForm({
           prefix="founder"
           errors={errors}
           pending={pending}
+          initialAvatar={initialAvatar}
           gallery={gallery}
         />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
