@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { isFounderEmail } from "@baumy/auth/env";
 import { createHttpDb, type Queryable } from "@baumy/db";
+import { listAvatars } from "@baumy/db/avatars";
+import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { findMemberByAuthUserId } from "@baumy/db/members";
 import { Card, FormMessage, PageHeading, buttonClass } from "@baumy/ui";
 import { requireJoiningPage } from "@/lib/auth";
+import { avatarImageView } from "@/lib/avatars/paths";
 import { FounderForm, InviteForm } from "./join-forms";
 
 // /join (SPEC §6.2): where a signed-in account with no member row lands.
@@ -22,6 +25,10 @@ export default async function JoinPage() {
     me.userId,
   );
   const founder = isFounderEmail(process.env, me.email);
+  // The gallery to pick a character from (issue #111): the live ones.
+  const gallery = (
+    await listAvatars(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID, false)
+  ).map((a) => ({ id: a.id, name: a.name, image: avatarImageView(a)! }));
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-4 py-10">
@@ -48,9 +55,13 @@ export default async function JoinPage() {
       ) : (
         <>
           {founder ? (
-            <FounderForm email={me.email} emailVerified={me.emailVerified} />
+            <FounderForm
+              email={me.email}
+              emailVerified={me.emailVerified}
+              gallery={gallery}
+            />
           ) : null}
-          <InviteForm />
+          <InviteForm gallery={gallery} />
         </>
       )}
     </main>

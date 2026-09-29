@@ -369,7 +369,10 @@ export function gridSize(img: RgbaImage): number {
     let n = 1;
     for (let x = 1; x < width; x++) {
       if (px[y * width + x] === px[y * width + x - 1]) n += 1;
-      else (count(n), (n = 1));
+      else {
+        count(n);
+        n = 1;
+      }
     }
     count(n);
   }
@@ -377,7 +380,10 @@ export function gridSize(img: RgbaImage): number {
     let n = 1;
     for (let y = 1; y < height; y++) {
       if (px[y * width + x] === px[(y - 1) * width + x]) n += 1;
-      else (count(n), (n = 1));
+      else {
+        count(n);
+        n = 1;
+      }
     }
     count(n);
   }
