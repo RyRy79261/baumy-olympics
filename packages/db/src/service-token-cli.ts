@@ -2,9 +2,8 @@ import type { Queryable } from "./index";
 import {
   BRAIN_SCOPE,
   SERVICE_TOKEN_NAME,
-  generateServiceToken,
-  insertServiceToken,
   listServiceTokens,
+  mintServiceToken,
   revokeServiceToken,
 } from "./service-tokens";
 
@@ -99,14 +98,16 @@ export async function runServiceTokenCommand(
     io.info(SERVICE_TOKEN_USAGE);
     return 2;
   }
-  const token = generateServiceToken();
-  const minted = await deps.transaction(async (tx) => {
-    if (command === "rotate") {
-      await revokeServiceToken(tx, { name, now: deps.now });
-    }
-    return insertServiceToken(tx, { name, token, scopes, now: deps.now });
-  });
-  if (!minted) {
+  // Here `rotate` also mints a name that has no live token yet.
+  const minted = await deps.transaction((tx) =>
+    mintServiceToken(tx, {
+      name,
+      scopes,
+      now: deps.now,
+      mode: command === "rotate" ? "rotate" : "mint",
+    }),
+  );
+  if (!minted.ok) {
     io.info(
       `A live token is already called ${name}. Use "rotate ${name}" to replace it, or "revoke ${name}" first.`,
     );
@@ -115,6 +116,6 @@ export async function runServiceTokenCommand(
   io.info(
     `Minted ${name} (${scopes.join(",")}). This is the only time the token is shown; only its hash is stored.`,
   );
-  io.out(token);
+  io.out(minted.token);
   return 0;
 }

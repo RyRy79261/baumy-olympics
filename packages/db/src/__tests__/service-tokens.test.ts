@@ -6,12 +6,15 @@ import {
   BRAIN_SCOPE,
   SERVICE_TOKEN_MAX_LENGTH,
   SERVICE_TOKEN_PREFIX,
+  SERVICE_TOKEN_TOUCH_EVERY_MS,
   findLiveServiceToken,
   generateServiceToken,
   hashServiceToken,
   insertServiceToken,
   listServiceTokens,
+  mintServiceToken,
   revokeServiceToken,
+  touchServiceToken,
 } from "../service-tokens";
 import { useTestDb } from "./_harness";
 
@@ -97,6 +100,82 @@ describe("service tokens", () => {
     const list = await listServiceTokens(db());
     expect(list.map((r) => r.revokedAt)).toEqual([LATER, null]);
     expect(list[0]).not.toHaveProperty("tokenHash");
+  });
+
+  it("mintServiceToken mints once per live name, and rotates in place", async () => {
+    const minted = await mintServiceToken(db(), {
+      name: "baumy-brain",
+      scopes: [BRAIN_SCOPE],
+      now: NOW,
+      mode: "mint",
+    });
+    expect(minted.ok).toBe(true);
+    if (!minted.ok) return;
+    expect(minted.token.startsWith(SERVICE_TOKEN_PREFIX)).toBe(true);
+    expect(minted.row).toMatchObject({
+      name: "baumy-brain",
+      scopes: ["brain"],
+    });
+    await expect(
+      mintServiceToken(db(), {
+        name: "baumy-brain",
+        scopes: [BRAIN_SCOPE],
+        now: NOW,
+        mode: "mint",
+      }),
+    ).resolves.toEqual({ ok: false, reason: "exists" });
+
+    const rotated = await mintServiceToken(db(), {
+      name: "baumy-brain",
+      scopes: [BRAIN_SCOPE],
+      now: LATER,
+      mode: "rotate",
+      requireLive: true,
+    });
+    expect(rotated.ok).toBe(true);
+    if (!rotated.ok) return;
+    await expect(findLiveServiceToken(db(), minted.token)).resolves.toBeNull();
+    await expect(
+      findLiveServiceToken(db(), rotated.token),
+    ).resolves.not.toBeNull();
+
+    // requireLive refuses a name with no live token and mints nothing.
+    await expect(
+      mintServiceToken(db(), {
+        name: "robot",
+        scopes: [BRAIN_SCOPE],
+        now: LATER,
+        mode: "rotate",
+        requireLive: true,
+      }),
+    ).resolves.toEqual({ ok: false, reason: "missing" });
+    const names = (await listServiceTokens(db())).map((r) => r.name);
+    expect(names).toContain("baumy-brain");
+    expect(names).not.toContain("robot");
+  });
+
+  it("records a use at most every SERVICE_TOKEN_TOUCH_EVERY_MS", async () => {
+    const token = generateServiceToken();
+    await insertServiceToken(db(), {
+      name: "baumy-brain",
+      token,
+      scopes: [BRAIN_SCOPE],
+      now: NOW,
+    });
+    const found = await findLiveServiceToken(db(), token);
+    expect(found?.lastUsedAt).toBeNull();
+    await touchServiceToken(db(), found!, NOW);
+    const touched = await findLiveServiceToken(db(), token);
+    expect(touched?.lastUsedAt).toEqual(NOW);
+
+    const soon = new Date(NOW.getTime() + SERVICE_TOKEN_TOUCH_EVERY_MS - 1);
+    await touchServiceToken(db(), touched!, soon);
+    expect((await findLiveServiceToken(db(), token))?.lastUsedAt).toEqual(NOW);
+
+    const due = new Date(NOW.getTime() + SERVICE_TOKEN_TOUCH_EVERY_MS);
+    await touchServiceToken(db(), touched!, due);
+    const [listed] = await listServiceTokens(db());
+    expect(listed?.lastUsedAt).toEqual(due);
   });
 });
 
