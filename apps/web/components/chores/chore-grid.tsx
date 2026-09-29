@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BountyList,
   BountyRow,
@@ -77,6 +77,7 @@ export function ChoreGrid({
   kiosk = false,
   action,
   initialOpenId,
+  rowAction,
 }: {
   chores: ChoreView[];
   members: GridMember[];
@@ -89,6 +90,8 @@ export function ChoreGrid({
    * (`/kiosk/chores?chore=<id>`, ADR 0005 §1). Ignored if it is not listed.
    */
   initialOpenId?: string;
+  /** A control beside each row: an admin's Edit on /chores (issue #109). */
+  rowAction?: (chore: ChoreView) => ReactNode;
 }) {
   // The tab lives in the address (`?show=`): the hub's Urgent and New tiles
   // link to theirs, and a refresh keeps it. A tap shows the tab at once and
@@ -239,7 +242,11 @@ export function ChoreGrid({
 
       <BountyList aria-label="Bounties">
         {shown.map((c) => (
-          <li key={c.id} data-testid={`chore-${c.name}`}>
+          <li
+            key={c.id}
+            data-testid={`chore-${c.name}`}
+            className={rowAction ? "flex items-center gap-2" : undefined}
+          >
             <BountyRow
               name={c.name}
               sprite={c.sprite}
@@ -251,12 +258,14 @@ export function ChoreGrid({
               isNew={c.isNew}
               kiosk={kiosk}
               disabled={c.state === "unavailable"}
+              className={rowAction ? "min-w-0 flex-1" : undefined}
               onClick={() => {
                 setDoneBy(actorId);
                 choosePhoto(null);
                 setOpenId(c.id);
               }}
             />
+            {rowAction?.(c)}
           </li>
         ))}
       </BountyList>

@@ -54,7 +54,7 @@ export interface SuggestionView {
   scheduledBy: string | null;
 }
 
-function suggestionView(s: WeightSuggestionRow): SuggestionView {
+export function suggestionView(s: WeightSuggestionRow): SuggestionView {
   return {
     id: s.id,
     choreId: s.choreId,

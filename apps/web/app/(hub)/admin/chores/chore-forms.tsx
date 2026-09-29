@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   BASE_POINTS_MAX,
   BASE_POINTS_MIN,
@@ -26,7 +27,9 @@ import { toast } from "@/lib/ui/toast";
 import { manageChoreAction } from "./actions";
 
 // The admin chores page's forms, all `manage_chore`: create, edit (a dialog
-// per chore), archive and restore (one tap, a toast).
+// per chore), archive and restore (one tap, a toast). The Bounties page
+// reuses create (NewBountyButton) and edit (EditChoreDialog, with its own
+// points section) for admins (issue #109).
 
 export interface ChoreFormValues {
   name: string;
@@ -60,15 +63,20 @@ const NEW_CHORE: ChoreFormValues = {
   effortFactorPct: 100,
 };
 
-/** The fields both forms share, with inline errors. */
+/**
+ * The fields both forms share, with inline errors. Without `weight` the
+ * points and cooldown are left out, and so kept as they are.
+ */
 function ChoreFields({
   prefix,
   values,
   errors,
+  weight = true,
 }: {
   prefix: string;
   values: ChoreFormValues;
   errors: Record<string, string[]>;
+  weight?: boolean;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -91,45 +99,49 @@ function ChoreFields({
           </Select>
         )}
       </Field>
-      <Field
-        id={`${prefix}-base`}
-        label="Base points"
-        hint={`${BASE_POINTS_MIN} to ${BASE_POINTS_MAX}, before streaks and breaks.`}
-        errors={errors.basePoints}
-      >
-        {(control) => (
-          <Input
-            {...control}
-            name="basePoints"
-            type="number"
-            inputMode="numeric"
-            min={BASE_POINTS_MIN}
-            max={BASE_POINTS_MAX}
-            required
-            defaultValue={values.basePoints}
-          />
-        )}
-      </Field>
-      <Field
-        id={`${prefix}-cooldown`}
-        label="Cooldown (hours)"
-        hint="How long before anyone may log it again. 84 is 3.5 days."
-        errors={errors.cooldownHours}
-      >
-        {(control) => (
-          <Input
-            {...control}
-            name="cooldownHours"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            max={COOLDOWN_HOURS_MAX}
-            step="0.25"
-            required
-            defaultValue={values.cooldownHours}
-          />
-        )}
-      </Field>
+      {weight ? (
+        <>
+          <Field
+            id={`${prefix}-base`}
+            label="Base points"
+            hint={`${BASE_POINTS_MIN} to ${BASE_POINTS_MAX}, before streaks and breaks.`}
+            errors={errors.basePoints}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                name="basePoints"
+                type="number"
+                inputMode="numeric"
+                min={BASE_POINTS_MIN}
+                max={BASE_POINTS_MAX}
+                required
+                defaultValue={values.basePoints}
+              />
+            )}
+          </Field>
+          <Field
+            id={`${prefix}-cooldown`}
+            label="Cooldown (hours)"
+            hint="How long before anyone may log it again. 84 is 3.5 days."
+            errors={errors.cooldownHours}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                name="cooldownHours"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={COOLDOWN_HOURS_MAX}
+                step="0.25"
+                required
+                defaultValue={values.cooldownHours}
+              />
+            )}
+          </Field>
+        </>
+      ) : null}
       <Field
         id={`${prefix}-effort`}
         label="Effort factor (%)"
@@ -193,38 +205,80 @@ function FormError({
   return <FormMessage tone="error">{state.message}</FormMessage>;
 }
 
-export function CreateChoreForm() {
+/** The create form, fresh again after each chore is added. */
+function CreateChoreBody({
+  prefix,
+  label,
+  onAdded,
+}: {
+  prefix: string;
+  label: string;
+  onAdded?: () => void;
+}) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(manageChoreAction);
-  // A fresh form after each chore is added.
   const [round, setRound] = useState(0);
   useEffect(() => {
     if (state?.ok) {
       toast.success(`Added ${state.data.name}.`);
       setRound((n) => n + 1);
+      onAdded?.();
     }
+    // `onAdded` is a new function on every render.
   }, [state]);
   return (
+    <form key={round} action={formAction} className="flex flex-col gap-4">
+      <input type="hidden" name="requestId" value={requestId} />
+      <input type="hidden" name="op" value="create" />
+      <ChoreFields prefix={prefix} values={NEW_CHORE} errors={errors} />
+      <FormError state={state} />
+      <Button type="submit" disabled={pending} className="self-start">
+        {pending ? "Adding..." : label}
+      </Button>
+    </form>
+  );
+}
+
+export function CreateChoreForm() {
+  return (
     <Card title="Add a chore">
-      <form key={round} action={formAction} className="flex flex-col gap-4">
-        <input type="hidden" name="requestId" value={requestId} />
-        <input type="hidden" name="op" value="create" />
-        <ChoreFields prefix="new" values={NEW_CHORE} errors={errors} />
-        <FormError state={state} />
-        <Button type="submit" disabled={pending} className="self-start">
-          {pending ? "Adding..." : "Add chore"}
-        </Button>
-      </form>
+      <CreateChoreBody prefix="new" label="Add chore" />
     </Card>
   );
 }
 
-function EditChoreDialog({
+/** The Bounties page's "New bounty": the same create form, in a dialog. */
+export function NewBountyButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>New bounty</Button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="New bounty">
+        {open ? (
+          <CreateChoreBody
+            prefix="new-bounty"
+            label="Add bounty"
+            onAdded={() => setOpen(false)}
+          />
+        ) : null}
+      </Dialog>
+    </>
+  );
+}
+
+/**
+ * The edit dialog. Given `points` (the Bounties page), it shows that section
+ * in place of the points and cooldown fields, which it then leaves as they
+ * are, and links to /admin/chores for archiving.
+ */
+export function EditChoreDialog({
   chore,
   onClose,
+  points,
 }: {
   chore: ChoreView;
   onClose: () => void;
+  points?: ReactNode;
 }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(manageChoreAction);
@@ -241,6 +295,7 @@ function EditChoreDialog({
   }, [state]);
   return (
     <Dialog open onClose={onClose} title={`Edit ${chore.name}`}>
+      {points}
       <form action={formAction} className="flex flex-col gap-4">
         <input type="hidden" name="requestId" value={requestId} />
         <input type="hidden" name="op" value="update" />
@@ -261,11 +316,14 @@ function EditChoreDialog({
             sprite: chore.sprite,
           }}
           errors={errors}
+          weight={points === undefined}
         />
-        <p className="text-sm text-bm-muted">
-          New points or a new cooldown apply from now on; what was already
-          scored keeps its points.
-        </p>
+        {points === undefined ? (
+          <p className="text-sm text-bm-muted">
+            New points or a new cooldown apply from now on; what was already
+            scored keeps its points.
+          </p>
+        ) : null}
         <FormError state={state} />
         <div className="flex gap-2">
           <Button type="submit" disabled={pending}>
@@ -276,6 +334,17 @@ function EditChoreDialog({
           </Button>
         </div>
       </form>
+      {points !== undefined ? (
+        <p className="mt-4 text-sm text-bm-muted">
+          <Link
+            href="/admin/chores"
+            className="underline underline-offset-4 hover:text-bm-text"
+          >
+            More options
+          </Link>{" "}
+          (archive, restore) on Edit chores.
+        </p>
+      ) : null}
     </Dialog>
   );
 }

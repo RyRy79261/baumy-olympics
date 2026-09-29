@@ -31,7 +31,8 @@ export async function addChore(admin: Page, chore: NewChore) {
 
 /** The tile of a chore in the grid. */
 export function tile(page: Page, name: string): Locator {
-  return page.getByTestId(`chore-${name}`).getByRole("button");
+  // The first: an admin also has the Edit button beside it (issue #109).
+  return page.getByTestId(`chore-${name}`).getByRole("button").first();
 }
 
 /** Tap a chore's tile and return its sheet. */
