@@ -1,6 +1,11 @@
 import { and, asc, eq, inArray, isNull, lte, notExists } from "drizzle-orm";
+import {
+  avatarImageColumns,
+  avatarImageOf,
+  type AvatarImageRef,
+} from "./avatars";
 import type { Queryable } from "./index";
-import { members, reminderAcks, reminders } from "./schema";
+import { avatars, members, reminderAcks, reminders } from "./schema";
 
 // Reminders (ADR 0005 §4, SPEC §5 `reminders`, `reminder_acks`). Every
 // function takes the caller's handle (the action's transaction for writes),
@@ -20,6 +25,8 @@ export interface ReminderMember {
   color: string;
   /** `members.avatar` as stored: `avatarFor` (packages/types) reads it. */
   avatar: unknown;
+  /** The gallery sprite they picked (issue #111), or null. */
+  avatarImage: AvatarImageRef | null;
   /** When they joined: only reminders posted since then wait for them. */
   createdAt: Date;
 }
@@ -179,19 +186,34 @@ export async function listActiveReminders(
   db: Queryable,
   householdId: string,
 ): Promise<ActiveReminders> {
-  const people = await db
-    .select({
-      id: members.id,
-      displayName: members.displayName,
-      color: members.color,
-      avatar: members.avatar,
-      createdAt: members.createdAt,
-    })
-    .from(members)
-    .where(
-      and(eq(members.householdId, householdId), isNull(members.deactivatedAt)),
-    )
-    .orderBy(asc(members.createdAt), asc(members.id));
+  const people = (
+    await db
+      .select({
+        id: members.id,
+        displayName: members.displayName,
+        color: members.color,
+        avatar: members.avatar,
+        createdAt: members.createdAt,
+        ...avatarImageColumns,
+      })
+      .from(members)
+      .leftJoin(avatars, eq(avatars.id, members.avatarImageId))
+      .where(
+        and(
+          eq(members.householdId, householdId),
+          isNull(members.deactivatedAt),
+        ),
+      )
+      .orderBy(asc(members.createdAt), asc(members.id))
+  ).map(({ imageId, imagePathname, imageWidth, imageHeight, ...m }) => ({
+    ...m,
+    avatarImage: avatarImageOf({
+      imageId,
+      imagePathname,
+      imageWidth,
+      imageHeight,
+    }),
+  }));
   const open = await withAcks(
     db,
     await db

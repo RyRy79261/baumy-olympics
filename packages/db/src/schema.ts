@@ -340,6 +340,16 @@ export const members = pgTable(
      * default picked from their id.
      */
     avatar: jsonb("avatar"),
+    /**
+     * The gallery sprite they picked (issue #111), or null: then the
+     * parametric character above is drawn instead. Two members may pick the
+     * same one. Archiving a sprite hides it from the gallery but keeps it on
+     * whoever already wears it, so nothing ever deletes the row this points
+     * at.
+     */
+    avatarImageId: uuid("avatar_image_id").references(
+      (): AnyPgColumn => avatars.id,
+    ),
     color: text("color").notNull(),
     role: memberRole("role").notNull().default("member"),
     /** scrypt hash, never the PIN itself. */
@@ -353,6 +363,40 @@ export const members = pgTable(
       .defaultNow(),
   },
   (t) => [index("members_household_id_idx").on(t.householdId)],
+);
+
+/**
+ * The gallery of pre-generated pixel characters (issue #111). The owner makes
+ * each one elsewhere and uploads it at /admin/avatars; the app only cleans it
+ * (apps/web lib/avatars/clean.ts) and stores the result in the PRIVATE Blob
+ * store at `pathname` (`avatars/{id}/{rand}.png`), served only through
+ * /api/blob. `width` and `height` are the cleaned sprite's own pixels, so
+ * every screen can draw it at a whole-number scale. Archived ones leave the
+ * gallery but stay on whoever already picked them; rows are never deleted.
+ */
+export const avatars = pgTable(
+  "avatars",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    name: text("name").notNull(),
+    pathname: text("pathname").notNull().unique(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references((): AnyPgColumn => members.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("avatars_household_id_idx").on(t.householdId),
+    check("avatars_size_positive", sql`${t.width} > 0 AND ${t.height} > 0`),
+  ],
 );
 
 /**
