@@ -114,3 +114,17 @@ export const DisputeReason = z
   .trim()
   .min(1, "Say why you are disputing it.")
   .max(DISPUTE_REASON_MAX, `Keep it to ${DISPUTE_REASON_MAX} characters.`);
+
+export const WEIGHT_CHANGE_REASON_MAX = 280;
+
+/**
+ * Why an admin changes a bounty's points (issue #115): optional and trimmed,
+ * so a blank one is no reason at all. Shown in the points history.
+ */
+export const WeightChangeReason = z
+  .string()
+  .trim()
+  .max(
+    WEIGHT_CHANGE_REASON_MAX,
+    `Keep it to ${WEIGHT_CHANGE_REASON_MAX} characters.`,
+  );

@@ -23,17 +23,26 @@ import {
   computeSuggestions,
   dismissSuggestion,
   findSuggestion,
+  insertAdminChange,
   lastAppliedAt,
   listActiveSuggestions,
+  listPointsHistory,
   listScheduledChanges,
   listWeightPanel,
+  lockActiveSuggestion,
   lockSuggestion,
   measureChore,
   scheduleSuggestion,
+  supersedeSuggestion,
   vetoSuggestion,
   type WeightSuggestionRow,
 } from "../weights";
-import { SEED_CHORES, seedChore, seedPlayer } from "./_game-fixtures";
+import {
+  RULES_FROM,
+  SEED_CHORES,
+  seedChore,
+  seedPlayer,
+} from "./_game-fixtures";
 import { useTestDb } from "./_harness";
 
 // Frequency-derived weights (SPEC §4.4, issue #17) on PGlite: the weekly
@@ -544,8 +553,8 @@ describe("applyDueSuggestions", () => {
     await tx((q) =>
       scheduleSuggestion(q, {
         suggestionId: base.suggestion.id,
-        basePoints: base.suggestion.suggestedPoints,
-        cooldownMinutes: base.suggestion.suggestedCooldownMinutes,
+        basePoints: base.suggestion.suggestedPoints!,
+        cooldownMinutes: base.suggestion.suggestedCooldownMinutes!,
         appliesAt,
         scheduledBy: base.ryan,
         now: NOW,
@@ -762,5 +771,306 @@ describe("listActiveSuggestions", () => {
     await expect(listActiveSuggestions(db(), HOUSEHOLD_ID)).resolves.toEqual(
       [],
     );
+  });
+});
+
+describe("an admin's points change (issue #115)", () => {
+  /** An admin's change to `choreId`, 35 → `to`, applying a week out. */
+  function adminChange(
+    choreId: string,
+    by: string,
+    over: Partial<Parameters<typeof insertAdminChange>[1]> = {},
+  ) {
+    return tx((q) =>
+      insertAdminChange(q, {
+        householdId: HOUSEHOLD_ID,
+        choreId,
+        currentPoints: 35,
+        currentCooldownMinutes: SEED_CHORES.bathroom.cooldownMinutes,
+        basePoints: 50,
+        cooldownMinutes: 2 * DAY_MIN,
+        reason: "It takes an hour",
+        appliesAt: new Date(NOW.getTime() + 7 * DAY),
+        scheduledBy: by,
+        now: NOW,
+        ...over,
+      }),
+    );
+  }
+
+  async function bathroom() {
+    const ryan = await seedPlayer(db(), "Ryan");
+    const partner = await seedPlayer(db(), "Partner");
+    const { choreId } = await seedChore(db(), {
+      ...SEED_CHORES.bathroom,
+      basePoints: 35,
+    });
+    return { ryan, partner, choreId };
+  }
+
+  it("is stored scheduled, without a measurement, as the chore's one active change", async () => {
+    const { ryan, choreId } = await bathroom();
+    const row = await adminChange(choreId, ryan);
+    expect(row).toMatchObject({
+      origin: "admin",
+      status: "scheduled",
+      weekStart: startOfBerlinWeek(NOW),
+      currentPoints: 35,
+      scheduledPoints: 50,
+      scheduledCooldownMinutes: 2 * DAY_MIN,
+      reason: "It takes an hour",
+      scheduledBy: ryan,
+      scheduledAt: NOW,
+      medianIntervalMinutes: null,
+      suggestedPoints: null,
+    });
+    await expect(
+      tx((q) => lockActiveSuggestion(q, choreId)),
+    ).resolves.toMatchObject({ id: row.id });
+    // A second one while it waits breaks the one-active index.
+    await expect(adminChange(choreId, ryan)).rejects.toThrow();
+    // A measured row still needs its measurement (the check).
+    await expect(
+      t
+        .db()
+        .insert(weightSuggestions)
+        .values({
+          householdId: HOUSEHOLD_ID,
+          choreId,
+          weekStart: startOfBerlinWeek(NOW),
+          computedAt: NOW,
+          currentPoints: 35,
+          currentCooldownMinutes: 60,
+          status: "dismissed",
+          dismissedBy: ryan,
+          dismissedAt: NOW,
+        }),
+    ).rejects.toThrow();
+  });
+
+  it("supersedes an open suggestion only while it is open", async () => {
+    const { ryan, suggestion } = await e7();
+    await expect(
+      tx((q) => supersedeSuggestion(q, suggestion.id)),
+    ).resolves.toMatchObject({ status: "superseded" });
+    await expect(
+      tx((q) => supersedeSuggestion(q, suggestion.id)),
+    ).resolves.toBeNull();
+    expect(ryan).toBeTruthy();
+  });
+
+  it("keeps the weekly compute away while scheduled, but not after a veto the same week", async () => {
+    const { ryan, partner, choreId } = await bathroom();
+    await logSeries(choreId, [ryan, partner], E7_GAPS);
+    const row = await adminChange(choreId, ryan, {
+      now: new Date(NOW.getTime() - HOUR),
+    });
+    expect(await tx((q) => computeSuggestions(q, NOW))).toEqual({
+      measured: 0,
+      suggested: [],
+    });
+    await tx((q) =>
+      vetoSuggestion(q, { suggestionId: row.id, vetoedBy: partner, now: NOW }),
+    );
+    // The admin row shares the week, but only a measured one counts.
+    const r = await tx((q) => computeSuggestions(q, NOW));
+    expect(r.suggested).toHaveLength(1);
+    expect(r.suggested[0]).toMatchObject({
+      origin: "measured",
+      weekStart: startOfBerlinWeek(NOW),
+      suggestedPoints: 26,
+    });
+  });
+
+  it("applies without the 28-day spacing", async () => {
+    const { ryan, partner, choreId, suggestion } = await e7();
+    const appliesAt = new Date(NOW.getTime() + 7 * DAY);
+    await tx((q) =>
+      scheduleSuggestion(q, {
+        suggestionId: suggestion.id,
+        basePoints: 26,
+        cooldownMinutes: 3.5 * DAY_MIN,
+        appliesAt,
+        scheduledBy: ryan,
+        now: NOW,
+      }),
+    );
+    const runAt = new Date(appliesAt.getTime() + HOUR);
+    expect(await tx((q) => applyDueSuggestions(q, runAt))).toHaveLength(1);
+    const admin = await adminChange(choreId, partner, {
+      currentPoints: 26,
+      appliesAt: new Date(appliesAt.getTime() + 7 * DAY),
+      now: runAt,
+    });
+    const later = new Date(appliesAt.getTime() + 8 * DAY);
+    const applied = await tx((q) => applyDueSuggestions(q, later));
+    expect(applied).toEqual([
+      expect.objectContaining({ suggestionId: admin.id, basePoints: 50 }),
+    ]);
+    const versions = await versionsOf(choreId);
+    expect(versions.at(-1)).toMatchObject({
+      source: "suggestion",
+      suggestionId: admin.id,
+      basePoints: 50,
+      createdBy: partner,
+    });
+  });
+
+  it("reads back every change with who, from, to, why, when and what became of it", async () => {
+    const { ryan, partner, choreId } = await bathroom();
+    const other = await seedChore(db(), SEED_CHORES.dishes);
+    // The seed's createdAt is the database's clock; pin it for the order.
+    await t
+      .db()
+      .update(choreRuleVersions)
+      .set({ createdAt: RULES_FROM })
+      .where(eq(choreRuleVersions.choreId, choreId));
+    const at = (days: number) => new Date(NOW.getTime() + days * DAY);
+
+    // 1. Cancelled by an admin.
+    const cancelled = await adminChange(choreId, ryan, { now: at(0) });
+    await tx((q) =>
+      dismissSuggestion(q, {
+        suggestionId: cancelled.id,
+        dismissedBy: ryan,
+        now: at(1),
+      }),
+    );
+    // 2. Vetoed by the partner.
+    const vetoed = await adminChange(choreId, ryan, {
+      basePoints: 60,
+      reason: null,
+      now: at(2),
+      appliesAt: at(7),
+    });
+    await tx((q) =>
+      vetoSuggestion(q, {
+        suggestionId: vetoed.id,
+        vetoedBy: partner,
+        now: at(3),
+      }),
+    );
+    // 3. Landed.
+    const landed = await adminChange(choreId, ryan, {
+      basePoints: 40,
+      reason: "Fair",
+      now: at(4),
+      appliesAt: at(14),
+    });
+    await tx((q) => applyDueSuggestions(q, at(14)));
+    // 4. Waiting.
+    const pending = await adminChange(choreId, ryan, {
+      currentPoints: 40,
+      basePoints: 45,
+      reason: null,
+      now: at(15),
+      appliesAt: at(21),
+    });
+
+    const history = await listPointsHistory(db(), {
+      householdId: HOUSEHOLD_ID,
+      choreId,
+    });
+    const ryanP = { memberId: ryan, displayName: "Ryan" };
+    const partnerP = { memberId: partner, displayName: "Partner" };
+    expect(history).toEqual([
+      expect.objectContaining({
+        key: `s:${pending.id}`,
+        source: "admin",
+        outcome: "pending",
+        suggestionId: pending.id,
+        proposedBy: ryanP,
+        proposedAt: at(15),
+        fromPoints: 40,
+        toPoints: 45,
+        appliesAt: at(21),
+        decidedBy: null,
+      }),
+      expect.objectContaining({
+        source: "admin",
+        outcome: "landed",
+        suggestionId: landed.id,
+        proposedBy: ryanP,
+        proposedAt: at(4),
+        fromPoints: 35,
+        fromCooldownMinutes: SEED_CHORES.bathroom.cooldownMinutes,
+        toPoints: 40,
+        toCooldownMinutes: 2 * DAY_MIN,
+        reason: "Fair",
+        appliesAt: at(14),
+      }),
+      expect.objectContaining({
+        key: `s:${vetoed.id}`,
+        outcome: "vetoed",
+        toPoints: 60,
+        reason: null,
+        decidedBy: partnerP,
+        decidedAt: at(3),
+      }),
+      expect.objectContaining({
+        key: `s:${cancelled.id}`,
+        outcome: "cancelled",
+        fromPoints: 35,
+        toPoints: 50,
+        reason: "It takes an hour",
+        decidedBy: ryanP,
+        decidedAt: at(1),
+      }),
+      expect.objectContaining({
+        source: "seed",
+        outcome: "landed",
+        proposedBy: null,
+        fromPoints: null,
+        toPoints: 35,
+        appliesAt: RULES_FROM,
+      }),
+    ]);
+
+    // Without a chore: every bounty's, the other's seed too.
+    const all = await listPointsHistory(db(), { householdId: HOUSEHOLD_ID });
+    expect(all).toHaveLength(6);
+    expect(all.map((e) => e.choreId)).toContain(other.choreId);
+    await expect(
+      listPointsHistory(db(), {
+        householdId: "00000000-0000-4000-8000-000000000000",
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("leaves out a suggestion nobody scheduled, and names a manual change's admin", async () => {
+    const { ryan, choreId, suggestion } = await e7();
+    await tx((q) =>
+      dismissSuggestion(q, {
+        suggestionId: suggestion.id,
+        dismissedBy: ryan,
+        now: NOW,
+      }),
+    );
+    await t
+      .db()
+      .update(choreRuleVersions)
+      .set({ createdAt: RULES_FROM })
+      .where(eq(choreRuleVersions.choreId, choreId));
+    await t.db().insert(choreRuleVersions).values({
+      choreId,
+      effectiveFrom: NOW,
+      basePoints: 30,
+      cooldownMinutes: 60,
+      source: "manual",
+      createdBy: ryan,
+      createdAt: NOW,
+    });
+    const history = await listPointsHistory(db(), {
+      householdId: HOUSEHOLD_ID,
+      choreId,
+    });
+    expect(history.map((e) => e.source)).toEqual(["manual", "seed"]);
+    expect(history[0]).toMatchObject({
+      proposedBy: { memberId: ryan, displayName: "Ryan" },
+      fromPoints: 35,
+      toPoints: 30,
+      toCooldownMinutes: 60,
+      suggestionId: null,
+    });
   });
 });
