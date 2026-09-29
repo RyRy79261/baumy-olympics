@@ -138,6 +138,7 @@ describe("listActiveMembers and findActiveMember", () => {
       avatarSprite: "cat",
       color: "#112233",
       avatar: null,
+      avatarImage: null,
     });
     // A chosen character comes along, for the avatar bar and the reminder.
     expect(list[1]?.avatar).toEqual(avatar);

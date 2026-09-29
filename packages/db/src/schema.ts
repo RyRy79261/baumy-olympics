@@ -340,6 +340,16 @@ export const members = pgTable(
      * default picked from their id.
      */
     avatar: jsonb("avatar"),
+    /**
+     * The gallery sprite they picked (issue #111), or null: then the
+     * parametric character above is drawn instead. Two members may pick the
+     * same one. Archiving a sprite hides it from the gallery but keeps it on
+     * whoever already wears it, so nothing ever deletes the row this points
+     * at.
+     */
+    avatarImageId: uuid("avatar_image_id").references(
+      (): AnyPgColumn => avatars.id,
+    ),
     color: text("color").notNull(),
     role: memberRole("role").notNull().default("member"),
     /** scrypt hash, never the PIN itself. */
@@ -353,6 +363,62 @@ export const members = pgTable(
       .defaultNow(),
   },
   (t) => [index("members_household_id_idx").on(t.householdId)],
+);
+
+/**
+ * The gallery of pre-generated pixel characters (issue #111), one row per
+ * character SET (its poses are `avatar_poses`). The owner makes each one
+ * elsewhere and uploads it at /admin/avatars; the app only cleans it (apps/web
+ * lib/avatars/clean.ts) and stores the poses in the PRIVATE Blob store,
+ * served only through /api/blob. Archived ones leave the gallery but stay on
+ * whoever already picked them; rows are never deleted.
+ */
+export const avatars = pgTable(
+  "avatars",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    name: text("name").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references((): AnyPgColumn => members.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [index("avatars_household_id_idx").on(t.householdId)],
+);
+
+/**
+ * The poses of one gallery character (owner ruling 2026-09-29): `idle`
+ * (standing, three-quarter; every set has it), `walk` and `emote`. All the
+ * poses of a set were cleaned together at one scale and on one palette.
+ * `pathname` is `avatars/{avatarId}/{rand}.png`; `width` and `height` are
+ * the sprite's own pixels.
+ */
+export const avatarPose = pgEnum("avatar_pose", ["idle", "walk", "emote"]);
+
+export const avatarPoses = pgTable(
+  "avatar_poses",
+  {
+    avatarId: uuid("avatar_id")
+      .notNull()
+      .references(() => avatars.id),
+    pose: avatarPose("pose").notNull(),
+    pathname: text("pathname").notNull().unique(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.avatarId, t.pose] }),
+    check(
+      "avatar_poses_size_positive",
+      sql`${t.width} > 0 AND ${t.height} > 0`,
+    ),
+  ],
 );
 
 /**

@@ -7,9 +7,12 @@ import { members } from "@baumy/db/schema";
 import { Card, FormMessage, PageHeading } from "@baumy/ui";
 import { avatarFor } from "@baumy/types";
 import { requireMemberPage } from "@/lib/auth";
+import { listAvatars } from "@baumy/db/avatars";
+import { avatarImageView } from "@/lib/avatars/paths";
 import { activeCharacters } from "@/lib/members/characters";
 import { telegramBotUsername } from "@/lib/telegram/deep-link";
 import { AvatarForm } from "./avatar-form";
+import { GalleryForm } from "./gallery-form";
 import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
 
 // /settings (SPEC §6.2): the member's own character (ADR 0005 §5), kiosk
@@ -27,9 +30,19 @@ export default async function SettingsPage() {
       kioskPinHash: members.kioskPinHash,
       kioskPinLockedAt: members.kioskPinLockedAt,
       telegramUserId: members.telegramUserId,
+      avatarImageId: members.avatarImageId,
     })
     .from(members)
     .where(eq(members.id, me.memberId));
+  const db = createHttpDb() as unknown as Queryable;
+  // The gallery (issue #111): once it has characters, "Your character" is
+  // a pick from it; until then, the drawn character's options.
+  const gallery = await listAvatars(db, HOUSEHOLD_ID);
+  const live = gallery.filter((a) => a.archivedAt === null);
+  const worn = gallery.find((a) => a.id === row?.avatarImageId);
+  const character =
+    (await activeCharacters(db, HOUSEHOLD_ID)).get(me.memberId) ??
+    avatarFor({ id: me.memberId, avatar: me.avatar ?? null });
 
   return (
     <>
@@ -44,17 +57,20 @@ export default async function SettingsPage() {
             below to unlock it.
           </FormMessage>
         ) : null}
-        <AvatarForm
-          initial={
-            (
-              await activeCharacters(
-                createHttpDb() as unknown as Queryable,
-                HOUSEHOLD_ID,
-              )
-            ).get(me.memberId) ??
-            avatarFor({ id: me.memberId, avatar: me.avatar ?? null })
-          }
-        />
+        {live.length > 0 ? (
+          <GalleryForm
+            memberId={me.memberId}
+            character={character}
+            options={live.map((a) => ({
+              id: a.id,
+              name: a.name,
+              sprites: avatarImageView(a)!,
+            }))}
+            picked={row?.avatarImageId ?? ""}
+            archivedName={worn?.archivedAt ? worn.name : undefined}
+          />
+        ) : null}
+        <AvatarForm initial={character} secondary={live.length > 0} />
         <Card
           title="Security"
           description="Passkeys, two-factor, Google, your password and the devices signed in as you."
