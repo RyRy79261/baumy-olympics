@@ -128,10 +128,7 @@ export const previewAvatar = defineAction({
     }
     const cleaned = await cleanAvatarSet(ctx.avatarUpload.files, { height });
     if (!cleaned.ok) {
-      return fail(
-        "AVATAR_IMAGE_UNREADABLE",
-        UNREADABLE[cleaned.reason],
-      );
+      return fail("AVATAR_IMAGE_UNREADABLE", UNREADABLE[cleaned.reason]);
     }
     const data: PreviewAvatarData = {
       height,
