@@ -92,7 +92,10 @@ function Pose({
       aria-hidden={label ? undefined : true}
       draggable={false}
       className={cx("block", className)}
-      style={{ imageRendering: "pixelated" }}
+      // Whole-number scales keep square pixels; below 1× the browser's
+      // smoothing averages each block instead of dropping rows, so thin
+      // outlines survive in the smallest slots.
+      style={{ imageRendering: f < 1 ? "auto" : "pixelated" }}
     />
   );
 }

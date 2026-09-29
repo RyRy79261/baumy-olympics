@@ -49,6 +49,18 @@ describe("spriteFit (the bust in small slots)", () => {
     expect(64 / 2).toBeLessThanOrEqual(BUST_MAX_PX);
   });
 
+  it("smooths below 1× so outlines are averaged, and stays pixelated at 1× and up", () => {
+    const set = { idle: { src: "/i.png", width: 21, height: 64 } };
+    const header = renderToStaticMarkup(
+      <MemberCharacter sprites={set} scale={1} />,
+    );
+    expect(header).toContain("image-rendering:auto");
+    const bar = renderToStaticMarkup(
+      <MemberCharacter sprites={set} scale={2} />,
+    );
+    expect(bar).toContain("image-rendering:pixelated");
+  });
+
   it("crops the drawn image to the bust, the whole image kept inside", () => {
     const set = { idle: { src: "/i.png", width: 21, height: 64 } };
     const html = renderToStaticMarkup(
@@ -193,6 +205,23 @@ describe("AvatarGallery", () => {
     expect(html).toContain('data-avatar="a2" data-picked="true"');
     expect(html.match(/Picked/g)).toHaveLength(1);
     expect(html).toContain('checked="" value="a2"');
+  });
+
+  it("shows each character's whole name, wrapping, never cut off", () => {
+    const long = "Brooklyn the pirate queen";
+    const html = renderToStaticMarkup(
+      <AvatarGallery
+        legend="Gallery"
+        name="avatarId"
+        options={[{ id: "a1", name: long, sprites: SET }]}
+        value=""
+        onChange={() => {}}
+      />,
+    );
+    expect(html).toMatch(
+      /<span data-name="true" class="[^"]*break-words[^"]*">Brooklyn the pirate queen</,
+    );
+    expect(html).not.toContain("truncate");
   });
 
   it("leaves out the none tile when not asked for it", () => {
