@@ -30,7 +30,8 @@ const GATES: Record<Gate, string> = {
     "the member themself: brain counts as the member (the kiosk would need their PIN)",
   service:
     "the service token alone; the member comes from the code, so an unlinked sender may call it",
-  admin: "an admin in the app",
+  admin:
+    "a linked admin, in their own name only (a member gets 403 `FORBIDDEN`)",
   session: "a real session in the app",
   account: "a real session in the app",
 };
@@ -89,6 +90,9 @@ function behalfLine(spec: ToolSpec): string {
   }
   if (spec.member_field) {
     return `no (400): name the housemate in \`${spec.member_field}\` instead`;
+  }
+  if (spec.admin_only) {
+    return "no (403 `FORBIDDEN`): an admin change is only ever made in the admin's own name";
   }
   if (ownWordOnly(spec)) {
     return "no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram";

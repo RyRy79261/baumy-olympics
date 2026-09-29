@@ -25,7 +25,8 @@ import {
 import type { Actor } from "@/lib/auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { RequestCtx } from "./define";
-import { runAction } from "./registry";
+import { createProposer } from "./propose";
+import { REGISTRY, runAction } from "./registry";
 
 // get_standings, get_streaks, get_pot, adjust_points, add_pot_contribution
 // and set_prize_mode through the real runAction on PGlite (issue #16):
@@ -766,6 +767,124 @@ describe("add_pot_contribution", () => {
     expect(await t.db().select().from(potContributions)).toEqual([]);
   });
 
+  it("defaults to this Berlin month (issue #107)", async () => {
+    const data = ok(
+      await runAction("add_pot_contribution", { amount: 20 }, asAdmin(adminA)),
+    );
+    expect(data.month).toBe("2026-09");
+    // 23:30 UTC on 31 Oct is already November in Berlin.
+    const late = ok(
+      await runAction(
+        "add_pot_contribution",
+        { amount: 20 },
+        asAdmin(adminA, { now: new Date("2026-10-31T23:30:00Z") }),
+      ),
+    );
+    expect(late.month).toBe("2026-11");
+  });
+
+  it("is offered to the AI and brain for an admin in their own name, never kiosk or MCP (issue #107)", async () => {
+    const adminBrain = {
+      kind: "service",
+      tokenName: "baumy-brain",
+      memberId: adminA,
+      role: "admin",
+    } as Actor;
+    ok(
+      await runAction(
+        "add_pot_contribution",
+        { amount: 5 },
+        asAdmin(adminA, { source: "ai" }),
+      ),
+    );
+    ok(
+      await runAction(
+        "add_pot_contribution",
+        { amount: 5 },
+        ctxFor(adminBrain, { source: "brain" }),
+      ),
+    );
+    const refusals: [Actor, RequestCtx["source"], string][] = [
+      [sessionActor(ryan), "ai", "FORBIDDEN"],
+      [brain(ryan), "brain", "FORBIDDEN"],
+      [
+        { ...adminBrain, initiatorMemberId: ryan } as Actor,
+        "brain",
+        "FORBIDDEN",
+      ],
+      [kiosk(adminA), "kiosk", "SURFACE_FORBIDDEN"],
+      [mcp(adminA), "mcp", "SURFACE_FORBIDDEN"],
+    ];
+    for (const [actor, source, code] of refusals) {
+      await expect(
+        runAction(
+          "add_pot_contribution",
+          { amount: 5 },
+          ctxFor(actor, { source }),
+        ),
+        source,
+      ).resolves.toMatchObject({ ok: false, code });
+    }
+    expect(await t.db().select().from(potContributions)).toHaveLength(2);
+  });
+
+  it("previews the amount, and the month and payer when they differ (issue #107)", async () => {
+    const propose = createProposer(REGISTRY, {
+      readDb: () => db(),
+      newId: () => "p-1",
+      logError: () => {},
+    });
+    const choices = { members: [], chores: [] };
+    const ai = asAdmin(adminA, { source: "ai" });
+    await expect(
+      propose("add_pot_contribution", { amount: "20" }, ai, choices),
+    ).resolves.toMatchObject({ valid: true, preview: "Add €20 to the pot" });
+    await expect(
+      propose(
+        "add_pot_contribution",
+        { amount: "20.5", month: "2026-08", contributedBy: partner },
+        ai,
+        choices,
+      ),
+    ).resolves.toMatchObject({
+      preview: "Add €20.50 to the pot for Aug 2026 from Partner",
+    });
+    await expect(
+      propose(
+        "add_pot_contribution",
+        { amount: 1, contributedBy: crypto.randomUUID() },
+        ai,
+        choices,
+      ),
+    ).resolves.toMatchObject({
+      preview: "Add €1 to the pot from someone unknown",
+    });
+    // The note is on the card too, and the amount can be edited there.
+    const noted = await propose(
+      "add_pot_contribution",
+      { amount: 20, note: "  September, late  " },
+      ai,
+      choices,
+    );
+    expect(noted.preview).toBe("Add €20 to the pot (note: September, late)");
+    expect(noted.fields.find((f) => f.name === "amount")).toMatchObject({
+      kind: "text",
+      label: "Amount",
+    });
+    await expect(
+      propose(
+        "add_pot_contribution",
+        { amount: 1 },
+        as(ryan, { source: "ai" }),
+        choices,
+      ),
+    ).resolves.toMatchObject({
+      valid: false,
+      error: "Only a household admin can do this.",
+    });
+    expect(await t.db().select().from(potContributions)).toEqual([]);
+  });
+
   it("validates the month and the amount", async () => {
     for (const bad of [
       { month: "2026-9", amount: 25 },
@@ -849,7 +968,6 @@ describe("set_prize_mode", () => {
 describe("the admin writes' surfaces and gates", () => {
   const writes: [string, Record<string, unknown>][] = [
     ["set_prize_mode", { season: "next", mode: "points" }],
-    ["add_pot_contribution", { month: "2026-09", amount: 5 }],
     ["adjust_points", { op: "create", memberId: "", points: 5, reason: "x" }],
   ];
 

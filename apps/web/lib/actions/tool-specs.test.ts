@@ -33,6 +33,18 @@ describe("toolSpecs", () => {
     expect(names).toContain("delete_event");
     expect(names).toContain("delete_note");
     expect(names).not.toContain("manage_members");
+    expect(names).not.toContain("manage_chore");
+    // Issue #107: the bounty and pot writes, in the admin's own word only.
+    for (const n of [
+      "create_bounty",
+      "update_bounty",
+      "add_pot_contribution",
+    ]) {
+      expect(specs.find((s) => s.name === n)).toMatchObject({
+        risk: "confirm",
+        own_word_only: true,
+      });
+    }
     expect(specs.find((s) => s.name === "create_event")?.risk).toBe("confirm");
     expect(specs.find((s) => s.name === "log_completion")?.member_field).toBe(
       "doneBy",

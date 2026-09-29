@@ -4,8 +4,9 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 
 // Issue #21 (SPEC §10 flow 7), with the scripted fake Claude
 // (lib/integrations/claude-fake.ts): a member types "I took out the …" to
-// Baumy, sees a log_completion proposal with its points, approves it, and
-// the scoreboard counts it once, even when the approval is sent again.
+// Baumy, sees a log_completion suggestion card with its points, confirms it
+// (Confirm all), and the scoreboard counts it once, even when the approval is
+// sent again.
 // "Who's winning?" is answered with no proposal.
 //
 // The member joins for this run only, so specs running in parallel on the
@@ -49,37 +50,42 @@ test("type a chore to Baumy, approve it, and the scoreboard counts it once", asy
   await expect(says).toContainText(
     /is winning with \d+ points|Nobody is ahead/,
   );
-  await expect(sheet.getByTestId("proposal-log_completion")).toHaveCount(0);
+  await expect(sheet.getByTestId("suggestion-log_completion")).toHaveCount(0);
   await expect(
-    sheet.getByRole("region", { name: "Baumy's proposals" }),
+    sheet.getByRole("region", { name: "Baumy's suggestions" }),
   ).toHaveCount(0);
 
   // A chore is proposed with the points it will score; nothing is logged yet.
   await say(sheet, `I took out the ${chore}`);
   await expect(says).toContainText(`logging ${chore}`);
-  const row = sheet.getByTestId("proposal-log_completion");
+  const row = sheet.getByTestId("suggestion-log_completion");
   await expect(row).toContainText(`Log ${chore} for ${player}: +20 (streak 1)`);
   await expect(row.getByTestId("proposal-state")).toHaveText("Waiting for you");
-  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(
+    sheet.getByRole("button", { name: "Confirm all" }),
+  ).toBeVisible();
+  // Cancel rejects it and closes the sheet.
+  await sheet.getByRole("button", { name: "Cancel" }).click();
+  await expect(sheet).toBeHidden();
   await me.goto("/scores");
   const standing = me.getByTestId(`standing-${player}`);
   await expect(standing.getByTestId("points")).toHaveText("0");
 
-  // Approve it: it saves once, with the previewed points.
+  // Confirm all: it saves once, with the previewed points.
   sheet = await openBaumy(me);
   await say(sheet, `I took out the ${chore}`);
   const run = me.waitForRequest("**/api/actions/run");
-  await sheet
-    .getByTestId("proposal-log_completion")
-    .getByRole("button", { name: "Approve" })
-    .click();
+  await sheet.getByRole("button", { name: "Confirm all" }).click();
   const approved = await run;
   await expect(
-    sheet.getByTestId("proposal-log_completion").getByTestId("proposal-state"),
+    sheet
+      .getByTestId("suggestion-log_completion")
+      .getByTestId("proposal-state"),
   ).toHaveText("Done");
-  await expect(sheet.getByTestId("proposal-log_completion")).toContainText(
+  await expect(sheet.getByTestId("suggestion-log_completion")).toContainText(
     "Saved: +20 points.",
   );
+  await sheet.getByRole("button", { name: "Done" }).click();
 
   // The same approval again (a retry, a double tap) replays the stored
   // result instead of logging it twice.

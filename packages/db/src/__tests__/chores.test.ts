@@ -6,6 +6,7 @@ import {
   STARTER_CHORES,
   choreNameTaken,
   createChore,
+  findChoreWithWeight,
   listChoreBoard,
   listChoreNames,
   lockChoreRow,
@@ -651,5 +652,62 @@ describe("chore admin writes", () => {
     await expect(taken("TRASH", choreId)).resolves.toBe(false);
     await expect(taken("Dishes")).resolves.toBe(false);
     await expect(taken("Keller")).resolves.toBe(false);
+  });
+});
+
+describe("findChoreWithWeight", () => {
+  it("reads a chore with the weight in effect now, else its first one", async () => {
+    const trash = SEED_CHORES.trash;
+    const { choreId } = await seedChore(db(), trash);
+    const found = await findChoreWithWeight(db(), {
+      householdId: HOUSEHOLD_ID,
+      choreId,
+      now: NOW,
+    });
+    expect(found?.chore).toMatchObject({ id: choreId, name: trash.name });
+    expect(found?.weight).toEqual({
+      basePoints: trash.basePoints,
+      cooldownMinutes: trash.cooldownMinutes,
+    });
+
+    await t
+      .db()
+      .insert(choreRuleVersions)
+      .values({
+        choreId,
+        effectiveFrom: at(1),
+        basePoints: trash.basePoints + 5,
+        cooldownMinutes: trash.cooldownMinutes,
+        source: "manual",
+      });
+    await expect(
+      findChoreWithWeight(db(), {
+        householdId: HOUSEHOLD_ID,
+        choreId,
+        now: at(2),
+      }),
+    ).resolves.toMatchObject({ weight: { basePoints: trash.basePoints + 5 } });
+
+    const { choreId: later } = await seedChore(db(), {
+      ...SEED_CHORES.dishes,
+      effectiveFrom: at(5),
+    });
+    await expect(
+      findChoreWithWeight(db(), {
+        householdId: HOUSEHOLD_ID,
+        choreId: later,
+        now: NOW,
+      }),
+    ).resolves.toMatchObject({
+      weight: { basePoints: SEED_CHORES.dishes.basePoints },
+    });
+
+    await expect(
+      findChoreWithWeight(db(), {
+        householdId: HOUSEHOLD_ID,
+        choreId: "00000000-0000-4000-8000-00000000beef",
+        now: NOW,
+      }),
+    ).resolves.toBeNull();
   });
 });

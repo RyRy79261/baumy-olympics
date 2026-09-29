@@ -14,6 +14,7 @@ import {
 import { addPotContribution } from "./add-pot-contribution";
 import { adjustPoints } from "./adjust-points";
 import { attachCompletionPhoto } from "./attach-completion-photo";
+import { createBounty, updateBounty } from "./bounties";
 import { createEvent, deleteEvent, listEvents, updateEvent } from "./calendar";
 import { checkKioskPin } from "./check-kiosk-pin";
 import {
@@ -117,6 +118,8 @@ export const REGISTRY = {
   list_chores: listChores,
   log_completion: logCompletionAction,
   manage_chore: manageChore,
+  create_bounty: createBounty,
+  update_bounty: updateBounty,
   get_pending_confirmations: getPendingConfirmations,
   confirm_completion: confirmCompletion,
   dispute_completion: disputeCompletion,
