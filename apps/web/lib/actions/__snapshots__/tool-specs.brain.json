@@ -147,6 +147,153 @@
     "member_field": "doneBy"
   },
   {
+    "name": "create_bounty",
+    "title": "Add a bounty",
+    "description": "Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none), confirm mode (default optimistic) and effort factor (default 100). Only a household admin may do this, in their own name.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "What the bounty is called, e.g. Recycling."
+        },
+        "kind": {
+          "default": "maintenance",
+          "type": "string",
+          "enum": [
+            "consumable",
+            "maintenance"
+          ],
+          "description": "consumable (something to buy or refill) or maintenance (something to clean or fix)."
+        },
+        "points": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Base points for doing it, 1 to 200."
+        },
+        "cooldownHours": {
+          "default": 24,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 720,
+          "description": "Hours before it scores again (0 to 720)."
+        },
+        "proofMode": {
+          "default": "none",
+          "type": "string",
+          "enum": [
+            "none",
+            "optional",
+            "required"
+          ],
+          "description": "Whether a proof photo is none, optional or required."
+        },
+        "confirmMode": {
+          "default": "optimistic",
+          "type": "string",
+          "enum": [
+            "optimistic",
+            "partner"
+          ],
+          "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
+        },
+        "effortFactorPct": {
+          "default": 100,
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 300,
+          "description": "The effort factor in percent (100 is normal)."
+        }
+      },
+      "required": [
+        "name",
+        "points"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "confirm",
+    "own_word_only": true,
+    "admin_only": true
+  },
+  {
+    "name": "update_bounty",
+    "title": "Edit a bounty",
+    "description": "Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, confirm mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "choreId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "What the bounty is called, e.g. Recycling."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "consumable",
+            "maintenance"
+          ],
+          "description": "consumable (something to buy or refill) or maintenance (something to clean or fix)."
+        },
+        "points": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Base points for doing it, 1 to 200."
+        },
+        "cooldownHours": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 720,
+          "description": "Hours before it scores again (0 to 720)."
+        },
+        "proofMode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "optional",
+            "required"
+          ],
+          "description": "Whether a proof photo is none, optional or required."
+        },
+        "confirmMode": {
+          "type": "string",
+          "enum": [
+            "optimistic",
+            "partner"
+          ],
+          "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
+        },
+        "effortFactorPct": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 300,
+          "description": "The effort factor in percent (100 is normal)."
+        }
+      },
+      "required": [
+        "choreId"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "confirm",
+    "own_word_only": true,
+    "admin_only": true
+  },
+  {
     "name": "get_pending_confirmations",
     "title": "Claims waiting for an OK",
     "description": "Lists the household's chore claims still waiting to settle (pending or disputed), with who did and logged each, when its dispute window ends, any open dispute and its reason, and `can`: which of confirm, dispute, withdraw, concede, undo and attach a photo you may do to it now. `needsYou` marks the ones waiting on you. `recent` lists your own claims of the last 7 days that have settled (finalized, confirmed or voided). Times are ISO 8601 in UTC.",
@@ -357,6 +504,44 @@
     },
     "kind": "read",
     "risk": "safe"
+  },
+  {
+    "name": "add_pot_contribution",
+    "title": "Add to the pot",
+    "description": "Records a monthly contribution to the season's savings pot: the amount in euros, the month (YYYY-MM, default: this month), who paid it (a member id, default: you) and an optional note. Only a household admin may do this, in their own name.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "month": {
+          "type": "string",
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+        },
+        "amount": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "contributedBy": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "amount"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "confirm",
+    "own_word_only": true,
+    "admin_only": true
   },
   {
     "name": "get_weights",

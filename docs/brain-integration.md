@@ -22,7 +22,12 @@ the registry by `pnpm brain:spec`. Brain keeps a copy as
 
 `GET` needs only the token. The list is `toolSpecs("brain")`: every action
 whose `surfaces` include `brain`. Since 2026-09-28 (issue #70) that is every
-member action, the `destructive` ones included, but never an admin one.
+member action, the `destructive` ones included, but no admin one except
+`create_bounty`, `update_bounty` and `add_pot_contribution` (issue #107,
+SPEC §12 decision 10 as amended 2026-09-29), which run only for a linked admin
+in their own name (`own_word_only` and `admin_only`), behind the confirm button.
+`admin_only` (added 2026-09-29, PR #110) is set on an action only a household
+admin may run.
 `member_field` is set when the action names the member it is done for in its
 own input (`log_completion`'s `doneBy`). `input_schema` is JSON Schema (the Zod input side), ready to become an
 LLM tool. It is snapshotted in
@@ -94,7 +99,9 @@ brain sends `X-Baumy-On-Behalf-Of: <Sam's member id>` with Ryan in
   confirm their own claim by speaking as a housemate. The sign-in answers
   (`approve_login`, `deny_login`) are `own_word_only` too. Everything
   else, notes included, works on a housemate's behalf.
-- Admin actions stay unavailable, on anyone's behalf.
+- Admin actions stay unavailable, on anyone's behalf: the three brain gets
+  (`admin_only` in the tool list) answer 403 `FORBIDDEN` "Admin changes can't
+  be made on someone's behalf. Ask an admin to do it themself."
 - Brain can read member ids from `list_reminders` (`members`) or
   `get_standings`.
 

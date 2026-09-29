@@ -89,7 +89,8 @@ function ok<T>(r: { ok: true; data: T } | { ok: false }): T {
 }
 
 /** The "+N" in a preview line. */
-function previewPoints(line: string): number {
+function previewPoints(line: string | { invalid: string }): number {
+  if (typeof line !== "string") throw new Error(`refused: ${line.invalid}`);
   const m = /: \+(\d+) \(streak (\d+)\)/.exec(line);
   if (!m) throw new Error(`no points in "${line}"`);
   return Number(m[1]);

@@ -479,6 +479,50 @@ async function rescoreSeasons(
   }
 }
 
+/**
+ * A chore of the household by id with the weight in effect at `now` (or,
+ * before its first version starts, the first one), without locking it. For
+ * previews and for an edit that changes only half of the weight. Null when
+ * the household has no such chore.
+ */
+export async function findChoreWithWeight(
+  db: Queryable,
+  input: { householdId: string; choreId: string; now: Date },
+): Promise<{ chore: ChoreRow; weight: ChoreWeight | null } | null> {
+  const [chore] = await db
+    .select()
+    .from(chores)
+    .where(
+      and(
+        eq(chores.id, input.choreId),
+        eq(chores.householdId, input.householdId),
+      ),
+    )
+    .limit(1);
+  if (!chore) return null;
+  const versions = await db
+    .select({
+      id: choreRuleVersions.id,
+      effectiveFrom: choreRuleVersions.effectiveFrom,
+      basePoints: choreRuleVersions.basePoints,
+      cooldownMinutes: choreRuleVersions.cooldownMinutes,
+    })
+    .from(choreRuleVersions)
+    .where(eq(choreRuleVersions.choreId, chore.id))
+    .orderBy(asc(choreRuleVersions.effectiveFrom));
+  const rule = versions.some(
+    (v) => v.effectiveFrom.getTime() <= input.now.getTime(),
+  )
+    ? ruleVersionAt(versions, input.now)
+    : versions[0];
+  return {
+    chore,
+    weight: rule
+      ? { basePoints: rule.basePoints, cooldownMinutes: rule.cooldownMinutes }
+      : null,
+  };
+}
+
 export interface ChoreSettings {
   name: string;
   kind: ChoreKind;

@@ -790,6 +790,55 @@ describe("X-Baumy-On-Behalf-Of", () => {
     expect(deps.findHousemate).not.toHaveBeenCalled();
   });
 
+  it("passes the linked member's role in their own name only, and refuses the bounty and pot writes on anyone's behalf (issue #107)", async () => {
+    const { deps, runAction } = setup();
+    deps.findMember = vi.fn(async (tg: number) =>
+      tg === LINKED_TG ? { id: MEMBER, role: "admin" as const } : null,
+    );
+    const own = await handleBrainAction(
+      post("create_bounty", {
+        confirmed: "1",
+        body: JSON.stringify({ name: "Recycling", points: 15 }),
+      }),
+      "create_bounty",
+      deps,
+    );
+    expect(own.status).toBe(200);
+    expect(runAction.mock.calls[0]![2].actor).toEqual({
+      kind: "service",
+      tokenName: "baumy-brain",
+      telegramUserId: LINKED_TG,
+      memberId: MEMBER,
+      role: "admin",
+    });
+
+    for (const name of [
+      "create_bounty",
+      "update_bounty",
+      "add_pot_contribution",
+    ]) {
+      const res = await handleBrainAction(
+        post(name, { onBehalfOf: HOUSEMATE, confirmed: "1" }),
+        name,
+        deps,
+      );
+      expect(res.status, name).toBe(403);
+      expect(await body(res)).toMatchObject({
+        code: "FORBIDDEN",
+        message:
+          "Admin changes can't be made on someone's behalf. Ask an admin to do it themself.",
+      });
+    }
+    // A read on someone's behalf never carries the asker's role.
+    await handleBrainAction(
+      post("list_chores", { onBehalfOf: HOUSEMATE }),
+      "list_chores",
+      deps,
+    );
+    expect(runAction.mock.calls.at(-1)![2].actor).not.toHaveProperty("role");
+    expect(runAction).toHaveBeenCalledTimes(2);
+  });
+
   it("does not open admin actions on anyone's behalf", async () => {
     const { deps } = setup();
     const res = await handleBrainAction(

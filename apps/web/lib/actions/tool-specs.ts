@@ -26,6 +26,11 @@ export interface ToolSpec {
    * someone's behalf. Only set when true.
    */
   own_word_only?: true;
+  /**
+   * Only a household admin may do it, in their own name (`requires:
+   * "admin"`). Only set when true.
+   */
+  admin_only?: true;
 }
 
 /**
@@ -55,5 +60,6 @@ export function toolSpecs(
       risk: def.risk,
       ...(def.memberField ? { member_field: def.memberField } : {}),
       ...(def.ownWordOnly ? { own_word_only: true as const } : {}),
+      ...(def.requires === "admin" ? { admin_only: true as const } : {}),
     }));
 }

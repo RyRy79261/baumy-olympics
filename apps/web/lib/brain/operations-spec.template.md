@@ -15,7 +15,9 @@ they are exactly what the endpoint enforces. The short contract is
    (`delete_event`, `delete_note`). A `confirm` or `destructive` action always
    waits for the asker's inline confirm button; a read, or a `safe` write for
    the asker, does not (section 3). Admin actions stay in the Olympics app only
-   (SPEC §12 decision 10).
+   (SPEC §12 decision 10), except adding and editing a bounty and recording
+   money in the pot (amended 2026-09-29, issue #107): those only for a linked
+   admin, in their own name, behind the confirm button.
 2. **Baumy can act on behalf of housemates.** With `X-Baumy-On-Behalf-Of` the
    action runs as that housemate; the audit trail records both the housemate
    and the linked member who asked. Any write on someone's behalf needs the
@@ -147,7 +149,11 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   the honesty layer (nobody confirms their own claim) would mean nothing.
   Tell the asker the housemate has to do it. Notes, reminders, calendar
   events and the rest do work on a housemate's behalf.
-- Admin actions stay unavailable, on anyone's behalf.
+- Admin actions stay unavailable, on anyone's behalf. The three admin writes
+  brain gets (`create_bounty`, `update_bounty`, `add_pot_contribution`) run
+  only for a linked admin in their own name (`admin_only` in the tool list):
+  a member gets 403 `FORBIDDEN`, and `X-Baumy-On-Behalf-Of` is refused with
+  403 "Admin changes can't be made on someone's behalf."
 - To turn a name into a member id, read the roster: `list_reminders` answers
   `members` (id, name) for every active member; `get_standings` lists them
   with their points. Match the name to exactly one member, or ask.
@@ -155,7 +161,9 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 ## 5. The household, as Olympics models it
 
 - **Members.** Each housemate is a member with a display name, a colour and a
-  16-bit character. One or more are admins; admin work happens in the app.
+  16-bit character. One or more are admins; admin work happens in the app,
+  except adding or editing a bounty and recording pot money, which an admin
+  may ask Baumy for.
   Nobody is hard-coded: always read names from Olympics.
 - **Bounties are chores.** Each chore has a `kind`: `consumable` (buy or
   refill: toilet paper, dish soap) or `maintenance` (clean or fix: trash,
