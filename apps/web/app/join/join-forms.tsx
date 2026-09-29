@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { MemberAvatar } from "@baumy/types";
 import { Button, Card, Field, FormMessage, Input } from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
 import { authClient } from "@/lib/auth-client";
@@ -8,7 +9,7 @@ import { joinAsFounderAction, redeemInviteAction } from "./actions";
 import { ProfileFields } from "./profile-fields";
 
 /** Redeem an invite code (redeem_invite). */
-export function InviteForm() {
+export function InviteForm({ initialAvatar }: { initialAvatar: MemberAvatar }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(redeemInviteAction);
   return (
@@ -31,7 +32,12 @@ export function InviteForm() {
             />
           )}
         </Field>
-        <ProfileFields prefix="invite" errors={errors} pending={pending} />
+        <ProfileFields
+          prefix="invite"
+          errors={errors}
+          pending={pending}
+          initialAvatar={initialAvatar}
+        />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}
@@ -47,9 +53,11 @@ export function InviteForm() {
 export function FounderForm({
   email,
   emailVerified,
+  initialAvatar,
 }: {
   email: string;
   emailVerified: boolean;
+  initialAvatar: MemberAvatar;
 }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(joinAsFounderAction);
@@ -96,7 +104,12 @@ export function FounderForm({
     >
       <form action={formAction} className="flex flex-col gap-4">
         <input type="hidden" name="requestId" value={requestId} />
-        <ProfileFields prefix="founder" errors={errors} pending={pending} />
+        <ProfileFields
+          prefix="founder"
+          errors={errors}
+          pending={pending}
+          initialAvatar={initialAvatar}
+        />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}

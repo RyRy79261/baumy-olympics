@@ -68,7 +68,7 @@ async function linkedHousemate(
   await page.goto("/admin/members");
   const row = page.getByTestId(`member-${name}`);
   await row.locator("summary", { hasText: "Telegram" }).click();
-  await row.getByLabel("Telegram user id").fill(String(tg));
+  await row.getByLabel("Telegram user id", { exact: true }).fill(String(tg));
   await row.getByRole("button", { name: "Save Telegram id" }).click();
   await expect(row.getByText("Telegram id saved.")).toBeVisible();
   return { email, name, tg };

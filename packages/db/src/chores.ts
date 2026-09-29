@@ -542,7 +542,8 @@ export async function updateChore(
   input: {
     householdId: string;
     chore: ChoreRow;
-    settings: Partial<ChoreSettings>;
+    // The icon too (`chores.sprite`), when the admin picks another.
+    settings: Partial<ChoreSettings & { sprite: string }>;
     weight?: ChoreWeight;
     createdBy: string;
     now: Date;
