@@ -1,14 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, Field, FormMessage, Input } from "@baumy/ui";
+import {
+  Button,
+  Card,
+  Field,
+  FormMessage,
+  Input,
+  type GalleryOption,
+} from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
 import { authClient } from "@/lib/auth-client";
 import { joinAsFounderAction, redeemInviteAction } from "./actions";
 import { ProfileFields } from "./profile-fields";
 
 /** Redeem an invite code (redeem_invite). */
-export function InviteForm() {
+export function InviteForm({
+  gallery,
+}: {
+  gallery: readonly GalleryOption[];
+}) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(redeemInviteAction);
   return (
@@ -31,7 +42,12 @@ export function InviteForm() {
             />
           )}
         </Field>
-        <ProfileFields prefix="invite" errors={errors} pending={pending} />
+        <ProfileFields
+          prefix="invite"
+          errors={errors}
+          pending={pending}
+          gallery={gallery}
+        />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}
@@ -47,9 +63,11 @@ export function InviteForm() {
 export function FounderForm({
   email,
   emailVerified,
+  gallery,
 }: {
   email: string;
   emailVerified: boolean;
+  gallery: readonly GalleryOption[];
 }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(joinAsFounderAction);
@@ -96,7 +114,12 @@ export function FounderForm({
     >
       <form action={formAction} className="flex flex-col gap-4">
         <input type="hidden" name="requestId" value={requestId} />
-        <ProfileFields prefix="founder" errors={errors} pending={pending} />
+        <ProfileFields
+          prefix="founder"
+          errors={errors}
+          pending={pending}
+          gallery={gallery}
+        />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}

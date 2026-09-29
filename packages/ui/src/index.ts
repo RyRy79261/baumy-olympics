@@ -72,6 +72,7 @@ export {
   housemateGrid,
   housematePalette,
 } from "./housemate";
+export { AvatarGallery, type GalleryOption } from "./avatar-gallery";
 export {
   HOUSEMATE_HEIGHT_PX,
   MemberCharacter,

@@ -1,15 +1,19 @@
 import { AVATAR_SPRITES, MEMBER_COLORS } from "@baumy/types";
-import { Field, Input, Select } from "@baumy/ui";
+import { Field, Input, Select, type GalleryOption } from "@baumy/ui";
+import { GalleryField } from "./gallery-field";
 
 /** The name, colour and avatar a new member picks, shared by both forms. */
 export function ProfileFields({
   prefix,
   errors,
   pending,
+  gallery = [],
 }: {
   prefix: string;
   errors: Record<string, string[]>;
   pending: boolean;
+  /** The household's avatar gallery (issue #111), to pick from. */
+  gallery?: readonly GalleryOption[];
 }) {
   return (
     <>
@@ -66,6 +70,7 @@ export function ProfileFields({
           </Select>
         )}
       </Field>
+      <GalleryField options={gallery} pending={pending} />
     </>
   );
 }
