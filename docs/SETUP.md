@@ -189,12 +189,15 @@ too; the lines are in brain's SETUP.md and the PR bodies).
       `KITCHEN_API_TOKEN` in brain's Vercel project (Production) **and** in
       `baumy-olympics-web` (Production and Preview), plus `BRAIN_BASE_URL` =
       brain's https production URL here. Redeploy both.
-- [ ] **Mint brain's service token** from `main` against production:
-      `DATABASE_URL_UNPOOLED='<direct string>' pnpm --filter @baumy/db --silent service-token mint baumy-brain`.
+- [ ] **Create brain's service token** on production: Admin → Connections
+      (`/admin/connections`) → Create token (name `baumy-brain`). It is
+      shown once, with a Copy button; if you signed in over 10 minutes ago
+      it asks for your password. (The terminal alternative is under
+      [Brain actions endpoint](#brain-actions-endpoint-and-telegram-linking-issue-27).)
 - [ ] **Review and merge baumy-brain PR #8** (Olympics client, `/link`,
       calendar/chore intents, issue #28). Reviewed overnight; two fixes
       pushed. Then in brain's Vercel project set `BRAIN_SERVICE_TOKEN` (the
-      minted token) and `OLYMPICS_BASE_URL` (the custom domain, one that does
+      token you copied) and `OLYMPICS_BASE_URL` (the custom domain, one that does
       not redirect), redeploy, run `scripts/set-commands.ts` and
       `pnpm test:scenarios:live`.
 - [ ] **Link Telegram:** Settings → Create a link code → `/link <code>` to
@@ -948,16 +951,21 @@ it keeps only the token's hash, in the database. Until a token is minted
 every call answers 401, so nothing is exposed. CI and e2e mint their own
 tokens against Docker Postgres.
 
-- [ ] **Mint brain's token against production**, from a checkout of `main`
-      after this PR deploys, with the direct (unpooled) Neon string:
+- [ ] **Create brain's token** (updated 2026-09-29, issue #104: no
+      terminal): as an admin on production, open Admin → Connections
+      (`/admin/connections`) and press **Create token** with the name
+      `baumy-brain`. The token is shown once, with a Copy button; only its
+      hash is stored, and neither the audit trail nor the request ledger
+      keeps it. It asks for your password unless you signed in within the
+      last 10 minutes (Google-only: sign out and in again first).
+
+      The terminal still works, from a checkout of `main` with the direct
+      (unpooled) Neon string:
 
       ```sh
       DATABASE_URL_UNPOOLED='<direct production string>' \
         pnpm --filter @baumy/db --silent service-token mint baumy-brain
       ```
-
-      It prints the token once (stderr names the host). Nothing else keeps
-      it.
 
 - [ ] **In baumy-brain's Vercel project** (Production) set
       `BRAIN_SERVICE_TOKEN` to that token and `OLYMPICS_BASE_URL` to this
@@ -969,9 +977,12 @@ tokens against Docker Postgres.
 - [ ] **Check it** with a curl from your machine (the example at the end of
       brain-integration.md): with `X-Baumy-Confirmed: 1` the event appears on
       `/calendar`; without it the answer is 428 `CONFIRMATION_REQUIRED`.
-- To rotate the token, run `service-token rotate baumy-brain` (the old one
-  stops at once), then update brain's env.
-- To cut brain off, run `service-token revoke baumy-brain`.
+- To rotate the token, press **Rotate** on its row in `/admin/connections`
+  (or run `service-token rotate baumy-brain`). The old one stops at once,
+  so update brain's env and redeploy it straight away.
+- To cut brain off, press **Revoke** there, or run
+  `service-token revoke baumy-brain`. The row's "Last used" shows when
+  brain last called.
 
 ## Kitchen iPad as an appliance (issue #29)
 

@@ -66,6 +66,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     { href: "/admin/chores", label: "Edit chores" },
     { href: "/admin/weights", label: "Weights" },
     { href: "/admin/avatars", label: "Avatars" },
+    { href: "/admin/connections", label: "Connections" },
   ];
   return (
     <AppShell

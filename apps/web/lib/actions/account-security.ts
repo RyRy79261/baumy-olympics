@@ -51,9 +51,14 @@ export const SIGNED_OUT =
  * database. Better Auth accepts a signed cookie cache for up to 5 minutes
  * after a session is revoked, so without this a device signed out elsewhere
  * could, in that window, sign the owner out everywhere, unlink Google or add
- * a password. Every write here asks first, share-locking the row.
+ * a password. Every write here asks first, share-locking the row, and so do
+ * the service-token actions (service-tokens.ts). Only after a `session` or
+ * `admin` gate, which has checked it is a member's own session.
  */
-async function liveActor(ctx: ActionCtx): Promise<MemberActor | ActionFailure> {
+export async function liveActor(
+  ctx: ActionCtx,
+  signedOut: string = SIGNED_OUT,
+): Promise<MemberActor | ActionFailure> {
   const actor = me(ctx);
   if (
     !actor.sessionId ||
@@ -63,12 +68,12 @@ async function liveActor(ctx: ActionCtx): Promise<MemberActor | ActionFailure> {
       now: ctx.now,
     }))
   ) {
-    return fail("UNAUTHENTICATED", SIGNED_OUT);
+    return fail("UNAUTHENTICATED", signedOut);
   }
   return actor;
 }
 
-const isFailure = (x: MemberActor | ActionFailure): x is ActionFailure =>
+export const isFailure = (x: MemberActor | ActionFailure): x is ActionFailure =>
   "ok" in x;
 
 const NO_WAY_IN =
