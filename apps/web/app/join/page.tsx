@@ -30,12 +30,17 @@ export default async function JoinPage() {
     me.userId,
     await listActiveMembers(db, HOUSEHOLD_ID),
   );
-  // The gallery to pick a character from (issue #111): the live ones.
-  const gallery = (await listAvatars(db, HOUSEHOLD_ID, false)).map((a) => ({
-    id: a.id,
-    name: a.name,
-    sprites: avatarImageView(a)!,
-  }));
+  // The gallery to pick a character from (issue #111). It depicts real
+  // housemates, so only a verified founder sees it here; someone with an
+  // invite code picks theirs in Settings once the code has let them in.
+  const gallery =
+    founder && me.emailVerified
+      ? (await listAvatars(db, HOUSEHOLD_ID, false)).map((a) => ({
+          id: a.id,
+          name: a.name,
+          sprites: avatarImageView(a)!,
+        }))
+      : [];
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-4 py-10">
@@ -69,7 +74,7 @@ export default async function JoinPage() {
               gallery={gallery}
             />
           ) : null}
-          <InviteForm initialAvatar={initialAvatar} gallery={gallery} />
+          <InviteForm initialAvatar={initialAvatar} gallery={[]} />
         </>
       )}
     </main>

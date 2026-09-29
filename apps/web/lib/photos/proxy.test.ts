@@ -27,6 +27,7 @@ const member: Actor = {
 function deps(over: Partial<ProxyDeps> = {}): ProxyDeps {
   return {
     getActor: async () => member,
+    mayJoinAsFounder: () => false,
     householdId: HOUSE,
     findPhoto: async (h, id) => (h === HOUSE && id === ID ? PATH : undefined),
     findAvatar: async (h, id, p) =>
@@ -179,12 +180,8 @@ describe("GET /api/blob for a gallery sprite (issue #111)", () => {
     sessionCreatedAt: "2026-09-27T09:00:00.000Z",
   };
 
-  it("serves the household's sprite to a member, a kiosk and an account joining", async () => {
-    for (const actor of [
-      member,
-      { kind: "kiosk", deviceId: "d" } as Actor,
-      account,
-    ]) {
+  it("serves the household's sprite to a member and a kiosk", async () => {
+    for (const actor of [member, { kind: "kiosk", deviceId: "d" } as Actor]) {
       const res = await handleBlobProxy(
         req(SPRITE),
         deps({ getActor: async () => actor, store: await withSprite() }),
@@ -192,6 +189,35 @@ describe("GET /api/blob for a gallery sprite (issue #111)", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("image/png");
     }
+  });
+
+  it("shows the gallery to a founder about to join, and to no other account", async () => {
+    const asked: Actor[] = [];
+    const founder = await handleBlobProxy(
+      req(SPRITE),
+      deps({
+        getActor: async () => account,
+        mayJoinAsFounder: (a) => (asked.push(a), true),
+        store: await withSprite(),
+      }),
+    );
+    expect(founder.status).toBe(200);
+    expect(asked).toEqual([account]);
+    const stranger = await handleBlobProxy(
+      req(SPRITE),
+      deps({ getActor: async () => account, store: await withSprite() }),
+    );
+    expect(stranger.status).toBe(401);
+    // Founder or not, never a completion photo.
+    const photo = await handleBlobProxy(
+      req(PATH),
+      deps({
+        getActor: async () => account,
+        mayJoinAsFounder: () => true,
+        store: await withPhoto(),
+      }),
+    );
+    expect(photo.status).toBe(401);
   });
 
   it("refuses an account a completion photo, and nobody a sprite", async () => {
