@@ -230,10 +230,13 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await expect(chip.getByTestId("acting-as")).toHaveText(founder);
   await expectKioskTargets(chip);
   // One character everywhere: the admin page draws the founder exactly as
-  // the kitchen screen does (the same colours, pixel for pixel).
+  // the kitchen screen does (the same colours, pixel for pixel). The card
+  // also draws them in its Character section, so compare the first drawing.
   const fills = (scope: Locator) =>
     scope
-      .locator("[data-housemate] path")
+      .locator("[data-housemate]")
+      .first()
+      .locator("path")
       .evaluateAll((ps) => ps.map((p) => p.getAttribute("fill")).sort());
   const onKiosk = await fills(chip);
   expect(onKiosk.length).toBeGreaterThan(3);

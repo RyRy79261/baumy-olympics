@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 import { expectKioskTargets, openKioskChores, pairedKiosk } from "../lib/kiosk";
+import { pickTile } from "../lib/pickers";
 
 // Issue #66 (ADR 0005 §4, §5), on the kitchen iPad against Docker Postgres:
 // a member chooses their character in Settings and it shows in the hub
@@ -73,10 +74,7 @@ test("choose a character, post a reminder, and see it on the kiosk until everyon
   const preview = jo.page.getByTestId("avatar-preview");
   await expect(preview).toBeVisible();
   const choose = (group: string, option: string) =>
-    jo.page
-      .getByRole("group", { name: group })
-      .getByText(option, { exact: true })
-      .click();
+    pickTile(jo.page, group, option);
   await choose("Hair style", "Spiky");
   await choose("Hair colour", "Platinum");
   await choose("Skin", "Deep");

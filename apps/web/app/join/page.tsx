@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { isFounderEmail } from "@baumy/auth/env";
 import { createHttpDb, type Queryable } from "@baumy/db";
-import { findMemberByAuthUserId } from "@baumy/db/members";
+import { HOUSEHOLD_ID } from "@baumy/db/household";
+import { findMemberByAuthUserId, listActiveMembers } from "@baumy/db/members";
+import { newcomerAvatar } from "@baumy/types";
 import { Card, FormMessage, PageHeading, buttonClass } from "@baumy/ui";
 import { requireJoiningPage } from "@/lib/auth";
 import { FounderForm, InviteForm } from "./join-forms";
@@ -17,11 +19,15 @@ export const metadata: Metadata = { title: "Join - Baumy Olympics" };
 
 export default async function JoinPage() {
   const me = await requireJoiningPage();
-  const existing = await findMemberByAuthUserId(
-    createHttpDb() as unknown as Queryable,
-    me.userId,
-  );
+  const db = createHttpDb() as unknown as Queryable;
+  const existing = await findMemberByAuthUserId(db, me.userId);
   const founder = isFounderEmail(process.env, me.email);
+  // The character the form starts on: in a shirt no active member wears.
+  // Only this one character reaches the page, not the roster.
+  const initialAvatar = newcomerAvatar(
+    me.userId,
+    await listActiveMembers(db, HOUSEHOLD_ID),
+  );
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-4 py-10">
@@ -48,9 +54,13 @@ export default async function JoinPage() {
       ) : (
         <>
           {founder ? (
-            <FounderForm email={me.email} emailVerified={me.emailVerified} />
+            <FounderForm
+              email={me.email}
+              emailVerified={me.emailVerified}
+              initialAvatar={initialAvatar}
+            />
           ) : null}
-          <InviteForm />
+          <InviteForm initialAvatar={initialAvatar} />
         </>
       )}
     </main>

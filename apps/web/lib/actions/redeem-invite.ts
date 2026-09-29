@@ -12,7 +12,11 @@ import {
   DEFAULT_AVATAR,
   defaultColorFor,
   isFailure,
+  JOIN_CHARACTER,
+  joinCharacter,
   joiningAccount,
+  PART_CHARACTER,
+  wholeCharacterOrNone,
 } from "./joining";
 import { fail, type ActionFailure } from "./result";
 
@@ -22,18 +26,21 @@ import { fail, type ActionFailure } from "./result";
 // failure gives the use back, and two people racing for the last use of a
 // code cannot both get in (the claim is one UPDATE … RETURNING).
 
-const input = z.strictObject({
-  code: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .min(1, "Enter your invite code.")
-    .max(64, "That is too long for an invite code.")
-    .describe("The invite code a housemate gave you."),
-  displayName: DisplayName.describe("The name housemates will see."),
-  color: MemberColor.optional().describe("Your colour, as #rrggbb."),
-  avatarSprite: AvatarSprite.optional().describe("Your avatar."),
-});
+const input = z
+  .strictObject({
+    code: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .min(1, "Enter your invite code.")
+      .max(64, "That is too long for an invite code.")
+      .describe("The invite code a housemate gave you."),
+    displayName: DisplayName.describe("The name housemates will see."),
+    color: MemberColor.optional().describe("Your colour, as #rrggbb."),
+    avatarSprite: AvatarSprite.optional().describe("Your avatar."),
+    ...JOIN_CHARACTER,
+  })
+  .refine(wholeCharacterOrNone, PART_CHARACTER);
 
 const ASK_AGAIN = "Ask a housemate for a new one.";
 
@@ -74,7 +81,7 @@ export const redeemInvite = defineAction({
   // Codes are guessable only by brute force; keep that slow.
   rateLimit: { perMember: 10, perIp: 30, windowMs: 15 * 60_000 },
   input,
-  async execute(ctx, { code, displayName, color, avatarSprite }) {
+  async execute(ctx, { code, displayName, color, avatarSprite, ...look }) {
     const account = await joiningAccount(ctx);
     if (isFailure(account)) return account;
     const { userId } = account;
@@ -95,6 +102,7 @@ export const redeemInvite = defineAction({
       authUserId: userId,
       displayName,
       avatarSprite: avatarSprite ?? DEFAULT_AVATAR,
+      avatar: joinCharacter(look),
       color: color ?? defaultColorFor(userId),
       role: claimed.role,
       createdAt: ctx.now,
