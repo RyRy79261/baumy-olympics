@@ -8,6 +8,7 @@ import {
 import { REQUEST_ID_PATTERN } from "@/lib/actions/run";
 import type { ToolSpec } from "@/lib/actions/tool-specs";
 import type { ServiceActor } from "@/lib/auth";
+import { ADMIN_ON_BEHALF } from "@/lib/auth/gates";
 import { getClientIp, type RateLimiter } from "@/lib/rate-limit";
 import { BRAIN_SCOPE } from "@baumy/db/service-tokens";
 import { TelegramUserId } from "@baumy/types";
@@ -305,6 +306,9 @@ async function onBehalfOf(
   // refusals below are about acting for someone else.
   if (target.id === asker.id) return { ok: true, target: null };
   if (name === LINK_ACTION) return issue(linking);
+  if (spec.admin_only) {
+    return fail("FORBIDDEN", ADMIN_ON_BEHALF);
+  }
   if (spec.own_word_only) {
     // Before the confirm check: no point asking for a tap that cannot help.
     return fail(

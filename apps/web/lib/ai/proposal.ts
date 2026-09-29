@@ -64,7 +64,19 @@ type JsonSchema = {
   description?: string;
   properties?: Record<string, JsonSchema>;
   required?: string[];
+  anyOf?: JsonSchema[];
 };
+
+/** "25" or 25: a text or a number (the pot's euros), typed as text. */
+function textOrNumber(prop: JsonSchema): boolean {
+  const kinds = Array.isArray(prop.type)
+    ? prop.type
+    : (prop.anyOf ?? []).map((p) => p.type);
+  return (
+    kinds.length > 0 &&
+    kinds.every((k) => k === "string" || k === "number" || k === "integer")
+  );
+}
 
 const MEMBER_FIELDS = new Set(["doneBy", "memberId", "contributedBy"]);
 const LONG_TEXT = 200;
@@ -132,6 +144,7 @@ export function describeFields(
         name === "description";
       return { ...base, kind: long ? "textarea" : "text" };
     }
+    if (textOrNumber(prop)) return { ...base, kind: "text" };
     return { ...base, kind: "readonly" };
   });
 }

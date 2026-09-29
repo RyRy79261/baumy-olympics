@@ -139,6 +139,11 @@ const updateInput = z
   });
 
 const NOT_FOUND = fail("NOT_FOUND", "That bounty was not found.");
+const archived = (name: string) =>
+  fail(
+    "ARCHIVED_CHORE",
+    `${name} is archived. Restore it on the admin page first.`,
+  );
 
 export const updateBounty = defineAction({
   name: "update_bounty",
@@ -158,7 +163,11 @@ export const updateBounty = defineAction({
       choreId: i.choreId,
       now: ctx.now,
     });
-    if (!found) return NOT_FOUND.message;
+    // What execute would refuse, said on the card instead (never run).
+    if (!found) return { invalid: NOT_FOUND.message };
+    if (found.chore.archivedAt !== null) {
+      return { invalid: archived(found.chore.name).message };
+    }
     const { choreId: _id, name, ...rest } = i;
     const changes = describeBounty(rest);
     if (name !== undefined && name !== found.chore.name) {
@@ -169,12 +178,7 @@ export const updateBounty = defineAction({
   async execute(ctx, i) {
     const chore = await lockChoreRow(ctx.db, ctx.householdId, i.choreId);
     if (!chore) return NOT_FOUND;
-    if (chore.archivedAt !== null) {
-      return fail(
-        "ARCHIVED_CHORE",
-        `${chore.name} is archived. Restore it on the admin page first.`,
-      );
-    }
+    if (chore.archivedAt !== null) return archived(chore.name);
     if (
       i.name !== undefined &&
       (await choreNameTaken(ctx.db, {

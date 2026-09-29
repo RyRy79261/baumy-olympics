@@ -272,7 +272,7 @@ export async function fakeClaude(
     return message(
       model,
       [
-        text("I've lined up the shopping list for you. Tap approve."),
+        text("I've lined up the shopping list for you. Tap Confirm all."),
         toolUse("add_shopping_items", { items: shopping }),
       ],
       "tool_use",
@@ -297,7 +297,7 @@ export async function fakeClaude(
       model,
       [
         text(
-          `I've lined up logging ${named.map((c) => c.name).join(" and ")} for you. Tap approve.`,
+          `I've lined up logging ${named.map((c) => c.name).join(" and ")} for you. Tap Confirm all.`,
         ),
         ...named.map((c) => toolUse("log_completion", { choreId: c.id })),
       ],

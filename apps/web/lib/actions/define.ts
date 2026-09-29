@@ -186,6 +186,11 @@ export interface RateLimitSpec {
   windowMs: number;
 }
 
+/** A preview's answer when the input cannot run as it stands. */
+export interface PreviewRefusal {
+  invalid: string;
+}
+
 export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
   /** snake_case, `^[a-z0-9_]{1,64}$`. */
   name: N;
@@ -232,8 +237,16 @@ export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
    * password): an unsalted sha256 of a 4-digit PIN is no secret at all.
    */
   fingerprint?: (input: z.output<I>) => unknown;
-  /** One line a human approves, e.g. "Log Trash for Ryan: +25 (streak 2)". */
-  preview?(ctx: ActionCtx, input: z.output<I>): Promise<string>;
+  /**
+   * One line a human approves, e.g. "Log Trash for Ryan: +25 (streak 2)".
+   * Or `{ invalid }` when the input cannot run as it stands (a bounty that
+   * is gone): the proposal is then shown greyed, with that sentence, and
+   * is never run (lib/actions/propose.ts).
+   */
+  preview?(
+    ctx: ActionCtx,
+    input: z.output<I>,
+  ): Promise<string | PreviewRefusal>;
   execute(ctx: ActionCtx, input: z.output<I>): Promise<ExecuteResult<O>>;
 }
 

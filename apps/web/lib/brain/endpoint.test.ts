@@ -823,7 +823,11 @@ describe("X-Baumy-On-Behalf-Of", () => {
         deps,
       );
       expect(res.status, name).toBe(403);
-      expect(await body(res)).toMatchObject({ code: "FORBIDDEN" });
+      expect(await body(res)).toMatchObject({
+        code: "FORBIDDEN",
+        message:
+          "Admin changes can't be made on someone's behalf. Ask an admin to do it themself.",
+      });
     }
     // A read on someone's behalf never carries the asker's role.
     await handleBrainAction(

@@ -91,6 +91,9 @@ function behalfLine(spec: ToolSpec): string {
   if (spec.member_field) {
     return `no (400): name the housemate in \`${spec.member_field}\` instead`;
   }
+  if (spec.admin_only) {
+    return "no (403 `FORBIDDEN`): an admin change is only ever made in the admin's own name";
+  }
   if (ownWordOnly(spec)) {
     return "no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram";
   }

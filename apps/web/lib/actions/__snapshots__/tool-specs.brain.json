@@ -217,7 +217,8 @@
     },
     "kind": "write",
     "risk": "confirm",
-    "own_word_only": true
+    "own_word_only": true,
+    "admin_only": true
   },
   {
     "name": "update_bounty",
@@ -289,7 +290,8 @@
     },
     "kind": "write",
     "risk": "confirm",
-    "own_word_only": true
+    "own_word_only": true,
+    "admin_only": true
   },
   {
     "name": "get_pending_confirmations",
@@ -538,7 +540,8 @@
     },
     "kind": "write",
     "risk": "confirm",
-    "own_word_only": true
+    "own_word_only": true,
+    "admin_only": true
   },
   {
     "name": "get_weights",

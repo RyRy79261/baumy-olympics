@@ -859,6 +859,18 @@ describe("add_pot_contribution", () => {
     ).resolves.toMatchObject({
       preview: "Add €1 to the pot from someone unknown",
     });
+    // The note is on the card too, and the amount can be edited there.
+    const noted = await propose(
+      "add_pot_contribution",
+      { amount: 20, note: "  September, late  " },
+      ai,
+      choices,
+    );
+    expect(noted.preview).toBe("Add €20 to the pot (note: September, late)");
+    expect(noted.fields.find((f) => f.name === "amount")).toMatchObject({
+      kind: "text",
+      label: "Amount",
+    });
     await expect(
       propose(
         "add_pot_contribution",

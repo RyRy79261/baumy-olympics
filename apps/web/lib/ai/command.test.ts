@@ -144,7 +144,7 @@ describe("runCommand", () => {
     );
 
     expect(outcome.reply).toBe(
-      "Nice one! I've lined up logging Trash for you. Tap approve.",
+      "Nice one! I've lined up logging Trash for you. Tap Confirm all.",
     );
     expect(outcome.proposals).toHaveLength(1);
     const [p] = outcome.proposals;

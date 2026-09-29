@@ -220,7 +220,12 @@ describe("requireAdmin", () => {
     // Acting for a housemate: even an admin asker may not.
     expect(
       requireAdmin(ctx({ ...brainAdmin, initiatorMemberId: "m9" } as Actor)),
-    ).toMatchObject({ ok: false, code: "FORBIDDEN" });
+    ).toEqual({
+      ok: false,
+      code: "FORBIDDEN",
+      message:
+        "Admin changes can't be made on someone's behalf. Ask an admin to do it themself.",
+    });
     expect(
       requireAdmin(ctx({ ...brainUnlinked, role: "admin" } as Actor)),
     ).toMatchObject({ ok: false, code: "FORBIDDEN" });
