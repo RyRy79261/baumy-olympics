@@ -1,17 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { TELEGRAM_ID_MESSAGE, TelegramUserId } from "@baumy/types";
 import { Button, Dialog, Field, Input } from "@baumy/ui";
 
 // The admin members page's Telegram id field (owner request, issue #106):
-// digits only, checked as they are typed, and a "How do I find this?"
-// popup. The server still parses it with TelegramUserId (manage_members).
+// checked as they are typed with the same TelegramUserId schema the server
+// (manage_members) parses it with, and a "How do I find this?" popup.
 
-export const DIGITS_ONLY = "Use the Telegram user id: digits only.";
+export const DIGITS_ONLY = TELEGRAM_ID_MESSAGE;
 
-/** The inline error for what is typed so far, or undefined. */
+/** The inline error for what is typed so far, or undefined. Empty unlinks. */
 export function telegramIdError(value: string): string | undefined {
-  return /^\d*$/.test(value.trim()) ? undefined : DIGITS_ONLY;
+  if (value.trim() === "") return undefined;
+  return TelegramUserId.safeParse(value).success ? undefined : DIGITS_ONLY;
 }
 
 export function TelegramIdField({

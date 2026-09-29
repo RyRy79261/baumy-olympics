@@ -234,7 +234,9 @@ export function memberColorName(color: string): string {
 /** A kiosk PIN (SPEC §6.2): 4 to 6 digits. */
 export const KioskPin = z.string().regex(/^\d{4,6}$/, "Use 4 to 6 digits.");
 
-const TELEGRAM_ID_MESSAGE = "Use the Telegram user id: digits only.";
+/** What a wrong Telegram user id is told, by the server and the browser. */
+export const TELEGRAM_ID_MESSAGE =
+  "Use the Telegram user id: digits only, not starting with 0.";
 
 /**
  * A Telegram user id (`members.telegram_user_id`): a positive integer of at
