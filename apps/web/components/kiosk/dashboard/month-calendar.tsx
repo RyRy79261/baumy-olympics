@@ -8,7 +8,7 @@ import { addDaysToDateKey } from "@baumy/core";
 import {
   DayEventRow,
   EventChip,
-  Housemate,
+  MemberCharacter,
   MonthDayCell,
   PixelScroll,
   WeekdayRow,
@@ -165,7 +165,8 @@ function DaySheet({
                         colour={who.colour}
                         who={
                           who.member ? (
-                            <Housemate
+                            <MemberCharacter
+                              image={who.member.image}
                               avatar={who.member.avatar}
                               memberId={who.member.id}
                               scale={2}

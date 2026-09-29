@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import {
   ModuleBountyRow,
-  Housemate,
+  MemberCharacter,
   KioskModal,
   MarkdownBody,
   MessageRow,
@@ -219,7 +219,8 @@ function MessagesModule({
                 key={m.id}
                 data-testid={`message-${m.title}`}
                 who={
-                  <Housemate
+                  <MemberCharacter
+                    image={who.member?.image}
                     avatar={who.member?.avatar}
                     memberId={m.authorId}
                     scale={4}
