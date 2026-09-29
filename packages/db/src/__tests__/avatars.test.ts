@@ -90,9 +90,9 @@ describe("insertAvatar and listAvatars", () => {
       createdAt: NOW,
     });
     expect(again).toBeNull();
-    expect((await listAvatars(db(), HOUSEHOLD_ID)).map((r) => r.name)).toEqual(
-      ["Knight"],
-    );
+    expect((await listAvatars(db(), HOUSEHOLD_ID)).map((r) => r.name)).toEqual([
+      "Knight",
+    ]);
   });
 });
 
@@ -109,8 +109,12 @@ describe("setAvatarArchived", () => {
         now: NOW,
       }),
     ).toEqual({ ok: true, name: "Knight" });
-    expect((await listAvatars(db(), HOUSEHOLD_ID, false)).map((r) => r.id)).toEqual([live.id]);
-    expect((await listAvatars(db(), HOUSEHOLD_ID, true)).map((r) => r.id)).toEqual([a.id]);
+    expect(
+      (await listAvatars(db(), HOUSEHOLD_ID, false)).map((r) => r.id),
+    ).toEqual([live.id]);
+    expect(
+      (await listAvatars(db(), HOUSEHOLD_ID, true)).map((r) => r.id),
+    ).toEqual([a.id]);
     expect(await countLiveAvatars(db(), HOUSEHOLD_ID)).toBe(1);
     expect((await findAvatar(db(), HOUSEHOLD_ID, a.id))?.archivedAt).toEqual(
       NOW,
@@ -205,7 +209,9 @@ describe("a member's pick", () => {
   it("finds a sprite's pathname for the proxy, in its household only", async () => {
     const a = await add("Knight");
     expect(await findAvatarPathname(db(), HOUSEHOLD_ID, a.id)).toBe(a.pathname);
-    expect(await findAvatarPathname(db(), HOUSEHOLD_ID, randomUUID())).toBeNull();
+    expect(
+      await findAvatarPathname(db(), HOUSEHOLD_ID, randomUUID()),
+    ).toBeNull();
     expect(await findAvatar(db(), HOUSEHOLD_ID, randomUUID())).toBeNull();
   });
 });

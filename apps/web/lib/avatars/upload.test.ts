@@ -212,7 +212,10 @@ describe("what is refused before anything is decoded", () => {
     const notForm = new Request("http://localhost/api/uploads/avatar", {
       method: "POST",
       body: "x",
-      headers: { "sec-fetch-site": "same-origin", "content-type": "text/plain" },
+      headers: {
+        "sec-fetch-site": "same-origin",
+        "content-type": "text/plain",
+      },
     });
     expect((await handleAvatarUpload(notForm, deps())).status).toBe(400);
   });
@@ -254,7 +257,10 @@ describe("what is refused before anything is decoded", () => {
     );
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).toBe("42");
-    expect(keys).toEqual(["avatar-upload:member:m1", expect.stringMatching(/^avatar-upload:ip:/)]);
+    expect(keys).toEqual([
+      "avatar-upload:member:m1",
+      expect.stringMatching(/^avatar-upload:ip:/),
+    ]);
     expect(run).not.toHaveBeenCalled();
   });
 });

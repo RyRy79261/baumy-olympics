@@ -129,8 +129,7 @@ export async function insertAvatar(
 }
 
 export type ArchiveResult =
-  | { ok: true; name: string }
-  | { ok: false; code: "NOT_FOUND" | "STALE" };
+  { ok: true; name: string } | { ok: false; code: "NOT_FOUND" | "STALE" };
 
 /**
  * Archive (`archived: true`) or restore a sprite, compare-and-set on its
@@ -139,7 +138,12 @@ export type ArchiveResult =
  */
 export async function setAvatarArchived(
   db: Queryable,
-  input: { householdId: string; avatarId: string; archived: boolean; now: Date },
+  input: {
+    householdId: string;
+    avatarId: string;
+    archived: boolean;
+    now: Date;
+  },
 ): Promise<ArchiveResult> {
   const [row] = await db
     .update(avatars)

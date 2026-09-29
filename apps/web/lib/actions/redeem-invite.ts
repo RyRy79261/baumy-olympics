@@ -83,7 +83,10 @@ export const redeemInvite = defineAction({
   // Codes are guessable only by brute force; keep that slow.
   rateLimit: { perMember: 10, perIp: 30, windowMs: 15 * 60_000 },
   input,
-  async execute(ctx, { code, displayName, color, avatarSprite, avatarImageId }) {
+  async execute(
+    ctx,
+    { code, displayName, color, avatarSprite, avatarImageId },
+  ) {
     const account = await joiningAccount(ctx);
     if (isFailure(account)) return account;
     if (avatarImageId) {

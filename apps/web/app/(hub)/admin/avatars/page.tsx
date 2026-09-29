@@ -41,8 +41,7 @@ function Tile({ a }: { a: AvatarRow }) {
   );
 }
 
-const GRID =
-  "grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3";
+const GRID = "grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3";
 
 export default async function AdminAvatarsPage() {
   await requireAdminPage();

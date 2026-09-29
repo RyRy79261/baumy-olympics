@@ -15,11 +15,7 @@ import { joinAsFounderAction, redeemInviteAction } from "./actions";
 import { ProfileFields } from "./profile-fields";
 
 /** Redeem an invite code (redeem_invite). */
-export function InviteForm({
-  gallery,
-}: {
-  gallery: readonly GalleryOption[];
-}) {
+export function InviteForm({ gallery }: { gallery: readonly GalleryOption[] }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(redeemInviteAction);
   return (

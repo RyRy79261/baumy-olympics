@@ -68,12 +68,12 @@ export function GalleryForm({
           }}
         />
         {state?.ok ? (
-          <FormMessage tone="success">Character saved.</FormMessage>
+          <FormMessage tone="success">You wear it now.</FormMessage>
         ) : state ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}
         <Button type="submit" disabled={pending} className="self-start">
-          {pending ? "Saving..." : "Save character"}
+          {pending ? "Saving..." : "Wear this character"}
         </Button>
       </form>
     </Card>

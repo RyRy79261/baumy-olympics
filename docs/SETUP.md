@@ -88,6 +88,11 @@ secrets from earlier ones.
       (Production); Vercel sets `BLOB_READ_WRITE_TOKEN`.
       Details: [Confirmations and photo proof](#confirmations-and-photo-proof-issue-15).
 
+### 5a. Avatar gallery (issue #111)
+
+- [ ] **Make the characters, then add them at Admin → Avatars** (needs the Blob store above).
+      Details: [Avatar gallery](#avatar-gallery-issue-111).
+
 ### 6. Daily job
 
 - [ ] **`CRON_SECRET`** (Production, `openssl rand -hex 32`).
@@ -996,3 +1001,35 @@ itself, in [kiosk-setup.md](kiosk-setup.md).
       the night screen's sleeping Baumy and every sprite are placeholders:
       the final sheets, AI-generated from `design/baumy-reference.png` and
       cleaned up by hand, need your approval before they ship (issue #7).
+
+## Avatar gallery (issue #111)
+
+Owner ruling 2026-09-29: "have a collection of pre-generated avatars to select from, that way
+they're integrated and uniform." The app never draws a character; it only cleans what you upload.
+
+1. Make each character with Nano Banana (Gemini image), one image per character, with this
+   shared prompt so they match (add the person's description, or attach their photo, after it):
+
+   ```text
+   16-bit JRPG chibi pixel-art sprite of one character, full body, standing, three-quarter
+   view facing left, big head and small body (about 2.5 heads tall), clean dark outline,
+   flat shading with at most 24 colours, no dithering, no text, no shadow on the ground.
+   Plain flat background of one colour (or a transparent background), the character
+   centred with space around it. Crisp square pixels, as if drawn on a 32 x 56 grid and
+   scaled up. The character:
+   ```
+
+2. Download the PNG (JPEG and WebP work too; 4 MB at most; never SVG).
+3. In the app: **Admin → Avatars → Add characters**, choose one or several files. Each shows
+   before and after: the background (a fake grey checkerboard, or any one flat colour) is
+   removed, the character trimmed, snapped to a pixel grid about 56 pixels tall and limited to
+   24 colours. A watermark in a corner is dropped. Name it and **Save to gallery**.
+4. Everyone picks theirs in **Settings → Your character** (or when joining at `/join`). Two
+   housemates may pick the same one; tell an agent if you want that refused. Until the gallery
+   has a character, Settings keeps the drawn (hair/skin/shirt) character, and anyone who has not
+   picked still wears theirs.
+5. **Archive** takes a character out of the gallery; whoever already wears it keeps it.
+   **Restore** puts it back. Nothing is ever deleted.
+
+If a cleaned character looks wrong (bits of background left, part of the character gone),
+regenerate it on a plain flat background of a colour the character does not use.

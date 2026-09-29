@@ -140,7 +140,9 @@ export function AvatarUploader() {
                   alt={`${d.name} before cleaning`}
                   className="max-h-56 w-auto bg-bm-ink"
                 />
-                <figcaption className="text-xs text-bm-muted">Before</figcaption>
+                <figcaption className="text-xs text-bm-muted">
+                  Before
+                </figcaption>
               </figure>
               <figure className="flex flex-col items-center gap-1">
                 {d.preview ? (

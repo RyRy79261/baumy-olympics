@@ -66,7 +66,10 @@ function compose(
       const sx = Math.floor((x - canvas.left) / k);
       const sy = Math.floor((y - canvas.top) / k);
       const inside =
-        x >= canvas.left && y >= canvas.top && sx < img.width && sy < img.height;
+        x >= canvas.left &&
+        y >= canvas.top &&
+        sx < img.width &&
+        sy < img.height;
       const o = (sy * img.width + sx) * 4;
       const px: Rgba =
         inside && img.data[o + 3]! > 0
@@ -103,7 +106,9 @@ const checker =
     const light = (Math.floor(x / tile) + Math.floor(y / tile)) % 2 === 0;
     // A little noise, as a generator paints it.
     const n = (x * 7 + y * 13) % 9;
-    return light ? [196 + n, 196 + n, 196 + n, 255] : [60 + n, 60 + n, 60 + n, 255];
+    return light
+      ? [196 + n, 196 + n, 196 + n, 255]
+      : [60 + n, 60 + n, 60 + n, 255];
   };
 
 const CANVAS = { width: 200, height: 180, left: 56, top: 40 };
@@ -177,17 +182,24 @@ describe("cleanAvatar", () => {
       for (let x = 0; x < width; x++) {
         const edge = x < 2 || x >= width - 2 || y < 2 || y >= height - 2;
         data.set(
-          edge ? [10, 10, 10, 255] : [y % 256, (y * 3) % 256, 255 - (y % 256), 255],
+          edge
+            ? [10, 10, 10, 255]
+            : [y % 256, (y * 3) % 256, 255 - (y % 256), 255],
           (y * width + x) * 4,
         );
       }
     }
-    const input = compose({ data, width, height }, 1, {
-      width: 160,
-      height: 340,
-      left: 45,
-      top: 20,
-    }, () => [0, 200, 0, 255]);
+    const input = compose(
+      { data, width, height },
+      1,
+      {
+        width: 160,
+        height: 340,
+        left: 45,
+        top: 20,
+      },
+      () => [0, 200, 0, 255],
+    );
     const r = await cleanAvatar(await png(input));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -199,7 +211,9 @@ describe("cleanAvatar", () => {
       const a = out.data[i * 4 + 3]!;
       expect([0, 255]).toContain(a);
       colours.add(
-        (out.data[i * 4]! << 16) | (out.data[i * 4 + 1]! << 8) | out.data[i * 4 + 2]!,
+        (out.data[i * 4]! << 16) |
+          (out.data[i * 4 + 1]! << 8) |
+          out.data[i * 4 + 2]!,
       );
     }
     expect(colours.size).toBeGreaterThan(4);
@@ -236,12 +250,17 @@ describe("cleanAvatar", () => {
   });
 
   it("shrinks a huge upload before cleaning it", async () => {
-    const big = compose(grid(SPRITE), 200, {
-      width: 2600,
-      height: 3000,
-      left: 300,
-      top: 100,
-    }, () => [0, 255, 0, 255]);
+    const big = compose(
+      grid(SPRITE),
+      200,
+      {
+        width: 2600,
+        height: 3000,
+        left: 300,
+        top: 100,
+      },
+      () => [0, 255, 0, 255],
+    );
     const r = await cleanAvatar(await png(big));
     expect(r.ok && r.height).toBe(AVATAR_HEIGHT_PX);
   });
@@ -264,7 +283,12 @@ describe("the pieces", () => {
 
   it("gridSize finds the blow-up factor, and 1 when there is none", () => {
     const sprite = grid(SPRITE);
-    const blown = compose(sprite, 5, { width: 50, height: 70, left: 0, top: 0 }, () => [0, 0, 0, 0]);
+    const blown = compose(
+      sprite,
+      5,
+      { width: 50, height: 70, left: 0, top: 0 },
+      () => [0, 0, 0, 0],
+    );
     expect(gridSize(blown)).toBe(5);
     expect(gridSize(sprite)).toBe(1);
   });
