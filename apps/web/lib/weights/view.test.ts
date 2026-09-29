@@ -5,6 +5,9 @@ import {
   changeLabel,
   formatMinutes,
   formatRaw,
+  historyByLabel,
+  historyChangeLabel,
+  historyOutcomeLabel,
   hoursField,
   intervalsLabel,
   verdictLabel,
@@ -72,5 +75,85 @@ describe("weights view", () => {
         toCooldownMinutes: 3.5 * DAY_MIN,
       }),
     ).toBe("35 → 26 pts, cooldown 3.5 days → 3.5 days");
+  });
+
+  it("puts a points history entry into words (issue #115)", () => {
+    const iso = (d: number, h = 0) =>
+      berlinWallTimeToUtc(2026, 10, d, h).toISOString();
+    const ryan = { memberId: "m-1", displayName: "Ryan" };
+    const partner = { memberId: "m-2", displayName: "Partner" };
+    const entry = {
+      source: "admin" as const,
+      proposedBy: ryan,
+      proposedAt: iso(1, 9),
+      fromPoints: 35,
+      fromCooldownMinutes: 84 * 60,
+      toPoints: 50,
+      toCooldownMinutes: 2 * DAY_MIN,
+      appliesAt: iso(5),
+      outcome: "pending" as const,
+      decidedBy: null,
+      decidedAt: null,
+    };
+    expect(historyChangeLabel(entry)).toBe(
+      "35 → 50 pts, cooldown 3.5 days → 2 days",
+    );
+    expect(
+      historyChangeLabel({
+        ...entry,
+        fromPoints: null,
+        fromCooldownMinutes: null,
+      }),
+    ).toBe("50 pts, cooldown 2 days");
+    expect(historyByLabel(entry)).toBe(
+      "Set by an admin · Ryan, Thu 1 Oct, 09:00",
+    );
+    expect(historyByLabel({ ...entry, source: "seed", proposedBy: null })).toBe(
+      "Starting points · Thu 1 Oct, 09:00",
+    );
+    // A bounty's first points, set on the admin page, start it too.
+    expect(
+      historyByLabel({
+        ...entry,
+        source: "manual",
+        fromPoints: null,
+        fromCooldownMinutes: null,
+      }),
+    ).toBe("Starting points · Ryan, Thu 1 Oct, 09:00");
+    expect(historyByLabel({ ...entry, source: "manual" })).toBe(
+      "Set at once · Ryan, Thu 1 Oct, 09:00",
+    );
+    expect(historyByLabel({ ...entry, source: "measured" })).toBe(
+      "Baumy's weekly suggestion · Ryan, Thu 1 Oct, 09:00",
+    );
+    expect(historyOutcomeLabel(entry)).toBe(
+      "Waiting: applies Mon 5 Oct, 00:00 (Berlin time) unless someone vetoes it.",
+    );
+    expect(historyOutcomeLabel({ ...entry, outcome: "landed" })).toBe(
+      "In effect from Mon 5 Oct, 00:00.",
+    );
+    expect(
+      historyOutcomeLabel({
+        ...entry,
+        outcome: "vetoed",
+        decidedBy: partner,
+        decidedAt: iso(2, 18),
+      }),
+    ).toBe("Vetoed by Partner, Fri 2 Oct, 18:00. It never applied.");
+    expect(
+      historyOutcomeLabel({
+        ...entry,
+        outcome: "cancelled",
+        decidedBy: ryan,
+        decidedAt: iso(3, 8),
+      }),
+    ).toBe("Cancelled by Ryan, Sat 3 Oct, 08:00. It never applied.");
+    expect(
+      historyOutcomeLabel({
+        ...entry,
+        outcome: "cancelled",
+        decidedAt: iso(3, 8),
+      }),
+    ).toBe("Cancelled, Sat 3 Oct, 08:00. It never applied.");
   });
 });

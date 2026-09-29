@@ -244,10 +244,16 @@ export function ChoreGrid({
 
       <BountyList aria-label="Bounties">
         {shown.map((c) => (
+          // Below `sm` the row action (an admin's Edit) gets its own line
+          // under the row, so a phone keeps the whole bounty name (#115).
           <li
             key={c.id}
             data-testid={`chore-${c.name}`}
-            className={rowAction ? "flex items-center gap-2" : undefined}
+            className={
+              rowAction
+                ? "flex flex-col gap-2 sm:flex-row sm:items-center"
+                : undefined
+            }
           >
             <BountyRow
               name={c.name}
@@ -260,7 +266,7 @@ export function ChoreGrid({
               isNew={c.isNew}
               kiosk={kiosk}
               disabled={c.state === "unavailable"}
-              className={rowAction ? "min-w-0 flex-1" : undefined}
+              className={rowAction ? "min-w-0 sm:flex-1" : undefined}
               onClick={() => {
                 setDoneBy(actorId);
                 choosePhoto(null);

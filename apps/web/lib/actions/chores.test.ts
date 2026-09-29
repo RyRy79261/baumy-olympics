@@ -1013,7 +1013,7 @@ describe("manage_chore", () => {
     });
   });
 
-  it("keeps the weight when points and cooldown are both left out, and refuses one alone", async () => {
+  it("keeps the weight only when asked to, and refuses one of points and cooldown alone", async () => {
     const settingsOnly = {
       op: "update",
       choreId: trash,
@@ -1021,6 +1021,7 @@ describe("manage_chore", () => {
       proofMode: "none",
       confirmMode: "optimistic",
       effortFactorPct: "100",
+      weight: "keep",
     };
     const versions = () =>
       t
@@ -1049,6 +1050,38 @@ describe("manage_chore", () => {
       { base: TRASH.basePoints, cooldown: TRASH.cooldownMinutes },
     ]);
 
+    // Issue #115: the admin chores form, both fields cleared, is told the
+    // weight is required instead of quietly keeping it.
+    const { weight: _keep, ...cleared } = settingsOnly;
+    const required = "Required: give the points and the cooldown.";
+    await expect(
+      runAction(
+        "manage_chore",
+        { ...cleared, name: "Other" },
+        adminCtx({ now: at(2) }),
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      code: "INVALID_INPUT",
+      message: required,
+      issues: [
+        { path: ["basePoints"], message: required },
+        { path: ["cooldownHours"], message: required },
+      ],
+    });
+    const leaveOut = "Leave the points and the cooldown out to keep them.";
+    await expect(
+      runAction(
+        "manage_chore",
+        { ...settingsOnly, name: "Other", basePoints: "30" },
+        adminCtx({ now: at(2) }),
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "INVALID_INPUT",
+      message: leaveOut,
+    });
+
     for (const [half, field] of [
       [{ basePoints: "30" }, "basePoints"],
       [{ cooldownHours: "2" }, "cooldownHours"],
@@ -1056,19 +1089,17 @@ describe("manage_chore", () => {
       await expect(
         runAction(
           "manage_chore",
-          { ...settingsOnly, name: "Other", ...half },
+          { ...cleared, name: "Other", ...half },
           adminCtx({ now: at(2) }),
         ),
       ).resolves.toEqual({
         ok: false,
         code: "INVALID_INPUT",
-        message:
-          "Give the points and the cooldown together, or leave both out.",
+        message: "Give the points and the cooldown together.",
         issues: [
           {
             path: [field === "basePoints" ? "cooldownHours" : "basePoints"],
-            message:
-              "Give the points and the cooldown together, or leave both out.",
+            message: "Give the points and the cooldown together.",
           },
         ],
       });

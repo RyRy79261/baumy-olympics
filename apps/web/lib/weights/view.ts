@@ -1,5 +1,5 @@
 import { formatBerlinDateTime } from "@baumy/core";
-import type { WeightRowView } from "@/lib/actions/weights";
+import type { PointsHistoryView, WeightRowView } from "@/lib/actions/weights";
 
 // What the weights panel and the veto list say (SPEC §4.4). Pure and
 // client-safe: the pages render from `get_weights`.
@@ -67,4 +67,69 @@ export function changeLabel(input: {
   toCooldownMinutes: number;
 }): string {
   return `${input.fromPoints} → ${input.toPoints} pts, cooldown ${formatMinutes(input.fromCooldownMinutes)} → ${formatMinutes(input.toCooldownMinutes)}`;
+}
+
+// The points history (issue #115): each change in words.
+
+type HistoryEntry = Pick<
+  PointsHistoryView,
+  | "source"
+  | "proposedBy"
+  | "proposedAt"
+  | "fromPoints"
+  | "fromCooldownMinutes"
+  | "toPoints"
+  | "toCooldownMinutes"
+  | "appliesAt"
+  | "outcome"
+  | "decidedBy"
+  | "decidedAt"
+>;
+
+/** How the change was made. */
+export const HISTORY_SOURCE: Record<PointsHistoryView["source"], string> = {
+  seed: "Starting points",
+  manual: "Set at once",
+  measured: "Baumy's weekly suggestion",
+  admin: "Set by an admin",
+};
+
+/** "35 → 50 pts, cooldown 3.5 days → 2 days"; a first one "20 pts, …". */
+export function historyChangeLabel(e: HistoryEntry): string {
+  if (e.fromPoints === null || e.fromCooldownMinutes === null) {
+    return `${e.toPoints} pts, cooldown ${formatMinutes(e.toCooldownMinutes)}`;
+  }
+  return changeLabel({
+    fromPoints: e.fromPoints,
+    toPoints: e.toPoints,
+    fromCooldownMinutes: e.fromCooldownMinutes,
+    toCooldownMinutes: e.toCooldownMinutes,
+  });
+}
+
+/**
+ * "Set by an admin · Ryan, Mon 28 Sep, 04:00": how, who and when. A
+ * bounty's first points are its starting points, however they were set.
+ */
+export function historyByLabel(e: HistoryEntry): string {
+  const who = e.proposedBy ? `${e.proposedBy.displayName}, ` : "";
+  const how =
+    e.fromPoints === null ? HISTORY_SOURCE.seed : HISTORY_SOURCE[e.source];
+  return `${how} · ${who}${formatBerlinDateTime(new Date(e.proposedAt))}`;
+}
+
+/** What became of it, and when (Berlin time). */
+export function historyOutcomeLabel(e: HistoryEntry): string {
+  const at = (iso: string) => formatBerlinDateTime(new Date(iso));
+  const by = e.decidedBy ? ` by ${e.decidedBy.displayName}` : "";
+  switch (e.outcome) {
+    case "landed":
+      return `In effect from ${at(e.appliesAt)}.`;
+    case "vetoed":
+      return `Vetoed${by}, ${at(e.decidedAt!)}. It never applied.`;
+    case "cancelled":
+      return `Cancelled${by}, ${at(e.decidedAt!)}. It never applied.`;
+    default:
+      return `Waiting: applies ${at(e.appliesAt)} (Berlin time) unless someone vetoes it.`;
+  }
 }

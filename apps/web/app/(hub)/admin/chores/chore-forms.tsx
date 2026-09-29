@@ -296,10 +296,15 @@ export function EditChoreDialog({
   return (
     <Dialog open onClose={onClose} title={`Edit ${chore.name}`}>
       {points}
-      <form action={formAction} className="flex flex-col gap-4">
+      {/* No browser validation: a cleared field gets the action's inline
+          error (both points and cooldown blank is "Required", issue #115). */}
+      <form action={formAction} noValidate className="flex flex-col gap-4">
         <input type="hidden" name="requestId" value={requestId} />
         <input type="hidden" name="op" value="update" />
         <input type="hidden" name="choreId" value={chore.id} />
+        {points !== undefined ? (
+          <input type="hidden" name="weight" value="keep" />
+        ) : null}
         <ChoreFields
           prefix={`edit-${chore.id}`}
           values={{

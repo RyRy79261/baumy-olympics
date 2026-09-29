@@ -73,6 +73,8 @@ export {
   EFFORT_FACTOR_MIN,
   EffortFactorPct,
   ProofMode,
+  WEIGHT_CHANGE_REASON_MAX,
+  WeightChangeReason,
   cooldownMinutesFromHours,
 } from "./chore";
 export {

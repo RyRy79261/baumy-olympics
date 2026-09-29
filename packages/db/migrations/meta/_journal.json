@@ -134,6 +134,13 @@
       "when": 1790678710017,
       "tag": "0018_avatar_gallery",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790705484761,
+      "tag": "0019_admin_points_changes",
+      "breakpoints": true
     }
   ]
 }
