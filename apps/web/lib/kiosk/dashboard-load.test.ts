@@ -125,7 +125,7 @@ describe("loadDashboard", () => {
       data: { notes: [{ title: "Pasta", authorId: ryan }], recentCount: 1 },
     });
     expect(data.members).toEqual([
-      { id: ryan, displayName: "Ryan", avatar: character },
+      { id: ryan, displayName: "Ryan", avatar: character, image: null },
     ]);
   });
 
