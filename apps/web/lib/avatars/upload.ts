@@ -41,7 +41,10 @@ export const AVATAR_UPLOAD_WINDOW_MS = 60 * 60 * 1000;
 export const AVATAR_UPLOAD_MAX_REQUEST_BYTES =
   AVATAR_UPLOAD_MAX_BYTES + 64 * 1024;
 
-const TOO_LARGE = fail("INVALID_INPUT", "That image is too large (4 MB at most).");
+const TOO_LARGE = fail(
+  "INVALID_INPUT",
+  "That image is too large (4 MB at most).",
+);
 
 export interface AvatarUploadDeps {
   /** The signed-in UI request, or null when nobody is signed in. */

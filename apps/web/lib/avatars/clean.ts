@@ -1,6 +1,5 @@
 import "server-only";
 
-
 // The gallery's cleaning pipeline (issue #111). The owner generates each
 // character elsewhere (one shared style prompt, docs/setup.md) and uploads
 // it; the app never draws. What arrives is rarely clean: a fake grey
@@ -113,7 +112,9 @@ function between(img: RgbaImage, i: number, keys: readonly Key[]): boolean {
             len,
         ),
       );
-      if ([0, 1, 2].every((c) => Math.abs(p[c]! - (ka[c]! + t * d[c]!)) <= tol)) {
+      if (
+        [0, 1, 2].every((c) => Math.abs(p[c]! - (ka[c]! + t * d[c]!)) <= tol)
+      ) {
         return true;
       }
     }
@@ -403,7 +404,11 @@ export function gridSize(img: RgbaImage): number {
  * from the centre of the source area it covers (so an exact k× blow-up comes
  * back pixel for pixel).
  */
-export function sample(img: RgbaImage, width: number, height: number): RgbaImage {
+export function sample(
+  img: RgbaImage,
+  width: number,
+  height: number,
+): RgbaImage {
   const data = new Uint8Array(width * height * 4);
   const sx = img.width / width;
   const sy = img.height / height;
@@ -444,7 +449,9 @@ export function limitPalette(img: RgbaImage, colours: number): RgbaImage {
   const counts = new Map<number, number>();
   const n = img.width * img.height;
   const rgb = (i: number) =>
-    (img.data[i * 4]! << 16) | (img.data[i * 4 + 1]! << 8) | img.data[i * 4 + 2]!;
+    (img.data[i * 4]! << 16) |
+    (img.data[i * 4 + 1]! << 8) |
+    img.data[i * 4 + 2]!;
   for (let i = 0; i < n; i++) {
     if (img.data[i * 4 + 3]) counts.set(rgb(i), (counts.get(rgb(i)) ?? 0) + 1);
   }

@@ -241,7 +241,10 @@ describe("archive_avatar and restore_avatar", () => {
     const id = await addOne();
     expect(
       await runAction("archive_avatar", { avatarId: id }, adminCtx()),
-    ).toEqual({ ok: true, data: { avatarId: id, name: "Knight", archived: true } });
+    ).toEqual({
+      ok: true,
+      data: { avatarId: id, name: "Knight", archived: true },
+    });
     expect(
       await runAction("archive_avatar", { avatarId: id }, adminCtx()),
     ).toMatchObject({ ok: false, code: "INVALID_STATE" });

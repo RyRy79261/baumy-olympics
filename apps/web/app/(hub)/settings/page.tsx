@@ -68,9 +68,12 @@ export default async function SettingsPage() {
             picked={row?.avatarImageId ?? ""}
             archivedName={worn?.archivedAt ? worn.name : undefined}
           />
-        ) : (
-          <AvatarForm memberId={me.memberId} initial={character} />
-        )}
+        ) : null}
+        <AvatarForm
+          memberId={me.memberId}
+          initial={character}
+          secondary={live.length > 0}
+        />
         <Card
           title="Security"
           description="Passkeys, two-factor, Google, your password and the devices signed in as you."

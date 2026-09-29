@@ -28,9 +28,9 @@ describe("NewAvatar", () => {
 describe("AvatarRef and ChooseAvatar", () => {
   it("takes a gallery id", () => {
     expect(AvatarRef.parse({ avatarId: ID })).toEqual({ avatarId: ID });
-    expect(AvatarRef.safeParse({ avatarId: "x" }).error?.issues[0]).toMatchObject(
-      { message: "Pick a character from the gallery." },
-    );
+    expect(
+      AvatarRef.safeParse({ avatarId: "x" }).error?.issues[0],
+    ).toMatchObject({ message: "Pick a character from the gallery." });
   });
 
   it("reads an empty form value, or null, as the drawn character", () => {

@@ -179,7 +179,11 @@ describe("GET /api/blob for a gallery sprite (issue #111)", () => {
   };
 
   it("serves the household's sprite to a member, a kiosk and an account joining", async () => {
-    for (const actor of [member, { kind: "kiosk", deviceId: "d" } as Actor, account]) {
+    for (const actor of [
+      member,
+      { kind: "kiosk", deviceId: "d" } as Actor,
+      account,
+    ]) {
       const res = await handleBlobProxy(
         req(SPRITE),
         deps({ getActor: async () => actor, store: await withSprite() }),
@@ -205,9 +209,13 @@ describe("GET /api/blob for a gallery sprite (issue #111)", () => {
   it("is 404 for a sprite not in the household, a wrong name or a non-PNG path", async () => {
     const store = await withSprite();
     const other = `avatars/${ID}/a1b2c3d4e5f60718.png`;
-    expect((await handleBlobProxy(req(other), deps({ store }))).status).toBe(404);
+    expect((await handleBlobProxy(req(other), deps({ store }))).status).toBe(
+      404,
+    );
     const renamed = `avatars/${AVATAR}/zzzzzzzzzzzzzzzz.png`;
-    expect((await handleBlobProxy(req(renamed), deps({ store }))).status).toBe(404);
+    expect((await handleBlobProxy(req(renamed), deps({ store }))).status).toBe(
+      404,
+    );
     const svg = `avatars/${AVATAR}/a1b2c3d4e5f60718.svg`;
     expect((await handleBlobProxy(req(svg), deps({ store }))).status).toBe(404);
   });

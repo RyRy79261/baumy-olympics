@@ -122,6 +122,12 @@ export default function PrivacyPage() {
             <strong>Proof photos</strong> you attach to a chore.
           </li>
           <li>
+            <strong>Avatar images:</strong> the pixel characters an admin adds
+            to the household&apos;s gallery (cleaned, about 56 pixels tall), who
+            added each, and which one each member picked. The file as uploaded
+            is not kept.
+          </li>
+          <li>
             <strong>The audit log:</strong> who changed what, when, from which
             screen, and a copy of what was entered: for example a note&apos;s
             text (also after the note is deleted), shopping items, a calendar
@@ -163,9 +169,11 @@ export default function PrivacyPage() {
             time), are not tied to one region.
           </li>
           <li>
-            Proof photos are stored in Vercel Blob in Frankfurt (fra1). The
-            store is private: a photo is only shown through the app, to
-            household members and the paired kitchen screen.
+            Proof photos and avatar images are stored in Vercel Blob in
+            Frankfurt (fra1). The store is private: an image is only shown
+            through the app, to household members and the paired kitchen screen
+            (avatar images also to someone signed in who is joining, so they can
+            pick one).
           </li>
           <li>
             Calendar events live in the house&apos;s Google Calendar; the app
@@ -346,6 +354,10 @@ export default function PrivacyPage() {
           <li>
             Proof photos are deleted {PHOTO_RETENTION_DAYS} days after their
             claim was settled.
+          </li>
+          <li>
+            Avatar images are kept while the household has them; archiving one
+            only takes it out of the gallery.
           </li>
           <li>Password-reset and confirmation links expire.</li>
           <li>

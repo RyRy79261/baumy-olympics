@@ -27,7 +27,11 @@ export default async function JoinPage() {
   const founder = isFounderEmail(process.env, me.email);
   // The gallery to pick a character from (issue #111): the live ones.
   const gallery = (
-    await listAvatars(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID, false)
+    await listAvatars(
+      createHttpDb() as unknown as Queryable,
+      HOUSEHOLD_ID,
+      false,
+    )
   ).map((a) => ({ id: a.id, name: a.name, image: avatarImageView(a)! }));
 
   return (
