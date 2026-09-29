@@ -152,21 +152,43 @@ export function rosterAvatars(
   }
   for (const m of roster) {
     if (out.has(m.id)) continue;
-    const base = defaultAvatar(m.id);
-    const start = AVATAR_SHIRT_COLORS.indexOf(base.shirtColor);
-    let shirt = base.shirtColor;
-    for (let i = 0; i < AVATAR_SHIRT_COLORS.length; i++) {
-      const next =
-        AVATAR_SHIRT_COLORS[(start + i) % AVATAR_SHIRT_COLORS.length]!;
-      if (!worn.has(next)) {
-        shirt = next;
-        break;
-      }
-    }
-    worn.add(shirt);
-    out.set(m.id, { ...base, shirtColor: shirt });
+    const character = withFreeShirt(defaultAvatar(m.id), worn);
+    worn.add(character.shirtColor);
+    out.set(m.id, character);
   }
   return out;
+}
+
+/**
+ * `base` in a shirt nobody in `worn` wears: its own if free, else the next
+ * free one in AVATAR_SHIRT_COLORS order; its own once every shirt is taken.
+ */
+function withFreeShirt(
+  base: MemberAvatar,
+  worn: ReadonlySet<MemberAvatar["shirtColor"]>,
+): MemberAvatar {
+  const start = AVATAR_SHIRT_COLORS.indexOf(base.shirtColor);
+  for (let i = 0; i < AVATAR_SHIRT_COLORS.length; i++) {
+    const next = AVATAR_SHIRT_COLORS[(start + i) % AVATAR_SHIRT_COLORS.length]!;
+    if (!worn.has(next)) return { ...base, shirtColor: next };
+  }
+  return base;
+}
+
+/**
+ * The character the join form starts a newcomer on (issue #106): the
+ * default for `seed` (their account id, as they have no member id yet) in a
+ * shirt none of the active `roster` wears, so the shirt they keep without
+ * touching it is still a colour of their own on the kitchen screen.
+ */
+export function newcomerAvatar(
+  seed: string,
+  roster: readonly { id: string; avatar: unknown }[],
+): MemberAvatar {
+  const worn = new Set(
+    [...rosterAvatars(roster).values()].map((a) => a.shirtColor),
+  );
+  return withFreeShirt(defaultAvatar(seed), worn);
 }
 
 /** The same values as the `member_role` pg enum. */
@@ -188,10 +210,33 @@ export const MEMBER_COLORS = [
   "#d0467a",
 ] as const;
 
+/**
+ * What each of MEMBER_COLORS is called: the swatch pickers' accessible
+ * names, so a screen reader says "Orange", never "#e8743b".
+ */
+export const MEMBER_COLOR_NAMES: Readonly<
+  Record<(typeof MEMBER_COLORS)[number], string>
+> = {
+  "#e8743b": "Orange",
+  "#3b82c4": "Blue",
+  "#4caf50": "Green",
+  "#9c5fc9": "Purple",
+  "#d9b300": "Mustard",
+  "#d0467a": "Rose",
+};
+
+/** A member colour's name; one not in MEMBER_COLORS is a "Custom colour". */
+export function memberColorName(color: string): string {
+  const key = color.toLowerCase() as (typeof MEMBER_COLORS)[number];
+  return MEMBER_COLOR_NAMES[key] ?? "Custom colour";
+}
+
 /** A kiosk PIN (SPEC §6.2): 4 to 6 digits. */
 export const KioskPin = z.string().regex(/^\d{4,6}$/, "Use 4 to 6 digits.");
 
-const TELEGRAM_ID_MESSAGE = "Use the Telegram user id: digits only.";
+/** What a wrong Telegram user id is told, by the server and the browser. */
+export const TELEGRAM_ID_MESSAGE =
+  "Use the Telegram user id: digits only, not starting with 0.";
 
 /**
  * A Telegram user id (`members.telegram_user_id`): a positive integer of at

@@ -188,10 +188,12 @@ test("an admin sets and clears a member's Telegram id by hand", async ({
   await page.goto("/admin/members");
   const row = page.getByTestId(`member-Founder ${project}`);
   await row.locator("summary", { hasText: "Telegram" }).click();
-  const field = row.getByLabel("Telegram user id");
+  const field = row.getByLabel("Telegram user id", { exact: true });
   await field.fill("not a number");
-  await row.getByRole("button", { name: "Save Telegram id" }).click();
   await expect(row.getByText("Use the Telegram user id")).toBeVisible();
+  await expect(
+    row.getByRole("button", { name: "Save Telegram id" }),
+  ).toBeDisabled();
 
   await field.fill(String(tg));
   await row.getByRole("button", { name: "Save Telegram id" }).click();
