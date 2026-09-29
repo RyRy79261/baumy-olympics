@@ -14,7 +14,8 @@ import { fail } from "./result";
 
 // `/link <code>` in Telegram (SPEC §6.6, ADR 0003, issue #27). A member makes
 // a one-time code in /settings (`create_telegram_link_code`) and sends it to
-// the Baumy bot; brain calls this action with the code and the sender's
+// the Baumy bot, by hand or through the deep link's `/start link_<code>`
+// (issue #108, lib/telegram/deep-link.ts); brain calls this action with the code and the sender's
 // Telegram id in `X-Baumy-Actor`. It is the ONE action an unlinked Telegram
 // user may call (lib/brain/endpoint.ts), and the member comes from the code,
 // never from the header.
@@ -41,7 +42,7 @@ export const linkTelegram = defineAction({
   name: "link_telegram",
   title: "Link a Telegram account",
   description:
-    "Links the calling Telegram user to the household member who created the one-time link code in Baumy's Settings. Call it when someone sends /link <code>.",
+    "Links the calling Telegram user to the household member who created the one-time link code in Baumy's Settings. Call it when someone sends /link <code>, or /start link_<code> from the Settings deep link.",
   consent: "Link a Telegram account to a household member",
   kind: "write",
   risk: "safe",

@@ -66,10 +66,29 @@ test("brain links a member by code, then adds a confirmed calendar event once", 
   expect(early.status()).toBe(403);
   expect((await early.json()).code).toBe("TELEGRAM_NOT_LINKED");
 
+  // Issue #108: Link Telegram makes a deep link (and its QR code); tapping
+  // Start sends brain `/start link_<code>`, which it redeems like `/link`.
   await page.goto("/settings");
-  await page.getByRole("button", { name: "Create a link code" }).click();
-  const shown = await page.getByTestId("telegram-link-code").textContent();
-  const code = /\/link ([A-Z2-9]{10})/.exec(shown ?? "")![1]!;
+  await page.getByRole("button", { name: "Link Telegram" }).click();
+  const deepLink = page.getByRole("link", { name: "Open Telegram" });
+  await expect(deepLink).toBeVisible();
+  const href = new URL((await deepLink.getAttribute("href"))!);
+  expect(href.origin + href.pathname).toBe("https://t.me/baumy_bot");
+  const code = /^link_([A-Z2-9]{10})$/.exec(
+    href.searchParams.get("start")!,
+  )![1]!;
+  await expect(
+    page.getByRole("img", {
+      name: "QR code that opens @baumy_bot in Telegram",
+    }),
+  ).toBeVisible();
+  // The manual fallback carries the same code.
+  await expect(page.getByTestId("telegram-link-code")).toHaveText(
+    `/link ${code}`,
+  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Waiting for Telegram" }),
+  ).toBeVisible();
 
   const wrong = await call(
     brain,
@@ -88,6 +107,13 @@ test("brain links a member by code, then adds a confirmed calendar event once", 
   );
   expect(linked.status()).toBe(200);
   expect((await linked.json()).data.displayName).toBe(`Founder ${project}`);
+  // Settings notices on its own, with no reload.
+  await expect(
+    page.getByText("Linked. @baumy_bot knows who you are now."),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Telegram" })).toHaveCount(
+    0,
+  );
 
   // The code is spent, even for someone else.
   const reused = await call(

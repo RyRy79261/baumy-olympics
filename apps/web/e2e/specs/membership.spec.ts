@@ -138,7 +138,7 @@ test("a member sets a kiosk PIN and creates a Telegram link code", async ({
     p.getByRole("status").filter({ hasText: "PIN changed." }),
   ).toBeVisible();
 
-  await p.getByRole("button", { name: "Create a link code" }).click();
+  await p.getByRole("button", { name: "Link Telegram" }).click();
   await expect(p.getByTestId("telegram-link-code")).toHaveText(
     /^\/link [A-Z2-9]{10}$/,
   );

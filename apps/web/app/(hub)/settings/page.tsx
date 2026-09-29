@@ -8,6 +8,7 @@ import { Card, FormMessage, PageHeading } from "@baumy/ui";
 import { avatarFor } from "@baumy/types";
 import { requireMemberPage } from "@/lib/auth";
 import { activeCharacters } from "@/lib/members/characters";
+import { telegramBotUsername } from "@/lib/telegram/deep-link";
 import { AvatarForm } from "./avatar-form";
 import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
 
@@ -63,7 +64,10 @@ export default async function SettingsPage() {
           </Link>
         </Card>
         <KioskPinForm hasPin={Boolean(row?.kioskPinHash)} />
-        <TelegramLinkForm linked={row?.telegramUserId != null} />
+        <TelegramLinkForm
+          telegramUserId={row?.telegramUserId ?? null}
+          botUsername={telegramBotUsername()}
+        />
         <Card
           title="Connected apps"
           description="Apps such as Claude that can reach Baumy as you over MCP."
