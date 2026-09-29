@@ -35,6 +35,8 @@ test("an admin adds and edits a bounty on /chores; a member cannot", async ({
     project === "ipad-portrait",
     "Admin edits need a real session; the kiosk's board stays read-only.",
   );
+  // Two accounts, seven logs and the weekly compute: longer than most.
+  test.setTimeout(180_000);
   const tag = Math.random().toString(36).slice(2, 8);
   const first = `Mop ${tag}`;
   const renamed = `Milk ${tag}`;
