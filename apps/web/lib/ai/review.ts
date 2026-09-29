@@ -41,11 +41,29 @@ export function rowsFor(proposals: readonly Proposal[]): ReviewRow[] {
   }));
 }
 
+/** Whether a row is still open: waiting, or failed and worth another go. */
+export function isOpen(row: ReviewRow): boolean {
+  return row.state === "pending" || row.state === "failed";
+}
+
 /** Whether a row can be approved now. */
 export function canApprove(row: ReviewRow): boolean {
-  return (
-    row.proposal.valid && (row.state === "pending" || row.state === "failed")
-  );
+  return row.proposal.valid && isOpen(row);
+}
+
+/**
+ * Result codes after which Confirm all sends the PIN no more: it was wrong,
+ * or the member's PIN is resting or locked. Each try counts against it.
+ */
+const PIN_STOP_CODES: ReadonlySet<string> = new Set([
+  "ATTESTATION_REQUIRED",
+  "ATTESTATION_FAILED",
+  "RATE_LIMITED",
+  "PIN_LOCKED",
+]);
+
+export function stopsPin(code: string): boolean {
+  return PIN_STOP_CODES.has(code);
 }
 
 /**
@@ -79,9 +97,7 @@ export function cardTone(row: ReviewRow): "destructive" | "invalid" | "normal" {
 /** Every suggestion, open or not, rejected: what Cancel does. */
 export function cancelAll(rows: readonly ReviewRow[]): ReviewRow[] {
   return rows.map((r) =>
-    r.state === "pending" || r.state === "failed"
-      ? { ...r, state: "rejected", message: undefined }
-      : r,
+    isOpen(r) ? { ...r, state: "rejected", message: undefined } : r,
   );
 }
 

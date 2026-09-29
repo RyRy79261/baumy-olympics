@@ -7,6 +7,8 @@ import {
   cardTone,
   confirmAllTargets,
   confirmNeedsPin,
+  isOpen,
+  stopsPin,
   visibleRows,
   nextHistory,
   rowsFor,
@@ -120,6 +122,32 @@ describe("asksForPin", () => {
       asksForPin({ ok: false, code: "COOLDOWN", message: "" }, codes),
     ).toBe(false);
     expect(asksForPin({ ok: true, data: null }, codes)).toBe(false);
+  });
+});
+
+describe("stopsPin", () => {
+  it("stops sending the PIN once it was refused, resting or locked", () => {
+    for (const code of [
+      "ATTESTATION_REQUIRED",
+      "ATTESTATION_FAILED",
+      "RATE_LIMITED",
+      "PIN_LOCKED",
+    ]) {
+      expect(stopsPin(code), code).toBe(true);
+    }
+    // A card failing for its own reason says nothing about the PIN.
+    expect(stopsPin("COOLDOWN")).toBe(false);
+    expect(stopsPin("NOT_FOUND")).toBe(false);
+  });
+});
+
+describe("isOpen", () => {
+  it("is a card still waiting, or failed and worth another go", () => {
+    expect(isOpen(row(proposal()))).toBe(true);
+    expect(isOpen(row(proposal(), { state: "failed" }))).toBe(true);
+    for (const state of ["saving", "saved", "rejected"] as const) {
+      expect(isOpen(row(proposal(), { state })), state).toBe(false);
+    }
   });
 });
 

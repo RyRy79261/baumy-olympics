@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Field,
@@ -11,7 +11,7 @@ import {
   cx,
 } from "@baumy/ui";
 import type { ProposalField } from "@/lib/ai/proposal";
-import { cardTone, withField, type ReviewRow } from "@/lib/ai/review";
+import { cardTone, isOpen, withField, type ReviewRow } from "@/lib/ai/review";
 
 // One suggestion card (SPEC §3.6, owner ruling 2026-09-29, issue #107):
 // what Baumy will do, in plain words (the action's preview), with its tags
@@ -35,6 +35,11 @@ export interface SuggestionCardProps {
   onEdit?: (input: Record<string, unknown>) => Promise<void>;
   /** While "Confirm all" runs, nothing can be dropped or edited. */
   busy: boolean;
+  /**
+   * Told when the edit form opens or its check starts (true) and when both
+   * are over (false): "Confirm all" waits, so an edit never races it.
+   */
+  onEditing?: (active: boolean) => void;
 }
 
 function FieldInput({
@@ -129,10 +134,9 @@ function tagsOf(row: ReviewRow, kiosk: boolean): string[] {
 
 /** Why it cannot run, what running it did, or why it failed. */
 function messageOf(row: ReviewRow): string | undefined {
-  const open = row.state === "pending" || row.state === "failed";
   return (
     row.message ??
-    (!row.proposal.valid && open ? row.proposal.error : undefined)
+    (!row.proposal.valid && isOpen(row) ? row.proposal.error : undefined)
   );
 }
 
@@ -175,13 +179,25 @@ export function SuggestionCard({
   onDrop,
   onEdit,
   busy,
+  onEditing,
 }: SuggestionCardProps) {
   const { proposal, state } = row;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(proposal.input);
   const [checking, setChecking] = useState(false);
   const size = kiosk ? "kiosk" : "default";
-  const open = state === "pending" || state === "failed";
+  const open = isOpen(row);
+  // The form shows only while the card is open: a card that saved or was
+  // dropped has nothing left to edit.
+  const formShown = editing && open && onEdit !== undefined;
+  const active = formShown || checking;
+  const tell = useRef(onEditing);
+  tell.current = onEditing;
+  useEffect(() => {
+    if (!active) return;
+    tell.current?.(true);
+    return () => tell.current?.(false);
+  }, [active]);
   const tone = cardTone(row);
   const editable =
     !bubble &&
@@ -279,15 +295,16 @@ export function SuggestionCard({
         </ul>
       ) : null}
 
-      {editing && onEdit ? (
+      {formShown ? (
         <form
           className="flex flex-col gap-3"
           aria-label={`Edit: ${proposal.title}`}
           onSubmit={async (e) => {
             e.preventDefault();
+            if (busy) return;
             setChecking(true);
             try {
-              await onEdit(draft);
+              await onEdit!(draft);
               setEditing(false);
             } finally {
               setChecking(false);
@@ -312,7 +329,7 @@ export function SuggestionCard({
             );
           })}
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" size={size} disabled={checking}>
+            <Button type="submit" size={size} disabled={checking || busy}>
               {checking ? "Checking\u2026" : "Check it"}
             </Button>
             <Button
