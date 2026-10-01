@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { kioskActionForm } from "@/lib/actions/kiosk";
 import type { ActionResult } from "@/lib/actions/result";
@@ -18,45 +18,20 @@ import type {
   CheckOffShoppingData,
 } from "@/lib/actions/shopping";
 import { getKioskActor } from "@/lib/auth";
-import { now } from "@/lib/clock";
 import {
-  KIOSK_COOKIE,
-  KIOSK_COOKIE_MAX_AGE_S,
   KIOSK_MEMBER_COOKIE,
   KIOSK_MEMBER_MAX_AGE_S,
   KIOSK_WALK_IN_COOKIE,
   kioskCookieOptions,
   walkInCookieOptions,
 } from "@/lib/kiosk/cookies";
-import { pairKioskDevice } from "@/lib/kiosk/pairing";
 import { pickKioskMember } from "@/lib/kiosk/selection";
-import { getClientIp } from "@/lib/rate-limit";
 import { splitItemsForm } from "@/lib/shopping/view";
 
-// The kiosk's server actions (SPEC §8). Pairing and picking who is acting
-// are the kiosk's own sign-in state, kept in its cookies; everything the
-// household can DO from the kiosk goes through runAction (kioskActionForm).
-
-/** /kiosk/pair: trade the admin's code for the device cookie. */
-export async function pairKioskAction(
-  _prev: ActionResult<null> | null,
-  form: FormData,
-): Promise<ActionResult<null>> {
-  const result = await pairKioskDevice({
-    code: form.get("code"),
-    ip: getClientIp(await headers()),
-    now: now(),
-  });
-  if (!result.ok) return result;
-  const jar = await cookies();
-  jar.set(
-    KIOSK_COOKIE,
-    result.token,
-    kioskCookieOptions(KIOSK_COOKIE_MAX_AGE_S),
-  );
-  jar.delete(KIOSK_MEMBER_COOKIE);
-  redirect("/kiosk");
-}
+// The kiosk's server actions (SPEC §8). Picking who is acting is the
+// kiosk's own sign-in state, kept in its cookies (pairing is the
+// /api/kiosk-pairing routes, issue #126); everything the household can DO
+// from the kiosk goes through runAction (kioskActionForm).
 
 /** An avatar was tapped: that member is acting now. */
 export async function pickMemberAction(form: FormData): Promise<void> {

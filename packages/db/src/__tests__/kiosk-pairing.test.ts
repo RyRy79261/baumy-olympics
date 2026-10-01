@@ -82,7 +82,9 @@ async function row(id: string) {
 describe("codes and secrets", () => {
   it("normalises a code however it is typed, and hashes code and secret", () => {
     expect(normalizeKioskPairingCode(" abc-234 ")).toBe("ABC234");
-    expect(hashKioskPairingCode("abc 234")).toBe(hashKioskPairingCode("ABC-234"));
+    expect(hashKioskPairingCode("abc 234")).toBe(
+      hashKioskPairingCode("ABC-234"),
+    );
     expect(hashKioskPairingCode("ABC234")).toMatch(/^[0-9a-f]{64}$/);
     expect(hashKioskPairingCode("ABC235")).not.toBe(
       hashKioskPairingCode("ABC234"),

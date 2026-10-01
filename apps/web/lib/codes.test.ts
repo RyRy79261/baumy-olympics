@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { KioskPairingCode } from "@baumy/types";
 import {
   CODE_ALPHABET,
   generateInviteCode,
+  generateKioskPairingCode,
   generateTelegramLinkCode,
   randomCode,
 } from "./codes";
@@ -24,5 +26,12 @@ describe("codes", () => {
     const code = generateTelegramLinkCode();
     expect(code).toMatch(/^[A-Z2-9]{10}$/);
     expect(generateTelegramLinkCode()).not.toBe(code);
+  });
+
+  it("kiosk pairing codes are 6 uppercase characters the approve form takes", () => {
+    const code = generateKioskPairingCode();
+    expect(code).toMatch(/^[A-Z2-9]{6}$/);
+    expect(KioskPairingCode.parse(code)).toBe(code);
+    expect(generateKioskPairingCode()).not.toBe(code);
   });
 });

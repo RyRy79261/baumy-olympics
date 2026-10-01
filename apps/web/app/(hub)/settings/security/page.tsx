@@ -127,8 +127,8 @@ export default async function SecurityPage({
                   ))}
                 </ul>
               )}
-              <Link href="/admin/members" className={linkClass}>
-                Pair or unpair kiosks
+              <Link href="/admin/kitchen-screen" className={linkClass}>
+                Pair or sign out the kitchen screen
               </Link>
             </Card>
           ) : null}

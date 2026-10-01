@@ -204,7 +204,10 @@ describe("kioskDeviceState and listKioskDevices", () => {
     expect(JSON.stringify(list)).not.toMatch(/[0-9a-f]{64}/);
     const at = (ms: number) => new Date(NOW.getTime() + ms);
     const state = (id: string, when: Date) =>
-      kioskDeviceState(list.find((d) => d.id === id)!, when);
+      kioskDeviceState(
+        list.find((d) => d.id === id)!,
+        when,
+      );
     const pickUpBy = KIOSK_PAIRING_TTL_MS + KIOSK_PAIRING_EXCHANGE_GRACE_MS;
     expect(state(waiting.id, NOW)).toBe("waiting");
     expect(state(waiting.id, at(pickUpBy - 1))).toBe("waiting");

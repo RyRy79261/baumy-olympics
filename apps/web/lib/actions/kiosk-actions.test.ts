@@ -1,19 +1,22 @@
 // @vitest-environment node
 import { eq } from "drizzle-orm";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hashKioskPin } from "@baumy/auth/kiosk-pin";
 import type { Queryable } from "@baumy/db";
+import { hashKioskToken } from "@baumy/db/kiosk-devices";
 import {
+  KIOSK_PAIRING_EXCHANGE_GRACE_MS,
   KIOSK_PAIRING_TTL_MS,
-  hashPairingCode,
-  insertKioskPairing,
-} from "@baumy/db/kiosk-devices";
+  claimApprovedKioskPairing,
+  insertKioskPairingRequest,
+} from "@baumy/db/kiosk-pairing";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import {
   actionRateLimit,
   actionRequests,
   auditEvents,
   kioskDevices,
+  kioskPairingRequests,
 } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
 import {
@@ -25,23 +28,12 @@ import {
 } from "@/test-utils/actions";
 import type { Actor } from "@/lib/auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
-import type * as Codes from "@/lib/codes";
+import { runAction } from "./registry";
 
 // The kiosk's actions through the real runAction and the real PIN verifier
-// on PGlite: pair_kiosk and revoke_kiosk (admin, UI only, never the kiosk)
-// and check_kiosk_pin (attested, kiosk only).
-
-const nextCodes: string[] = [];
-vi.mock("@/lib/codes", async (importOriginal) => {
-  const real = await importOriginal<typeof Codes>();
-  return {
-    ...real,
-    generateKioskPairingCode: () =>
-      nextCodes.shift() ?? real.generateKioskPairingCode(),
-  };
-});
-
-const { runAction } = await import("./registry");
+// on PGlite: approve_kiosk_pairing, rename_kiosk and revoke_kiosk (admin, UI
+// only, never the kiosk; issue #126) and check_kiosk_pin (attested, kiosk
+// only).
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -54,7 +46,6 @@ beforeAll(async () => {
 
 beforeEach(() => {
   __resetMemoryRateLimits();
-  nextCodes.length = 0;
 });
 
 async function adminCtx() {
@@ -71,6 +62,18 @@ async function device(id: string) {
   return r!;
 }
 
+/** An unpaired iPad showing `code`, holding the secret `secret-<code>`. */
+async function ipadShowing(code: string, now = FIXED_NOW) {
+  const row = await insertKioskPairingRequest(db(), {
+    householdId: HOUSEHOLD_ID,
+    secret: `secret-${code}`,
+    code,
+    device: "Safari on iPad",
+    now,
+  });
+  return row!;
+}
+
 /** Everyone but an admin with a real session. */
 async function nonAdmins(): Promise<Actor[]> {
   const plain = await seedMember(db());
@@ -84,110 +87,292 @@ async function nonAdmins(): Promise<Actor[]> {
   ];
 }
 
-describe("pair_kiosk", () => {
-  it("shows the code once, stores only its hash for 10 minutes, and audits it", async () => {
+/** An approved and paired device, through the real action. */
+async function pairedDevice(ctx: ReturnType<typeof ctxFor>, code = "PAI234") {
+  await ipadShowing(code);
+  const res = await runAction(
+    "approve_kiosk_pairing",
+    { code, name: "iPad" },
+    { ...ctx, requestId: `approve-${code}` },
+  );
+  if (!res.ok) throw new Error(`approve failed: ${res.message}`);
+  await claimApprovedKioskPairing(db(), {
+    secret: `secret-${code}`,
+    tokenHash: hashKioskToken(`token-${code}`),
+    now: FIXED_NOW,
+  });
+  return res.data.deviceId;
+}
+
+describe("approve_kiosk_pairing", () => {
+  it("creates the device for the iPad showing the code, and audits it without the code", async () => {
     const { id, ctx } = await adminCtx();
-    nextCodes.push("ABCD2345");
-    const res = await runAction("pair_kiosk", { name: " Kitchen iPad " }, ctx);
-    expect(res.ok).toBe(true);
-    if (!res.ok) return;
-    const expiresAt = new Date(
-      FIXED_NOW.getTime() + KIOSK_PAIRING_TTL_MS,
-    ).toISOString();
-    expect(res.data).toEqual({
-      deviceId: expect.any(String),
-      name: "Kitchen iPad",
-      code: "ABCD2345",
-      expiresAt,
+    const request = await ipadShowing("ABC234");
+    const res = await runAction(
+      "approve_kiosk_pairing",
+      { code: " abc-234 ", name: " Kitchen " },
+      ctx,
+    );
+    expect(res).toEqual({
+      ok: true,
+      data: {
+        deviceId: expect.any(String),
+        name: "Kitchen",
+        device: "Safari on iPad",
+      },
     });
+    if (!res.ok) return;
     expect(await device(res.data.deviceId)).toMatchObject({
-      name: "Kitchen iPad",
-      pairingCodeHash: hashPairingCode("ABCD2345"),
+      name: "Kitchen",
       pairedBy: id,
       tokenHash: null,
+      pairedAt: null,
+    });
+    const [req] = await t.db().select().from(kioskPairingRequests);
+    expect(req).toMatchObject({
+      status: "approved",
+      deviceId: res.data.deviceId,
+      approvedBy: id,
+      approvedAt: FIXED_NOW,
     });
 
-    // Neither the ledger nor the audit row holds the code.
     const [ledger] = await t.db().select().from(actionRequests);
     const [audit] = await t.db().select().from(auditEvents);
-    expect(JSON.stringify([ledger, audit])).not.toContain("ABCD2345");
+    expect(JSON.stringify([ledger, audit])).not.toMatch(/ABC-?234/i);
     expect(audit).toMatchObject({
       actorMemberId: id,
-      action: "pair_kiosk",
+      action: "approve_kiosk_pairing",
       entity: "kiosk_device",
       entityId: res.data.deviceId,
-      payload: { name: "Kitchen iPad", expiresAt },
+      payload: {
+        name: "Kitchen",
+        device: "Safari on iPad",
+        requestId: request.id,
+      },
     });
 
-    // A replay of the same request gets the result without the code.
+    // The same request again is a replay, not a second device.
     await expect(
-      runAction("pair_kiosk", { name: "Kitchen iPad" }, ctx),
-    ).resolves.toEqual({ ok: true, data: { ...res.data, code: null } });
+      runAction(
+        "approve_kiosk_pairing",
+        { code: " abc-234 ", name: " Kitchen " },
+        ctx,
+      ),
+    ).resolves.toEqual(res);
     expect(await t.db().select().from(kioskDevices)).toHaveLength(1);
-  });
 
-  it("mints another code after a collision", async () => {
-    const { id, ctx } = await adminCtx();
-    await insertKioskPairing(db(), {
-      householdId: HOUSEHOLD_ID,
-      name: "Old",
-      code: "TAKEN234",
-      pairedBy: id,
-      now: FIXED_NOW,
-    });
-    nextCodes.push("TAKEN234", "FRESH234");
-    const res = await runAction("pair_kiosk", { name: "New" }, ctx);
-    expect(res).toMatchObject({ ok: true, data: { code: "FRESH234" } });
-  });
-
-  it("gives up with INTERNAL if every code collides", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const { id, ctx } = await adminCtx();
-    await insertKioskPairing(db(), {
-      householdId: HOUSEHOLD_ID,
-      name: "Old",
-      code: "TAKEN234",
-      pairedBy: id,
-      now: FIXED_NOW,
-    });
-    nextCodes.push(...Array(5).fill("TAKEN234"));
+    // The iPad's exchange then pairs that device.
     await expect(
-      runAction("pair_kiosk", { name: "New" }, ctx),
-    ).resolves.toMatchObject({ ok: false, code: "INTERNAL" });
-    error.mockRestore();
+      claimApprovedKioskPairing(db(), {
+        secret: "secret-ABC234",
+        tokenHash: hashKioskToken("tok"),
+        now: FIXED_NOW,
+      }),
+    ).resolves.toEqual({ deviceId: res.data.deviceId, name: "Kitchen" });
   });
 
-  it("refuses a blank or overlong name", async () => {
+  it("says NOT_FOUND for a code no iPad is showing", async () => {
     const { ctx } = await adminCtx();
-    for (const name of ["  ", "x".repeat(41)]) {
-      await expect(
-        runAction("pair_kiosk", { name }, ctx),
-      ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    await ipadShowing("ABC234");
+    await expect(
+      runAction("approve_kiosk_pairing", { code: "XYZ234", name: "K" }, ctx),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "NOT_FOUND",
+      message: expect.stringContaining("No iPad is showing that code"),
+    });
+    expect(await t.db().select().from(kioskDevices)).toHaveLength(0);
+  });
+
+  it("says WINDOW_CLOSED once the code's 10 minutes are up", async () => {
+    const { ctx } = await adminCtx();
+    await ipadShowing("ABC234");
+    const justIn = new Date(FIXED_NOW.getTime() + KIOSK_PAIRING_TTL_MS - 1);
+    const expired = new Date(FIXED_NOW.getTime() + KIOSK_PAIRING_TTL_MS);
+    await expect(
+      runAction(
+        "approve_kiosk_pairing",
+        { code: "ABC234", name: "K" },
+        { ...ctx, now: expired },
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "WINDOW_CLOSED",
+      message: expect.stringContaining("expired"),
+    });
+    expect(await t.db().select().from(kioskDevices)).toHaveLength(0);
+    // A millisecond earlier it still worked.
+    await expect(
+      runAction(
+        "approve_kiosk_pairing",
+        { code: "ABC234", name: "K" },
+        { ...ctx, requestId: "approve-just-in", now: justIn },
+      ),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
+  it("says INVALID_STATE for a code already approved or used, and adds no device", async () => {
+    const { ctx } = await adminCtx();
+    await pairedDevice(ctx, "ABC234");
+    const other = await adminCtx();
+    await expect(
+      runAction(
+        "approve_kiosk_pairing",
+        { code: "ABC234", name: "Again" },
+        other.ctx,
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "INVALID_STATE",
+      message: expect.stringContaining("already approved"),
+    });
+    expect(await t.db().select().from(kioskDevices)).toHaveLength(1);
+    // Past even the exchange grace, a used request is still INVALID_STATE.
+    await expect(
+      runAction(
+        "approve_kiosk_pairing",
+        { code: "ABC234", name: "Again" },
+        {
+          ...other.ctx,
+          requestId: "approve-late",
+          now: new Date(
+            FIXED_NOW.getTime() +
+              KIOSK_PAIRING_TTL_MS +
+              KIOSK_PAIRING_EXCHANGE_GRACE_MS,
+          ),
+        },
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "INVALID_STATE" });
+  });
+
+  it("refuses a malformed code, or a blank or overlong name", async () => {
+    const { ctx } = await adminCtx();
+    await ipadShowing("ABC234");
+    for (const [i, input] of [
+      { code: "ABC23", name: "K" },
+      { code: "ABC234", name: "  " },
+      { code: "ABC234", name: "x".repeat(41) },
+    ].entries()) {
+      const res = await runAction("approve_kiosk_pairing", input, {
+        ...ctx,
+        requestId: `approve-bad-${i}`,
+      });
+      expect(res).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+      if (!res.ok) {
+        expect(res.issues?.[0]?.path[0]).toBe(i === 0 ? "code" : "name");
+      }
     }
+    expect(await t.db().select().from(kioskDevices)).toHaveLength(0);
   });
 
   it("is for admins with a real session only, and never from the kiosk", async () => {
+    await ipadShowing("ABC234");
+    const input = { code: "ABC234", name: "X" };
     for (const actor of await nonAdmins()) {
       await expect(
-        runAction("pair_kiosk", { name: "X" }, ctxFor(actor)),
+        runAction("approve_kiosk_pairing", input, ctxFor(actor)),
       ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
     }
     const { ctx } = await adminCtx();
     for (const source of ["kiosk", "ai", "mcp", "brain"] as const) {
       await expect(
-        runAction("pair_kiosk", { name: "X" }, { ...ctx, source }),
+        runAction("approve_kiosk_pairing", input, { ...ctx, source }),
       ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
     }
     expect(await t.db().select().from(kioskDevices)).toHaveLength(0);
+    const [req] = await t.db().select().from(kioskPairingRequests);
+    expect(req!.status).toBe("pending");
+  });
+
+  it("is limited to 20 approvals per admin per 10 minutes", async () => {
+    const { ctx } = await adminCtx();
+    for (let i = 0; i < 20; i++) {
+      await expect(
+        runAction(
+          "approve_kiosk_pairing",
+          { code: "NOP234", name: "K" },
+          { ...ctx, requestId: `approve-${i}` },
+        ),
+      ).resolves.toMatchObject({ code: "NOT_FOUND" });
+    }
+    await expect(
+      runAction(
+        "approve_kiosk_pairing",
+        { code: "NOP234", name: "K" },
+        { ...ctx, requestId: "approve-21" },
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "RATE_LIMITED" });
+  });
+});
+
+describe("rename_kiosk", () => {
+  it("renames a screen, audits it, and refuses a revoked one", async () => {
+    const { ctx } = await adminCtx();
+    const deviceId = await pairedDevice(ctx);
+    await expect(
+      runAction("rename_kiosk", { deviceId, name: " Fridge " }, ctx),
+    ).resolves.toEqual({ ok: true, data: { deviceId, name: "Fridge" } });
+    expect((await device(deviceId)).name).toBe("Fridge");
+    const [audit] = await t
+      .db()
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "rename_kiosk"));
+    expect(audit).toMatchObject({
+      entity: "kiosk_device",
+      entityId: deviceId,
+      payload: { deviceId, name: "Fridge" },
+    });
+
+    await expect(
+      runAction(
+        "rename_kiosk",
+        { deviceId, name: " " },
+        { ...ctx, requestId: "rename-blank" },
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "INVALID_INPUT",
+      issues: [{ path: ["name"] }],
+    });
+
+    await expect(
+      runAction(
+        "revoke_kiosk",
+        { deviceId },
+        { ...ctx, requestId: "revoke-before-rename" },
+      ),
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      runAction(
+        "rename_kiosk",
+        { deviceId, name: "Late" },
+        { ...ctx, requestId: "rename-revoked" },
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "NOT_FOUND" });
+    expect((await device(deviceId)).name).toBe("Fridge");
+  });
+
+  it("is for admins with a real session only, and never from the kiosk", async () => {
+    const { ctx } = await adminCtx();
+    const deviceId = await pairedDevice(ctx);
+    const input = { deviceId, name: "Hacked" };
+    for (const actor of await nonAdmins()) {
+      await expect(
+        runAction("rename_kiosk", input, ctxFor(actor)),
+      ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    }
+    await expect(
+      runAction("rename_kiosk", input, { ...ctx, source: "kiosk" }),
+    ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
+    expect((await device(deviceId)).name).toBe("iPad");
   });
 });
 
 describe("revoke_kiosk", () => {
   it("revokes once, audits it, then says it is gone", async () => {
     const { ctx } = await adminCtx();
-    const paired = await runAction("pair_kiosk", { name: "iPad" }, ctx);
-    if (!paired.ok) throw new Error("pair failed");
-    const deviceId = paired.data.deviceId;
+    const deviceId = await pairedDevice(ctx);
     const res = await runAction(
       "revoke_kiosk",
       { deviceId },
@@ -195,7 +380,7 @@ describe("revoke_kiosk", () => {
     );
     expect(res).toEqual({
       ok: true,
-      data: { deviceId, name: "iPad", wasPaired: false },
+      data: { deviceId, name: "iPad", wasPaired: true },
     });
     expect((await device(deviceId)).revokedAt).toEqual(FIXED_NOW);
     const audits = await t
@@ -217,11 +402,34 @@ describe("revoke_kiosk", () => {
     ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
   });
 
+  it("cancels an approval the iPad has not picked up", async () => {
+    const { ctx } = await adminCtx();
+    await ipadShowing("ABC234");
+    const approved = await runAction(
+      "approve_kiosk_pairing",
+      { code: "ABC234", name: "iPad" },
+      ctx,
+    );
+    if (!approved.ok) throw new Error("approve failed");
+    await expect(
+      runAction(
+        "revoke_kiosk",
+        { deviceId: approved.data.deviceId },
+        { ...ctx, requestId: "revoke-early" },
+      ),
+    ).resolves.toMatchObject({ ok: true, data: { wasPaired: false } });
+    await expect(
+      claimApprovedKioskPairing(db(), {
+        secret: "secret-ABC234",
+        tokenHash: hashKioskToken("t"),
+        now: FIXED_NOW,
+      }),
+    ).resolves.toBeNull();
+  });
+
   it("is for admins with a real session only, and never from the kiosk", async () => {
     const { ctx } = await adminCtx();
-    const paired = await runAction("pair_kiosk", { name: "iPad" }, ctx);
-    if (!paired.ok) throw new Error("pair failed");
-    const input = { deviceId: paired.data.deviceId };
+    const input = { deviceId: await pairedDevice(ctx) };
     for (const actor of await nonAdmins()) {
       await expect(
         runAction("revoke_kiosk", input, ctxFor(actor)),

@@ -102,9 +102,15 @@ export async function memberOrVisitorPage(): Promise<PageMember | null> {
   return (await enforce("home")) as PageMember | null;
 }
 
-/** For /admin/*: an admin; anyone else gets a 404. */
-export async function requireAdminPage(): Promise<PageMember> {
-  return (await enforce("admin")) as PageMember;
+/**
+ * For /admin/*: an admin; anyone else gets a 404. `returnTo` (a path on this
+ * site) is where sign-in sends someone not signed in yet back to, as for the
+ * kitchen screen's QR code, opened on a phone (issue #126).
+ */
+export async function requireAdminPage(
+  opts: { returnTo?: string } = {},
+): Promise<PageMember> {
+  return (await enforce("admin", opts.returnTo)) as PageMember;
 }
 
 /** For /join: a signed-in account with no member row yet. */

@@ -15,6 +15,10 @@ import {
   LOGIN_REQUEST_RETENTION_MS,
   pruneLoginRequests,
 } from "@baumy/db/login-requests";
+import {
+  KIOSK_PAIRING_RETENTION_MS,
+  pruneKioskPairingRequests,
+} from "@baumy/db/kiosk-pairing";
 import { now as clockNow } from "./clock";
 import { redactSecrets } from "./redact";
 import { blobStore, type BlobStore } from "./photos/blob-store";
@@ -68,7 +72,8 @@ export function resetLocalCheckForTests(): void {
   lastLocalCheck = Number.NEGATIVE_INFINITY;
 }
 
-export type StepName = "settle" | "seasons" | "weights" | "photos" | "logins";
+export type StepName =
+  "settle" | "seasons" | "weights" | "photos" | "logins" | "kiosk_pairings";
 
 export type StepReport =
   | { step: StepName; ok: true; detail: Record<string, number | string> }
@@ -171,6 +176,14 @@ export async function runSweep(
       deleted: await pruneLoginRequests(
         createHttpDb() as unknown as Queryable,
         new Date(at.getTime() - LOGIN_REQUEST_RETENTION_MS),
+      ),
+    })),
+  );
+  steps.push(
+    await runStep("kiosk_pairings", async () => ({
+      deleted: await pruneKioskPairingRequests(
+        createHttpDb() as unknown as Queryable,
+        new Date(at.getTime() - KIOSK_PAIRING_RETENTION_MS),
       ),
     })),
   );
