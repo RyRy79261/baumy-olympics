@@ -119,9 +119,7 @@ describe("KioskShell and AvatarButton", () => {
   it("puts the avatar bar and its status over the other pages", () => {
     const out = renderToStaticMarkup(
       <KioskTopBar
-        avatars={
-          <AvatarButton displayName="Ryan" sprite="cat" color="#123456" />
-        }
+        avatars={<AvatarButton displayName="Ryan" color="#123456" />}
         status={<span>Acting as Ryan</span>}
       />,
     );
@@ -134,19 +132,14 @@ describe("KioskShell and AvatarButton", () => {
 
   it("marks the acting member as pressed, with a 64px target", () => {
     const on = renderToStaticMarkup(
-      <AvatarButton displayName="Ryan" sprite="cat" color="#123456" selected />,
+      <AvatarButton displayName="Ryan" color="#123456" selected />,
     );
     expect(on).toContain('aria-pressed="true"');
     expect(on).toContain('type="button"');
     expect(on).toContain("min-h-16");
     expect(on).toContain("Ryan");
     const off = renderToStaticMarkup(
-      <AvatarButton
-        displayName="Kim"
-        sprite="fox"
-        color="#654321"
-        type="submit"
-      />,
+      <AvatarButton displayName="Kim" color="#654321" type="submit" />,
     );
     expect(off).toContain('aria-pressed="false"');
     expect(off).toContain('type="submit"');

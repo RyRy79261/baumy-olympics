@@ -6,7 +6,7 @@ import { MemberCharacter } from "./member-character";
 // The avatar gallery as a picker (issue #111): a grid of the household's
 // pixel characters, one radio each, the picked one framed in violet with a
 // "Picked" tag, so the choice is clear without hover. The first tile can be
-// "no gallery character" (their drawn one), whose value is "".
+// "no gallery character" (their initial tile), whose value is "".
 
 export interface GalleryOption {
   id: string;
@@ -32,7 +32,7 @@ export function AvatarGallery({
   options: readonly GalleryOption[];
   value: string;
   onChange: (value: string) => void;
-  /** The "none" tile's picture (the drawn character); omitted, no tile. */
+  /** The "none" tile's picture (the initial tile); omitted, no tile. */
   none?: { label: string; picture: ReactNode };
   disabled?: boolean;
 }) {

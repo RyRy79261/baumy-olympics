@@ -1,17 +1,16 @@
 "use client";
 
-import { avatarFor, type AvatarSprites } from "@baumy/types";
+import type { AvatarSprites } from "@baumy/types";
 import { useState, type CSSProperties } from "react";
 import { BaumyCat } from "./baumy-cat";
 import { cx } from "./cx";
-import { SHIRT_COLOURS } from "./housemate";
 import { MemberCharacter } from "./member-character";
 import { Glyph } from "./pixel/glyph";
 
 // The kitchen screen's full-screen reminder (ADR 0005 §4), the approved
 // prototype's (proto/kiosk-home-pixel, shared-overlays.tsx `Reminder`): a
 // hazard-striped frame, a blinking REMINDER, the note in a retro window,
-// "x of N have seen it", every housemate as their 16-bit character with a
+// "x of N have seen it", every housemate as their character (or initial tile) with a
 // big "I've seen it" button, and "Dismiss for everyone". The app runs the
 // actions; this only draws and reports taps.
 //
@@ -23,10 +22,10 @@ export interface ReminderFace {
   id: string;
   displayName: string;
   /**
-   * `members.avatar` as stored; null draws their default character. Their
-   * name, their seen card and their dismiss button take its shirt colour.
+   * Their colour (`members.color`): their name, their seen card, their
+   * dismiss button and their initial tile take it.
    */
-  avatar: unknown;
+  colour: string;
   /** Their gallery sprite (issue #111), drawn instead when they picked one. */
   sprites?: AvatarSprites | null;
   seen: boolean;
@@ -49,13 +48,6 @@ const C = {
 } as const;
 
 /** The prototype's raised (or pressed) bevel: light top-left, dark bottom-right. */
-/** A face's colour: their character's shirt. */
-export function faceColour(face: Pick<ReminderFace, "id" | "avatar">): string {
-  return SHIRT_COLOURS[
-    avatarFor({ id: face.id, avatar: face.avatar }).shirtColor
-  ];
-}
-
 function bevel(raised = true): CSSProperties {
   return {
     boxShadow: raised
@@ -230,7 +222,7 @@ export function ReminderScreen({
               data-seen={f.seen}
               className="flex flex-col items-center gap-3 p-3"
               style={{
-                background: f.seen ? `${faceColour(f)}26` : C.panel,
+                background: f.seen ? `${f.colour}26` : C.panel,
                 ...bevel(),
               }}
             >
@@ -245,8 +237,8 @@ export function ReminderScreen({
                 <MemberCharacter
                   moment={f.seen && f.id === tapped ? "emote" : undefined}
                   sprites={f.sprites}
-                  avatar={f.avatar}
-                  memberId={f.id}
+                  name={f.displayName}
+                  colour={f.colour}
                   scale={7}
                   bob={!f.seen}
                 />
@@ -258,7 +250,7 @@ export function ReminderScreen({
               </span>
               <span
                 className="max-w-full truncate font-display text-[16px] uppercase"
-                style={{ color: faceColour(f) }}
+                style={{ color: f.colour }}
               >
                 {f.displayName}
               </span>
@@ -322,7 +314,7 @@ export function ReminderScreen({
                   className="h-[56px] max-w-[240px] min-w-[120px] truncate px-4 font-display text-[14px] uppercase active:translate-y-px"
                   style={{
                     background: C.chrome,
-                    color: faceColour(f),
+                    color: f.colour,
                     ...bevel(),
                   }}
                 >

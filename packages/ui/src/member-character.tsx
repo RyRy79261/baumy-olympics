@@ -1,18 +1,18 @@
 import type { AvatarImage, AvatarPose, AvatarSprites } from "@baumy/types";
 import type { CSSProperties } from "react";
 import { cx } from "./cx";
-import { Housemate } from "./housemate";
 
-// How a member is drawn, everywhere (issue #111): the gallery character they
-// picked, or, until they pick one, their parametric Housemate. One
-// component, so the header, the kiosk's avatar bar and acting chip, the
-// reminder faces, the dashboard, the scoreboard and the admin pages agree.
+// How a member is shown, everywhere (issue #111): the gallery character they
+// picked, or, until they pick one, a plain tile with their initial in their
+// colour (issue #116: the app never draws a person). One component, so the
+// header, the kiosk's avatar bar and acting chip, the reminder faces, the
+// dashboard, the scoreboard and the admin pages agree.
 //
-// `scale` means what it means for the Housemate (a 17px-tall character
-// drawn `scale` times), so a slot keeps its size whichever is drawn. A set
-// is drawn at the whole-number multiple (or whole-number fraction) of its
-// idle pose's pixels that comes closest to that height, the same factor for
-// every pose, with `image-rendering: pixelated`, so its pixels stay square.
+// A slot is `CHARACTER_SLOT_PX * scale` pixels tall, whichever is shown. A
+// set is drawn at the whole-number multiple (or whole-number fraction) of
+// its idle pose's pixels that comes closest to that height, the same factor
+// for every pose, with `image-rendering: pixelated`, so its pixels stay
+// square. The initial tile is a square of that height.
 //
 // A set has an idle pose and maybe walk and emote (owner ruling
 // 2026-09-29). `pose` picks one to hold (the scoreboard's leader emotes);
@@ -20,8 +20,8 @@ import { Housemate } from "./housemate";
 // score, a "seen it"), or "walk-in" (someone taps in on the kiosk), which
 // under reduced motion is just idle. A pose the set lacks is idle.
 
-/** The Housemate's height in its own pixels (packages/ui housemate.tsx). */
-export const HOUSEMATE_HEIGHT_PX = 17;
+/** A slot's height at scale 1, in CSS pixels. */
+export const CHARACTER_SLOT_PX = 17;
 
 const FACTORS = [1 / 4, 1 / 3, 1 / 2, 1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -100,10 +100,63 @@ function Pose({
   );
 }
 
+/** The first letter of a name, as the initial tile shows it. */
+export function initialOf(name: string): string {
+  const first = Array.from(name.trim())[0];
+  return first ? first.toLocaleUpperCase() : "?";
+}
+
+/**
+ * A member with no gallery character: a neutral pixel-frame tile, tinted
+ * with their colour, with their initial in that colour. Text only.
+ */
+function InitialTile({
+  name,
+  colour,
+  px,
+  label,
+  bob,
+  className,
+  style,
+}: {
+  name: string;
+  colour: string;
+  px: number;
+  label?: string;
+  bob: boolean;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <span
+      data-member-initial
+      {...(label
+        ? { role: "img", "aria-label": label }
+        : { "aria-hidden": true })}
+      className={cx(
+        "pixel-frame inline-flex shrink-0 items-center justify-center bg-bm-raised font-display leading-none uppercase [--pf:var(--color-bm-line)]",
+        bob && "motion-safe:animate-pixel-bob",
+        className,
+      )}
+      style={{
+        width: px,
+        height: px,
+        color: colour,
+        backgroundImage: `linear-gradient(color-mix(in srgb, ${colour} 22%, transparent), color-mix(in srgb, ${colour} 22%, transparent))`,
+        fontSize: Math.max(8, Math.round(px * 0.5)),
+        ["--pf-w" as string]: `${px >= 48 ? 3 : 2}px`,
+        ...style,
+      }}
+    >
+      {initialOf(name)}
+    </span>
+  );
+}
+
 export function MemberCharacter({
   sprites,
-  avatar,
-  memberId = "",
+  name = "",
+  colour = "var(--color-bm-muted)",
   scale = 3,
   label,
   bob = false,
@@ -112,12 +165,13 @@ export function MemberCharacter({
   className,
   style,
 }: {
-  /** Their gallery set, or null/undefined for the drawn character. */
+  /** Their gallery set, or null/undefined for the initial tile. */
   sprites?: AvatarSprites | null;
-  /** What `members.avatar` holds, for the drawn character. */
-  avatar?: unknown;
-  memberId?: string;
-  /** The Housemate's scale; the sprite fills the same height. */
+  /** Their display name: the initial tile shows its first letter. */
+  name?: string;
+  /** Their colour (`members.color`): the initial tile's letter and tint. */
+  colour?: string;
+  /** The slot is `CHARACTER_SLOT_PX * scale` pixels tall. */
   scale?: number;
   /** Accessible name; without it the character is decorative. */
   label?: string;
@@ -132,10 +186,10 @@ export function MemberCharacter({
 }) {
   if (!sprites) {
     return (
-      <Housemate
-        avatar={avatar}
-        memberId={memberId}
-        scale={scale}
+      <InitialTile
+        name={name}
+        colour={colour}
+        px={CHARACTER_SLOT_PX * scale}
         label={label}
         bob={bob}
         className={className}
@@ -143,10 +197,7 @@ export function MemberCharacter({
       />
     );
   }
-  const { f, rows } = spriteFit(
-    sprites.idle.height,
-    HOUSEMATE_HEIGHT_PX * scale,
-  );
+  const { f, rows } = spriteFit(sprites.idle.height, CHARACTER_SLOT_PX * scale);
   const held = (pose !== "idle" && sprites[pose]) || sprites.idle;
   const heldPose: AvatarPose = held === sprites.idle ? "idle" : pose;
   const extra =

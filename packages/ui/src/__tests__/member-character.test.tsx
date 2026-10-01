@@ -5,14 +5,15 @@ import { AvatarButton } from "../kiosk-shell";
 import {
   BUST_FRACTION,
   BUST_MAX_PX,
-  HOUSEMATE_HEIGHT_PX,
+  CHARACTER_SLOT_PX,
   MemberCharacter,
+  initialOf,
   spriteFactor,
   spriteFit,
 } from "../member-character";
 
 // A member's gallery sprite (issue #111), drawn crisp at whole-number
-// scales in the slot the drawn Housemate would fill.
+// scales in its slot; without one, their initial tile (issue #116).
 
 const SPRITE = {
   src: "/api/blob?pathname=avatars%2Fx%2Fy.png",
@@ -26,10 +27,10 @@ const FULL = { idle: SPRITE, walk: pose("walk"), emote: pose("emote") };
 
 describe("spriteFactor", () => {
   it("picks the whole-number multiple or fraction closest to the slot", () => {
-    expect(spriteFactor(56, HOUSEMATE_HEIGHT_PX * 3)).toBe(1); // 51 → 56
-    expect(spriteFactor(56, HOUSEMATE_HEIGHT_PX * 2)).toBe(1 / 2); // 34 → 28
-    expect(spriteFactor(56, HOUSEMATE_HEIGHT_PX * 7)).toBe(2); // 119 → 112
-    expect(spriteFactor(56, HOUSEMATE_HEIGHT_PX)).toBe(1 / 3); // 17 → 19
+    expect(spriteFactor(56, CHARACTER_SLOT_PX * 3)).toBe(1); // 51 → 56
+    expect(spriteFactor(56, CHARACTER_SLOT_PX * 2)).toBe(1 / 2); // 34 → 28
+    expect(spriteFactor(56, CHARACTER_SLOT_PX * 7)).toBe(2); // 119 → 112
+    expect(spriteFactor(56, CHARACTER_SLOT_PX)).toBe(1 / 3); // 17 → 19
     expect(spriteFactor(14, 400)).toBe(8); // capped
   });
 });
@@ -37,14 +38,14 @@ describe("spriteFactor", () => {
 describe("spriteFit (the bust in small slots)", () => {
   it("draws a 64px set whole where it is taller than 32px, else its top 45%", () => {
     // Dashboard (scale 4): whole, at 1×.
-    expect(spriteFit(64, HOUSEMATE_HEIGHT_PX * 4)).toEqual({
+    expect(spriteFit(64, CHARACTER_SLOT_PX * 4)).toEqual({
       f: 1,
       rows: null,
     });
     // Kitchen bar (scale 2): whole would be 32px, so the bust (29 rows) at 1×.
-    expect(spriteFit(64, HOUSEMATE_HEIGHT_PX * 2)).toEqual({ f: 1, rows: 29 });
+    expect(spriteFit(64, CHARACTER_SLOT_PX * 2)).toEqual({ f: 1, rows: 29 });
     // Header (scale 1): the bust at 1/2 rather than the body at 1/4.
-    expect(spriteFit(64, HOUSEMATE_HEIGHT_PX)).toEqual({ f: 1 / 2, rows: 29 });
+    expect(spriteFit(64, CHARACTER_SLOT_PX)).toEqual({ f: 1 / 2, rows: 29 });
     expect(Math.ceil(64 * BUST_FRACTION)).toBe(29);
     expect(64 / 2).toBeLessThanOrEqual(BUST_MAX_PX);
   });
@@ -78,6 +79,15 @@ describe("spriteFit (the bust in small slots)", () => {
   });
 });
 
+describe("initialOf", () => {
+  it("is the name's first letter, upper-cased, or ? for no name", () => {
+    expect(initialOf("ryan")).toBe("R");
+    expect(initialOf("  Øyvind")).toBe("Ø");
+    expect(initialOf("😀 Kim")).toBe("😀");
+    expect(initialOf("   ")).toBe("?");
+  });
+});
+
 describe("MemberCharacter", () => {
   it("draws the sprite pixelated, sized to the slot, named when labelled", () => {
     const html = renderToStaticMarkup(
@@ -89,7 +99,7 @@ describe("MemberCharacter", () => {
     expect(html).toContain("image-rendering:pixelated");
     expect(html).toContain('alt="Ryan"');
     expect(html).toContain("animate-pixel-bob");
-    expect(html).not.toContain("data-housemate");
+    expect(html).not.toContain("data-member-initial");
   });
 
   it("is decorative without a label", () => {
@@ -98,12 +108,40 @@ describe("MemberCharacter", () => {
     expect(html).toContain('aria-hidden="true"');
   });
 
-  it("falls back to the drawn Housemate without a sprite", () => {
+  it("shows the initial tile in their colour without a sprite, never a drawn person", () => {
     const html = renderToStaticMarkup(
-      <MemberCharacter sprites={null} memberId="m1" scale={2} />,
+      <MemberCharacter
+        sprites={null}
+        name="jo"
+        colour="#3b82c4"
+        scale={2}
+        label="Jo"
+      />,
     );
-    expect(html).toContain("data-housemate");
+    expect(html).toContain("data-member-initial");
+    expect(html).toContain(">J</span>");
+    expect(html).toContain("color:#3b82c4");
+    expect(html).toContain("color-mix(in srgb, #3b82c4 22%, transparent)");
+    // A square the height of the slot, as a sprite would fill.
+    expect(html).toContain(`width:${CHARACTER_SLOT_PX * 2}px`);
+    expect(html).toContain(`height:${CHARACTER_SLOT_PX * 2}px`);
+    expect(html).toContain('role="img"');
+    expect(html).toContain('aria-label="Jo"');
     expect(html).not.toContain("data-member-sprite");
+    expect(html).not.toContain("<svg");
+    expect(html).not.toContain("<img");
+  });
+
+  it("sizes the initial tile at every scale it is used at", () => {
+    for (const scale of [1, 2, 3, 4, 7]) {
+      const html = renderToStaticMarkup(
+        <MemberCharacter name="Sam" colour="#4caf50" scale={scale} />,
+      );
+      expect(html).toContain(`width:${CHARACTER_SLOT_PX * scale}px`);
+      expect(html).toContain('aria-hidden="true"');
+    }
+    const bob = renderToStaticMarkup(<MemberCharacter name="Sam" bob />);
+    expect(bob).toContain("motion-safe:animate-pixel-bob");
   });
 
   it("holds a pose the set has, and idle for one it lacks", () => {
@@ -150,36 +188,23 @@ describe("MemberCharacter", () => {
     const html = renderToStaticMarkup(
       <AvatarButton
         displayName="Ryan"
-        sprite="cat"
         color="#fff"
-        memberId="m1"
         character={<i data-testid="custom" />}
       />,
     );
     expect(html).toContain('data-testid="custom"');
-    expect(html).not.toContain("data-housemate");
+    expect(html).not.toContain("data-member-initial");
   });
 
   it("is what the kiosk's avatar button draws", () => {
     const withSprite = renderToStaticMarkup(
-      <AvatarButton
-        displayName="Ryan"
-        sprite="cat"
-        color="#fff"
-        memberId="m1"
-        sprites={SET}
-      />,
+      <AvatarButton displayName="Ryan" color="#fff" sprites={SET} />,
     );
     expect(withSprite).toContain("data-member-sprite");
-    const drawn = renderToStaticMarkup(
-      <AvatarButton
-        displayName="Ryan"
-        sprite="cat"
-        color="#fff"
-        memberId="m1"
-      />,
+    const none = renderToStaticMarkup(
+      <AvatarButton displayName="Ryan" color="#fff" />,
     );
-    expect(drawn).toContain("data-housemate");
+    expect(none).toContain("data-member-initial");
   });
 });
 
@@ -197,7 +222,7 @@ describe("AvatarGallery", () => {
         options={options}
         value="a2"
         onChange={() => {}}
-        none={{ label: "Drawn", picture: <span>drawn</span> }}
+        none={{ label: "None", picture: <span>none</span> }}
       />,
     );
     expect(html).toContain('data-avatar="none"');

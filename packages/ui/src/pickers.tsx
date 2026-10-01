@@ -1,29 +1,18 @@
 import {
-  AVATAR_HAIR_COLORS,
-  AVATAR_HAIR_STYLES,
-  AVATAR_SHIRT_COLORS,
-  AVATAR_SKIN_TONES,
   CHORE_ICONS,
   MEMBER_COLORS,
   memberColorName,
   type ChoreIcon,
-  type MemberAvatar,
 } from "@baumy/types";
 import type { ReactNode } from "react";
 import { choreGlyph } from "./chores";
 import { cx } from "./cx";
-import {
-  HAIR_COLOURS,
-  Housemate,
-  SHIRT_COLOURS,
-  SKIN_TONES,
-} from "./housemate";
 import { Glyph } from "./pixel/glyph";
 import { RadiosFollowReset } from "./radios-follow-reset";
 import type { GlyphName } from "./pixel/glyphs";
 
 // Pickers that show the thing itself, not its name (issue #106): a colour is
-// a swatch of that colour, a hair style is the character wearing it. Each is
+// a swatch of that colour, a chore icon is its glyph. Each is
 // a fieldset of native radios, visually hidden inside pixel-framed tiles, so
 // Tab reaches the group, the arrow keys move through it and a form posts
 // the value; the option's name is the radio's accessible name. The chosen
@@ -278,101 +267,4 @@ export function choreIconValue(sprite?: string): string {
 
 function isChoreIcon(sprite: string): sprite is ChoreIcon {
   return (CHORE_ICONS as readonly string[]).includes(sprite);
-}
-
-const title = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
-
-function swatchesOf(
-  ids: readonly string[],
-  colours: Readonly<Record<string, string>>,
-): SwatchOption[] {
-  return ids.map((id) => ({
-    value: id,
-    colour: colours[id]!,
-    label: title(id),
-  }));
-}
-
-const HAIR_COLOUR_OPTIONS = swatchesOf(AVATAR_HAIR_COLORS, HAIR_COLOURS);
-const SKIN_OPTIONS = swatchesOf(AVATAR_SKIN_TONES, SKIN_TONES);
-const SHIRT_OPTIONS = swatchesOf(AVATAR_SHIRT_COLORS, SHIRT_COLOURS);
-
-/**
- * The 16-bit character picker (ADR 0005 §5): a large live preview, the hair
- * styles as the character itself wearing each one (drawn by Housemate from
- * the other current choices), and hair colour, skin and shirt as swatches
- * of the palette Housemate draws with. Controlled; the radios are named
- * `hairStyle`, `hairColor`, `skinTone` and `shirtColor`, so the enclosing
- * form posts a whole `MemberAvatar`.
- */
-export function CharacterPicker({
-  avatar,
-  onChange,
-  disabled,
-  previewLabel = "Your character",
-}: {
-  avatar: MemberAvatar;
-  onChange: (avatar: MemberAvatar) => void;
-  disabled?: boolean;
-  previewLabel?: string;
-}) {
-  const set =
-    <K extends keyof MemberAvatar>(key: K) =>
-    (value: string) =>
-      onChange({ ...avatar, [key]: value as MemberAvatar[K] });
-  return (
-    <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-      <div
-        data-testid="avatar-preview"
-        data-hair-style={avatar.hairStyle}
-        data-hair-color={avatar.hairColor}
-        data-skin-tone={avatar.skinTone}
-        data-shirt-color={avatar.shirtColor}
-        className="pixel-frame flex justify-center self-start bg-bm-ink px-8 py-4"
-      >
-        <Housemate avatar={avatar} scale={8} label={previewLabel} />
-      </div>
-      <div className="flex min-w-0 flex-col gap-4">
-        <TilePicker
-          legend="Hair style"
-          name="hairStyle"
-          value={avatar.hairStyle}
-          onChange={set("hairStyle")}
-          disabled={disabled}
-          captions
-          options={AVATAR_HAIR_STYLES.map((style) => ({
-            value: style,
-            label: title(style),
-            tile: (
-              <Housemate avatar={{ ...avatar, hairStyle: style }} scale={3} />
-            ),
-          }))}
-        />
-        <SwatchPicker
-          legend="Hair colour"
-          name="hairColor"
-          value={avatar.hairColor}
-          onChange={set("hairColor")}
-          disabled={disabled}
-          options={HAIR_COLOUR_OPTIONS}
-        />
-        <SwatchPicker
-          legend="Skin"
-          name="skinTone"
-          value={avatar.skinTone}
-          onChange={set("skinTone")}
-          disabled={disabled}
-          options={SKIN_OPTIONS}
-        />
-        <SwatchPicker
-          legend="Shirt"
-          name="shirtColor"
-          value={avatar.shirtColor}
-          onChange={set("shirtColor")}
-          disabled={disabled}
-          options={SHIRT_OPTIONS}
-        />
-      </div>
-    </div>
-  );
 }
