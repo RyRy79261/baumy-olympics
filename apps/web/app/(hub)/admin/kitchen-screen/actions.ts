@@ -16,9 +16,10 @@ export async function approveKioskPairingAction(
   _prev: ActionResult<ApproveKioskPairingData> | null,
   form: FormData,
 ): Promise<ActionResult<ApproveKioskPairingData>> {
-  const result = await actionForm("approve_kiosk_pairing", form);
-  if (result.ok) revalidatePath(PAGE);
-  return result;
+  // No revalidatePath: it would re-render the confirm page, which then reads
+  // the request as already approved and replaces the "Done" message. The
+  // Kitchen screen page is dynamic and reads the new device anyway.
+  return actionForm("approve_kiosk_pairing", form);
 }
 
 export async function renameKioskAction(

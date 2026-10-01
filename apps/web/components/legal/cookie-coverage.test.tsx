@@ -13,6 +13,7 @@ import {
   KIOSK_MEMBER_COOKIE,
   KIOSK_WALK_IN_COOKIE,
 } from "@/lib/kiosk/cookies";
+import { PAIRING_COOKIE } from "@/lib/kiosk/pairing";
 import { LOGIN_COOKIE } from "@/lib/login-approval/flow";
 
 // Issues #87 and #89: the privacy page must name every cookie the app sets.
@@ -35,8 +36,7 @@ const SCANNED = [
 ];
 
 /** What a setter's first argument names, for every setter in the code. */
-const KNOWN: Record<string, string> = {
-  KIOSK_COOKIE,
+const KNOWN: Record<string, string | string[]> = {
   KIOSK_MEMBER_COOKIE,
   // Set by the tap that picks a member; cleared by the dashboard
   // (components/kiosk/forget-cookie.tsx), which only ever deletes it.
@@ -44,8 +44,15 @@ const KNOWN: Record<string, string> = {
   "`${KIOSK_WALK_IN_COOKIE}=": KIOSK_WALK_IN_COOKIE,
   "refreshCookieLine()": REFRESH_COOKIE,
   // Sign in with Baumy's routes (lib/login-approval/flow.ts): its own cookie
-  // (loginCookie), and Better Auth's session cookies passed through.
-  '"set-cookie"': LOGIN_COOKIE,
+  // (loginCookie), and Better Auth's session cookies passed through. The
+  // kiosk pairing routes (lib/kiosk/pairing.ts, issue #126): the iPad's
+  // pairing secret, then the device cookie (and the picked member cleared).
+  '"set-cookie"': [
+    LOGIN_COOKIE,
+    PAIRING_COOKIE,
+    KIOSK_COOKIE,
+    KIOSK_MEMBER_COOKIE,
+  ],
 };
 
 /** Better Auth plugins and social providers the page was written against. */
@@ -147,7 +154,7 @@ describe("the privacy page's cookie list", () => {
     const auth = getCookies(options);
     const plugin = createCookieGetter(options);
     const names = [
-      ...Object.values(KNOWN),
+      ...Object.values(KNOWN).flat(),
       auth.sessionToken.name,
       auth.sessionData.name,
       auth.dontRememberToken.name,

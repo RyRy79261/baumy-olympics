@@ -51,13 +51,13 @@ export default async function SettingsPage() {
     <>
       <PageHeading
         title="Settings"
-        description="Your character, your sign-in security, your kiosk PIN, your Telegram link and your connected apps."
+        description="Your character, your sign-in security, your personal PIN, your Telegram link and your connected apps."
       />
       <div className="flex max-w-xl flex-col gap-6">
         {row?.kioskPinLockedAt ? (
           <FormMessage tone="error">
-            Your kiosk PIN is locked after too many wrong tries. Set a new PIN
-            below to unlock it.
+            Your personal PIN is locked after too many wrong tries. Set a new
+            PIN below to unlock it.
           </FormMessage>
         ) : null}
         {show ? (

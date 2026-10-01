@@ -57,6 +57,7 @@ describe("useTestDb", () => {
       "households",
       "invite_codes",
       "kiosk_devices",
+      "kiosk_pairing_requests",
       "login_requests",
       "mcp_access_tokens",
       "mcp_auth_codes",
