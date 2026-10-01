@@ -1,12 +1,30 @@
 # Kitchen iPad setup
 
 How to turn the iPad into the always-on kitchen screen (SPEC §8, issue #29).
-Pairing itself is in [SETUP.md](SETUP.md#kiosk-issue-10).
 
-## 1. Install it to the home screen
+## 1. Pair it, then install it to the home screen
 
-1. Pair the iPad first: open `https://<production host>/kiosk/pair` in
-   Safari and type the code from `/admin/members`.
+1. Pair the iPad by scanning it (issue #126). Nothing is typed on the iPad:
+   1. On the iPad, open `https://<production host>/kiosk` in Safari. It
+      is not paired yet, so it shows **Make this the kitchen screen** with
+      a big QR code and a short code (`ABC-234`) under it.
+   2. On your phone, signed in to Baumy as an admin, point the camera at
+      the QR code and open the link.
+   3. The phone asks **Make this iPad the kitchen screen?** with the code
+      (check it matches the iPad), the browser that asked and the name
+      "Kitchen". Tap **Make it the kitchen screen**.
+   4. The iPad switches to the kitchen home by itself within a couple of
+      seconds.
+
+   If the camera will not read the code, open Admin → **Kitchen screen** on
+   the phone and type the short code instead. A code lasts 10 minutes and
+   works once; the iPad shows a new one by itself. Rename the screen or sign
+   it out on Admin → Kitchen screen.
+
+   This is not the **personal PIN** in Settings: that is each housemate's
+   own 4 to 6 digits, which the kitchen screen asks for before it confirms
+   something as them. Pairing needs no PIN.
+
 2. On `/kiosk`, tap Share → **Add to Home Screen**. Keep the name "Baumy".
 3. Open Baumy from the home screen. It opens full screen, with no Safari
    bars (`display: standalone` in `app/manifest.ts`, and `appleWebApp`

@@ -2206,7 +2206,8 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `remove_passkey`: The member's own account settings: only in the app, signed in.
 - `unlink_google`: The member's own account settings: only in the app, signed in.
 - `set_first_password`: The member's own account settings: only in the app, signed in.
-- `pair_kiosk`: An admin action: UI only (SPEC §12 decision 10).
+- `approve_kiosk_pairing`: An admin action: UI only (SPEC §12 decision 10).
+- `rename_kiosk`: An admin action: UI only (SPEC §12 decision 10).
 - `revoke_kiosk`: An admin action: UI only (SPEC §12 decision 10).
 - `create_service_token`: An admin action: UI only (SPEC §12 decision 10).
 - `rotate_service_token`: An admin action: UI only (SPEC §12 decision 10).
