@@ -5,12 +5,11 @@ import {
   dateKeyWeekday,
 } from "@baumy/core";
 import {
-  avatarFor,
   isCalendarDate,
   type AvatarSprites,
   type ChoreKind,
 } from "@baumy/types";
-import { HOUSE_COLOUR, SHIRT_COLOURS } from "@baumy/ui";
+import { HOUSE_COLOUR } from "@baumy/ui";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import type { NoteView } from "@/lib/actions/notes";
 import {
@@ -25,31 +24,18 @@ import {
 // the bounty and message modules, and the month grid with its day sheet.
 // Days and times are Berlin's (packages/core time.ts).
 
-/** A member as the dashboard draws them: their character and its colour. */
+/** A member as the dashboard shows them: their character and colour. */
 export interface DashboardMember {
   id: string;
   displayName: string;
-  /**
-   * Their character: chosen, or the roster's default (`rosterAvatars`), so
-   * no two active members wear the same shirt until there are more members
-   * than shirts.
-   */
-  avatar: unknown;
-  /** Their gallery sprite (issue #111), drawn instead when they picked one. */
+  /** Their colour (`members.color`): chips, names and the initial tile. */
+  color: string;
+  /** Their gallery sprite (issue #111); without one, their initial tile. */
   sprites?: AvatarSprites | null;
 }
 
-/** The house's colour (the kit's `--color-bm-house`), which no shirt uses. */
+/** The house's colour (the kit's `--color-bm-house`), which no member colour offered uses. */
 export { HOUSE_COLOUR };
-
-/**
- * A member's colour on the dashboard: their character's shirt (the
- * prototype's per-housemate colour), so a chip, a name and a character
- * always agree.
- */
-export function memberColour(m: { id: string; avatar: unknown }): string {
-  return SHIRT_COLOURS[avatarFor({ id: m.id, avatar: m.avatar }).shirtColor];
-}
 
 /** Who a calendar event or message is from, for its colour and name. */
 export function whoOf(
@@ -58,7 +44,7 @@ export function whoOf(
 ): { member: DashboardMember | null; name: string; colour: string } {
   const member = members.find((m) => m.id === memberId) ?? null;
   return member
-    ? { member, name: member.displayName, colour: memberColour(member) }
+    ? { member, name: member.displayName, colour: member.color }
     : { member: null, name: "House", colour: HOUSE_COLOUR };
 }
 

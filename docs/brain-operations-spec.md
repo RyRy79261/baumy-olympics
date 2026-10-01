@@ -164,7 +164,7 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 ## 5. The household, as Olympics models it
 
 - **Members.** Each housemate is a member with a display name, a colour and a
-  16-bit character. One or more are admins; admin work happens in the app,
+  gallery character, if picked. One or more are admins; admin work happens in the app,
   except adding or editing a bounty and recording pot money, which an admin
   may ask Baumy for.
   Nobody is hard-coded: always read names from Olympics.
@@ -2011,7 +2011,7 @@ The reminders on the kitchen screen, who has seen each, and the household's acti
 
 **When to use it.** For "any reminders up?" and "who hasn't seen the plumber one?". Its `members` is also the roster: use it to turn a housemate's name into the member id for X-Baumy-On-Behalf-Of or `doneBy`.
 
-**Tool description** (the registry's, verbatim): Lists the household's active reminders (posted, and neither dismissed nor seen by every member yet), the oldest first, each with its id, title, body, who posted it, when (ISO 8601, UTC), the member ids who have seen it and those still to see it; and the active members (id, name, colour, character).
+**Tool description** (the registry's, verbatim): Lists the household's active reminders (posted, and neither dismissed nor seen by every member yet), the oldest first, each with its id, title, body, who posted it, when (ISO 8601, UTC), the member ids who have seen it and those still to see it; and the active members (id, name, colour, and their gallery character if they picked one).
 
 **Examples.**
 
@@ -2027,7 +2027,7 @@ The reminders on the kitchen screen, who has seen each, and the household's acti
 }
 ```
 
-**Returns** (`data`): `members` (id, name, colour, character) and `reminders` (id, title, body, who posted it, when, `seenBy`, `waitingFor`).
+**Returns** (`data`): `members` (id, `displayName`, `color`, and `sprites`: their gallery character, or null) and `reminders` (id, title, body, who posted it, when, `seenBy`, `waitingFor`).
 
 **Its errors:** none of its own. Every call can also get the endpoint's codes (above).
 
@@ -2183,7 +2183,6 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 ## 8. Not available to Baumy
 
 - `update_my_profile`: The member's own account settings: only in the app, signed in.
-- `update_avatar`: The member's own account settings: only in the app, signed in.
 - `choose_avatar`: The member's own account settings: only in the app, signed in.
 - `preview_avatar`: An admin action: UI only (SPEC §12 decision 10).
 - `add_avatar`: An admin action: UI only (SPEC §12 decision 10).

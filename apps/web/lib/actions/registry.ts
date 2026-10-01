@@ -80,7 +80,6 @@ import {
   listShopping,
 } from "./shopping";
 import { setPrizeMode } from "./set-prize-mode";
-import { updateAvatar } from "./update-avatar";
 import { updateMyProfile } from "./update-my-profile";
 import {
   dismissWeight,
@@ -98,7 +97,6 @@ import { whoami } from "./whoami";
 export const REGISTRY = {
   whoami,
   update_my_profile: updateMyProfile,
-  update_avatar: updateAvatar,
   choose_avatar: chooseAvatar,
   preview_avatar: previewAvatar,
   add_avatar: addAvatar,

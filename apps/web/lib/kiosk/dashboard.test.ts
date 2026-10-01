@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { defaultAvatar } from "@baumy/types";
-import { SHIRT_COLOURS } from "@baumy/ui";
+import { MEMBER_COLORS } from "@baumy/types";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import { NOTE_RECENT_MS, type NoteView } from "@/lib/actions/notes";
 import { eventView } from "@/lib/calendar/view";
@@ -27,7 +26,6 @@ import {
   isUrgentBounty,
   kindLabel,
   longDay,
-  memberColour,
   monthCells,
   monthGridDays,
   monthTitle,
@@ -50,14 +48,13 @@ const at = (h: number) => new Date(NOW.getTime() + h * HOUR).toISOString();
 const RYAN: DashboardMember = {
   id: "m-ryan",
   displayName: "Ryan",
-  avatar: {
-    hairStyle: "short",
-    hairColor: "brown",
-    skinTone: "light",
-    shirtColor: "pink",
-  },
+  color: MEMBER_COLORS[5],
 };
-const JO: DashboardMember = { id: "m-jo", displayName: "Jo", avatar: null };
+const JO: DashboardMember = {
+  id: "m-jo",
+  displayName: "Jo",
+  color: MEMBER_COLORS[1],
+};
 const MEMBERS = [RYAN, JO];
 
 function chore(over: Partial<ChoreView>): ChoreView {
@@ -87,29 +84,22 @@ function chore(over: Partial<ChoreView>): ChoreView {
 }
 
 describe("the house's colour", () => {
-  it("is the kit's --color-bm-house, which no shirt uses", () => {
+  it("is the kit's --color-bm-house, which no member colour offered uses", () => {
     const css = readFileSync(
       path.resolve(import.meta.dirname, "../../app/globals.css"),
       "utf8",
     );
     expect(css).toContain(`--color-bm-house: ${HOUSE_COLOUR};`);
-    expect(Object.values(SHIRT_COLOURS)).not.toContain(HOUSE_COLOUR);
+    expect(MEMBER_COLORS).not.toContain(HOUSE_COLOUR);
   });
 });
 
 describe("members' colours", () => {
-  it("is their character's shirt, their default one without a choice", () => {
-    expect(memberColour(RYAN)).toBe(SHIRT_COLOURS.pink);
-    expect(memberColour(JO)).toBe(
-      SHIRT_COLOURS[defaultAvatar(JO.id).shirtColor],
-    );
-  });
-
   it("finds who an event or note is from, else the house in amber", () => {
     expect(whoOf("m-ryan", MEMBERS)).toEqual({
       member: RYAN,
       name: "Ryan",
-      colour: SHIRT_COLOURS.pink,
+      colour: MEMBER_COLORS[5],
     });
     for (const id of [null, "m-gone"]) {
       expect(whoOf(id, MEMBERS)).toEqual({
@@ -223,7 +213,7 @@ describe("bountyRows", () => {
         holderId: "m-ryan",
         holderName: "Ryan",
         length: 6,
-        colour: SHIRT_COLOURS.pink,
+        colour: MEMBER_COLORS[5],
       },
       loggable: true,
     });

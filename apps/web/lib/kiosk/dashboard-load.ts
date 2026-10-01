@@ -1,7 +1,6 @@
 import "server-only";
 
 import { berlinDateKey } from "@baumy/core";
-import { rosterAvatars } from "@baumy/types";
 import type { Queryable } from "@baumy/db";
 import { listActiveMembers } from "@baumy/db/members";
 import type { RequestCtx } from "@/lib/actions/define";
@@ -55,7 +54,7 @@ async function read<T, U>(
 export async function loadDashboard(
   ctx: RequestCtx,
   month: string,
-  /** For the members' characters: a read, so the HTTP driver will do. */
+  /** For the members' looks: a read, so the HTTP driver will do. */
   db: Queryable,
 ): Promise<DashboardData> {
   const days = monthGridDays(month);
@@ -74,8 +73,6 @@ export async function loadDashboard(
     ),
     listActiveMembers(db, ctx.householdId),
   ]);
-  // Members who have not chosen a character wear shirts nobody else wears.
-  const roster = rosterAvatars(members);
   return {
     now: ctx.now.toISOString(),
     today: berlinDateKey(ctx.now),
@@ -83,7 +80,7 @@ export async function loadDashboard(
     members: members.map((m) => ({
       id: m.id,
       displayName: m.displayName,
-      avatar: roster.get(m.id),
+      color: m.color,
       sprites: avatarImageView(m.avatarImage),
     })),
     chores,

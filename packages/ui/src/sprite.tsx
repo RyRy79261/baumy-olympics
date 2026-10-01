@@ -8,10 +8,8 @@ import {
 import { cx } from "./cx";
 
 // A sprite by name (SPEC §7). "baumy" is the cat (BaumyCat), in its state;
-// any other name is what `members.avatar_sprite` or `chores.sprite` stores,
-// drawn as a pixel tile with its initial until those get art of their own
-// (members get their 16-bit character, Housemate). `size` is the integer
-// scale of a 16px cell.
+// any other name is drawn as a pixel tile with its initial (members are
+// shown by MemberCharacter). `size` is the integer scale of a 16px cell.
 
 export { BAUMY_STATES, SPRITE_MOTION, type SpriteState };
 

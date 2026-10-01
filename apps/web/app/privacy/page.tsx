@@ -105,10 +105,12 @@ export default function PrivacyPage() {
             or a place.
           </li>
           <li>
-            <strong>Your member profile:</strong> display name, colour, your
-            16-bit character, your role, your kiosk PIN (as a hash only), your
-            Telegram user id if you link Telegram, and whether your membership
-            is switched off.
+            <strong>Your member profile:</strong> display name, colour, the
+            gallery character you picked (if any), your role, your kiosk PIN (as
+            a hash only), your Telegram user id if you link Telegram, and
+            whether your membership is switched off. A drawn character chosen
+            before characters moved to the gallery (hair, skin and shirt) is
+            still stored on it but is no longer shown or used.
           </li>
           <li>
             <strong>The game:</strong> chores, every completion (who did it, who
@@ -404,8 +406,9 @@ export default function PrivacyPage() {
             (everyone&apos;s scores are rebuilt from it), and the audit log
             keeps its copies, including your earlier names. The admin can rename
             the entry, change its colour and avatar, and unlink your Telegram
-            account in the app; your PIN hash and your chosen 16-bit character
-            stay on it unless the owner clears them in the database.
+            account in the app; your PIN hash, your gallery pick and any old
+            drawn character stay on it unless the owner clears them in the
+            database.
           </li>
           <li>
             For a copy of what we hold about you, or anything else removed, ask

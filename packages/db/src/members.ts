@@ -1,5 +1,4 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
-import type { MemberAvatar } from "@baumy/types";
 import { withAvatarImages, type AvatarImageRef } from "./avatars";
 import { createHttpDb, type Queryable } from "./index";
 import { members } from "./schema";
@@ -13,8 +12,6 @@ export interface ActiveMember {
   householdId: string;
   role: "admin" | "member";
   displayName: string;
-  /** `members.avatar` as stored (null until chosen): `avatarFor` reads it. */
-  avatar: unknown;
 }
 
 /**
@@ -30,7 +27,6 @@ export async function findActiveMemberByAuthUserId(
       householdId: members.householdId,
       role: members.role,
       displayName: members.displayName,
-      avatar: members.avatar,
     })
     .from(members)
     .where(
@@ -61,8 +57,6 @@ export interface NewMember {
   authUserId: string;
   displayName: string;
   avatarSprite: string;
-  /** The character picked on the join form; null or left out: the default. */
-  avatar?: MemberAvatar | null;
   /** The gallery character picked on /join (issue #111), if any. */
   avatarImageId?: string | null;
   color: string;
@@ -193,7 +187,6 @@ export type MemberPatch = Partial<
     typeof members.$inferInsert,
     | "displayName"
     | "avatarSprite"
-    | "avatar"
     | "color"
     | "role"
     | "deactivatedAt"
@@ -250,19 +243,12 @@ export interface KioskMember {
   id: string;
   displayName: string;
   avatarSprite: string;
+  /** Their colour (`#rrggbb`): the initial tile, the calendar, the names. */
   color: string;
-  /**
-   * Their 16-bit character (`members.avatar`, ADR 0005 §5) as stored: null
-   * until they choose one. `avatarFor` (packages/types) reads it, and the
-   * Housemate draws their default character for null.
-   */
-  avatar: unknown;
 }
 
-/** An active member with their 16-bit character (`members.avatar`). */
+/** An active member with their gallery character, if they picked one. */
 export interface KioskMemberWithAvatar extends KioskMember {
-  /** As stored: `avatarFor` (packages/types) reads it; null is the default. */
-  avatar: unknown;
   /** The gallery character they picked (issue #111), or null. */
   avatarImage: AvatarImageRef | null;
 }
@@ -278,7 +264,6 @@ export async function listActiveMembers(
       displayName: members.displayName,
       avatarSprite: members.avatarSprite,
       color: members.color,
-      avatar: members.avatar,
       avatarImageId: members.avatarImageId,
     })
     .from(members)
@@ -301,7 +286,6 @@ export async function findActiveMember(
       displayName: members.displayName,
       avatarSprite: members.avatarSprite,
       color: members.color,
-      avatar: members.avatar,
     })
     .from(members)
     .where(

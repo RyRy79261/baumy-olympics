@@ -39,7 +39,7 @@ vi.mock("@/lib/integrations/groq", () => ({ voiceConfigured: () => false }));
 vi.mock("@/lib/actions/registry", () => ({ runAction: vi.fn() }));
 vi.mock("@/lib/background-work", () => ({ runSweepAfterResponse: vi.fn() }));
 vi.mock("@/lib/members/characters", () => ({
-  activeCharacters: async () => new Map(),
+  activeRoster: async () => new Map(),
   rosterColours: () => ({}),
 }));
 

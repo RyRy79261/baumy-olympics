@@ -19,8 +19,6 @@ export interface ReminderMember {
   id: string;
   displayName: string;
   color: string;
-  /** `members.avatar` as stored: `avatarFor` (packages/types) reads it. */
-  avatar: unknown;
   /** The gallery sprite they picked (issue #111), or null. */
   avatarImage: AvatarImageRef | null;
   /** When they joined: only reminders posted since then wait for them. */
@@ -189,7 +187,6 @@ export async function listActiveReminders(
         id: members.id,
         displayName: members.displayName,
         color: members.color,
-        avatar: members.avatar,
         createdAt: members.createdAt,
         avatarImageId: members.avatarImageId,
       })

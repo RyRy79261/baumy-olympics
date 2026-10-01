@@ -1,26 +1,8 @@
-import {
-  AVATAR_HAIR_COLORS,
-  AVATAR_HAIR_STYLES,
-  AVATAR_SHIRT_COLORS,
-  AVATAR_SKIN_TONES,
-  defaultAvatar,
-  type MemberAvatar,
-} from "@baumy/types";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { BAUMY_STATE_FRAMES, BaumyCat, baumyFrames } from "../baumy-cat";
 import { BAUMY_STATES, SPRITE_MOTION, STATE_MARK } from "../baumy-states";
 import { choreGlyph, ChoreTile } from "../chores";
-import {
-  HAIR_COLOURS,
-  HAIR_STYLE_HEADS,
-  HOUSE_COLOUR,
-  Housemate,
-  SHIRT_COLOURS,
-  SKIN_TONES,
-  housemateGrid,
-  housematePalette,
-} from "../housemate";
 import { AvatarButton } from "../kiosk-shell";
 import {
   BAUMY_COLOURS,
@@ -155,80 +137,6 @@ describe("BaumyCat", () => {
   });
 });
 
-const EVERY_AVATAR: MemberAvatar[] = AVATAR_HAIR_STYLES.flatMap(
-  (hairStyle, i) =>
-    AVATAR_HAIR_COLORS.map((hairColor, j) => ({
-      hairStyle,
-      hairColor,
-      skinTone: AVATAR_SKIN_TONES[(i + j) % AVATAR_SKIN_TONES.length]!,
-      shirtColor:
-        AVATAR_SHIRT_COLORS[(i * 2 + j) % AVATAR_SHIRT_COLORS.length]!,
-    })),
-);
-
-describe("Housemate", () => {
-  it("has art for every id packages/types offers", () => {
-    for (const s of AVATAR_HAIR_STYLES)
-      expect(HAIR_STYLE_HEADS[s]).toBeDefined();
-    for (const c of AVATAR_HAIR_COLORS) expect(HAIR_COLOURS[c]).toMatch(/^#/);
-    for (const t of AVATAR_SKIN_TONES) expect(SKIN_TONES[t]).toMatch(/^#/);
-    for (const c of AVATAR_SHIRT_COLORS) expect(SHIRT_COLOURS[c]).toMatch(/^#/);
-  });
-
-  it("keeps the house's colour off every shirt", () => {
-    expect(HOUSE_COLOUR).toBe("#9d90bf");
-    expect(Object.values(SHIRT_COLOURS)).not.toContain(HOUSE_COLOUR);
-    // The shirts are all different, so members never share a colour.
-    expect(new Set(Object.values(SHIRT_COLOURS)).size).toBe(
-      AVATAR_SHIRT_COLORS.length,
-    );
-  });
-
-  it("is a 12 × 17 person in every hair style, every pixel coloured", () => {
-    for (const a of EVERY_AVATAR) {
-      const grid = housemateGrid(a.hairStyle);
-      expect(gridSize(grid)).toEqual({ w: 12, h: 17 });
-      expect(grid.every((r) => r.length === 12)).toBe(true);
-      const pal = housematePalette(a);
-      for (const row of grid)
-        for (const ch of row) if (ch !== ".") expect(pal[ch]).toBeTruthy();
-    }
-  });
-
-  it("wears the member's chosen hair, skin and shirt", () => {
-    const chosen: MemberAvatar = {
-      hairStyle: "spiky",
-      hairColor: "auburn",
-      skinTone: "deep",
-      shirtColor: "pink",
-    };
-    const out = html(<Housemate avatar={chosen} memberId="m1" scale={2} />);
-    expect(out).toContain('data-hair="spiky"');
-    expect(out).toContain(HAIR_COLOURS.auburn);
-    expect(out).toContain(SKIN_TONES.deep);
-    expect(out).toContain(SHIRT_COLOURS.pink);
-    expect(out).toContain('width="24"');
-  });
-
-  it("falls back to the member's default without a valid choice", () => {
-    const id = "00000000-0000-4000-8000-000000000007";
-    const d = defaultAvatar(id);
-    for (const avatar of [null, undefined, { hairStyle: "mohawk" }]) {
-      const out = html(<Housemate avatar={avatar} memberId={id} />);
-      expect(out).toContain(`data-hair="${d.hairStyle}"`);
-      expect(out).toContain(HAIR_COLOURS[d.hairColor]);
-      expect(out).toContain(SHIRT_COLOURS[d.shirtColor]);
-    }
-  });
-
-  it("is labelled or decorative, and bobs only motion-safe", () => {
-    expect(html(<Housemate label="Ryan" />)).toContain('aria-label="Ryan"');
-    expect(html(<Housemate />)).toContain('aria-hidden="true"');
-    expect(html(<Housemate />)).not.toContain("animate-");
-    expect(html(<Housemate bob />)).toContain("motion-safe:animate-pixel-bob");
-  });
-});
-
 describe("Raccoon", () => {
   it("walks on two frames of one size that differ only in the legs", () => {
     expect(RACCOON_FRAMES).toHaveLength(2);
@@ -281,26 +189,39 @@ describe("choreGlyph", () => {
 });
 
 describe("AvatarButton", () => {
-  it("shows the member's character when it knows the member", () => {
-    const out = html(
-      <AvatarButton
-        displayName="Ryan"
-        sprite="cat"
-        color="#4ff5e6"
-        memberId="m1"
-      />,
-    );
-    expect(out).toContain("data-housemate");
-    expect(out).not.toContain('data-sprite="cat"');
-    expect(out).toContain(">Ryan<");
+  it("shows the member's initial tile in their colour without a gallery character", () => {
+    const out = html(<AvatarButton displayName="ryan" color="#e8743b" />);
+    expect(out).toContain("data-member-initial");
+    expect(out).toContain(">R</span>");
+    // Ink on their colour (initialTileColours).
+    expect(out).toContain("background-color:#e8743b");
+    expect(out).toMatch(/[^-]color:#0b0712/);
+    expect(out).not.toContain("data-member-sprite");
+    expect(out).toContain(">ryan<");
+    // Not picked: no frame in their colour.
+    expect(out).toContain('aria-pressed="false"');
+    expect(out).not.toContain("--pf:#e8743b");
   });
 
-  it("keeps the sprite tile without a member id, framed in their colour when picked", () => {
+  it("shows their gallery character, framed in their colour when picked", () => {
+    const sprites = {
+      idle: {
+        src: "/api/blob?pathname=avatars%2Fa%2Fb.png",
+        width: 28,
+        height: 56,
+      },
+    };
     const out = html(
-      <AvatarButton displayName="Jo" sprite="fox" color="#ff8fc7" selected />,
+      <AvatarButton
+        displayName="Jo"
+        color="#d0467a"
+        sprites={sprites}
+        selected
+      />,
     );
-    expect(out).toContain('data-sprite="fox"');
-    expect(out).toContain("--pf:#ff8fc7");
+    expect(out).toContain("data-member-sprite");
+    expect(out).not.toContain("data-member-initial");
+    expect(out).toContain("--pf:#d0467a");
     expect(out).toContain('aria-pressed="true"');
   });
 });

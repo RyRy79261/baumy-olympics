@@ -2,7 +2,6 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cx } from "./cx";
 import type { AvatarSprites } from "@baumy/types";
 import { MemberCharacter } from "./member-character";
-import { Sprite } from "./sprite";
 
 // The kitchen kiosk's frame in the pixel kit (SPEC §8; ADR 0005): a
 // portrait screen (820×1180) that never scrolls as a page. The content
@@ -74,18 +73,10 @@ export function KioskTopBar({
 
 export interface AvatarButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   displayName: string;
-  /** What `members.avatar_sprite` stores. */
-  sprite: string;
+  /** Their colour (`members.color`): the frame when picked, the initial tile. */
   color: string;
-  /**
-   * The member's 16-bit character (`members.avatar`) and id; given the id,
-   * the button shows their Housemate (their default one without a choice)
-   * instead of the sprite tile.
-   */
-  avatar?: unknown;
-  /** Their gallery sprite (issue #111), drawn instead when they picked one. */
+  /** Their gallery sprite (issue #111); without one, their initial tile. */
   sprites?: AvatarSprites | null;
-  memberId?: string;
   /** Drawn instead of the character (the acting member's score emote). */
   character?: ReactNode;
   /** This member is the one acting now. */
@@ -95,12 +86,9 @@ export interface AvatarButtonProps extends ButtonHTMLAttributes<HTMLButtonElemen
 /** A member's avatar in the kiosk bar: a 64px tap target. */
 export function AvatarButton({
   displayName,
-  sprite,
   color,
   selected = false,
-  avatar,
   sprites,
-  memberId,
   character,
   className,
   type = "button",
@@ -120,17 +108,13 @@ export function AvatarButton({
       style={selected ? { ["--pf" as string]: color } : undefined}
       {...props}
     >
-      {character ? (
-        character
-      ) : memberId ? (
+      {character ?? (
         <MemberCharacter
           sprites={sprites}
-          avatar={avatar}
-          memberId={memberId}
+          name={displayName}
+          colour={color}
           scale={2}
         />
-      ) : (
-        <Sprite name={sprite} color={color} size={2} />
       )}
       <span className="max-w-full truncate whitespace-nowrap">
         {displayName}

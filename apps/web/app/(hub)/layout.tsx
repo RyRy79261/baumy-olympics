@@ -23,11 +23,10 @@ export const dynamic = "force-dynamic";
 export default async function HubLayout({ children }: { children: ReactNode }) {
   const me = await memberOrVisitorPage();
   if (!me) return children;
-  // Their character as every screen draws it (lib/members/characters.ts).
-  const { characters, sprites } = await activeRoster(
-    createHttpDb() as unknown as Queryable,
-    HOUSEHOLD_ID,
-  );
+  // Their look as every screen shows it (lib/members/characters.ts).
+  const look = (
+    await activeRoster(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID)
+  ).get(me.memberId);
   // SPEC §6.7: the daily job's sweep, at most every 15 minutes, after this
   // response (lib/background-work.ts). Nothing on the page waits on it.
   runSweepAfterResponse();
@@ -82,9 +81,9 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
             label={
               <>
                 <ScoreEmote
-                  sprites={sprites.get(me.memberId)}
-                  memberId={me.memberId}
-                  avatar={characters.get(me.memberId) ?? me.avatar}
+                  sprites={look?.sprites}
+                  name={me.displayName}
+                  colour={look?.colour}
                   scale={1}
                 />
                 {/* On a phone only the character shows; the name is still

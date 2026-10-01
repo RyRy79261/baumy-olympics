@@ -12,18 +12,15 @@ import {
   ListRemindersInput,
   NewReminder,
   ReminderRef,
-  avatarFor,
-  rosterAvatars,
   type AvatarSprites,
-  type MemberAvatar,
 } from "@baumy/types";
 import { avatarImageView } from "@/lib/avatars/paths";
 import { defineAction } from "./define";
 import { fail } from "./result";
 
 // Reminders (ADR 0005 §4): a member posts a title and a short body; the
-// kitchen screen shows it full-screen with every active member's character
-// and a "Seen" button under each, until everyone has seen it or a member
+// kitchen screen shows it full-screen with every active member (their gallery
+// character, or their initial in their colour) and a "Seen" button under each, until everyone has seen it or a member
 // dismisses it for everyone.
 //
 // Every action here is `member`, never `attested`: saying "I read this" or
@@ -55,9 +52,8 @@ export interface ReminderView {
 export interface ReminderMemberView {
   id: string;
   displayName: string;
+  /** Their colour (`members.color`). */
   color: string;
-  /** Their chosen character, or the default for their id. */
-  avatar: MemberAvatar;
   /** Their gallery sprite (issue #111), through the proxy, or null. */
   sprites: AvatarSprites | null;
 }
@@ -80,16 +76,11 @@ function reminderView(r: ReminderRow, people: ReminderMember[]): ReminderView {
   };
 }
 
-function memberView(
-  m: ReminderMember,
-  roster: ReadonlyMap<string, MemberAvatar>,
-): ReminderMemberView {
+function memberView(m: ReminderMember): ReminderMemberView {
   return {
     id: m.id,
     displayName: m.displayName,
     color: m.color,
-    // The same character everywhere: chosen, or the roster's default.
-    avatar: roster.get(m.id) ?? avatarFor(m),
     sprites: avatarImageView(m.avatarImage),
   };
 }
@@ -105,7 +96,7 @@ export const listReminders = defineAction({
   name: "list_reminders",
   title: "Reminders",
   description:
-    "Lists the household's active reminders (posted, and neither dismissed nor seen by every member yet), the oldest first, each with its id, title, body, who posted it, when (ISO 8601, UTC), the member ids who have seen it and those still to see it; and the active members (id, name, colour, character).",
+    "Lists the household's active reminders (posted, and neither dismissed nor seen by every member yet), the oldest first, each with its id, title, body, who posted it, when (ISO 8601, UTC), the member ids who have seen it and those still to see it; and the active members (id, name, colour, and their gallery character if they picked one).",
   consent: "Read the household's reminders",
   kind: "read",
   risk: "safe",
@@ -118,10 +109,8 @@ export const listReminders = defineAction({
       ctx.db,
       ctx.householdId,
     );
-    // The active members, in join order: one roster for their characters.
-    const roster = rosterAvatars(members);
     const data: ListRemindersData = {
-      members: members.map((m) => memberView(m, roster)),
+      members: members.map(memberView),
       reminders: reminders.map((r) => reminderView(r, members)),
     };
     return { ok: true, data };

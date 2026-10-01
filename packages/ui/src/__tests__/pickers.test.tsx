@@ -3,21 +3,10 @@ import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import {
-  AVATAR_HAIR_COLORS,
-  AVATAR_HAIR_STYLES,
-  AVATAR_SHIRT_COLORS,
-  AVATAR_SKIN_TONES,
-  CHORE_ICONS,
-  MEMBER_COLORS,
-  MEMBER_COLOR_NAMES,
-  type MemberAvatar,
-} from "@baumy/types";
+import { CHORE_ICONS, MEMBER_COLORS, MEMBER_COLOR_NAMES } from "@baumy/types";
 import { ChoiceGroup } from "../chores";
-import { HAIR_COLOURS, SHIRT_COLOURS } from "../housemate";
 import {
   CHORE_ICON_LABELS,
-  CharacterPicker,
   ChoreIconPicker,
   SwatchPicker,
   TilePicker,
@@ -56,13 +45,6 @@ const radios = (c: ParentNode, name?: string) => [
 const radio = (c: ParentNode, label: string) =>
   radios(c).find((r) => r.getAttribute("aria-label") === label)!;
 const tileOf = (input: HTMLInputElement) => input.closest("label")!;
-
-const ME: MemberAvatar = {
-  hairStyle: "short",
-  hairColor: "auburn",
-  skinTone: "tan",
-  shirtColor: "teal",
-};
 
 describe("SwatchPicker", () => {
   const options = memberColourOptions();
@@ -226,61 +208,6 @@ describe("TilePicker", () => {
   });
 });
 
-describe("CharacterPicker", () => {
-  function Harness({ onSave }: { onSave: (a: MemberAvatar) => void }) {
-    const [a, setA] = useState(ME);
-    return (
-      <CharacterPicker
-        avatar={a}
-        onChange={(next) => {
-          setA(next);
-          onSave(next);
-        }}
-      />
-    );
-  }
-
-  it("shows each hair style as the character wearing it, in my other choices", async () => {
-    const c = await mount(<Harness onSave={vi.fn()} />);
-    const styles = radios(c, "hairStyle");
-    expect(styles.map((r) => r.value)).toEqual([...AVATAR_HAIR_STYLES]);
-    for (const r of styles) {
-      const sprite = tileOf(r).querySelector("[data-housemate]")!;
-      expect(sprite.getAttribute("data-hair")).toBe(r.value);
-      // Drawn in my hair colour and shirt, not a stock palette.
-      const html = sprite.innerHTML.toLowerCase();
-      expect(html).toContain(HAIR_COLOURS[ME.hairColor].toLowerCase());
-      expect(html).toContain(SHIRT_COLOURS[ME.shirtColor].toLowerCase());
-    }
-    expect(radios(c, "hairColor")).toHaveLength(AVATAR_HAIR_COLORS.length);
-    expect(radios(c, "skinTone")).toHaveLength(AVATAR_SKIN_TONES.length);
-    expect(radios(c, "shirtColor")).toHaveLength(AVATAR_SHIRT_COLORS.length);
-    expect(radio(c, "Spiky")).toBeDefined();
-    expect(radio(c, "Platinum")).toBeDefined();
-  });
-
-  it("redraws the preview and every hair tile as choices change", async () => {
-    const onSave = vi.fn();
-    const c = await mount(<Harness onSave={onSave} />);
-    const preview = c.querySelector('[data-testid="avatar-preview"]')!;
-    expect(preview.getAttribute("data-hair-style")).toBe("short");
-    await act(async () => tileOf(radio(c, "Spiky")).click());
-    expect(onSave).toHaveBeenLastCalledWith({ ...ME, hairStyle: "spiky" });
-    expect(preview.getAttribute("data-hair-style")).toBe("spiky");
-    expect(
-      preview.querySelector("[data-housemate]")!.getAttribute("data-hair"),
-    ).toBe("spiky");
-    await act(async () => tileOf(radio(c, "Pink")).click());
-    expect(preview.getAttribute("data-shirt-color")).toBe("pink");
-    const longTile = tileOf(radio(c, "Long"))
-      .querySelector("[data-housemate]")!
-      .innerHTML.toLowerCase();
-    expect(longTile).toContain(SHIRT_COLOURS.pink.toLowerCase());
-    expect(radio(c, "Spiky").checked).toBe(true);
-    expect(radio(c, "Short").checked).toBe(false);
-  });
-});
-
 describe("ChoreIconPicker", () => {
   it("offers every chore icon as its glyph, each a glyph the kit has", async () => {
     for (const icon of CHORE_ICONS) expect(GLYPHS[icon]).toBeDefined();
@@ -348,29 +275,6 @@ describe("after the form resets", () => {
     expect(data.get("color")).toBe(MEMBER_COLORS[5]);
     expect(rose.checked).toBe(true);
     expect(radio(c, MEMBER_COLOR_NAMES[MEMBER_COLORS[0]]).checked).toBe(false);
-  });
-
-  it("a CharacterPicker's form still posts every chosen part", async () => {
-    function Harness() {
-      const [v, setV] = useState<MemberAvatar>(ME);
-      return (
-        <form>
-          <CharacterPicker avatar={v} onChange={setV} />
-        </form>
-      );
-    }
-    const c = await mount(<Harness />);
-    const style = radios(c, "hairStyle").find((r) => r.value !== ME.hairStyle)!;
-    const shirt = radios(c, "shirtColor").find(
-      (r) => r.value !== ME.shirtColor,
-    )!;
-    await act(async () => tileOf(style).click());
-    await act(async () => tileOf(shirt).click());
-    await resetForm(c);
-    const data = new FormData(c.querySelector("form")!);
-    expect(data.get("hairStyle")).toBe(style.value);
-    expect(data.get("shirtColor")).toBe(shirt.value);
-    expect(data.get("hairColor")).toBe(ME.hairColor);
   });
 
   it("a ChoiceGroup's form still posts the chosen option", async () => {

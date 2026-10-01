@@ -40,11 +40,11 @@ const STATE_LABEL = {
 export default async function AdminMembersPage() {
   const me = await requireAdminPage();
   const db = createHttpDb() as unknown as Queryable;
-  const [people, codes, devices, { characters, sprites }] = await Promise.all([
+  const [people, codes, devices, roster] = await Promise.all([
     listMembers(db, HOUSEHOLD_ID),
     listInviteCodes(db, HOUSEHOLD_ID),
     listKioskDevices(db, HOUSEHOLD_ID),
-    // The same characters as every other screen (the active roster).
+    // The same gallery characters as every other screen (the active roster).
     activeRoster(db, HOUSEHOLD_ID),
   ]);
   const at = now();
@@ -69,8 +69,7 @@ export default async function AdminMembersPage() {
                 active={m.deactivatedAt === null}
                 isMe={m.id === me.memberId}
                 telegramUserId={m.telegramUserId}
-                character={characters.get(m.id)}
-                sprites={sprites.get(m.id)}
+                sprites={roster.get(m.id)?.sprites}
               />
             ))}
           </ul>

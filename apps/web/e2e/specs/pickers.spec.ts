@@ -1,17 +1,22 @@
 import { expect, test } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount } from "../lib/household";
 import { pickTile, tileRadio } from "../lib/pickers";
-import { TELEGRAM_ID_MESSAGE } from "@baumy/types";
+import { MEMBER_COLORS, TELEGRAM_ID_MESSAGE } from "@baumy/types";
 
 // Issue #106: pickers show the thing, not its name. A newcomer picks a
-// colour swatch and a character on /join (tap and keyboard), the character
-// is theirs after joining, Settings changes the hair style on the
-// character itself, the admin sees the real character and swatches on the
-// member card (with the Telegram id help), and picks a chore's icon.
+// colour swatch on /join (tap and keyboard); with no gallery character they
+// show as their initial in that colour (issue #116: nothing draws a person,
+// so there is no hair, skin or shirt to pick); the admin sees that tile and
+// the swatches on the member card (with the Telegram id help), and picks a
+// chore's icon.
+
+const ROSE = MEMBER_COLORS[5];
+const rgb = (hex: string) =>
+  `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ")})`;
 
 test.describe.configure({ mode: "default" });
 
-test("a newcomer picks a colour and a character on /join, then a hair style in Settings", async ({
+test("a newcomer picks a colour on /join and shows as their initial in it", async ({
   page,
   browser,
 }, testInfo) => {
@@ -37,69 +42,48 @@ test("a newcomer picks a colour and a character on /join, then a hair style in S
   await expect(tileRadio(form, "Colour", "Rose")).toBeChecked();
   await expect(orange).not.toBeChecked();
 
-  // The hair styles are the character wearing them; the keyboard moves
-  // through a group as it does through any radio group.
-  const preview = form.getByTestId("avatar-preview");
-  await pickTile(form, "Hair style", "Short");
-  await expect(preview).toHaveAttribute("data-hair-style", "short");
-  await tileRadio(form, "Hair style", "Short").focus();
+  // The keyboard moves through the swatches as through any radio group.
+  await tileRadio(form, "Colour", "Rose").focus();
+  await jo.page.keyboard.press("ArrowLeft");
+  await expect(tileRadio(form, "Colour", "Mustard")).toBeChecked();
   await jo.page.keyboard.press("ArrowRight");
-  await expect(tileRadio(form, "Hair style", "Long")).toBeChecked();
-  await expect(preview).toHaveAttribute("data-hair-style", "long");
-  await pickTile(form, "Hair colour", "Platinum");
-  await pickTile(form, "Shirt", "Yellow");
-  await expect(preview).toHaveAttribute("data-shirt-color", "yellow");
+  await expect(tileRadio(form, "Colour", "Rose")).toBeChecked();
+  // Nothing to draw a person with (issue #116).
+  await expect(form.getByRole("group", { name: "Colour" })).toBeVisible();
+  await expect(form.getByRole("group", { name: "Hair style" })).toHaveCount(0);
+  await expect(form.getByTestId("avatar-preview")).toHaveCount(0);
 
   await form.getByRole("button", { name: "Join the household" }).click();
   await expect(jo.page).toHaveURL(/\/$/);
 
-  // Settings starts on the character picked at the door.
-  await jo.page.goto("/settings");
-  const settings = jo.page.getByTestId("avatar-form");
-  await expect(tileRadio(settings, "Hair style", "Long")).toBeChecked();
-  await expect(tileRadio(settings, "Hair colour", "Platinum")).toBeChecked();
-  await expect(tileRadio(settings, "Shirt", "Yellow")).toBeChecked();
-  const spikyTile = tileRadio(settings, "Hair style", "Spiky").locator(
-    "xpath=..",
-  );
-  await expect(spikyTile.locator("[data-housemate]")).toHaveAttribute(
-    "data-hair",
-    "spiky",
-  );
-  await pickTile(settings, "Hair style", "Spiky");
-  await settings.getByRole("button", { name: "Save character" }).click();
-  await expect(
-    jo.page.getByRole("status").filter({ hasText: "Character saved." }),
-  ).toBeVisible();
-  await jo.page.reload();
-  await expect(
-    tileRadio(jo.page.getByTestId("avatar-form"), "Hair style", "Spiky"),
-  ).toBeChecked();
-  await expect(
-    jo.page.getByTestId("account-menu").locator("[data-housemate]").first(),
-  ).toHaveAttribute("data-hair", "spiky");
+  // The header: their initial, in Rose.
+  const mine = jo.page.getByTestId("account-menu");
+  const tile = mine.locator("[data-member-initial]").first();
+  await expect(tile).toHaveText("P");
+  await expect(tile).toHaveCSS("background-color", rgb(ROSE));
+  await expect(mine.locator("[data-housemate]")).toHaveCount(0);
+  await jo.context.close();
 
-  // The admin's member card: the real character, the colour as swatches
-  // (Rose chosen), and no legacy avatar select.
+  // The admin's member card: the same tile, the colour as swatches (Rose
+  // chosen), and no legacy avatar select.
   await page.goto("/admin/members");
   const card = page.getByTestId(`member-${name}`);
   await card.getByText("Edit name and colour").click();
-  await expect(card.locator("[data-housemate]").first()).toHaveAttribute(
-    "data-hair",
-    "spiky",
-  );
+  const cardTile = card.locator("[data-member-initial]").first();
+  await expect(cardTile).toHaveText("P");
+  await expect(cardTile).toHaveCSS("background-color", rgb(ROSE));
   await expect(tileRadio(card, "Colour", "Rose")).toBeChecked();
   await expect(
     card.getByText(`Only ${name} can change their character`),
   ).toBeVisible();
   await expect(card.getByLabel("Avatar")).toHaveCount(0);
-  await jo.context.close();
 });
 
 // React resets a form after every action, which puts radios back to their
 // page-load choice while the tiles still show the pick (issue #106 review).
-// Each form here is submitted twice without a reload; the second submit
-// must still send what the tiles show.
+// Each form here is submitted twice without a reload (the join after a
+// failure, the admin card saved twice); the second submit must still send
+// what the tiles show.
 test("picks survive a failed join and a second save", async ({
   page,
   browser,
@@ -112,8 +96,8 @@ test("picks survive a failed join and a second save", async ({
   const posted = (p: typeof page) =>
     p.waitForResponse((r) => r.request().method() === "POST");
 
-  // A wrong code first, then the right one: the join keeps the colour and
-  // character picked before the failure.
+  // A wrong code first, then the right one: the join keeps the colour
+  // picked before the failure.
   const jo = await newAccount(browser, `twice-${project}`);
   const form = jo.page.locator("form").filter({
     has: jo.page.getByRole("button", { name: "Join the household" }),
@@ -121,41 +105,14 @@ test("picks survive a failed join and a second save", async ({
   await form.getByLabel("Invite code").fill("NOPENOPE1");
   await form.getByLabel("Your name").fill(name);
   await pickTile(form, "Colour", "Rose");
-  await pickTile(form, "Hair style", "Spiky");
-  await pickTile(form, "Shirt", "Yellow");
   await form.getByRole("button", { name: "Join the household" }).click();
   await expect(form.getByText("That invite code doesn't exist")).toBeVisible();
   await expect(tileRadio(form, "Colour", "Rose")).toBeChecked();
-  await expect(tileRadio(form, "Hair style", "Spiky")).toBeChecked();
-  await expect(tileRadio(form, "Shirt", "Yellow")).toBeChecked();
   await form.getByLabel("Invite code").fill(code);
   await form.getByLabel("Your name").fill(name);
   await form.getByRole("button", { name: "Join the household" }).click();
   await expect(jo.page).toHaveURL(/\/$/);
 
-  // Settings, saved twice without a reload: the second save changes only
-  // the shirt, and the hair style from the first save stays.
-  await jo.page.goto("/settings");
-  const settings = jo.page.getByTestId("avatar-form");
-  await expect(tileRadio(settings, "Hair style", "Spiky")).toBeChecked();
-  await expect(tileRadio(settings, "Shirt", "Yellow")).toBeChecked();
-  const saveCharacter = settings.getByRole("button", {
-    name: "Save character",
-  });
-  await pickTile(settings, "Hair style", "Long");
-  let done = posted(jo.page);
-  await saveCharacter.click();
-  await done;
-  await expect(settings.getByText("Character saved.")).toBeVisible();
-  await pickTile(settings, "Shirt", "Teal");
-  done = posted(jo.page);
-  await saveCharacter.click();
-  await done;
-  await expect(settings.getByText("Character saved.")).toBeVisible();
-  await jo.page.reload();
-  const reread = jo.page.getByTestId("avatar-form");
-  await expect(tileRadio(reread, "Hair style", "Long")).toBeChecked();
-  await expect(tileRadio(reread, "Shirt", "Teal")).toBeChecked();
   await jo.context.close();
 
   // The admin card: Rose from the join; a new colour saved twice stays.
@@ -165,7 +122,7 @@ test("picks survive a failed join and a second save", async ({
   await expect(tileRadio(card, "Colour", "Rose")).toBeChecked();
   await pickTile(card, "Colour", "Green");
   const save = card.getByRole("button", { name: "Save", exact: true });
-  done = posted(page);
+  let done = posted(page);
   await save.click();
   await done;
   await expect(card.getByText("Saved.", { exact: true })).toBeVisible();

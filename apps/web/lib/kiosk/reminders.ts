@@ -26,15 +26,13 @@ export function kioskShowsReminders(
   return !isTestMode(env) || testCookie === "on";
 }
 
-/**
- * A housemate on the reminder screen (packages/ui ReminderFace). No colour:
- * the screen colours each face by their character's shirt.
- */
+/** A housemate on the reminder screen (packages/ui ReminderFace). */
 export interface ReminderFaceView {
   id: string;
   displayName: string;
-  avatar: unknown;
-  /** Their gallery sprite, or null for the drawn character. */
+  /** Their colour (`members.color`). */
+  colour: string;
+  /** Their gallery sprite, or null for their initial tile. */
   sprites: AvatarSprites | null;
   seen: boolean;
 }
@@ -55,7 +53,7 @@ export function reminderFaces(
     .map((m) => ({
       id: m.id,
       displayName: m.displayName,
-      avatar: m.avatar,
+      colour: m.color,
       sprites: m.sprites,
       seen: seen.has(m.id),
     }));

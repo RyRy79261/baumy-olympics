@@ -125,11 +125,9 @@ export interface MemberRowProps {
   isMe: boolean;
   telegramUserId: number | null;
   /**
-   * Their character as every screen draws it (lib/members/characters.ts);
-   * a member who has left is drawn from their id.
+   * Their gallery character (issue #111), if they picked one; without it,
+   * their initial in their colour.
    */
-  character?: unknown;
-  /** Their gallery character (issue #111), if they picked one. */
   sprites?: AvatarSprites | null;
 }
 
@@ -216,8 +214,8 @@ export function MemberControls(props: MemberRowProps) {
       <div className="flex flex-wrap items-center gap-3">
         <MemberCharacter
           sprites={props.sprites}
-          avatar={props.character}
-          memberId={props.id}
+          name={props.displayName}
+          colour={props.color}
           scale={2}
           label={`${props.displayName}'s character`}
         />
@@ -314,8 +312,8 @@ export function MemberControls(props: MemberRowProps) {
               <span className="pixel-frame inline-flex bg-bm-ink p-2">
                 <MemberCharacter
                   sprites={props.sprites}
-                  avatar={props.character}
-                  memberId={props.id}
+                  name={props.displayName}
+                  colour={props.color}
                   scale={3}
                   label={`${props.displayName}'s character`}
                 />

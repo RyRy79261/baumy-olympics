@@ -164,7 +164,7 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 ## 5. The household, as Olympics models it
 
 - **Members.** Each housemate is a member with a display name, a colour and a
-  16-bit character. One or more are admins; admin work happens in the app,
+  gallery character, if picked. One or more are admins; admin work happens in the app,
   except adding or editing a bounty and recording pot money, which an admin
   may ask Baumy for.
   Nobody is hard-coded: always read names from Olympics.

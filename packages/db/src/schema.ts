@@ -346,14 +346,15 @@ export const members = pgTable(
     displayName: text("display_name").notNull(),
     avatarSprite: text("avatar_sprite").notNull(),
     /**
-     * The member's 16-bit character (ADR 0005 §5): `MemberAvatar` in
-     * packages/types. Null until they choose one; `avatarFor` then draws the
-     * default picked from their id.
+     * UNUSED since issue #116 (owner ruling 2026-09-29, "Burn it"): it held
+     * the drawn character's hair, skin and shirt ids, and nothing reads or
+     * writes it now. Kept, not dropped, so no migration touches member data;
+     * a later cleanup may drop it.
      */
     avatar: jsonb("avatar"),
     /**
-     * The gallery sprite they picked (issue #111), or null: then the
-     * parametric character above is drawn instead. Two members may pick the
+     * The gallery sprite they picked (issue #111), or null: then their
+     * initial in their `color` is shown instead. Two members may pick the
      * same one. Archiving a sprite hides it from the gallery but keeps it on
      * whoever already wears it, so nothing ever deletes the row this points
      * at.
