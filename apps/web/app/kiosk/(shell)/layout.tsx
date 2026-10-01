@@ -44,13 +44,11 @@ export default async function KioskLayout({
 }: {
   children: ReactNode;
 }) {
-  // The avatar bar's members are read alongside the device (issue #128),
-  // and shared with the page below (lib/members/household.ts).
-  const [kiosk, people] = await Promise.all([
-    getKioskActor(),
-    householdMembers(HOUSEHOLD_ID),
-  ]);
+  const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
+  // The avatar bar's members: one read, shared with the page below
+  // (lib/members/household.ts, issue #128), and only for a paired device.
+  const members = householdMembers(HOUSEHOLD_ID);
   // The kitchen screen is the page loaded most: it runs the daily job's
   // sweep too, at most every 15 minutes (lib/background-work.ts).
   runSweepAfterResponse();
@@ -58,6 +56,7 @@ export default async function KioskLayout({
   const night = kioskNightWindow(
     (await cookies()).get(NIGHT_TEST_COOKIE)?.value,
   );
+  const people = await members;
 
   const avatars = people.map((p) => (
     <form key={p.id} action={pickMemberAction}>

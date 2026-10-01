@@ -435,7 +435,7 @@ describe("step 4: rate limits", () => {
     ]);
   });
 
-  it("counts both buckets at once, not one after the other (issue #128)", async () => {
+  it("counts a read's two buckets at once, not one after the other (issue #128)", async () => {
     const me = await seedMember(db());
     const started: string[] = [];
     let release!: () => void;
@@ -451,18 +451,74 @@ describe("step 4: rate limits", () => {
       },
     });
     const pending = run(
-      "test_rename",
-      { name: "A" },
+      "test_read",
+      {},
       ctxFor(sessionActor(me), { ip: "1.2.3.4" }),
     );
     // Let the runner reach step 4; neither bucket has answered yet.
     await vi.waitFor(() => expect(started).toHaveLength(2));
     expect(started).toEqual([
-      `action:test_rename:member:${me}`,
-      "action:test_rename:ip:1.2.3.4",
+      `action:test_read:member:${me}`,
+      "action:test_read:ip:1.2.3.4",
     ]);
     release();
     expect((await pending).ok).toBe(true);
+  });
+
+  it("never spends the shared IP bucket on a write the actor's bucket refused", async () => {
+    // brain's calls share one server IP and a house shares one home IP: one
+    // member retrying must not use up everyone's budget (issue #128 review).
+    const me = await seedMember(db());
+    const asked: string[] = [];
+    run = createRunner(registry, {
+      ...deps,
+      rateLimiter: {
+        limit: async (key) => {
+          asked.push(key);
+          return key.includes(":ip:")
+            ? { ok: true, retryAfterSeconds: 0 }
+            : { ok: false, retryAfterSeconds: 3 };
+        },
+      },
+    });
+    const res = await run(
+      "test_rename",
+      { name: "A" },
+      ctxFor(sessionActor(me), { ip: "1.2.3.4" }),
+    );
+    expect(res).toMatchObject({ ok: false, code: "RATE_LIMITED" });
+    expect(asked).toEqual([`action:test_rename:member:${me}`]);
+    expect(executed).not.toHaveBeenCalled();
+  });
+
+  it("keeps a read with its own budget one bucket after the other", async () => {
+    const me = await seedMember(db());
+    const asked: string[] = [];
+    run = createRunner(
+      {
+        ...registry,
+        test_read: {
+          ...registry.test_read!,
+          rateLimit: { perMember: 5, perIp: 30, windowMs: 60_000 },
+        },
+      },
+      {
+        ...deps,
+        rateLimiter: {
+          limit: async (key) => {
+            asked.push(key);
+            return { ok: false, retryAfterSeconds: 3 };
+          },
+        },
+      },
+    );
+    const res = await run(
+      "test_read",
+      {},
+      ctxFor(sessionActor(me), { ip: "1.2.3.4" }),
+    );
+    expect(res).toMatchObject({ ok: false, retryAfterSeconds: 3 });
+    expect(asked).toEqual([`action:test_read:member:${me}`]);
   });
 
   it("reports the actor's bucket first when both are empty", async () => {
@@ -477,8 +533,8 @@ describe("step 4: rate limits", () => {
       },
     });
     const res = await run(
-      "test_rename",
-      { name: "A" },
+      "test_read",
+      {},
       ctxFor(sessionActor(me), { ip: "1.2.3.4" }),
     );
     expect(res).toMatchObject({
