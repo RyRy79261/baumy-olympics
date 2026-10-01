@@ -27,9 +27,11 @@ export const metadata: Metadata = { title: "Needs your OK" };
 export default async function InboxPage() {
   const me = await requireMemberPage();
   const ctx = (await uiRequestCtx(undefined))!;
-  const listed = await runAction("get_pending_confirmations", {}, ctx);
-  // Weight changes waiting to apply, which any other member may veto.
-  const weights = await runAction("get_weights", { scheduledOnly: true }, ctx);
+  const [listed, weights] = await Promise.all([
+    runAction("get_pending_confirmations", {}, ctx),
+    // Weight changes waiting to apply, which any other member may veto.
+    runAction("get_weights", { scheduledOnly: true }, ctx),
+  ]);
   const scheduled = weights.ok ? weights.data.scheduled : [];
   const actions = {
     confirm: confirmClaimAction,

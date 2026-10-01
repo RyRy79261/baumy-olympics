@@ -8,7 +8,7 @@ import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { memberOrVisitorPage } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
-import { activeRoster } from "@/lib/members/characters";
+import { householdRoster } from "@/lib/members/household";
 import { ScoreEmote } from "@/components/members/score-emote";
 import { HubMenu, InboxBadge, NavLinks, type NavItem } from "./nav-links";
 
@@ -23,25 +23,24 @@ export const dynamic = "force-dynamic";
 export default async function HubLayout({ children }: { children: ReactNode }) {
   const me = await memberOrVisitorPage();
   if (!me) return children;
-  // Their look as every screen shows it (lib/members/characters.ts).
-  const look = (
-    await activeRoster(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID)
-  ).get(me.memberId);
   // SPEC §6.7: the daily job's sweep, at most every 15 minutes, after this
   // response (lib/background-work.ts). Nothing on the page waits on it.
   runSweepAfterResponse();
-  // SPEC §6.2: after 10 wrong PINs at the kiosk, the member hears about it
-  // on their own device, on every page, until they set a new PIN.
-  const pinLockedAt = await findKioskPinLockedAt(
-    createHttpDb() as unknown as Queryable,
-    me.memberId,
-  );
-  // "Needs your OK" shows how many claims wait on this member (SPEC §4.3).
-  const pending = await runAction(
-    "get_pending_confirmations",
-    {},
-    (await uiRequestCtx(undefined))!,
-  );
+  // The frame's three reads are independent, so they run side by side
+  // (issue #128): one database round trip of waiting, not three.
+  const db = createHttpDb() as unknown as Queryable;
+  const [roster, pinLockedAt, pending] = await Promise.all([
+    // Their look as every screen shows it (lib/members/characters.ts).
+    householdRoster(HOUSEHOLD_ID),
+    // SPEC §6.2: after 10 wrong PINs at the kiosk, the member hears about it
+    // on their own device, on every page, until they set a new PIN.
+    findKioskPinLockedAt(db, me.memberId),
+    // "Needs your OK" shows how many claims wait on this member (SPEC §4.3).
+    uiRequestCtx(undefined).then((ctx) =>
+      runAction("get_pending_confirmations", {}, ctx!),
+    ),
+  ]);
+  const look = roster.get(me.memberId);
   const waiting = pending.ok ? pending.data.needsYouCount : 0;
   // The main pages are the nav, named as on the kitchen screen (ADR 0005:
   // chores are Bounties, notes are the Board); Admin and the account fold into menus

@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { berlinMonthKey, formatMonthKey } from "@baumy/core";
-import { createHttpDb, type Queryable } from "@baumy/db";
-import { listActiveMembers } from "@baumy/db/members";
 import { Card, FormMessage, PageHeading, Stat, Table, Td, Th } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
+import { householdMembers } from "@/lib/members/household";
 import { formatEuros } from "@/lib/scores/view";
 import { AddContributionForm } from "./pot-forms";
 
@@ -19,7 +18,11 @@ export const metadata: Metadata = { title: "Pot" };
 export default async function PotPage() {
   const me = await requireMemberPage();
   const ctx = (await uiRequestCtx(undefined))!;
-  const pot = await runAction("get_pot", {}, ctx);
+  // The members are the header's read, shared (issue #128).
+  const [pot, people] = await Promise.all([
+    runAction("get_pot", {}, ctx),
+    householdMembers(ctx.householdId),
+  ]);
   if (!pot.ok) {
     return (
       <>
@@ -30,12 +33,7 @@ export default async function PotPage() {
   }
   const data = pot.data;
   const isAdmin = me.role === "admin";
-  const members = isAdmin
-    ? await listActiveMembers(
-        createHttpDb() as unknown as Queryable,
-        ctx.householdId,
-      )
-    : [];
+  const members = isAdmin ? people : [];
   return (
     <>
       <PageHeading

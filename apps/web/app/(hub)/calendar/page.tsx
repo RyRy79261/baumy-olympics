@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 import { rosterColours } from "@/lib/members/characters";
 import { berlinDateKey } from "@baumy/core";
-import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { listActiveMembers } from "@baumy/db/members";
 import { PageHeading } from "@baumy/ui";
 import { CalendarBoard } from "@/components/calendar/calendar-board";
 import { CalendarStatus } from "@/components/calendar/calendar-status";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
+import { householdMembers } from "@/lib/members/household";
 import { parseViewParams, viewRange } from "@/lib/calendar/view";
 import {
   createEventAction,
@@ -37,7 +36,7 @@ export default async function CalendarPage({
   const range = viewRange(view, date);
   const [listed, people] = await Promise.all([
     runAction("list_events", { from: range.from, to: range.to }, ctx),
-    listActiveMembers(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID),
+    householdMembers(HOUSEHOLD_ID),
   ]);
   return (
     <>

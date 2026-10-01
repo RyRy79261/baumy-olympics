@@ -39,15 +39,15 @@ export const getTelegramLinkStatus = defineAction({
   input: z.strictObject({}),
   async execute(ctx) {
     const memberId = ctx.actor.memberId!;
-    const [row] = await ctx.db
-      .select({ telegramUserId: members.telegramUserId })
-      .from(members)
-      .where(eq(members.id, memberId));
+    // Both reads at once (issue #128).
+    const [[row], latest] = await Promise.all([
+      ctx.db
+        .select({ telegramUserId: members.telegramUserId })
+        .from(members)
+        .where(eq(members.id, memberId)),
+      latestTelegramLinkCodeState(ctx.db, { memberId, now: ctx.now }),
+    ]);
     if (!row) return fail("NOT_FOUND", "Your member profile was not found.");
-    const latest = await latestTelegramLinkCodeState(ctx.db, {
-      memberId,
-      now: ctx.now,
-    });
     const data: TelegramLinkStatus = {
       linked: row.telegramUserId !== null,
       code: latest && {

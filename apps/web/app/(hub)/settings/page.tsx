@@ -25,25 +25,26 @@ export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const me = await requireMemberPage();
-  const [row] = await createHttpDb()
-    .select({
-      kioskPinHash: members.kioskPinHash,
-      kioskPinLockedAt: members.kioskPinLockedAt,
-      avatarImageId: members.avatarImageId,
-      color: members.color,
-    })
-    .from(members)
-    .where(eq(members.id, me.memberId));
-  const telegram = await runAction(
-    "get_telegram_link_status",
-    {},
-    (await uiRequestCtx(undefined))!,
-  );
   const db = createHttpDb() as unknown as Queryable;
-  // The gallery (issue #111): once it has characters, "Your character" is
-  // a pick from it; until then, and until they pick, they show as their
-  // initial in their colour (issue #116).
-  const gallery = await listAvatars(db, HOUSEHOLD_ID);
+  // Three independent reads, side by side (issue #128).
+  const [[row], telegram, gallery] = await Promise.all([
+    db
+      .select({
+        kioskPinHash: members.kioskPinHash,
+        kioskPinLockedAt: members.kioskPinLockedAt,
+        avatarImageId: members.avatarImageId,
+        color: members.color,
+      })
+      .from(members)
+      .where(eq(members.id, me.memberId)),
+    uiRequestCtx(undefined).then((ctx) =>
+      runAction("get_telegram_link_status", {}, ctx!),
+    ),
+    // The gallery (issue #111): once it has characters, "Your character" is
+    // a pick from it; until then, and until they pick, they show as their
+    // initial in their colour (issue #116).
+    listAvatars(db, HOUSEHOLD_ID),
+  ]);
   const { show, live, worn } = showsGalleryForm(gallery, row?.avatarImageId);
   const colour = row?.color ?? "var(--color-bm-muted)";
 

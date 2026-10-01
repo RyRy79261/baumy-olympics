@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { formatBerlinDateTime } from "@baumy/core";
-import { createHttpDb, type Queryable } from "@baumy/db";
-import { listActiveMembers } from "@baumy/db/members";
 import {
   Card,
   FormMessage,
@@ -16,7 +14,7 @@ import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { StandingName } from "@/components/scores/standing-name";
 import { requireMemberPage } from "@/lib/auth";
-import { activeRoster } from "@/lib/members/characters";
+import { householdMembers, householdRoster } from "@/lib/members/household";
 import {
   breakdownLabel,
   disputeLabel,
@@ -44,9 +42,13 @@ export const metadata: Metadata = { title: "Scores" };
 export default async function ScoresPage() {
   const me = await requireMemberPage();
   const ctx = (await uiRequestCtx(undefined))!;
-  const [standings, streaks] = await Promise.all([
+  // Side by side (issue #128); the members are the same read the header's
+  // roster made.
+  const [standings, streaks, roster, people] = await Promise.all([
     runAction("get_standings", {}, ctx),
     runAction("get_streaks", {}, ctx),
+    householdRoster(ctx.householdId),
+    householdMembers(ctx.householdId),
   ]);
   if (!standings.ok || !streaks.ok) {
     const failed = !standings.ok ? standings : streaks;
@@ -65,16 +67,7 @@ export default async function ScoresPage() {
     data.disputesThisMonth.members.map((d) => [d.memberId, d]),
   );
   const leader = data.standings.find((s) => s.memberId === data.leaderId);
-  const roster = await activeRoster(
-    createHttpDb() as unknown as Queryable,
-    ctx.householdId,
-  );
-  const members = isAdmin
-    ? await listActiveMembers(
-        createHttpDb() as unknown as Queryable,
-        ctx.householdId,
-      )
-    : [];
+  const members = isAdmin ? people : [];
 
   return (
     <>
