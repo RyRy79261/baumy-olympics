@@ -9,7 +9,7 @@ import { PairForm } from "./pair-form";
 // that is already paired goes straight to its shell.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Pair this kiosk - Baumy" };
+export const metadata: Metadata = { title: "Pair this kiosk" };
 
 export default async function KioskPairPage() {
   if (await getKioskActor()) redirect("/kiosk");

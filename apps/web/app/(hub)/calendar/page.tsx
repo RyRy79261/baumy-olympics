@@ -24,7 +24,7 @@ import {
 // the calendar is not connected, rather than failing.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Calendar - Baumy Olympics" };
+export const metadata: Metadata = { title: "Calendar" };
 
 export default async function CalendarPage({
   searchParams,

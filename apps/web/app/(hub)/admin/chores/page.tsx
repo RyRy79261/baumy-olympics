@@ -10,7 +10,7 @@ import { ChoreAdminRow, CreateChoreForm } from "./chore-forms";
 // gets a 404 from the page gate, and `manage_chore` refuses them anyway.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Edit chores - Baumy Olympics" };
+export const metadata: Metadata = { title: "Edit chores" };
 
 export default async function AdminChoresPage() {
   await requireAdminPage();

@@ -10,7 +10,7 @@ import {
 // Public (issue #82): outside the (hub) gate, no session read. Move
 // TERMS_UPDATED whenever these words change.
 
-export const metadata: Metadata = { title: "Terms - Baumy Olympics" };
+export const metadata: Metadata = { title: "Terms" };
 
 export default function TermsPage() {
   return (

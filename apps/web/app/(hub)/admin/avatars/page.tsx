@@ -13,7 +13,7 @@ import { ArchiveAvatarButton, AvatarUploader } from "./avatar-forms";
 // gets a 404 from the page gate, and every write is an admin-only action.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Avatars - Baumy Olympics" };
+export const metadata: Metadata = { title: "Avatars" };
 
 function Tile({ a }: { a: AvatarRow }) {
   return (

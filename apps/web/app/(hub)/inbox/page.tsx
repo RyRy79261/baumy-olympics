@@ -22,7 +22,7 @@ import {
 // `get_pending_confirmations`, the same read the AI and MCP get.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Needs your OK - Baumy Olympics" };
+export const metadata: Metadata = { title: "Needs your OK" };
 
 export default async function InboxPage() {
   const me = await requireMemberPage();

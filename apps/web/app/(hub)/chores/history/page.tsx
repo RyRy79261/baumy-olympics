@@ -14,7 +14,7 @@ import { requireMemberPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Points history - Baumy Olympics",
+  title: "Points history",
 };
 
 /** The changes per bounty, bounties by name. */

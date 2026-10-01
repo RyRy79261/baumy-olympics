@@ -51,7 +51,7 @@ const PASSKEY_CHALLENGE_MIN =
 const LOGIN_REQUEST_MIN = LOGIN_REQUEST_TTL_MS / 60_000;
 const LOGIN_REQUEST_HOURS = LOGIN_REQUEST_RETENTION_MS / 3_600_000;
 
-export const metadata: Metadata = { title: "Privacy - Baumy Olympics" };
+export const metadata: Metadata = { title: "Privacy" };
 
 export default function PrivacyPage() {
   return (

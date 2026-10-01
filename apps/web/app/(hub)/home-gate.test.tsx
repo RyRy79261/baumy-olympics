@@ -85,8 +85,12 @@ describe("/", () => {
   });
 
   it("describes the app in its metadata", () => {
-    expect(metadata.title).toBe("Baumy Olympics");
+    // Issue #122: the title skips the "%s · Baumy Olympics" template, and
+    // this is the one indexable page, with its canonical URL.
+    expect(metadata.title).toEqual({ absolute: "Baumy Olympics" });
     expect(metadata.description).toContain("private household app");
+    expect(metadata.robots).toEqual({ index: true, follow: true });
+    expect(metadata.alternates).toEqual({ canonical: "/" });
   });
 
   it("lets the frame step aside for nobody", async () => {

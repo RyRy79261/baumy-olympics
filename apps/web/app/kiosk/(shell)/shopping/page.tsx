@@ -18,7 +18,7 @@ import {
 // off, with no PIN (adding milk vouches for nobody).
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Shopping - Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Shopping · Kiosk" };
 
 export default async function KioskShoppingPage() {
   const kiosk = await getKioskActor();

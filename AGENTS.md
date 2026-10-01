@@ -106,6 +106,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 - **No cron beyond the single daily job.** Other work runs in `after()` or lazily on page load behind a rate-limit row, and must be idempotent and safe against double claims (`FOR UPDATE SKIP LOCKED`).
 - **Env vars:** every new variable goes into both `.env.example` and turbo `globalEnv` in the same PR.
 - **UI:**
+  - A page's `metadata.title` is bare ("Bounties"); the root layout's template adds " · Baumy Olympics". Every page is noindex except the landing page (`lib/seo.ts`); add a new top-level path to its `DISALLOWED_PATHS`.
   - Pages start with `PageHeading`, except the kiosk dashboard, whose header is its heading (with a screen-reader `h1`). Do not add `loading.tsx` files.
   - Form errors show inline; one-tap actions report through a toast.
   - Kiosk touch targets are at least 56px, with no hover-only affordances.
