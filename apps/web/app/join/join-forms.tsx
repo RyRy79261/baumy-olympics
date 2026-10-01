@@ -14,6 +14,10 @@ import { authClient } from "@/lib/auth-client";
 import { joinAsFounderAction, redeemInviteAction } from "./actions";
 import { ProfileFields } from "./profile-fields";
 
+/** What a whole-input refusal says: a stale form needs a fresh page. */
+export const STALE_FORM =
+  "This form is out of date. Reload the page and try again.";
+
 /** Redeem an invite code (redeem_invite). */
 export function InviteForm({ gallery }: { gallery: readonly GalleryOption[] }) {
   const { state, formAction, pending, requestId, errors } =
@@ -44,10 +48,13 @@ export function InviteForm({ gallery }: { gallery: readonly GalleryOption[] }) {
           pending={pending}
           gallery={gallery}
         />
-        {state &&
-        !state.ok &&
-        (state.code !== "INVALID_INPUT" || errors[""]?.length) ? (
+        {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>
+        ) : errors[""]?.length ? (
+          // The whole input was refused: a page left open from before a
+          // change sends what the server no longer takes, and sending it
+          // again fails the same way.
+          <FormMessage tone="error">{STALE_FORM}</FormMessage>
         ) : null}
         <Button type="submit" disabled={pending}>
           {pending ? "Joining..." : "Join the household"}
@@ -118,10 +125,13 @@ export function FounderForm({
           pending={pending}
           gallery={gallery}
         />
-        {state &&
-        !state.ok &&
-        (state.code !== "INVALID_INPUT" || errors[""]?.length) ? (
+        {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>
+        ) : errors[""]?.length ? (
+          // The whole input was refused: a page left open from before a
+          // change sends what the server no longer takes, and sending it
+          // again fails the same way.
+          <FormMessage tone="error">{STALE_FORM}</FormMessage>
         ) : null}
         <Button type="submit" disabled={pending}>
           {pending ? "Setting up..." : "Join as admin"}

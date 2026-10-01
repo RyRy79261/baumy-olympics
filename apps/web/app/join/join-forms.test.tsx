@@ -14,7 +14,7 @@ vi.mock("./actions", () => ({
 }));
 vi.mock("@/lib/auth-client", () => ({ authClient: {} }));
 
-const { InviteForm } = await import("./join-forms");
+const { InviteForm, STALE_FORM } = await import("./join-forms");
 
 beforeAll(() => {
   (
@@ -50,22 +50,22 @@ describe("InviteForm", () => {
     const el = await submitWith({
       ok: false,
       code: "INVALID_INPUT",
-      message: "Some of that is not right. Reload the page and try again.",
+      message: "Some of that is not valid. Check it and try again.",
       issues: [{ path: [], message: 'Unrecognized key: "hairStyle"' }],
     });
-    expect(el.textContent).toContain(
-      "Some of that is not right. Reload the page and try again.",
-    );
+    expect(el.textContent).toContain(STALE_FORM);
+    expect(STALE_FORM).toContain("Reload the page and try again.");
   });
 
   it("keeps field errors inline, without the general message", async () => {
     const el = await submitWith({
       ok: false,
       code: "INVALID_INPUT",
-      message: "Check the form.",
+      message: "Some of that is not valid. Check it and try again.",
       issues: [{ path: ["code"], message: "Enter your invite code." }],
     });
     expect(el.textContent).toContain("Enter your invite code.");
-    expect(el.textContent).not.toContain("Check the form.");
+    expect(el.textContent).not.toContain("Check it and try again.");
+    expect(el.textContent).not.toContain(STALE_FORM);
   });
 });
