@@ -3,32 +3,19 @@
 
 export { Surface, SURFACES } from "./surface";
 export {
-  AVATAR_HAIR_COLORS,
-  AVATAR_HAIR_STYLES,
-  AVATAR_SHIRT_COLORS,
-  AVATAR_SKIN_TONES,
   AVATAR_SPRITES,
-  AvatarHairColor,
-  AvatarHairStyle,
-  AvatarShirtColor,
-  AvatarSkinTone,
   AvatarSprite,
   DISPLAY_NAME_MAX,
   DisplayName,
   KioskPin,
   MEMBER_COLORS,
   MEMBER_COLOR_NAMES,
-  MemberAvatar,
   MemberColor,
   MemberRole,
   TelegramLinkCode,
   TelegramUserId,
   TELEGRAM_ID_MESSAGE,
-  avatarFor,
   memberColorName,
-  newcomerAvatar,
-  rosterAvatars,
-  defaultAvatar,
 } from "./member";
 export {
   AVATAR_NAME_MAX,
