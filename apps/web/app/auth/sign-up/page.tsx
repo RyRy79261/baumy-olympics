@@ -9,7 +9,7 @@ import { SignUpForm } from "./sign-up-form";
 // (issue #9).
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Sign up - Baumy Olympics" };
+export const metadata: Metadata = { title: "Sign up" };
 
 export default async function SignUpPage() {
   await redirectIfSignedIn();

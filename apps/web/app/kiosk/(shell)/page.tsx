@@ -31,7 +31,7 @@ import { clearPickAction } from "../actions";
 // itself every 60 seconds and when it comes back into view.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Kiosk" };
 
 export default async function KioskHomePage({
   searchParams,

@@ -26,7 +26,7 @@ import {
 // Private events are never shown here (nor anywhere else).
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Calendar - Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Calendar · Kiosk" };
 
 export default async function KioskCalendarPage({
   searchParams,

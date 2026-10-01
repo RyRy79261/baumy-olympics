@@ -26,7 +26,7 @@ import { TwoFactorCard } from "./two-factor-card";
 // that fails says so rather than showing an empty list.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Security - Baumy Olympics" };
+export const metadata: Metadata = { title: "Security" };
 
 const seen = (d: Date) =>
   d.toLocaleString("en-GB", {

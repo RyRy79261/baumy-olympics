@@ -18,7 +18,7 @@ import {
 // one, and every change asks for their PIN in that request (SPEC §6.2).
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Board - Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Board · Kiosk" };
 
 export default async function KioskNotesPage() {
   const kiosk = await getKioskActor();

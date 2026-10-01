@@ -31,7 +31,7 @@ import { CheckPinForm } from "./check-pin-form";
 // button there asks for their PIN.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Bounties - Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Bounties · Kiosk" };
 
 export default async function KioskChoresPage({
   searchParams,

@@ -14,7 +14,7 @@ import { AddContributionForm } from "./pot-forms";
 // the same read the AI and MCP get; admins record contributions.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Pot - Baumy Olympics" };
+export const metadata: Metadata = { title: "Pot" };
 
 export default async function PotPage() {
   const me = await requireMemberPage();

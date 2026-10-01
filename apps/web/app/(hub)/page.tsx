@@ -14,6 +14,7 @@ import {
   LandingPage,
 } from "@/components/landing/landing-page";
 import { loadHub } from "@/lib/hub/load";
+import { landingMetadata } from "@/lib/seo";
 import { voiceConfigured } from "@/lib/integrations/groq";
 import { createReminderAction } from "./reminder-actions";
 import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
@@ -26,10 +27,9 @@ import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
 // public landing page instead (issue #96), never a redirect.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = {
-  title: "Baumy Olympics",
-  description: LANDING_DESCRIPTION,
-};
+// The one page search engines may index, with its canonical URL (issue
+// #122): every other page inherits the root layout's noindex.
+export const metadata: Metadata = landingMetadata(LANDING_DESCRIPTION);
 
 export default async function HubPage() {
   const me = await memberOrVisitorPage();
