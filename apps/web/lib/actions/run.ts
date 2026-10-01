@@ -326,23 +326,36 @@ export function createRunner(
       const verdict = await runGate(gate, ctx, def, deps.verifyPin);
       if (!verdict.ok) return verdict;
 
-      // 4. Rate limits: one bucket per actor, one per IP. Both are counted
-      // at once (issue #128): each is a database round trip, and every page
-      // runs several actions. Each request counts against both buckets, so a
-      // request refused by one bucket still counts against the other.
+      // 4. Rate limits: one bucket per actor, one per IP.
       const limits = def.rateLimit ?? DEFAULT_RATE_LIMITS[def.kind];
       const buckets: [string, number][] = [
         [`action:${def.name}:${actorKey(ctx.actor)}`, limits.perMember],
       ];
       if (ctx.ip)
         buckets.push([`action:${def.name}:ip:${ctx.ip}`, limits.perIp]);
-      const verdicts = await Promise.all(
-        buckets.map(([key, limit]) =>
-          deps.rateLimiter.limit(key, { limit, windowMs: limits.windowMs }),
-        ),
-      );
-      // The actor's bucket is reported first when both are empty.
-      const refused = verdicts.find((rl) => !rl.ok);
+      const consume = ([key, limit]: [string, number]) =>
+        deps.rateLimiter.limit(key, { limit, windowMs: limits.windowMs });
+      let refused: Awaited<ReturnType<typeof consume>> | undefined;
+      if (def.kind === "read" && !def.rateLimit) {
+        // A read on the default budget counts both at once (issue #128):
+        // each is a database round trip, and every page runs several reads.
+        // Its budgets are wide, so a read the actor's bucket refuses may
+        // still count against the IP's.
+        const verdicts = await Promise.all(buckets.map(consume));
+        // The actor's bucket is reported first when both are empty.
+        refused = verdicts.find((rl) => !rl.ok);
+      } else {
+        // Writes and tight budgets, one after the other: the IP bucket is
+        // shared (brain's calls come from one server, a house from one home
+        // address), so a request the actor's bucket refused never spends it.
+        for (const bucket of buckets) {
+          const rl = await consume(bucket);
+          if (!rl.ok) {
+            refused = rl;
+            break;
+          }
+        }
+      }
       if (refused) {
         return fail(
           "RATE_LIMITED",
