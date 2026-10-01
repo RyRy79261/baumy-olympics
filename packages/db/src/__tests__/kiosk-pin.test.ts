@@ -117,15 +117,8 @@ describe("refundKioskPinAttempt and clearKioskPinAttempts", () => {
 
 describe("listActiveMembers and findActiveMember", () => {
   it("lists active members in join order, and finds one in the household", async () => {
-    const avatar = {
-      hairStyle: "bob",
-      hairColor: "auburn",
-      skinTone: "tan",
-      shirtColor: "pink",
-    };
     const a = await member({
       displayName: "A",
-      avatar,
       createdAt: new Date(NOW.getTime() + 1),
     });
     const b = await member({ displayName: "B", createdAt: NOW });
@@ -137,14 +130,14 @@ describe("listActiveMembers and findActiveMember", () => {
       displayName: "B",
       avatarSprite: "cat",
       color: "#112233",
-      avatar: null,
       avatarImage: null,
     });
-    // A chosen character comes along, for the avatar bar and the reminder.
-    expect(list[1]?.avatar).toEqual(avatar);
-    await expect(
-      findActiveMember(db(), HOUSEHOLD_ID, a),
-    ).resolves.toMatchObject({ id: a, displayName: "A", avatar });
+    await expect(findActiveMember(db(), HOUSEHOLD_ID, a)).resolves.toEqual({
+      id: a,
+      displayName: "A",
+      avatarSprite: "cat",
+      color: "#112233",
+    });
     await expect(
       findActiveMember(db(), HOUSEHOLD_ID, gone),
     ).resolves.toBeNull();
