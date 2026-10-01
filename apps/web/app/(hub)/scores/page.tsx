@@ -39,7 +39,7 @@ import {
 // next year's) and propose and approve adjustments.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Scores - Baumy Olympics" };
+export const metadata: Metadata = { title: "Scores" };
 
 export default async function ScoresPage() {
   const me = await requireMemberPage();

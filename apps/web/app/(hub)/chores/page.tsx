@@ -26,7 +26,7 @@ import { BountyBoard } from "./bounty-board";
 // (/chores/history). The actions refuse anyone else whatever the page shows.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Bounties - Baumy Olympics" };
+export const metadata: Metadata = { title: "Bounties" };
 
 export default async function ChoresPage() {
   const me = await requireMemberPage();

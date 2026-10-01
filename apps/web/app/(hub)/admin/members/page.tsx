@@ -19,7 +19,7 @@ import { PairKioskForm, RevokeKioskButton } from "./kiosk-forms";
 // page gate, and every write here is an admin-only registry action.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Members - Baumy Olympics" };
+export const metadata: Metadata = { title: "Members" };
 
 const DEVICE_STATE_LABEL = {
   waiting: "Waiting for its code",

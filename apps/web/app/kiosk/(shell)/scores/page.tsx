@@ -14,7 +14,7 @@ import { gapLabel } from "@/lib/scores/view";
 // only `display`). Read only: prize modes and adjustments stay on /scores.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Scores - Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Scores · Kiosk" };
 
 export default async function KioskScoresPage() {
   const kiosk = await getKioskActor();

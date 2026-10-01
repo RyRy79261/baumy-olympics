@@ -5,7 +5,7 @@ import { ForgotPasswordForm } from "./forgot-password-form";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Forgot password - Baumy Olympics",
+  title: "Forgot password",
 };
 
 export default function ForgotPasswordPage() {

@@ -17,7 +17,7 @@ import { FounderForm, InviteForm } from "./join-forms";
 // because the visitor is not in the household yet.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Join - Baumy Olympics" };
+export const metadata: Metadata = { title: "Join" };
 
 export default async function JoinPage() {
   const me = await requireJoiningPage();

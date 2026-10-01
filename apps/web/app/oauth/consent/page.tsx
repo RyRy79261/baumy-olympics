@@ -21,7 +21,7 @@ import { MCP_SCOPES, defaultTicked, type McpScope } from "@/lib/mcp/scopes";
 // The look is the pixel kit's (packages/ui, issue #64).
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Connect an app - Baumy Olympics" };
+export const metadata: Metadata = { title: "Connect an app" };
 
 const SCOPE_TEXT: Record<McpScope, { label: string; hint: string }> = {
   "baumy:read": {

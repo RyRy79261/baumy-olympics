@@ -11,7 +11,7 @@ import { addShoppingAction, checkOffShoppingAction } from "./actions";
 // group: add here, tick off there, or the other way round.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Shopping - Baumy Olympics" };
+export const metadata: Metadata = { title: "Shopping" };
 
 export default async function ShoppingPage() {
   await requireMemberPage();

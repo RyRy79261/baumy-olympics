@@ -25,7 +25,7 @@ import { DismissWeightButton, ScheduleWeightForm } from "./weight-forms";
 // points history (issue #115): every change, and who vetoed or cancelled one.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Weights - Baumy Olympics" };
+export const metadata: Metadata = { title: "Weights" };
 
 function Figure({ label, value }: { label: string; value: string }) {
   return (
