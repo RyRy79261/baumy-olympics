@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { multiplierPct, pctOf } from "@baumy/core";
-import { addChore, logDoneAgo } from "../lib/chores";
+import { addChore, openChore } from "../lib/chores";
 import { founderAdmin } from "../lib/household";
 import {
   expectKioskTargets,
@@ -81,13 +81,16 @@ async function addEvent(
   await expect(sheet).toBeHidden();
 }
 
-/** Base points for a one-day rhythm at effort 100% (SPEC §4.7, Dishes). */
-const DAILY_POINTS = 10;
+/**
+ * The fewest base points: at effort 100% a rhythm of a quarter of an hour
+ * (`expectedIntervalMinutes`), so a chore done now falls due before
+ * midnight and is urgent at once (SPEC §12 decision 22).
+ */
+const QUICK_POINTS = 1;
 
 test("the kitchen dashboard: icons, modules, the month and its days", async ({
   page,
   browser,
-  request,
 }, testInfo) => {
   const project = testInfo.project.name;
   // The founder works on a phone and the kiosk is a context of its own at
@@ -103,16 +106,16 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const today = berlinDay();
   const tomorrow = berlinDay(1);
 
-  // Two new chores on a one-day rhythm. One is bought.
+  // Two new chores on a quarter-hour rhythm. One is bought.
   await founderAdmin(page, project);
   await addChore(page, {
     name: bins,
-    basePoints: DAILY_POINTS,
+    basePoints: QUICK_POINTS,
     cooldownHours: 0,
   });
   await addChore(page, {
     name: milk,
-    basePoints: DAILY_POINTS,
+    basePoints: QUICK_POINTS,
     cooldownHours: 0,
     kind: "consumable",
   });
@@ -151,8 +154,15 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await kiosk.keyboard.press("Escape");
   await expect(urgentBefore).toBeHidden();
 
-  // Done 23h50m ago on their one-day rhythm: due in 10 minutes, so urgent.
-  await logDoneAgo(page, request, [bins, milk], 23 * 60 + 50);
+  // Done once, they have a rhythm: due again in a quarter of an hour,
+  // before midnight, so urgent. (Run in the last quarter hour before
+  // midnight in Berlin, they become urgent only once they are due.)
+  await page.goto("/chores");
+  for (const name of [bins, milk]) {
+    const logSheet = await openChore(page, name);
+    await logSheet.getByRole("button", { name: "Log it" }).click();
+    await expect(logSheet).toBeHidden();
+  }
   await kiosk.reload();
 
   // One screen: the header, the month, the footer, Baumy. No scrolling.
@@ -194,9 +204,9 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const binsRow = module.getByTestId(`bounty-${bins}`);
   const milkRow = module.getByTestId(`bounty-${milk}`);
   await expect(binsRow).toContainText("Maintenance");
-  await expect(binsRow).toContainText(founder);
+  await expect(binsRow).toContainText(`steal ${founder}'s 1× streak`);
   await expect(binsRow).toContainText(/in \d+m|Due now/);
-  await expect(binsRow).toContainText(`+${DAILY_POINTS}`);
+  await expect(binsRow).toContainText(`+${QUICK_POINTS}`);
   await expect(binsRow).toContainText("new");
   await expect(milkRow).toContainText("Consumable");
   await module.getByRole("button", { name: /^Consumables/ }).click();
@@ -246,16 +256,18 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await expect(log).toBeHidden();
   // The founder's second in a row: a streak of 2.
   await expect(kiosk.getByTestId("score-pop")).toHaveText(
-    `+${pctOf(DAILY_POINTS, multiplierPct(2))}`,
+    `+${pctOf(QUICK_POINTS, multiplierPct(2))}`,
   );
 
-  // Home again: done now, it is next due in a day, after midnight, so it is
-  // not urgent any more.
+  // Home again: done now, on its quarter-hour rhythm it falls due again
+  // before midnight, so it is still urgent, with the founder's streak of 2.
   await kioskNav(kiosk, "Home");
   await expect(kiosk.getByTestId("kiosk-home")).toBeVisible();
   await urgent.click();
   await expect(module.getByTestId(`bounty-${milk}`)).toBeVisible();
-  await expect(module.getByTestId(`bounty-${bins}`)).toHaveCount(0);
+  await expect(module.getByTestId(`bounty-${bins}`)).toContainText(
+    `steal ${founder}'s 2× streak`,
+  );
   await module.getByRole("button", { name: "Close" }).click();
 
   // The home shows who is acting, so the next person sees whose name a tap
