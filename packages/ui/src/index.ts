@@ -62,22 +62,13 @@ export {
 export { cx } from "./cx";
 export { Dialog } from "./dialog";
 export { Checkbox, Field, FormMessage, Input, Select, Textarea } from "./field";
-export {
-  HAIR_COLOURS,
-  HOUSE_COLOUR,
-  HAIR_STYLE_HEADS,
-  Housemate,
-  SHIRT_COLOURS,
-  SKIN_TONES,
-  housemateGrid,
-  housematePalette,
-} from "./housemate";
 export { AvatarGallery, type GalleryOption } from "./avatar-gallery";
 export {
-  HOUSEMATE_HEIGHT_PX,
   BUST_FRACTION,
   BUST_MAX_PX,
+  CHARACTER_SLOT_PX,
   MemberCharacter,
+  initialOf,
   spriteFactor,
   spriteFit,
 } from "./member-character";
@@ -99,6 +90,7 @@ export {
 } from "./kiosk-shell";
 export {
   ActingChip,
+  HOUSE_COLOUR,
   ModuleBountyRow,
   DayEventRow,
   EventChip,
@@ -139,7 +131,6 @@ export { PageHeading, SectionHeading } from "./page-heading";
 export { PixelBubble } from "./pixel-bubble";
 export {
   CHORE_ICON_LABELS,
-  CharacterPicker,
   ChoreIconPicker,
   choreIconValue,
   Swatch,

@@ -120,19 +120,14 @@ describe("Baumy asleep and its marks", () => {
 describe("kiosk avatars", () => {
   it("stack the character over a one-line name, small enough for four", () => {
     const out = html(
-      <AvatarButton
-        displayName="Josephine-Marie"
-        sprite="cat"
-        color="#ff8fc7"
-        memberId="m1"
-      />,
+      <AvatarButton displayName="Josephine-Marie" color="#ff8fc7" />,
     );
     expect(out).toContain("flex-col");
     expect(out).toContain("max-w-32");
     expect(out).toContain("text-xs");
     expect(out).toMatch(/class="[^"]*truncate whitespace-nowrap"/);
-    // The character at 2x: 12 art pixels wide.
-    expect(out).toContain('width="24"');
+    // The initial tile fills the 2x slot: 34px square.
+    expect(out).toContain("width:34px;height:34px");
   });
 });
 
