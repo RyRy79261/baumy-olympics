@@ -1,4 +1,4 @@
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToReadableStream, renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { HubData } from "@/lib/hub/load";
 
@@ -67,5 +67,68 @@ describe("HubHome's status tiles", () => {
       'aria-label="Messages: unavailable"',
     );
     expect(tile(html, "new")).toContain("data-count");
+  });
+});
+
+// Issue #128: the calendar (Google) and the shopping list (brain) may take
+// seconds when those services start cold, so the page hands them over still
+// on their way and they stream in; nothing else waits for them.
+describe("HubHome's streamed widgets", () => {
+  function widget(html: string, id: string): string {
+    const at = html.indexOf(`data-testid="${id}"`);
+    expect(at).toBeGreaterThan(-1);
+    const start = html.lastIndexOf("<section", at);
+    return html.slice(start, html.indexOf("</section>", at));
+  }
+
+  const streamed = (
+    events: Promise<HubData["events"]>,
+    shopping: Promise<HubData["shopping"]>,
+  ) => (
+    <HubHome
+      hub={{ ...hub({ urgent: 1, new: 0, messages: 0 }), events, shopping }}
+      memberColors={{}}
+      shopping={{ add: vi.fn(), checkOff: vi.fn() }}
+    />
+  );
+
+  it("shows the rest of the page while the calendar and the list are on their way", () => {
+    const never = new Promise<never>(() => {});
+    const html = renderToStaticMarkup(streamed(never, never));
+    expect(tile(html, "urgent")).toContain('aria-label="Urgent: 1"');
+    for (const id of ["widget-events", "widget-shopping"]) {
+      const w = widget(html, id);
+      expect(w).toContain('data-status="loading"');
+      expect(w).toContain('aria-busy="true"');
+      expect(w).toContain("Loading…");
+    }
+  });
+
+  it("fills each one in when its read answers", async () => {
+    const stream = await renderToReadableStream(
+      streamed(
+        Promise.resolve({
+          status: "ready",
+          data: [
+            {
+              id: "e1",
+              title: "Flat meeting",
+              time: "19:00–20:00",
+              location: null,
+              addedBy: null,
+            },
+          ],
+        }),
+        Promise.resolve({ status: "unavailable", message: "Brain is down." }),
+      ),
+    );
+    await stream.allReady;
+    const html = await new Response(stream).text();
+    expect(html).toContain("Flat meeting");
+    expect(html).toContain("Brain is down.");
+    expect(widget(html, "widget-events")).toContain('data-status="ready"');
+    expect(widget(html, "widget-shopping")).toContain(
+      'data-status="unavailable"',
+    );
   });
 });

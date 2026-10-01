@@ -3,9 +3,8 @@ import { rosterColours } from "@/lib/members/characters";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { berlinDateKey } from "@baumy/core";
-import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { listActiveMembers } from "@baumy/db/members";
+import { householdMembers } from "@/lib/members/household";
 import { PageHeading, buttonClass } from "@baumy/ui";
 import { CalendarBoard } from "@/components/calendar/calendar-board";
 import { CalendarStatus } from "@/components/calendar/calendar-status";
@@ -43,7 +42,7 @@ export default async function KioskCalendarPage({
   const [listed, people] = ctx
     ? await Promise.all([
         runAction("list_events", { from: range.from, to: range.to }, ctx),
-        listActiveMembers(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID),
+        householdMembers(HOUSEHOLD_ID),
       ])
     : [null, []];
   return (

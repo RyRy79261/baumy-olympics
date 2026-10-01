@@ -260,20 +260,25 @@ export async function listChoreBoard(
   db: Queryable,
   input: { householdId: string; now: Date; includeArchived?: boolean },
 ): Promise<ChoreBoardRow[]> {
-  const rows = await db
-    .select()
-    .from(chores)
-    .where(
-      and(
-        eq(chores.householdId, input.householdId),
-        input.includeArchived ? undefined : sql`${chores.archivedAt} IS NULL`,
-      ),
-    )
-    .orderBy(asc(sql`lower(${chores.name})`), asc(chores.id));
+  // The reads run side by side where one does not need another's answer
+  // (issue #128): every page with the board waits on these round trips.
+  const [rows, season] = await Promise.all([
+    db
+      .select()
+      .from(chores)
+      .where(
+        and(
+          eq(chores.householdId, input.householdId),
+          input.includeArchived ? undefined : sql`${chores.archivedAt} IS NULL`,
+        ),
+      )
+      .orderBy(asc(sql`lower(${chores.name})`), asc(chores.id)),
+    findSeason(db, input.householdId, seasonYear(input.now)),
+  ]);
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
 
-  const versions = await db
+  const versionsRead = db
     .select({
       id: choreRuleVersions.id,
       choreId: choreRuleVersions.choreId,
@@ -283,18 +288,11 @@ export async function listChoreBoard(
     })
     .from(choreRuleVersions)
     .where(inArray(choreRuleVersions.choreId, ids));
-  const versionsOf = new Map<string, RuleVersion[]>();
-  for (const v of versions) {
-    const list = versionsOf.get(v.choreId) ?? [];
-    list.push(v);
-    versionsOf.set(v.choreId, list);
-  }
 
   // This season's streaks: the last scored completion of each chore in
   // replay order holds it, and its `streak_len` is the length.
-  const season = await findSeason(db, input.householdId, seasonYear(input.now));
-  const holders = season
-    ? await db
+  const holdersRead = season
+    ? db
         .selectDistinctOn([completions.choreId], {
           choreId: completions.choreId,
           holderId: completions.doneBy,
@@ -319,42 +317,53 @@ export async function listChoreBoard(
           desc(completions.loggedAt),
           desc(completions.id),
         )
-    : [];
+    : Promise.resolve([]);
+
+  const [versions, holders, lastDone] = await Promise.all([
+    versionsRead,
+    holdersRead,
+    Promise.all(rows.map((c) => lastLiveAt(db, c, input.now))),
+  ]);
+  const versionsOf = new Map<string, RuleVersion[]>();
+  for (const v of versions) {
+    const list = versionsOf.get(v.choreId) ?? [];
+    list.push(v);
+    versionsOf.set(v.choreId, list);
+  }
+
   const streakOf = new Map(holders.map((h) => [h.choreId, h]));
 
-  return Promise.all(
-    rows.map(async (c) => {
-      const list = versionsOf.get(c.id) ?? [];
-      const inEffect = list.some(
-        (v) => v.effectiveFrom.getTime() <= input.now.getTime(),
-      )
-        ? ruleVersionAt(list, input.now)
-        : null;
-      const h = streakOf.get(c.id);
-      return {
-        id: c.id,
-        name: c.name,
-        sprite: c.sprite,
-        kind: c.kind,
-        proofMode: c.proofMode,
-        confirmMode: c.confirmMode,
-        effortFactorPct: c.effortFactorPct,
-        archivedAt: c.archivedAt,
-        createdAt: c.createdAt,
-        rule: inEffect
-          ? {
-              id: inEffect.id,
-              basePoints: inEffect.basePoints,
-              cooldownMinutes: inEffect.cooldownMinutes,
-            }
-          : null,
-        streak: h
-          ? { holderId: h.holderId, holderName: h.holderName, length: h.length }
-          : null,
-        lastDoneAt: await lastLiveAt(db, c, input.now),
-      };
-    }),
-  );
+  return rows.map((c, i) => {
+    const list = versionsOf.get(c.id) ?? [];
+    const inEffect = list.some(
+      (v) => v.effectiveFrom.getTime() <= input.now.getTime(),
+    )
+      ? ruleVersionAt(list, input.now)
+      : null;
+    const h = streakOf.get(c.id);
+    return {
+      id: c.id,
+      name: c.name,
+      sprite: c.sprite,
+      kind: c.kind,
+      proofMode: c.proofMode,
+      confirmMode: c.confirmMode,
+      effortFactorPct: c.effortFactorPct,
+      archivedAt: c.archivedAt,
+      createdAt: c.createdAt,
+      rule: inEffect
+        ? {
+            id: inEffect.id,
+            basePoints: inEffect.basePoints,
+            cooldownMinutes: inEffect.cooldownMinutes,
+          }
+        : null,
+      streak: h
+        ? { holderId: h.holderId, holderName: h.holderName, length: h.length }
+        : null,
+      lastDoneAt: lastDone[i] ?? null,
+    };
+  });
 }
 
 /**

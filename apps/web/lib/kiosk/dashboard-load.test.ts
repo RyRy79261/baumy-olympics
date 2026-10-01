@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
 import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
 import { useTestDb } from "@baumy/db/test-harness";
+import { HOUSEHOLD_ID } from "@baumy/db/household";
+import { listActiveMembers } from "@baumy/db/members";
 import { members } from "@baumy/db/schema";
 import { eq } from "drizzle-orm";
 import { MEMBER_COLORS } from "@baumy/types";
@@ -32,6 +34,7 @@ import { loadDashboard } from "./dashboard-load";
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
+const readMembers = () => listActiveMembers(db(), HOUSEHOLD_ID);
 const kioskCtx = () => ctxFor(kioskActor(), { source: "kiosk" });
 
 let ryan: string;
@@ -89,7 +92,7 @@ describe("loadDashboard", () => {
       { title: "Pasta", bodyMd: "Who ate it?" },
       ctxFor(sessionActor(ryan)),
     );
-    const data = await loadDashboard(kioskCtx(), "2026-10", db());
+    const data = await loadDashboard(kioskCtx(), "2026-10", readMembers);
     expect(data.now).toBe(FIXED_NOW.toISOString());
     expect(data.today).toBe("2026-09-27");
     expect(data.month).toBe("2026-10");
@@ -129,7 +132,7 @@ describe("loadDashboard", () => {
       .update(members)
       .set({ color: MEMBER_COLORS[1] })
       .where(eq(members.id, ryan));
-    const data = await loadDashboard(kioskCtx(), "2026-09", db());
+    const data = await loadDashboard(kioskCtx(), "2026-09", readMembers);
     expect(data.members.map((m) => [m.id, m.color])).toEqual([
       [ryan, MEMBER_COLORS[1]],
       [jo, MEMBER_COLORS[5]],
@@ -139,7 +142,7 @@ describe("loadDashboard", () => {
   it("says the calendar is not connected, and reads everything else", async () => {
     await seedChore(db(), SEED_CHORES.trash);
     setCalendarClientForTests(unconfiguredCalendar);
-    const data = await loadDashboard(kioskCtx(), "2026-09", db());
+    const data = await loadDashboard(kioskCtx(), "2026-09", readMembers);
     expect(data.events).toEqual({
       ok: false,
       message: expect.stringContaining("not connected yet"),
@@ -158,7 +161,7 @@ describe("loadDashboard", () => {
         name === "list_notes"
           ? Promise.reject(new Error("boom"))
           : real(name, input, ctx)) as never);
-    const data = await loadDashboard(kioskCtx(), "2026-09", db());
+    const data = await loadDashboard(kioskCtx(), "2026-09", readMembers);
     expect(spy).toHaveBeenCalled();
     expect(data.notes).toEqual({
       ok: false,

@@ -22,6 +22,7 @@ vi.mock("next/headers", () => ({
 
 const {
   BRAIN_DOWN_COOKIE,
+  BRAIN_SLOW_MS,
   clearMemoryLoginApprovals,
   clearMemoryShopping,
   downWhenAsked,
@@ -103,6 +104,24 @@ describe("the fake brain", () => {
     expect((await brain.listShopping()).ok).toBe(true);
     jar.throws = true;
     expect((await brain.listShopping()).ok).toBe(true);
+  });
+
+  it("reads the list late for a browser that asked for it slow (issue #128)", async () => {
+    memoryAdd(["milk"]);
+    const slept: number[] = [];
+    const brain = downWhenAsked(memoryBrain(), async (ms) => {
+      slept.push(ms);
+    });
+    jar.value = "slow";
+    const read = await brain.listShopping();
+    expect(read.ok && read.data.map((i) => i.item)).toEqual(["milk"]);
+    expect(slept).toEqual([BRAIN_SLOW_MS]);
+    // Only the read waits; writes answer at once.
+    expect((await brain.addShopping(["eggs"])).ok).toBe(true);
+    expect(slept).toEqual([BRAIN_SLOW_MS]);
+    jar.value = "up";
+    await brain.listShopping();
+    expect(slept).toEqual([BRAIN_SLOW_MS]);
   });
 });
 

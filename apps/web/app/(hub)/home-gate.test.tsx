@@ -14,9 +14,9 @@ vi.mock("@/lib/auth", () => ({
   memberOrVisitorPage: () => memberOrVisitorPage(),
   requireMemberPage: vi.fn(),
 }));
-const loadHub = vi.fn();
+const startHub = vi.fn();
 vi.mock("@/lib/hub/load", () => ({
-  loadHub: (...a: unknown[]) => loadHub(...a),
+  startHub: (...a: unknown[]) => startHub(...a),
 }));
 vi.mock("@/lib/actions/ui", () => ({ uiRequestCtx: async () => ({}) }));
 vi.mock("@baumy/db", () => ({ createHttpDb: () => ({}) }));
@@ -42,6 +42,10 @@ vi.mock("@/lib/members/characters", () => ({
   activeRoster: async () => new Map(),
   rosterColours: () => ({}),
 }));
+vi.mock("@/lib/members/household", () => ({
+  householdMembers: async () => [],
+  householdRoster: async () => new Map(),
+}));
 
 const { default: HubPage, metadata } = await import("./page");
 const { default: HubLayout } = await import("./layout");
@@ -60,7 +64,7 @@ const member = {
 
 beforeEach(() => {
   memberOrVisitorPage.mockReset();
-  loadHub.mockReset();
+  startHub.mockReset();
 });
 
 describe("/", () => {
@@ -72,12 +76,16 @@ describe("/", () => {
     expect(out).toContain('href="/privacy"');
     expect(out).toContain('href="/terms"');
     expect(out).not.toContain("hub-home");
-    expect(loadHub).not.toHaveBeenCalled();
+    expect(startHub).not.toHaveBeenCalled();
   });
 
   it("still shows a member the hub", async () => {
     memberOrVisitorPage.mockResolvedValue(member);
-    loadHub.mockResolvedValue({});
+    startHub.mockReturnValue({
+      local: Promise.resolve({}),
+      events: new Promise(() => {}),
+      shopping: new Promise(() => {}),
+    });
     const out = renderToStaticMarkup(await HubPage());
     expect(out).toContain('data-testid="hub-home"');
     expect(out).toContain("Welcome, Ada.");
