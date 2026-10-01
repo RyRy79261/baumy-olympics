@@ -7,7 +7,7 @@ import { Card, PageHeading, linkClass } from "@baumy/ui";
 // read them; nothing here reads a session or the database.
 
 /** When each page's words last changed (ISO dates). */
-export const PRIVACY_UPDATED = "2026-09-29";
+export const PRIVACY_UPDATED = "2026-10-01";
 export const TERMS_UPDATED = "2026-09-28";
 
 /** The two legal pages, linked from the sign-in and sign-up footers. */

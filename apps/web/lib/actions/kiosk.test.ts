@@ -125,8 +125,8 @@ describe("kioskActionForm", () => {
     });
     await expect(
       kioskActionForm(
-        "pair_kiosk",
-        form({ name: "x", requestId: "req-12345678" }),
+        "approve_kiosk_pairing",
+        form({ code: "ABC234", name: "x", requestId: "req-12345678" }),
       ),
     ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
   });

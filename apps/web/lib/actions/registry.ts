@@ -13,6 +13,7 @@ import {
 } from "./account-security";
 import { addPotContribution } from "./add-pot-contribution";
 import { adjustPoints } from "./adjust-points";
+import { approveKioskPairing } from "./approve-kiosk-pairing";
 import { attachCompletionPhoto } from "./attach-completion-photo";
 import {
   addAvatar,
@@ -55,9 +56,9 @@ import {
   pinNote,
   updateNote,
 } from "./notes";
-import { pairKiosk } from "./pair-kiosk";
 import { createProposer } from "./propose";
 import { redeemInvite } from "./redeem-invite";
+import { renameKiosk } from "./rename-kiosk";
 import {
   acknowledgeReminder,
   createReminder,
@@ -123,7 +124,8 @@ export const REGISTRY = {
   remove_passkey: removePasskey,
   unlink_google: unlinkGoogle,
   set_first_password: setFirstPassword,
-  pair_kiosk: pairKiosk,
+  approve_kiosk_pairing: approveKioskPairing,
+  rename_kiosk: renameKiosk,
   revoke_kiosk: revokeKiosk,
   create_service_token: createServiceToken,
   rotate_service_token: rotateServiceToken,

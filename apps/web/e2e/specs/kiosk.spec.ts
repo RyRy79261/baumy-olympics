@@ -1,15 +1,23 @@
 import { expect, test } from "@playwright/test";
-import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 import {
+  founderAdmin,
+  mintCode,
+  newAccount,
+  redeem,
+  uniqueAddress,
+} from "../lib/household";
+import {
+  approveOnPhone,
   expectKioskTargets,
   KIOSK_VIEWPORT,
   openKioskChores,
-  pairCode,
+  shownPairing,
   typePin,
 } from "../lib/kiosk";
 
 // Issue #10 end to end, on the kitchen iPad (ipad-portrait), against Docker
-// Postgres: an admin pairs a kiosk, the code works once, a member taps their
+// Postgres: an admin pairs a kiosk by its QR code (issue #126), the code
+// works once, a member taps their
 // avatar and checks their PIN (wrong, then right, then asked again), every
 // kiosk touch target is at least 56px, idling forgets who is acting, and a
 // revoked kiosk is sent back to /kiosk/pair.
@@ -40,22 +48,20 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
     member.page.getByRole("status").filter({ hasText: "PIN saved." }),
   ).toBeVisible();
 
-  // The admin creates a pairing code.
-  const code = await pairCode(page, deviceName);
-
-  // The iPad: not paired yet, so /kiosk sends it to /kiosk/pair.
+  // The iPad: not paired yet, so /kiosk sends it to /kiosk/pair, which shows
+  // a QR code; the admin's phone opens it (issue #126).
   const ipad = await browser.newContext({
     viewport: KIOSK_VIEWPORT,
     hasTouch: true,
+    extraHTTPHeaders: { "x-forwarded-for": uniqueAddress() },
   });
   await ipad.clock.install();
   const kiosk = await ipad.newPage();
   await kiosk.goto("/kiosk");
   await expect(kiosk).toHaveURL(/\/kiosk\/pair$/);
+  const { url } = await shownPairing(kiosk);
   await expectKioskTargets(kiosk.locator("main"));
-  await kiosk.getByLabel("Pairing code").fill(code.toLowerCase());
-  await kiosk.getByRole("button", { name: "Pair this kiosk" }).click();
-  await expect(kiosk).toHaveURL(/\/kiosk$/);
+  await approveOnPhone(page, kiosk, deviceName);
   await expect(
     kiosk.getByRole("heading", { name: "Kitchen", level: 1 }),
   ).toBeVisible();
@@ -68,18 +74,13 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   });
 
   // The same code a second time is refused.
-  const other = await browser.newContext();
-  const second = await other.newPage();
-  await second.goto("/kiosk/pair");
-  await second.getByLabel("Pairing code").fill(code);
-  await second.getByRole("button", { name: "Pair this kiosk" }).click();
+  await page.goto(url);
   await expect(
-    second
-      .getByRole("alert")
-      .filter({ hasText: "That code is wrong, used or expired" }),
+    page.getByRole("alert").filter({ hasText: "already approved" }),
   ).toBeVisible();
-  await expect(second).toHaveURL(/\/kiosk\/pair$/);
-  await other.close();
+  await expect(
+    page.getByRole("button", { name: "Make it the kitchen screen" }),
+  ).toHaveCount(0);
 
   // The kiosk is not a person: the hub, admin pages included, sends it back
   // to its own shell.
@@ -141,12 +142,12 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   ).toBeVisible();
   await expect(kiosk.getByTestId("acting-as")).toHaveCount(0);
 
-  // The admin revokes the kiosk; its next page load goes to /kiosk/pair.
-  await page.goto("/admin/members");
+  // The admin signs the kiosk out; its next page load goes to /kiosk/pair.
+  await page.goto("/admin/kitchen-screen");
   await expect(page.getByTestId(`kiosk-${deviceName}`)).toContainText("Paired");
-  await page.getByRole("button", { name: `Revoke: ${deviceName}` }).click();
+  await page.getByRole("button", { name: `Sign out: ${deviceName}` }).click();
   await expect(page.getByTestId(`kiosk-${deviceName}`)).toContainText(
-    "Revoked",
+    "Signed out",
   );
   await kiosk.goto("/kiosk");
   await expect(kiosk).toHaveURL(/\/kiosk\/pair$/);

@@ -9,7 +9,7 @@ import {
   walksIn,
 } from "./cookies";
 import { PIN_PROMPT_CODES } from "./constants";
-import { formatKioskPairingCode } from "./format";
+import { formatKioskPairingCode, kioskApproveUrl } from "./format";
 
 describe("kiosk cookies", () => {
   it("are HttpOnly, Secure, SameSite=Strict on / for a year", () => {
@@ -37,7 +37,13 @@ describe("kiosk cookies", () => {
 
 describe("kiosk display helpers", () => {
   it("formats a pairing code in two halves", () => {
-    expect(formatKioskPairingCode("ABCD2345")).toBe("ABCD-2345");
+    expect(formatKioskPairingCode("ABC234")).toBe("ABC-234");
+  });
+
+  it("puts the code in the approve URL the QR code holds", () => {
+    expect(kioskApproveUrl("https://baumy.example", "ABC234")).toBe(
+      "https://baumy.example/admin/kitchen-screen/approve?code=ABC234",
+    );
   });
 
   it("opens the PIN pad for the attestation codes only", () => {

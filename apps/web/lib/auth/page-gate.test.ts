@@ -160,4 +160,20 @@ describe("the page wrappers", () => {
       requireMemberPage({ returnTo: "/oauth/consent" }),
     ).rejects.toThrow("NEXT_REDIRECT /join");
   });
+
+  it("brings an admin who scanned the kitchen screen's code back after sign-in", async () => {
+    getActor.mockResolvedValue(null);
+    await expect(
+      requireAdminPage({
+        returnTo: "/admin/kitchen-screen/approve?code=ABC234",
+      }),
+    ).rejects.toThrow(
+      "NEXT_REDIRECT /auth/sign-in?callbackURL=%2Fadmin%2Fkitchen-screen%2Fapprove%3Fcode%3DABC234",
+    );
+    // A member who is not an admin still gets a 404.
+    getActor.mockResolvedValue(member);
+    await expect(
+      requireAdminPage({ returnTo: "/admin/kitchen-screen/approve" }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+  });
 });

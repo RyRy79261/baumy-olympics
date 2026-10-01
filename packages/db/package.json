@@ -15,6 +15,7 @@
     "./telegram-link-codes": "./src/telegram-link-codes.ts",
     "./login-requests": "./src/login-requests.ts",
     "./kiosk-devices": "./src/kiosk-devices.ts",
+    "./kiosk-pairing": "./src/kiosk-pairing.ts",
     "./kiosk-pin": "./src/kiosk-pin.ts",
     "./seasons": "./src/seasons.ts",
     "./completions": "./src/completions.ts",

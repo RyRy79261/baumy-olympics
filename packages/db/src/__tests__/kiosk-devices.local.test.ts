@@ -8,16 +8,17 @@ import {
   withTransaction,
   type Queryable,
 } from "../index";
+import { hashKioskToken } from "../kiosk-devices";
 import {
-  claimKioskPairing,
-  hashKioskToken,
-  insertKioskPairing,
-} from "../kiosk-devices";
+  approveKioskPairing,
+  claimApprovedKioskPairing,
+  insertKioskPairingRequest,
+} from "../kiosk-pairing";
 import * as schema from "../schema";
 
-// A pairing code works once, even when several iPads type it at the same
-// moment: each claim is its own transaction on a real server, and exactly
-// one UPDATE … RETURNING may win the row.
+// An approved pairing request is traded for a device token once, even when
+// several tabs of the iPad poll at the same moment: each exchange is its own
+// transaction on a real server, and exactly one UPDATE … RETURNING may win.
 
 if (!isLocalProxy() || !process.env.DATABASE_URL) {
   throw new Error(
@@ -27,9 +28,15 @@ if (!isLocalProxy() || !process.env.DATABASE_URL) {
 
 const memberIds: string[] = [];
 const deviceIds: string[] = [];
+const requestIds: string[] = [];
 
 afterAll(async () => {
   const db = createHttpDb();
+  if (requestIds.length > 0) {
+    await db
+      .delete(schema.kioskPairingRequests)
+      .where(inArray(schema.kioskPairingRequests.id, requestIds));
+  }
   if (deviceIds.length > 0) {
     await db
       .delete(schema.kioskDevices)
@@ -42,7 +49,7 @@ afterAll(async () => {
   }
 });
 
-describe("claimKioskPairing under concurrent claims", () => {
+describe("claimApprovedKioskPairing under concurrent exchanges", () => {
   it("pairs exactly one device token", async () => {
     const [admin] = await createHttpDb()
       .insert(schema.members)
@@ -56,25 +63,37 @@ describe("claimKioskPairing under concurrent claims", () => {
       .returning({ id: schema.members.id });
     memberIds.push(admin!.id);
 
-    const code = randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
+    const code = randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase();
+    const secret = `secret-${randomUUID()}`;
     const now = new Date();
-    const row = await withTransaction((tx) =>
-      insertKioskPairing(tx as unknown as Queryable, {
+    const deviceId = await withTransaction(async (tx) => {
+      const q = tx as unknown as Queryable;
+      const req = await insertKioskPairingRequest(q, {
+        householdId: HOUSEHOLD_ID,
+        secret,
+        code,
+        device: "Safari on iPad",
+        now,
+      });
+      requestIds.push(req!.id);
+      const approved = await approveKioskPairing(q, {
+        requestId: req!.id,
         householdId: HOUSEHOLD_ID,
         name: "Race iPad",
-        code,
-        pairedBy: admin!.id,
+        approvedBy: admin!.id,
+        expiresAt: req!.expiresAt,
         now,
-      }),
-    );
-    deviceIds.push(row!.id);
+      });
+      return approved!.deviceId;
+    });
+    deviceIds.push(deviceId);
 
     const tokens = Array.from({ length: 12 }, (_, i) => `token-${i}-${code}`);
     const results = await Promise.all(
       tokens.map((token) =>
         withTransaction((tx) =>
-          claimKioskPairing(tx as unknown as Queryable, {
-            code,
+          claimApprovedKioskPairing(tx as unknown as Queryable, {
+            secret,
             tokenHash: hashKioskToken(token),
             now,
           }),
@@ -89,8 +108,7 @@ describe("claimKioskPairing under concurrent claims", () => {
     const [stored] = await createHttpDb()
       .select()
       .from(schema.kioskDevices)
-      .where(eq(schema.kioskDevices.id, row!.id));
+      .where(eq(schema.kioskDevices.id, deviceId));
     expect(stored!.tokenHash).toBe(hashKioskToken(winners[0]!));
-    expect(stored!.pairingCodeHash).toBeNull();
   });
 });

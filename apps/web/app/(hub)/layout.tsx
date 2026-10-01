@@ -62,6 +62,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
   ];
   const admin: NavItem[] = [
     { href: "/admin/members", label: "Members" },
+    { href: "/admin/kitchen-screen", label: "Kitchen screen" },
     { href: "/admin/chores", label: "Edit chores" },
     { href: "/admin/weights", label: "Weights" },
     { href: "/admin/avatars", label: "Avatars" },
