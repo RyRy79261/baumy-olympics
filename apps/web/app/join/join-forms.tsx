@@ -44,7 +44,9 @@ export function InviteForm({ gallery }: { gallery: readonly GalleryOption[] }) {
           pending={pending}
           gallery={gallery}
         />
-        {state && !state.ok && state.code !== "INVALID_INPUT" ? (
+        {state &&
+        !state.ok &&
+        (state.code !== "INVALID_INPUT" || errors[""]?.length) ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}
         <Button type="submit" disabled={pending}>
@@ -116,7 +118,9 @@ export function FounderForm({
           pending={pending}
           gallery={gallery}
         />
-        {state && !state.ok && state.code !== "INVALID_INPUT" ? (
+        {state &&
+        !state.ok &&
+        (state.code !== "INVALID_INPUT" || errors[""]?.length) ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}
         <Button type="submit" disabled={pending}>

@@ -60,7 +60,9 @@ export default async function SettingsPage() {
             below to unlock it.
           </FormMessage>
         ) : null}
-        {live.length > 0 ? (
+        {/* An archived character they still wear keeps the form, so they
+            see it and can take it off, even with nothing live to pick. */}
+        {live.length > 0 || worn ? (
           <GalleryForm
             displayName={me.displayName}
             colour={colour}
