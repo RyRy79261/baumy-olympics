@@ -29,7 +29,8 @@ vi.mock("./actions", () => ({
   telegramLinkStatusAction: () => linkStatus(),
 }));
 
-const { TelegramLinkForm } = await import("./settings-forms");
+const { KioskPinForm, TelegramLinkForm, pinProblem } =
+  await import("./settings-forms");
 
 beforeAll(() => {
   (
@@ -156,5 +157,61 @@ describe("TelegramLinkForm", () => {
       `https://t.me/baumy_bot?start=link_${NEXT_CODE}`,
     );
     expect(el.textContent).not.toContain("That link has expired.");
+  });
+});
+
+describe("pinProblem", () => {
+  it("flags letters and a 7th digit at once, too few digits once left", () => {
+    expect(pinProblem("", true)).toBeNull();
+    expect(pinProblem("12", false)).toBeNull();
+    expect(pinProblem("12", true)).toBe("Use 4 to 6 digits.");
+    expect(pinProblem("12a", false)).toBe("Use 4 to 6 digits.");
+    expect(pinProblem("1234567", false)).toBe("Use 4 to 6 digits.");
+    expect(pinProblem("1234", true)).toBeNull();
+    expect(pinProblem("123456", true)).toBeNull();
+  });
+});
+
+describe("KioskPinForm (issue #126)", () => {
+  async function mountPin() {
+    el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    await act(async () => root!.render(<KioskPinForm hasPin={false} />));
+  }
+
+  async function type(value: string) {
+    const input = el.querySelector<HTMLInputElement>("#kiosk-pin")!;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    await act(async () => {
+      setter.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  const shown = () => el.querySelector("#kiosk-pin-error")?.textContent;
+
+  it("is the personal PIN, not for pairing, and says 4 to 6 digits as you type", async () => {
+    await mountPin();
+    expect(el.querySelector("h2")?.textContent).toBe("Your personal PIN");
+    expect(el.textContent).toContain("not for pairing the iPad");
+
+    await type("12");
+    expect(shown()).toBeUndefined();
+    await type("12x");
+    expect(shown()).toBe("Use 4 to 6 digits.");
+    await type("12");
+    expect(shown()).toBeUndefined();
+    await act(async () => {
+      el.querySelector<HTMLInputElement>("#kiosk-pin")!.dispatchEvent(
+        new FocusEvent("focusout", { bubbles: true }),
+      );
+    });
+    expect(shown()).toBe("Use 4 to 6 digits.");
+    await type("1234");
+    expect(shown()).toBeUndefined();
   });
 });

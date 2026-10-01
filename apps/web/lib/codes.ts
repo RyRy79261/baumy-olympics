@@ -1,4 +1,5 @@
 import { randomInt } from "node:crypto";
+import { KIOSK_PAIRING_CODE_LENGTH } from "@baumy/types";
 
 // One-time codes people type: invite codes and Telegram link codes. Drawn
 // from crypto.randomInt over an alphabet without look-alikes (no 0/o, 1/l/i),
@@ -32,9 +33,11 @@ export function generateTelegramLinkCode(): string {
 }
 
 /**
- * A kiosk pairing code: 8 random characters (about 40 bits), uppercase, shown
- * as `ABCD-EFGH`. It lives 10 minutes and only its hash is stored.
+ * A kiosk pairing code (issue #126): 6 random characters (about 30 bits),
+ * uppercase, shown as `ABC-DEF` on the unpaired iPad and carried in its QR
+ * code. Only an admin can use one, it lives 10 minutes and only its hash is
+ * stored.
  */
 export function generateKioskPairingCode(): string {
-  return randomCode(8).toUpperCase();
+  return randomCode(KIOSK_PAIRING_CODE_LENGTH).toUpperCase();
 }
