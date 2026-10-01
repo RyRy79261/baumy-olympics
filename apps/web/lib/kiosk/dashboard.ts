@@ -104,8 +104,9 @@ export function dueLabel(
   // No weight yet: it cannot be logged, so it is not due either.
   if (c.state === "unavailable")
     return { text: "No points yet", tone: "later" };
-  // Never done: due since it was added, but "late" would be unfair.
-  if (c.dueAt === null) return { text: "Never done", tone: "late" };
+  // Never done: available, but it has no rhythm to be late on yet, so it
+  // is never urgent (SPEC §12 decision 22).
+  if (c.dueAt === null) return { text: "Never done", tone: "later" };
   const left = Date.parse(c.dueAt) - now.getTime();
   if (c.state === "due" || left <= 0) {
     const late = -left;
@@ -149,9 +150,10 @@ export interface BountyRowView {
 }
 
 /**
- * When a bounty fell or falls due, for sorting. A chore never done has been
- * due since it was added, so an old one sorts with the truly late ones and
- * a new one does not push real lateness down. No weight yet sorts last.
+ * When a bounty fell or falls due, for sorting. A chore never done has no
+ * due time and is never urgent (SPEC §12 decision 22), so it is listed only
+ * in the New module, where it sorts by when it was added. No weight yet
+ * sorts last.
  */
 export function dueAtMs(
   c: Pick<ChoreView, "state" | "dueAt" | "createdAt">,

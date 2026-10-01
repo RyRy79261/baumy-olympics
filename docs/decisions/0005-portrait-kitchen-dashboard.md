@@ -21,6 +21,7 @@ The owner approved variant A with the month calendar and the Camp 404 cat ("the 
    - **Baumy** sits on the right, over the footer's end. It is a simple cat, and the speech bubbles come from it. Tapping it opens the voice command (§3.6).
 2. **Chores are presented as bounties.** The data model keeps `chores`, and the scoring does not change. A chore gains a **kind**, `consumable` (buy or refill) or `maintenance` (clean or fix).
    - **Urgent** means state `due` and overdue, or falling due before Berlin midnight today. This is `list_chores`' existing split.
+     - [CORRECTION 2026-10-01] Owner ruling (SPEC §12 decision 22, issue #127): urgent means overdue on the chore's own rhythm, its last completion plus the larger of the interval its weight implies and its cooldown. A chore never done, or with no rhythm, is never urgent; a never-done chore is only available, and New while recent.
    - **New** means created in the last 3 days.
 3. **Messages are the notes board.** The Messages icon counts notes created or changed in the last 24 hours, and its module lists them.
 4. **Reminders are a new, small feature.**

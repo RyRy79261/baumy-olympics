@@ -157,7 +157,7 @@ function chore(over: Partial<ChoreView>): ChoreView {
 }
 
 describe("dueChores", () => {
-  it("lists never-done first, then the longest due, then later today", () => {
+  it("lists the longest due first, then later today; never a chore never done", () => {
     const list = dueChores(
       [
         chore({ name: "Soon", state: "done", dueAt: iso(3) }),
@@ -176,22 +176,20 @@ describe("dueChores", () => {
       NOW,
     );
     expect(list.map((c) => c.name)).toEqual([
-      "Never",
       "Ancient",
       "Recent",
       "Streaky",
       "Cooling",
       "Soon",
     ]);
-    expect(list[0]).toMatchObject({ when: "Never done", overdue: false });
-    expect(list[1]).toMatchObject({
+    expect(list[0]).toMatchObject({
       when: "Due since Fri 25 Sep, 12:00",
       overdue: true,
     });
-    expect(list[2]).toMatchObject({ overdue: false, streak: "No streak yet" });
-    expect(list[3]!.streak).toBe("Ryan · streak 3");
-    expect(list[4]).toMatchObject({ when: "Due at 14:00", overdue: false });
-    expect(list[5]!.when).toBe("Due at 15:00");
+    expect(list[1]).toMatchObject({ overdue: false, streak: "No streak yet" });
+    expect(list[2]!.streak).toBe("Ryan · streak 3");
+    expect(list[3]).toMatchObject({ when: "Due at 14:00", overdue: false });
+    expect(list[4]!.when).toBe("Due at 15:00");
   });
 
   it("lists a chore that is not due yet exactly when list_chores calls it urgent", () => {
@@ -209,6 +207,7 @@ describe("dueChores", () => {
           kind: "consumable",
           isNew: true,
           basePoints: 20,
+          dueAt: iso(-1),
         }),
       ],
       NOW,
