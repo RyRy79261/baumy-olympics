@@ -71,6 +71,20 @@ test("the admin's phone approves the iPad's QR code, and the iPad pairs itself",
   await expect(kiosk).toHaveURL(/\/kiosk\/pair$/);
   await expect(kiosk.getByTestId("pairing-code")).toHaveText(code);
 
+  // The phone is on a different network from the iPad (another address), so
+  // the confirm page warns, besides saying when the code was asked for and
+  // the rule it always shows (a link sent to an admin can be phished).
+  await page.goto(url);
+  await expect(page.getByTestId("approve-rule")).toHaveText(
+    "Only approve a code you can see on the iPad in front of you.",
+  );
+  await expect(page.getByTestId("asked-ago")).toHaveText(
+    /^Asked (just now|\d+ minutes? ago)\.$/,
+  );
+  await expect(page.getByTestId("network-warning")).toHaveText(
+    "This code was asked for from a different network than yours. Only approve it if you're standing at the iPad.",
+  );
+
   // The admin's phone: one tap, and the iPad is the kitchen screen.
   await approveOnPhone(page, kiosk, deviceName);
   await expect(
@@ -109,11 +123,16 @@ test("the admin's phone approves the iPad's QR code, and the iPad pairs itself",
   await expect(page.getByTestId(`kiosk-${renamed}`)).toHaveCount(0);
 
   // The camera will not read it: a second iPad's code, typed on the phone,
-  // leads to the same confirm page.
+  // leads to the same confirm page. This iPad and the phone share a network
+  // (the same /24), so there is no warning.
+  const home = uniqueAddress();
   const second = await browser.newContext({
     viewport: KIOSK_VIEWPORT,
     hasTouch: true,
-    extraHTTPHeaders: { "x-forwarded-for": uniqueAddress() },
+    extraHTTPHeaders: { "x-forwarded-for": home },
+  });
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": home.replace(/\.\d+$/, ".250"),
   });
   const other = await second.newPage();
   await other.goto("/kiosk/pair");
@@ -124,6 +143,8 @@ test("the admin's phone approves the iPad's QR code, and the iPad pairs itself",
     .fill(typed.code.toLowerCase());
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByTestId("approve-code")).toHaveText(typed.code);
+  await expect(page.getByTestId("approve-rule")).toBeVisible();
+  await expect(page.getByTestId("network-warning")).toHaveCount(0);
   await page
     .getByRole("button", { name: "Make it the kitchen screen" })
     .click();

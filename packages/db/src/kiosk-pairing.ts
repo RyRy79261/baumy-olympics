@@ -99,6 +99,8 @@ export async function insertKioskPairingRequest(
     secret: string;
     code: string;
     device: string;
+    /** The requester's network prefix, never the full address; or null. */
+    network?: string | null;
     now: Date;
   },
 ): Promise<{ id: string; expiresAt: Date } | null> {
@@ -110,6 +112,7 @@ export async function insertKioskPairingRequest(
       secretHash: hashKioskPairingSecret(input.secret),
       codeHash: hashKioskPairingCode(input.code),
       device: input.device,
+      requesterNetwork: input.network ?? null,
       createdAt: input.now,
       expiresAt,
     })
@@ -145,6 +148,10 @@ export interface KioskPairingByCode {
   device: string;
   state: KioskPairingState;
   expiresAt: Date;
+  /** When the iPad asked. */
+  createdAt: Date;
+  /** The network prefix it asked from, or null when unknown. */
+  network: string | null;
 }
 
 async function selectByCode(
@@ -162,6 +169,8 @@ async function selectByCode(
       device: kioskPairingRequests.device,
       status: kioskPairingRequests.status,
       expiresAt: kioskPairingRequests.expiresAt,
+      createdAt: kioskPairingRequests.createdAt,
+      network: kioskPairingRequests.requesterNetwork,
     })
     .from(kioskPairingRequests)
     .where(
@@ -178,6 +187,8 @@ async function selectByCode(
     device: row.device,
     state: kioskPairingState(row, now),
     expiresAt: row.expiresAt,
+    createdAt: row.createdAt,
+    network: row.network,
   };
 }
 

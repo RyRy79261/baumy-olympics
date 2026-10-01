@@ -54,6 +54,7 @@ async function request(code = "ABC234", secret = "secret-1", now = NOW) {
     secret,
     code,
     device: "Safari on iPad",
+    network: "203.0.113.0/24",
     now,
   });
   return row!;
@@ -118,6 +119,7 @@ describe("insertKioskPairingRequest", () => {
       secretHash: hashKioskPairingSecret("the-secret"),
       codeHash: hashKioskPairingCode("ABC234"),
       device: "Safari on iPad",
+      requesterNetwork: "203.0.113.0/24",
       status: "pending",
       deviceId: null,
       createdAt: NOW,
@@ -126,6 +128,17 @@ describe("insertKioskPairingRequest", () => {
     const text = JSON.stringify(r);
     expect(text).not.toContain("ABC234");
     expect(text).not.toContain("the-secret");
+  });
+
+  it("stores no network when it is unknown", async () => {
+    const res = await insertKioskPairingRequest(db(), {
+      householdId: HOUSEHOLD_ID,
+      secret: "s-unknown",
+      code: "UNK234",
+      device: "a browser",
+      now: NOW,
+    });
+    expect((await row(res!.id)).requesterNetwork).toBeNull();
   });
 
   it("returns null on a code or secret collision, writing nothing", async () => {
@@ -171,6 +184,8 @@ describe("finding a request", () => {
       device: "Safari on iPad",
       state: "pending",
       expiresAt,
+      createdAt: NOW,
+      network: "203.0.113.0/24",
     };
     await expect(
       findKioskPairingByCode(db(), HOUSEHOLD_ID, "abc-234", NOW),

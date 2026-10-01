@@ -33,6 +33,7 @@ describe("kioskPairingDeps", () => {
       secret,
       code,
       device: "Safari on iPad",
+      network: "203.0.113.0/24",
       now: NOW,
     });
     expect(req).toEqual({
@@ -41,6 +42,7 @@ describe("kioskPairingDeps", () => {
     });
     const [row] = await t.db().select().from(kioskPairingRequests);
     expect(row!.householdId).toBe(HOUSEHOLD_ID);
+    expect(row!.requesterNetwork).toBe("203.0.113.0/24");
     expect(JSON.stringify(row)).not.toContain(secret);
     expect(await deps.findBySecret(secret, NOW)).toEqual({
       id: req!.id,
