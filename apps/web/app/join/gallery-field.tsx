@@ -11,11 +11,13 @@ export function GalleryField({
   options,
   pending,
   colour,
+  name,
 }: {
   options: readonly GalleryOption[];
   pending: boolean;
-  /** The colour picked above: the "None" tile shows it. */
+  /** The colour and name typed above: the "None" tile shows them. */
   colour: string;
+  name: string;
 }) {
   const [value, setValue] = useState("");
   if (options.length === 0) return null;
@@ -29,7 +31,7 @@ export function GalleryField({
       disabled={pending}
       none={{
         label: "None",
-        picture: <MemberCharacter colour={colour} scale={3} />,
+        picture: <MemberCharacter name={name} colour={colour} scale={3} />,
       }}
     />
   );

@@ -109,8 +109,8 @@ export default function PrivacyPage() {
             gallery character you picked (if any), your role, your kiosk PIN (as
             a hash only), your Telegram user id if you link Telegram, and
             whether your membership is switched off. A drawn character chosen
-            before 29 September 2026 (hair, skin and shirt) is still stored on
-            it but is no longer shown or used.
+            before characters moved to the gallery (hair, skin and shirt) is
+            still stored on it but is no longer shown or used.
           </li>
           <li>
             <strong>The game:</strong> chores, every completion (who did it, who

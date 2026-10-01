@@ -32,6 +32,7 @@ export function ProfileFields({
   gallery?: readonly GalleryOption[];
 }) {
   const [color, setColor] = useState<string>(MEMBER_COLORS[0]);
+  const [name, setName] = useState("");
   const colorError = errors.color?.length ? `${prefix}-color-error` : undefined;
   return (
     <>
@@ -45,6 +46,7 @@ export function ProfileFields({
           <Input
             {...control}
             name="displayName"
+            onChange={(e) => setName(e.target.value)}
             autoComplete="nickname"
             required
             maxLength={40}
@@ -69,7 +71,12 @@ export function ProfileFields({
           </p>
         ) : null}
       </div>
-      <GalleryField options={gallery} pending={pending} colour={color} />
+      <GalleryField
+        options={gallery}
+        pending={pending}
+        colour={color}
+        name={name}
+      />
     </>
   );
 }
