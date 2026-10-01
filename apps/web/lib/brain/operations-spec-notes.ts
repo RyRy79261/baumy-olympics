@@ -513,7 +513,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns:
-      "`members` (id, name, colour, character) and `reminders` (id, title, body, who posted it, when, `seenBy`, `waitingFor`).",
+      "`members` (id, `displayName`, `color`, and `sprites`: their gallery character, or null) and `reminders` (id, title, body, who posted it, when, `seenBy`, `waitingFor`).",
     errors: [],
     reply:
       '"<title>: still waiting for <names of waitingFor>." Name people, never ids.',

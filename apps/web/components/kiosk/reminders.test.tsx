@@ -9,7 +9,6 @@ import {
   it,
   vi,
 } from "vitest";
-import { defaultAvatar } from "@baumy/types";
 import type { ListRemindersData, ReminderView } from "@/lib/actions/reminders";
 import { REMINDER_POLL_MS } from "@/lib/kiosk/constants";
 import { NIGHT_EVENT } from "@/lib/kiosk/night";
@@ -61,7 +60,6 @@ const member = (id: string, displayName: string) => ({
   id,
   displayName,
   color: "#4ff5e6",
-  avatar: defaultAvatar(id),
   sprites: null,
 });
 const R1: ReminderView = {

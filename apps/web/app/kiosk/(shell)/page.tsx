@@ -100,10 +100,10 @@ export default async function KioskHomePage({
                   sprites={
                     data.members.find((m) => m.id === kiosk.memberId)?.sprites
                   }
-                  avatar={
-                    data.members.find((m) => m.id === kiosk.memberId)?.avatar
+                  name={kiosk.displayName ?? ""}
+                  colour={
+                    data.members.find((m) => m.id === kiosk.memberId)?.color
                   }
-                  memberId={kiosk.memberId}
                   scale={2}
                 />
               }

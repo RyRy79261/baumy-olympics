@@ -64,8 +64,8 @@ export default async function AdminAvatarsPage() {
         <Card title="Gallery">
           {live.length === 0 ? (
             <p className="text-sm text-bm-muted">
-              No characters yet. Until there are, everyone keeps their drawn
-              character.
+              No characters yet. Until there are, everyone shows as their
+              initial in their colour.
             </p>
           ) : (
             <ul className={GRID}>

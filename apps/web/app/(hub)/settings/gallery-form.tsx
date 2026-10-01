@@ -6,7 +6,7 @@ import {
   Button,
   Card,
   FormMessage,
-  Housemate,
+  MemberCharacter,
   type GalleryOption,
 } from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
@@ -14,21 +14,21 @@ import { chooseAvatarAction } from "./actions";
 
 // Settings, "Your character" once the household has a gallery (issue #111):
 // tap a character, then save; choose_avatar puts it on you, and the header,
-// the kitchen screen and the reminder draw it. The first tile is your drawn
-// character, which is what you wear until you pick one.
+// the kitchen screen and the reminder show it. The first tile is your
+// initial in your colour, which is what you show until you pick one.
 
 export function GalleryForm({
-  memberId,
-  character,
+  displayName,
+  colour,
   options,
   picked,
   archivedName,
 }: {
-  memberId: string;
-  /** Their drawn character (the "none" tile). */
-  character: unknown;
+  /** Their name and colour: the "none" tile is their initial tile. */
+  displayName: string;
+  colour: string;
   options: readonly GalleryOption[];
-  /** The gallery character they wear now, or "" for the drawn one. */
+  /** The gallery character they wear now, or "" for none. */
   picked: string;
   /** The name of an archived character they still wear, if so. */
   archivedName?: string;
@@ -42,6 +42,7 @@ export function GalleryForm({
       description="How you look on the kitchen screen and in the header. Pick one from the household's gallery."
     >
       <form
+        id="character"
         action={formAction}
         className="flex flex-col gap-5"
         data-testid="gallery-form"
@@ -61,9 +62,9 @@ export function GalleryForm({
           onChange={setValue}
           disabled={pending}
           none={{
-            label: "Drawn",
+            label: "None",
             picture: (
-              <Housemate avatar={character} memberId={memberId} scale={3} />
+              <MemberCharacter name={displayName} colour={colour} scale={3} />
             ),
           }}
         />

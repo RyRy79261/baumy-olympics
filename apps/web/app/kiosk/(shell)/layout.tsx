@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { listActiveMembers } from "@baumy/db/members";
-import { rosterAvatars } from "@baumy/types";
 import { AvatarButton, Button, KioskShell, KioskTopBar } from "@baumy/ui";
 import { BaumySheet } from "@/components/baumy/baumy-sheet";
 import { IdleReset } from "@/components/kiosk/idle-reset";
@@ -60,26 +59,21 @@ export default async function KioskLayout({
     HOUSEHOLD_ID,
   );
 
-  // Members who have not chosen a character wear shirts nobody else wears.
-  const roster = rosterAvatars(people);
   const avatars = people.map((p) => (
     <form key={p.id} action={pickMemberAction}>
       <input type="hidden" name="memberId" value={p.id} />
       <AvatarButton
         type="submit"
         displayName={p.displayName}
-        sprite={p.avatarSprite}
         color={p.color}
-        avatar={roster.get(p.id)}
         sprites={avatarImageView(p.avatarImage)}
-        memberId={p.id}
         character={
           p.id === kiosk.memberId ? (
             // Whoever is acting emotes when they score (issue #111).
             <ScoreEmote
               sprites={avatarImageView(p.avatarImage)}
-              avatar={roster.get(p.id)}
-              memberId={p.id}
+              name={p.displayName}
+              colour={p.color}
               scale={2}
             />
           ) : undefined
