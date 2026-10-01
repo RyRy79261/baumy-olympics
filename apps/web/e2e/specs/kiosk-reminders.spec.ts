@@ -1,11 +1,17 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import { expectKioskTargets, openKioskChores, pairedKiosk } from "../lib/kiosk";
-import { pickTile } from "../lib/pickers";
+import {
+  expectKioskTargets,
+  kioskNav,
+  openKioskChores,
+  pairedKiosk,
+} from "../lib/kiosk";
+import { MEMBER_COLORS } from "@baumy/types";
 
 // Issue #66 (ADR 0005 §4, §5), on the kitchen iPad against Docker Postgres:
-// a member chooses their character in Settings and it shows in the hub
-// header and on the kiosk; they post a reminder from the hub; the kiosk
+// a member with no gallery character shows as their initial in their colour
+// (issue #116) in the hub header, the scores, the kiosk's avatar bar and
+// the reminder; they post a reminder from the hub; the kiosk
 // shows it full-screen with every face; a face's tap records it as that member
 // without changing who is picked; once everyone has seen it, it closes. A second
 // reminder is dismissed for everyone, as whoever says so.
@@ -18,6 +24,25 @@ import { pickTile } from "../lib/pickers";
 // spec taps faces until the reminder closes rather than counting them.
 
 test.describe.configure({ mode: "serial" });
+
+/** The colour /join starts on (the first swatch), as the browser reports it. */
+function rgb(hex: string): string {
+  const n = (i: number) => parseInt(hex.slice(i, i + 2), 16);
+  return `rgb(${n(1)}, ${n(3)}, ${n(5)})`;
+}
+
+/**
+ * `scope` shows the member as their initial tile, in their colour, and
+ * never as a drawn person or a gallery sprite (issue #116).
+ */
+async function expectInitialTile(scope: Locator, letter: string) {
+  const tile = scope.locator("[data-member-initial]").first();
+  await expect(tile).toBeVisible();
+  await expect(tile).toHaveText(letter);
+  await expect(tile).toHaveCSS("color", rgb(MEMBER_COLORS[0]));
+  await expect(scope.locator("[data-member-sprite]")).toHaveCount(0);
+  await expect(scope.locator("[data-housemate]")).toHaveCount(0);
+}
 
 async function showReminders(kiosk: Page) {
   await kiosk.context().addCookies([
@@ -52,7 +77,7 @@ async function clearOlder(kiosk: Page, reminder: Locator, title: string) {
   throw new Error(`"${title}" never came up on the kiosk`);
 }
 
-test("choose a character, post a reminder, and see it on the kiosk until everyone has", async ({
+test("show a member's initial tile everywhere, post a reminder, and see it on the kiosk until everyone has", async ({
   page,
   browser,
 }, testInfo) => {
@@ -69,36 +94,21 @@ test("choose a character, post a reminder, and see it on the kiosk until everyon
   await redeem(jo.page, invite, name);
   await expect(jo.page).toHaveURL(/\/$/);
 
-  // Settings: Jo's character, drawn live as it changes, then saved.
+  // Jo joined with a code, so has no gallery character: the header shows
+  // their initial in their colour (the join form's first swatch).
+  await expectInitialTile(jo.page.getByTestId("account-menu"), "J");
+  // Settings offers nothing to draw: no hair, skin or shirt pickers.
   await jo.page.goto("/settings");
-  const preview = jo.page.getByTestId("avatar-preview");
-  await expect(preview).toBeVisible();
-  const choose = (group: string, option: string) =>
-    pickTile(jo.page, group, option);
-  await choose("Hair style", "Spiky");
-  await choose("Hair colour", "Platinum");
-  await choose("Skin", "Deep");
-  await choose("Shirt", "Green");
-  await expect(preview).toHaveAttribute("data-hair-style", "spiky");
-  await expect(preview).toHaveAttribute("data-hair-color", "platinum");
-  await expect(preview).toHaveAttribute("data-skin-tone", "deep");
-  await expect(preview).toHaveAttribute("data-shirt-color", "green");
-  await expect(preview.locator("[data-housemate]")).toHaveAttribute(
-    "data-hair",
-    "spiky",
-  );
-  await jo.page.getByRole("button", { name: "Save character" }).click();
   await expect(
-    jo.page.getByRole("status").filter({ hasText: "Character saved." }),
+    jo.page.getByRole("heading", { name: "Settings", level: 1 }),
   ).toBeVisible();
-  // The header draws it, and it is still chosen after a reload.
-  await expect(
-    jo.page.getByTestId("account-menu").locator("[data-housemate]").first(),
-  ).toHaveAttribute("data-hair", "spiky");
-  await jo.page.reload();
-  await expect(
-    jo.page.getByRole("group", { name: "Hair style" }).getByLabel("Spiky"),
-  ).toBeChecked();
+  await expect(jo.page.getByRole("group", { name: "Hair style" })).toHaveCount(
+    0,
+  );
+  await expect(jo.page.getByTestId("avatar-form")).toHaveCount(0);
+  // The scoreboard: Jo's row, at zero, with the same tile.
+  await jo.page.goto("/scores");
+  await expectInitialTile(jo.page.getByTestId(`standing-${name}`), "J");
 
   // Jo posts a reminder from the hub.
   await jo.page.goto("/");
@@ -116,13 +126,15 @@ test("choose a character, post a reminder, and see it on the kiosk until everyon
     page,
     `iPad ${suffix}`,
   );
-  // Jo's character is in the avatar bar (on a page past the dashboard).
+  // Jo's initial tile is in the avatar bar (on a page past the dashboard),
+  // and on the kitchen screen's scoreboard.
   await openKioskChores(kiosk);
-  await expect(
-    kiosk
-      .getByRole("button", { name, exact: true })
-      .locator("[data-housemate]"),
-  ).toHaveAttribute("data-hair", "spiky");
+  await expectInitialTile(
+    kiosk.getByRole("button", { name, exact: true }),
+    "J",
+  );
+  await kioskNav(kiosk, "Scores");
+  await expectInitialTile(kiosk.getByTestId(`standing-${name}`), "J");
   // The founder is acting on the kiosk when the reminder comes up.
   const founder = `Founder ${project}`;
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
@@ -139,13 +151,11 @@ test("choose a character, post a reminder, and see it on the kiosk until everyon
   await expect(count).toHaveText(/^0 of \d+ have seen it$/);
   const total = Number(/of (\d+)/.exec((await count.textContent())!)![1]);
   expect(total).toBeGreaterThanOrEqual(2);
-  // Every face is their character: Jo's is the one Jo chose.
-  await expect(
-    reminder
-      .locator("[data-face]")
-      .filter({ hasText: name })
-      .locator("[data-housemate]"),
-  ).toHaveAttribute("data-hair", "spiky");
+  // Every face is their character or initial tile: Jo's is the tile.
+  await expectInitialTile(
+    reminder.locator("[data-face]").filter({ hasText: name }),
+    "J",
+  );
   await expectKioskTargets(reminder);
 
   // Jo's face: it is Jo who has seen it, and the founder is still the one

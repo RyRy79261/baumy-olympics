@@ -97,7 +97,7 @@ test("an admin adds a character, a new member picks it, every screen draws it", 
   });
   await join.getByLabel("Invite code").fill(invite);
   await join.getByLabel("Your name").fill(name);
-  await expect(join.getByTestId("invite-character")).toBeVisible();
+  await expect(join.getByTestId("invite-color")).toBeVisible();
   await expect(join.locator("[data-avatar]")).toHaveCount(0);
   await join.getByRole("button", { name: "Join the household" }).click();
   await expect(member.page).toHaveURL(/\/settings/);
@@ -109,12 +109,12 @@ test("an admin adds a character, a new member picks it, every screen draws it", 
   await gallery.getByRole("button", { name: "Wear this character" }).click();
   await expect(member.page.getByText("You wear it now.")).toBeVisible();
 
-  // The header draws the sprite, not the drawn character, and it stays
-  // picked after a reload.
+  // The header draws the sprite, not the initial tile, and it stays picked
+  // after a reload.
   await member.page.goto("/");
   const menu = member.page.getByTestId("account-menu");
   await expectLoadedSprite(menu);
-  await expect(menu.locator("[data-housemate]")).toHaveCount(0);
+  await expect(menu.locator("[data-member-initial]")).toHaveCount(0);
   await member.page.goto("/settings");
   await expect(
     member.page
