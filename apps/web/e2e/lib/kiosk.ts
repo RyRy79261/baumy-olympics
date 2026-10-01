@@ -1,5 +1,5 @@
-// Kiosk steps shared by the kiosk specs: an admin's pairing code, pairing an
-// iPad context with it, and typing a PIN on the pad.
+// Kiosk steps shared by the kiosk specs: pairing an iPad context by the
+// admin's phone opening its QR code's URL, and typing a PIN on the pad.
 
 import {
   expect,
@@ -27,45 +27,69 @@ export async function expectKioskTargets(scope: Locator) {
   }
 }
 
-/** The admin makes a pairing code for a new device on /admin/members. */
-export async function pairCode(
-  admin: Page,
-  deviceName: string,
-): Promise<string> {
-  await admin.goto("/admin/members");
-  const form = admin.locator("form").filter({
-    has: admin.getByRole("button", { name: "Create pairing code" }),
-  });
-  await form.getByLabel("Device name").fill(deviceName);
-  await form.getByRole("button", { name: "Create pairing code" }).click();
-  const code = (await admin.getByTestId("pairing-code").textContent())!.trim();
-  expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-  await expect(admin.getByTestId(`kiosk-${deviceName}`)).toContainText(
-    "Waiting for its code",
+/**
+ * What the unpaired iPad at /kiosk/pair shows (issue #126): the URL its QR
+ * code holds and the short code under it.
+ */
+export async function shownPairing(
+  ipad: Page,
+): Promise<{ url: string; code: string }> {
+  const qr = ipad.getByTestId("pairing-qr");
+  await expect(qr.getByRole("img", { name: /^QR code/ })).toBeVisible();
+  const url = (await qr.getAttribute("data-approve-url"))!;
+  const code = (await ipad.getByTestId("pairing-code").textContent())!.trim();
+  expect(code).toMatch(/^[A-Z2-9]{3}-[A-Z2-9]{3}$/);
+  expect(url).toBe(
+    `${new URL(ipad.url()).origin}/admin/kitchen-screen/approve?code=${code.replace("-", "")}`,
   );
-  return code;
+  return { url, code };
 }
 
-/** A new iPad-sized context, paired with a fresh code from `admin`. */
+/**
+ * The admin's phone opens the URL from the iPad's QR code (no camera in a
+ * test) and taps the one button; the iPad pairs itself and goes home.
+ */
+export async function approveOnPhone(
+  admin: Page,
+  ipad: Page,
+  deviceName: string,
+) {
+  const { url, code } = await shownPairing(ipad);
+  await admin.goto(url);
+  await expect(
+    admin.getByRole("heading", {
+      name: "Make this iPad the kitchen screen?",
+      level: 1,
+    }),
+  ).toBeVisible();
+  await expect(admin.getByTestId("approve-code")).toHaveText(code);
+  await admin.getByLabel("Name", { exact: true }).fill(deviceName);
+  await admin
+    .getByRole("button", { name: "Make it the kitchen screen" })
+    .click();
+  await expect(
+    admin.getByRole("status").filter({ hasText: "is now the kitchen screen" }),
+  ).toBeVisible();
+  await expect(ipad).toHaveURL(/\/kiosk$/);
+}
+
+/** A new iPad-sized context, paired by `admin` scanning its code. */
 export async function pairedKiosk(
   browser: Browser,
   admin: Page,
   deviceName: string,
 ) {
-  const code = await pairCode(admin, deviceName);
   const context = await browser.newContext({
     viewport: KIOSK_VIEWPORT,
     hasTouch: true,
-    // Its own address, so pairing's limit of 10 tries per address per 15
+    // Its own address, so pairing's limit of 20 codes per address per 10
     // minutes (lib/kiosk/pairing.ts) counts this kiosk alone, not every
     // kiosk the suite pairs from localhost.
     extraHTTPHeaders: { "x-forwarded-for": uniqueAddress() },
   });
   const page = await context.newPage();
   await page.goto("/kiosk/pair");
-  await page.getByLabel("Pairing code").fill(code);
-  await page.getByRole("button", { name: "Pair this kiosk" }).click();
-  await expect(page).toHaveURL(/\/kiosk$/);
+  await approveOnPhone(admin, page, deviceName);
   return { context, page };
 }
 
