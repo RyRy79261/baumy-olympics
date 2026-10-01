@@ -173,7 +173,10 @@ describe("list_chores", () => {
     expect(data.chores[0]).toMatchObject({
       id: dishes,
       state: "due",
-      urgent: true,
+      // Never done: no rhythm to be overdue on yet, so not urgent
+      // (SPEC §12 decision 22).
+      urgent: false,
+      dueAt: null,
       streak: null,
       lastDoneAt: null,
       next: { totalPts: SEED_CHORES.dishes.basePoints, streakLen: 1 },
@@ -234,7 +237,7 @@ describe("list_chores", () => {
     expect(await list(24)).toMatchObject({ state: "due", urgent: true });
   });
 
-  it("isUrgent: due, or due before midnight; never an unavailable chore", () => {
+  it("isUrgent: overdue, or due before midnight; never a chore never done or unavailable", () => {
     const now = FIXED_NOW;
     const midnight = berlinMidnightAfter(now);
     // 12:00 in Berlin (CEST): midnight is 22:00Z.
@@ -242,8 +245,17 @@ describe("list_chores", () => {
     const due = (
       state: "due" | "cooldown" | "done" | "unavailable",
       t: Date | null,
-    ) => isUrgent({ state, dueAt: t ? t.toISOString() : null }, now);
-    expect(due("due", null)).toBe(true);
+    ) =>
+      isUrgent(
+        {
+          state,
+          dueAt: t ? t.toISOString() : null,
+          intervalMinutes: 4 * 24 * 60,
+        },
+        now,
+      );
+    expect(due("due", at(-1))).toBe(true);
+    expect(due("due", null)).toBe(false);
     expect(due("cooldown", new Date(midnight.getTime() - 1))).toBe(true);
     expect(due("done", new Date(midnight.getTime() - 1))).toBe(true);
     expect(due("cooldown", midnight)).toBe(false);

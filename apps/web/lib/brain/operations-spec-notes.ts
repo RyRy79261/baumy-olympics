@@ -120,7 +120,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       { say: "what's urgent?", call: "list_chores {} (keep `urgent: true`)" },
     ],
     returns:
-      "`chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (due, cooling down with `availableAt`, or done for now), `urgent`, `isNew`, `streak` (holder and length) and `next` (what logging it now would score the asker).",
+      "`chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (due, cooling down with `availableAt`, or done for now; a chore never done is `due` with no `dueAt`), `urgent` (overdue on its own rhythm; never for a chore never done), `isNew`, `streak` (holder and length) and `next` (what logging it now would score the asker).",
     errors: [],
     reply:
       'Urgent ones first, then due, then the rest; say points as "+N". Times in Berlin time.',
