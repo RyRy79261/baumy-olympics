@@ -23,6 +23,7 @@ import {
   KIOSK_WALK_IN_COOKIE,
   KIOSK_WALK_IN_MAX_AGE_S,
 } from "@/lib/kiosk/cookies";
+import { PAIRING_COOKIE, PAIRING_COOKIE_MAX_AGE_S } from "@/lib/kiosk/pairing";
 import {
   LOGIN_REQUEST_RETENTION_MS,
   LOGIN_REQUEST_TTL_MS,
@@ -320,6 +321,12 @@ export default function PrivacyPage() {
             {LOGIN_REQUEST_MIN} minutes). A session made that way is marked with{" "}
             <code>{AUTH_COOKIE_PREFIX}.dont_remember</code> and ends when the
             browser closes, or after a day at most.
+          </li>
+          <li>
+            <code>{PAIRING_COOKIE}</code>: only on an iPad showing the code to
+            become the kitchen screen; it proves an admin&rsquo;s approval is
+            for that iPad, and goes after {PAIRING_COOKIE_MAX_AGE_S / 60}{" "}
+            minutes or once it is paired.
           </li>
           <li>
             <code>{KIOSK_COOKIE}</code>: only on a paired kitchen iPad; it signs

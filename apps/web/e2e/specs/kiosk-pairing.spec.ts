@@ -97,7 +97,7 @@ test("the admin's phone approves the iPad's QR code, and the iPad pairs itself",
   const row = page.getByTestId(`kiosk-${deviceName}`);
   await expect(row).toContainText("Paired");
   const renamed = `Fridge ${tag}`;
-  await row.getByLabel("Name").fill(renamed);
+  await row.getByRole("textbox", { name: "Name" }).fill(renamed);
   await row.getByRole("button", { name: `Rename ${deviceName}` }).click();
   await expect(page.getByTestId(`kiosk-${renamed}`)).toContainText("Paired");
 

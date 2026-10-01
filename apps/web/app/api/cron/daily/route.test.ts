@@ -57,6 +57,7 @@ describe("GET /api/cron/daily", () => {
       "weights",
       "photos",
       "logins",
+      "kiosk_pairings",
     ]);
     const second = await (await get(`Bearer ${SECRET}`)).json();
     expect(second.steps[0].detail).toEqual({
