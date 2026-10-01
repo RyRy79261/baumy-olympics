@@ -22,8 +22,9 @@ export function berlinMidnightAfter(now: Date): Date {
  * Urgent: overdue on the chore's own rhythm (SPEC §12 decision 22, owner
  * ruling 2026-10-01). Its rhythm is the interval its weight implies
  * (`expectedIntervalMinutes`, here `intervalMinutes`), and `dueAt` is its
- * last completion plus that interval (`choreTiming`). It is urgent once
- * `dueAt` has passed, or when `dueAt` falls before the next Berlin midnight.
+ * last completion plus the larger of that interval and its cooldown
+ * (`choreTiming`). It is urgent once `dueAt` has passed, or when `dueAt`
+ * falls before the next Berlin midnight.
  *
  * Never urgent: a chore never done (no `dueAt`: there is nothing to be
  * overdue against, so it is only available, or new), a chore with no rhythm

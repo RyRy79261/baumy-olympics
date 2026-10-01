@@ -51,9 +51,9 @@ export interface ChoreView {
   availableAt: string | null;
   dueAt: string | null;
   /**
-   * Overdue on its own rhythm: its last completion plus `intervalMinutes`
-   * has passed or falls before Berlin midnight (`isUrgent`). Never for a
-   * chore never done.
+   * Overdue on its own rhythm: its last completion plus the larger of
+   * `intervalMinutes` and `cooldownMinutes` has passed or falls before
+   * Berlin midnight (`isUrgent`). Never for a chore never done.
    */
   urgent: boolean;
   /** Created in the last 3 days (`NEW_BOUNTY_MS`). */
@@ -77,7 +77,7 @@ export const listChores = defineAction({
   name: "list_chores",
   title: "List chores",
   description:
-    "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (overdue on its own rhythm: its last completion plus its interval has passed, or falls before midnight in Berlin; a chore never done is never urgent), `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
+    "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (overdue on its own rhythm: its last completion plus the larger of its interval and its cooldown has passed, or falls before midnight in Berlin; a chore never done is never urgent), `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
   consent: "See the household's chores, streaks and points",
   kind: "read",
   risk: "safe",
