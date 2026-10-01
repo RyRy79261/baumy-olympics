@@ -1,6 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { multiplierPct, pctOf } from "@baumy/core";
+import {
+  addDaysToDateKey,
+  berlinDateKey,
+  berlinDateTimeToUtc,
+  multiplierPct,
+  pctOf,
+} from "@baumy/core";
 import { addChore, openChore } from "../lib/chores";
+import { serverClock } from "../lib/clock";
 import { founderAdmin } from "../lib/household";
 import {
   expectKioskTargets,
@@ -97,6 +104,16 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   // 820×1180 (pairedKiosk), as in hub.spec: the ipad-portrait founder
   // already pairs close to pair_kiosk's 10 codes per 10 minutes.
   test.skip(project !== "mobile-360", "Paired from the phone project.");
+  // Its bounties are urgent because they fall due before Berlin midnight
+  // (SPEC §12 decision 22); too close to midnight they would not yet be.
+  const { now } = await serverClock(page);
+  const midnight = berlinDateTimeToUtc(
+    addDaysToDateKey(berlinDateKey(new Date(now)), 1),
+  );
+  test.skip(
+    midnight.getTime() - Date.parse(now) < 30 * 60_000,
+    "Within 30 minutes of Berlin midnight.",
+  );
   const tag = Math.random().toString(36).slice(2, 8);
   const bins = `Bins ${tag}`;
   const milk = `Oat milk ${tag}`;
@@ -155,8 +172,7 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await expect(urgentBefore).toBeHidden();
 
   // Done once, they have a rhythm: due again in a quarter of an hour,
-  // before midnight, so urgent. (Run in the last quarter hour before
-  // midnight in Berlin, they become urgent only once they are due.)
+  // before midnight, so urgent.
   await page.goto("/chores");
   for (const name of [bins, milk]) {
     const logSheet = await openChore(page, name);

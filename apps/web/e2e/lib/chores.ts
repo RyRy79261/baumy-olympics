@@ -1,13 +1,6 @@
 // Chore steps shared by the chore specs, through the real pages.
 
-import {
-  expect,
-  type APIRequestContext,
-  type Locator,
-  type Page,
-} from "@playwright/test";
-import { serverClock } from "./clock";
-import { callTool, connect } from "./mcp";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export interface NewChore {
   name: string;
@@ -48,41 +41,4 @@ export async function openChore(page: Page, name: string): Promise<Locator> {
   const sheet = page.getByRole("dialog", { name: `Log ${name}` });
   await expect(sheet).toBeVisible();
   return sheet;
-}
-
-/**
- * The signed-in `member` logs each named chore as done `minutesAgo` before
- * the server's now, through MCP's log_completion (the pages always log
- * "now"). That gives a chore a rhythm: a chore never done is never urgent
- * (SPEC §12 decision 22), one done a day ago on a one-day rhythm is.
- */
-export async function logDoneAgo(
-  member: Page,
-  request: APIRequestContext,
-  names: string[],
-  minutesAgo: number,
-) {
-  const { tokens } = await connect(
-    member,
-    request,
-    `E2E backdate ${Math.random().toString(36).slice(2, 8)}`,
-    { write: true },
-  );
-  const token = tokens.access_token;
-  const { json: board } = await callTool<{
-    chores: { id: string; name: string }[];
-  }>(request, token, "list_chores");
-  const { now } = await serverClock(member);
-  const occurredAt = new Date(
-    Date.parse(now) - minutesAgo * 60_000,
-  ).toISOString();
-  for (const name of names) {
-    const chore = board.chores.find((c) => c.name === name);
-    expect(chore, `${name} is on the board`).toBeDefined();
-    const logged = await callTool(request, token, "log_completion", {
-      choreId: chore!.id,
-      occurredAt,
-    });
-    expect(logged.result.isError, `logging ${name}`).toBeUndefined();
-  }
 }

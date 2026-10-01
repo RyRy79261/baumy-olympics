@@ -119,9 +119,10 @@ export function bountyCounts(
 }
 
 /**
- * The board's order: urgent first, the longest-waiting at the top (never
- * done before anything with a date); then the rest by when they fall due;
- * chores that cannot be scored last; ties by name.
+ * The board's order: urgent first, the longest-overdue at the top; then the
+ * rest, chores never done (available, never urgent) before those with a
+ * date, which go by when they fall due; chores that cannot be scored last;
+ * ties by name.
  */
 export function sortBounties<
   C extends Pick<ChoreView, "urgent" | "state" | "dueAt" | "name">,

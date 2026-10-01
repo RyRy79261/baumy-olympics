@@ -171,10 +171,11 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 - **Bounties are chores.** Each chore has a `kind`: `consumable` (buy or
   refill: toilet paper, dish soap) or `maintenance` (clean or fix: trash,
   bathroom). It has base points and a cooldown. `urgent` means overdue on
-  its own rhythm: its last completion plus its interval has passed, or falls
-  before midnight in Berlin. A chore never done is never urgent, only
-  available (and new, if recent). `isNew` means added in the last 3 days. Logging a chore inside its cooldown is refused (`COOLDOWN`, with
-  `retryAt`).
+  its own rhythm: its last completion plus the larger of its interval and
+  its cooldown has passed, or falls before midnight in Berlin. A chore never
+  done is never urgent, only available (and new, if recent). `isNew` means
+  added in the last 3 days. Logging a chore inside its cooldown is refused
+  (`COOLDOWN`, with `retryAt`).
 - **Streaks and break bonuses.** Each chore has one streak holder. Doing a
   chore again while you hold it grows the streak (+25% of base per step, no
   cap). Doing a chore someone else holds **breaks** their streak: you get a

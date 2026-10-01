@@ -150,9 +150,10 @@ export interface BountyRowView {
 }
 
 /**
- * When a bounty fell or falls due, for sorting. A chore never done has been
- * due since it was added, so an old one sorts with the truly late ones and
- * a new one does not push real lateness down. No weight yet sorts last.
+ * When a bounty fell or falls due, for sorting. A chore never done has no
+ * due time and is never urgent (SPEC §12 decision 22), so it is listed only
+ * in the New module, where it sorts by when it was added. No weight yet
+ * sorts last.
  */
 export function dueAtMs(
   c: Pick<ChoreView, "state" | "dueAt" | "createdAt">,
