@@ -19,7 +19,7 @@ export function statusLabel(
     case "due":
       return c.dueAt
         ? `Due since ${formatBerlinDateTime(new Date(c.dueAt))}`
-        : "Due";
+        : "Never done";
     case "cooldown":
       return `Again from ${formatBerlinDateTime(new Date(c.availableAt!))}`;
     case "done":

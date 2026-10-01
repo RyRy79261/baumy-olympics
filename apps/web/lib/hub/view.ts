@@ -115,7 +115,7 @@ export interface HubChore {
   isNew: boolean;
   /** Base points, or null while it has none. */
   points: number | null;
-  /** "Due since Wed 30 Sep, 08:00", "Never done" or "Due at 18:00". */
+  /** "Due since Wed 30 Sep, 08:00" or "Due at 18:00". */
   when: string;
   overdue: boolean;
   /** "Ryan · streak 3", or "No streak yet". */
@@ -134,43 +134,32 @@ function bountyOf(c: ChoreView) {
 }
 
 /**
- * The chores that are due, the longest-waiting first (never done at the
- * top), then those that fall due before Berlin midnight. A chore is overdue
- * once it has been due for a day.
+ * The urgent chores (list_chores' `urgent`, the same split the kitchen
+ * screen's Urgent icon counts: overdue on their own rhythm, never a chore
+ * never done), the longest-waiting first, then those that fall due before
+ * Berlin midnight. A chore is overdue once it has been due for a day.
  */
 export function dueChores(chores: ChoreView[], now: Date): HubChore[] {
-  const due = chores
-    .filter((c) => c.state === "due")
+  return chores
+    .filter((c) => c.urgent && c.dueAt !== null)
     .sort(
       (a, b) =>
-        (a.dueAt ? Date.parse(a.dueAt) : -Infinity) -
-          (b.dueAt ? Date.parse(b.dueAt) : -Infinity) ||
+        Date.parse(a.dueAt!) - Date.parse(b.dueAt!) ||
         a.name.localeCompare(b.name),
     )
     .map((c): HubChore => {
-      const since = c.dueAt ? Date.parse(c.dueAt) : null;
+      const at = Date.parse(c.dueAt!);
+      const late = now.getTime() - at;
       return {
         ...bountyOf(c),
         when:
-          since === null
-            ? "Never done"
-            : `Due since ${formatBerlinDateTime(new Date(since))}`,
-        overdue: since !== null && now.getTime() - since >= OVERDUE_AFTER_MS,
+          late >= 0
+            ? `Due since ${formatBerlinDateTime(new Date(at))}`
+            : `Due at ${berlinTimeKey(new Date(at))}`,
+        overdue: late >= OVERDUE_AFTER_MS,
         streak: streakLabel(c),
       };
     });
-  const later = chores
-    // `urgent` is list_chores' (isUrgent): the same split the kitchen
-    // screen's Urgent icon counts.
-    .filter((c) => c.state !== "due" && c.urgent)
-    .sort((a, b) => Date.parse(a.dueAt!) - Date.parse(b.dueAt!))
-    .map((c): HubChore => ({
-      ...bountyOf(c),
-      when: `Due at ${berlinTimeKey(new Date(c.dueAt!))}`,
-      overdue: false,
-      streak: streakLabel(c),
-    }));
-  return [...due, ...later];
 }
 
 /** The clock's two lines, in Berlin time. */

@@ -82,7 +82,7 @@ describe("streakLabel", () => {
 describe("statusLabel", () => {
   const base = { archived: false, availableAt: null, dueAt: null };
   it("says when, in Berlin time", () => {
-    expect(statusLabel({ ...base, state: "due" })).toBe("Due");
+    expect(statusLabel({ ...base, state: "due" })).toBe("Never done");
     expect(
       statusLabel({ ...base, state: "due", dueAt: "2026-09-30T06:00:00.000Z" }),
     ).toBe("Due since Wed 30 Sep, 08:00");

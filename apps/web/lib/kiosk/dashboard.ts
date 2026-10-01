@@ -104,8 +104,9 @@ export function dueLabel(
   // No weight yet: it cannot be logged, so it is not due either.
   if (c.state === "unavailable")
     return { text: "No points yet", tone: "later" };
-  // Never done: due since it was added, but "late" would be unfair.
-  if (c.dueAt === null) return { text: "Never done", tone: "late" };
+  // Never done: available, but it has no rhythm to be late on yet, so it
+  // is never urgent (SPEC §12 decision 22).
+  if (c.dueAt === null) return { text: "Never done", tone: "later" };
   const left = Date.parse(c.dueAt) - now.getTime();
   if (c.state === "due" || left <= 0) {
     const late = -left;

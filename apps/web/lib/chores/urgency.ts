@@ -19,15 +19,23 @@ export function berlinMidnightAfter(now: Date): Date {
 }
 
 /**
- * Urgent: due now, or falling due before Berlin midnight. A chore that
- * cannot be scored (archived, or no weight yet) is never urgent.
+ * Urgent: overdue on the chore's own rhythm (SPEC §12 decision 22, owner
+ * ruling 2026-10-01). Its rhythm is the interval its weight implies
+ * (`expectedIntervalMinutes`, here `intervalMinutes`), and `dueAt` is its
+ * last completion plus that interval (`choreTiming`). It is urgent once
+ * `dueAt` has passed, or when `dueAt` falls before the next Berlin midnight.
+ *
+ * Never urgent: a chore never done (no `dueAt`: there is nothing to be
+ * overdue against, so it is only available, or new), a chore with no rhythm
+ * (no interval), and one that cannot be scored (archived, or no weight yet).
  */
 export function isUrgent(
-  c: Pick<ChoreView, "state" | "dueAt">,
+  c: Pick<ChoreView, "state" | "dueAt" | "intervalMinutes">,
   now: Date,
 ): boolean {
-  if (c.state === "due") return true;
-  if (c.state === "unavailable" || c.dueAt === null) return false;
+  if (c.state === "unavailable") return false;
+  if (c.intervalMinutes === null || c.intervalMinutes <= 0) return false;
+  if (c.dueAt === null) return false;
   return Date.parse(c.dueAt) < berlinMidnightAfter(now).getTime();
 }
 
