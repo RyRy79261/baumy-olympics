@@ -1,46 +1,24 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, gt, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { createHttpDb, type Queryable } from "./index";
 import { kioskDevices } from "./schema";
 
 // Kiosk devices (SPEC §5, §6.2): the kitchen iPad signs in as a device.
 //
-//   1. An admin's `pair_kiosk` stores the sha256 of an 8-character pairing
-//      code on a new row (insertKioskPairing). It lasts 10 minutes.
-//   2. The iPad sends the code to `/kiosk/pair`; claimKioskPairing swaps it,
-//      in ONE `UPDATE … RETURNING`, for the sha256 of a fresh random token,
-//      so two iPads racing with one code cannot both get it.
-//   3. Every kiosk request looks its cookie's token up by hash
+//   1. The iPad asks to be paired and an admin approves it by scanning its
+//      QR code (kiosk-pairing.ts, issue #126), which creates the row here,
+//      unpaired; the iPad's next poll stores the sha256 of its fresh token.
+//   2. Every kiosk request looks its cookie's token up by hash
 //      (findPairedKioskDevice). A revoked device is never found.
 //
 // Every function but the request-path lookups takes the caller's handle (the
 // action's transaction) and the caller's clock.
-
-/** A pairing code lives this long. */
-export const KIOSK_PAIRING_TTL_MS = 10 * 60_000;
 
 /** `last_seen_at` is written at most this often per device. */
 export const KIOSK_SEEN_EVERY_MS = 5 * 60_000;
 
 function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
-}
-
-/**
- * The one spelling of a pairing code: no spaces or dashes, uppercase. It is
- * shown as `ABCD-EFGH` and typed however the iPad keyboard likes.
- */
-export function normalizePairingCode(raw: string): string {
-  return raw.replace(/[\s-]/g, "").toUpperCase();
-}
-
-/**
- * The stored form of a pairing code. 8 random characters from a 31-letter
- * alphabet is about 40 bits, alive for 10 minutes behind a per-IP limit, so
- * a plain sha256 is enough.
- */
-export function hashPairingCode(code: string): string {
-  return sha256Hex(normalizePairingCode(code));
 }
 
 /**
@@ -52,70 +30,6 @@ export function hashKioskToken(token: string): string {
 }
 
 export type KioskDeviceRow = typeof kioskDevices.$inferSelect;
-
-/**
- * Store a new device's pairing code. Returns null, writing nothing, if the
- * code's hash is already taken (a collision; the caller mints another).
- */
-export async function insertKioskPairing(
-  db: Queryable,
-  input: {
-    householdId: string;
-    name: string;
-    code: string;
-    pairedBy: string;
-    now: Date;
-  },
-): Promise<{ id: string; expiresAt: Date } | null> {
-  const expiresAt = new Date(input.now.getTime() + KIOSK_PAIRING_TTL_MS);
-  const [row] = await db
-    .insert(kioskDevices)
-    .values({
-      householdId: input.householdId,
-      name: input.name,
-      pairingCodeHash: hashPairingCode(input.code),
-      pairingExpiresAt: expiresAt,
-      pairedBy: input.pairedBy,
-      createdAt: input.now,
-    })
-    .onConflictDoNothing({ target: kioskDevices.pairingCodeHash })
-    .returning({ id: kioskDevices.id });
-  return row ? { id: row.id, expiresAt } : null;
-}
-
-/**
- * Use a pairing code, once: ONE `UPDATE … RETURNING` whose WHERE is the whole
- * "still usable" test (not used, not expired, not revoked). It clears the
- * code and stores the token's hash. A second use of the code, or a
- * concurrent one, finds no row. Returns the paired device, or null.
- */
-export async function claimKioskPairing(
-  db: Queryable,
-  input: { code: string; tokenHash: string; now: Date },
-): Promise<{ id: string; householdId: string; name: string } | null> {
-  const [row] = await db
-    .update(kioskDevices)
-    .set({
-      tokenHash: input.tokenHash,
-      pairingCodeHash: null,
-      pairedAt: input.now,
-      lastSeenAt: input.now,
-    })
-    .where(
-      and(
-        eq(kioskDevices.pairingCodeHash, hashPairingCode(input.code)),
-        isNull(kioskDevices.pairedAt),
-        isNull(kioskDevices.revokedAt),
-        gt(kioskDevices.pairingExpiresAt, input.now),
-      ),
-    )
-    .returning({
-      id: kioskDevices.id,
-      householdId: kioskDevices.householdId,
-      name: kioskDevices.name,
-    });
-  return row ?? null;
-}
 
 export interface PairedKioskDevice {
   id: string;
@@ -175,8 +89,9 @@ export async function touchKioskDevice(
 }
 
 /**
- * Revoke a device (or cancel its unused code). Compare-and-set: only a
- * device of this household not already revoked. Returns it, or null.
+ * Revoke a device (or cancel an approval its iPad has not picked up).
+ * Compare-and-set: only a device of this household not already revoked.
+ * Returns it, or null.
  */
 export async function revokeKioskDevice(
   db: Queryable,
@@ -184,7 +99,7 @@ export async function revokeKioskDevice(
 ): Promise<{ id: string; name: string; paired: boolean } | null> {
   const [row] = await db
     .update(kioskDevices)
-    .set({ revokedAt: input.now, pairingCodeHash: null })
+    .set({ revokedAt: input.now })
     .where(
       and(
         eq(kioskDevices.id, input.id),
@@ -202,9 +117,34 @@ export async function revokeKioskDevice(
     : null;
 }
 
+/**
+ * Rename a device. Compare-and-set: only a device of this household that is
+ * not revoked. Returns it, or null.
+ */
+export async function renameKioskDevice(
+  db: Queryable,
+  input: { householdId: string; id: string; name: string },
+): Promise<{ id: string; name: string } | null> {
+  const [row] = await db
+    .update(kioskDevices)
+    .set({ name: input.name })
+    .where(
+      and(
+        eq(kioskDevices.id, input.id),
+        eq(kioskDevices.householdId, input.householdId),
+        isNull(kioskDevices.revokedAt),
+      ),
+    )
+    .returning({ id: kioskDevices.id, name: kioskDevices.name });
+  return row ?? null;
+}
+
 export type KioskDeviceState = "waiting" | "expired" | "paired" | "revoked";
 
-/** Where a device stands: waiting for its code, never paired, or paired. */
+/**
+ * Where a device stands: approved and waiting for its iPad to pick the
+ * approval up, never picked up, paired, or revoked.
+ */
 export function kioskDeviceState(
   row: Pick<KioskDeviceRow, "revokedAt" | "pairedAt" | "pairingExpiresAt">,
   now: Date,

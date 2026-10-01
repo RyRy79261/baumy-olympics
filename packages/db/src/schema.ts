@@ -553,16 +553,21 @@ export const loginRequests = pgTable(
 
 /**
  * A kitchen kiosk (SPEC §5, §6.2, §8): an iPad that stays signed in as a
- * DEVICE, not a person. An admin's `pair_kiosk` creates the row holding only
- * the sha256 of an 8-character pairing code (10 minutes, one use). The iPad
- * exchanges the code at `/kiosk/pair` with ONE `UPDATE … WHERE paired_at IS
- * NULL … RETURNING` (kiosk-devices.ts), which clears the code and stores the
- * sha256 of the random token its `baumy_kiosk` cookie carries. Neither the
- * code nor the token is ever stored. `revoke_kiosk` sets `revoked_at`, which
- * signs the device out (and cancels a code not yet used).
+ * DEVICE, not a person. Since issue #126 the iPad asks to be paired
+ * (`kiosk_pairing_requests`, below) and an admin approves it by scanning its
+ * QR code (`approve_kiosk_pairing`), which creates this row, unpaired, until
+ * `pairing_expires_at`. The iPad's next poll trades its request for a device
+ * token with ONE `UPDATE … WHERE paired_at IS NULL … RETURNING`
+ * (kiosk-pairing.ts), which stores the sha256 of the random token its
+ * `baumy_kiosk` cookie carries. The token is never stored. `revoke_kiosk`
+ * sets `revoked_at`, which signs the device out (or cancels an approval the
+ * iPad has not picked up).
  *
- * Both hashes are nullable and unique: Postgres lets many rows hold NULL in
- * a unique column, which is exactly "no code" or "not paired yet".
+ * `token_hash` is nullable and unique: Postgres lets many rows hold NULL in a
+ * unique column, which is exactly "not paired yet". `pairing_code_hash` held
+ * the admin-made 8-character code of the flow before issue #126; nothing
+ * writes it any more (drop it in a later migration, once no deployment of the
+ * old code is left).
  */
 export const kioskDevices = pgTable(
   "kiosk_devices",
@@ -574,10 +579,10 @@ export const kioskDevices = pgTable(
     name: text("name").notNull(),
     /** sha256 hex of the device token; set when the device pairs. */
     tokenHash: text("token_hash").unique(),
-    /** sha256 hex of the pairing code; cleared when it is used. */
+    /** Unused since issue #126 (the old admin-made code); always null. */
     pairingCodeHash: text("pairing_code_hash").unique(),
     pairingExpiresAt: timestamp("pairing_expires_at", { withTimezone: true }),
-    /** The admin who created the pairing code. */
+    /** The admin who approved the pairing. */
     pairedBy: uuid("paired_by")
       .notNull()
       .references(() => members.id),
@@ -594,6 +599,63 @@ export const kioskDevices = pgTable(
     check(
       "kiosk_devices_paired_has_token",
       sql`(${t.pairedAt} IS NULL) = (${t.tokenHash} IS NULL)`,
+    ),
+  ],
+);
+
+/**
+ * Where a kiosk pairing request stands (issue #126). `expired` is derived,
+ * never stored: a `pending` or `approved` row past its time reads as expired
+ * (`kioskPairingState`, kiosk-pairing.ts).
+ */
+export const kioskPairingStatus = pgEnum("kiosk_pairing_status", [
+  "pending",
+  "approved",
+  "used",
+]);
+
+/**
+ * An iPad asking to become the kitchen screen (issue #126, SPEC §6.2). The
+ * unpaired iPad at `/kiosk/pair` starts one (a sign-in, not an action: nobody
+ * is signed in) and shows its short code as a QR code. An admin scans it on
+ * their phone and approves it (`approve_kiosk_pairing`), which creates the
+ * `kiosk_devices` row; the iPad, polling, trades the request for its device
+ * token once.
+ *
+ * - Only hashes are stored: the sha256 of the iPad's 32-byte secret (in its
+ *   httpOnly cookie, never in a URL) and of the short code the QR carries.
+ * - pending → approved → used, each step a compare-and-set on the status.
+ *   10 minutes to approve; the exchange gets a short grace after that.
+ * - `device` is a short label for the browser that asked ("Safari on iPad"),
+ *   shown to the admin who approves it.
+ */
+export const kioskPairingRequests = pgTable(
+  "kiosk_pairing_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id),
+    secretHash: text("secret_hash").notNull().unique(),
+    codeHash: text("code_hash").notNull().unique(),
+    device: text("device").notNull(),
+    status: kioskPairingStatus("status").notNull().default("pending"),
+    /** The device row the approval created. */
+    deviceId: uuid("device_id").references(() => kioskDevices.id),
+    approvedBy: uuid("approved_by").references(() => members.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("kiosk_pairing_requests_created_at_idx").on(t.createdAt),
+    // Approved (or used) exactly when there is a device for it.
+    check(
+      "kiosk_pairing_requests_approved_has_device",
+      sql`(${t.status} = 'pending') = (${t.deviceId} IS NULL)`,
     ),
   ],
 );
