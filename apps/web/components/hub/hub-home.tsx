@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense, use, type ReactNode } from "react";
 import type { Route } from "next";
 import {
   AgendaItem,
@@ -21,7 +22,7 @@ import {
   type ShoppingActions,
 } from "@/components/shopping/shopping-list";
 import { eventAccent } from "@/lib/calendar/view";
-import type { HubData } from "@/lib/hub/load";
+import type { HubData, HubLocal } from "@/lib/hub/load";
 import { agendaTime } from "@/lib/hub/view";
 import { LiveClock } from "./live-clock";
 
@@ -63,6 +64,129 @@ const TILES: {
   },
 ];
 
+/**
+ * What the hub home shows. The calendar and the shopping list come from other
+ * services (Google, brain), so the page may hand them over still on their
+ * way: they then stream in, each in its own widget (issue #128), and the rest
+ * of the page does not wait for them.
+ */
+export type HubView = HubLocal & {
+  events: HubData["events"] | Promise<HubData["events"]>;
+  shopping: HubData["shopping"] | Promise<HubData["shopping"]>;
+};
+
+/** What a streaming widget says until its read answers. */
+export const WIDGET_LOADING = "Loading…";
+
+/** `value` now, or `loading` until its promise settles, then `value`. */
+function Deferred<T>({
+  value,
+  loading,
+  children,
+}: {
+  value: T | Promise<T>;
+  loading: ReactNode;
+  children: (value: T) => ReactNode;
+}) {
+  if (!(value instanceof Promise)) return children(value);
+  return (
+    <Suspense fallback={loading}>
+      <Settled promise={value}>{children}</Settled>
+    </Suspense>
+  );
+}
+
+function Settled<T>({
+  promise,
+  children,
+}: {
+  promise: Promise<T>;
+  children: (value: T) => ReactNode;
+}) {
+  return children(use(promise));
+}
+
+function EventsWidget(
+  props:
+    | { loading: true }
+    | {
+        loading?: false;
+        events: HubData["events"];
+        memberColors: Record<string, string>;
+      },
+) {
+  const events = props.loading ? null : props.events;
+  return (
+    <Widget
+      id="widget-events"
+      data-testid="widget-events"
+      title="Today"
+      status={events ? events.status : "loading"}
+      message={
+        !events
+          ? WIDGET_LOADING
+          : events.status === "ready"
+            ? undefined
+            : events.message
+      }
+      action={<More href="/calendar" label="Calendar" />}
+    >
+      {events?.status === "ready" && !props.loading ? (
+        <ul className="flex flex-col divide-y-2 divide-bm-line">
+          {events.data.map((e) => (
+            <AgendaItem
+              key={e.id}
+              {...agendaTime(e.time)}
+              title={e.title}
+              secondary={e.location ?? undefined}
+              accent={eventAccent(e, props.memberColors)}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </Widget>
+  );
+}
+
+function ShoppingWidget(
+  props:
+    | { loading: true }
+    | { loading?: false; list: HubData["shopping"]; actions: ShoppingActions },
+) {
+  const list = props.loading ? null : props.list;
+  return (
+    <Widget
+      id="widget-shopping"
+      data-testid="widget-shopping"
+      title="Shopping list"
+      status={
+        !list
+          ? "loading"
+          : list.status === "unavailable"
+            ? "unavailable"
+            : "ready"
+      }
+      message={
+        !list
+          ? WIDGET_LOADING
+          : list.status === "unavailable"
+            ? list.message
+            : undefined
+      }
+      action={<More href="/shopping" label="List" />}
+    >
+      {!list || props.loading || list.status === "unavailable" ? null : (
+        <ShoppingList
+          items={list.status === "ready" ? list.data : []}
+          canEdit
+          actions={props.actions}
+          idPrefix="hub-shopping"
+        />
+      )}
+    </Widget>
+  );
+}
+
 /** How many urgent bounties the hub lists before "N more". */
 export const HUB_BOUNTIES = 6;
 
@@ -80,15 +204,14 @@ export function HubHome({
   shopping,
   voice = false,
 }: {
-  hub: HubData;
+  hub: HubView;
   /** Member id → colour, for the agenda's bars. */
   memberColors: Record<string, string>;
   shopping: ShoppingActions;
   /** Offer hold-to-speak in the Baumy sheet (a transcriber is configured). */
   voice?: boolean;
 }) {
-  const { events, chores, standings, pot, notes, counts } = hub;
-  const list = hub.shopping;
+  const { chores, standings, pot, notes, counts } = hub;
   return (
     // From lg up the page keeps clear of the corner Baumy's button sits in
     // (fixed, bottom right), so it never covers a widget's link or the
@@ -168,28 +291,11 @@ export function HubHome({
             ) : null}
           </Widget>
 
-          <Widget
-            id="widget-events"
-            data-testid="widget-events"
-            title="Today"
-            status={events.status}
-            message={events.status === "ready" ? undefined : events.message}
-            action={<More href="/calendar" label="Calendar" />}
-          >
-            {events.status === "ready" ? (
-              <ul className="flex flex-col divide-y-2 divide-bm-line">
-                {events.data.map((e) => (
-                  <AgendaItem
-                    key={e.id}
-                    {...agendaTime(e.time)}
-                    title={e.title}
-                    secondary={e.location ?? undefined}
-                    accent={eventAccent(e, memberColors)}
-                  />
-                ))}
-              </ul>
-            ) : null}
-          </Widget>
+          <Deferred value={hub.events} loading={<EventsWidget loading />}>
+            {(events) => (
+              <EventsWidget events={events} memberColors={memberColors} />
+            )}
+          </Deferred>
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
@@ -265,23 +371,9 @@ export function HubHome({
             ) : null}
           </Widget>
 
-          <Widget
-            id="widget-shopping"
-            data-testid="widget-shopping"
-            title="Shopping list"
-            status={list.status === "unavailable" ? "unavailable" : "ready"}
-            message={list.status === "unavailable" ? list.message : undefined}
-            action={<More href="/shopping" label="List" />}
-          >
-            {list.status === "unavailable" ? null : (
-              <ShoppingList
-                items={list.status === "ready" ? list.data : []}
-                canEdit
-                actions={shopping}
-                idPrefix="hub-shopping"
-              />
-            )}
-          </Widget>
+          <Deferred value={hub.shopping} loading={<ShoppingWidget loading />}>
+            {(list) => <ShoppingWidget list={list} actions={shopping} />}
+          </Deferred>
         </div>
       </div>
       <BaumySheet voice={voice} />

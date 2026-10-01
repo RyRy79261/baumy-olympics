@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { rosterColours } from "@/lib/members/characters";
-import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { listActiveMembers } from "@baumy/db/members";
+import { householdMembers } from "@/lib/members/household";
 import { PageHeading } from "@baumy/ui";
 import { HubHome } from "@/components/hub/hub-home";
 import { PostReminderForm } from "@/components/hub/post-reminder-form";
@@ -12,7 +11,7 @@ import {
   LANDING_DESCRIPTION,
   LandingPage,
 } from "@/components/landing/landing-page";
-import { loadHub } from "@/lib/hub/load";
+import { startHub } from "@/lib/hub/load";
 import { landingMetadata } from "@/lib/seo";
 import { voiceConfigured } from "@/lib/integrations/groq";
 import { createReminderAction } from "./reminder-actions";
@@ -33,9 +32,13 @@ export const metadata: Metadata = landingMetadata(LANDING_DESCRIPTION);
 export default async function HubPage() {
   const me = await memberOrVisitorPage();
   if (!me) return <LandingPage />;
+  const ctx = (await uiRequestCtx(undefined))!;
+  // Google's and brain's widgets stream in (issue #128): the page waits only
+  // for our own database.
+  const { local, events, shopping } = startHub(ctx);
   const [hub, people] = await Promise.all([
-    uiRequestCtx(undefined).then((ctx) => loadHub(ctx!)),
-    listActiveMembers(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID),
+    local,
+    householdMembers(HOUSEHOLD_ID),
   ]);
   return (
     <>
@@ -45,7 +48,7 @@ export default async function HubPage() {
         description={`Welcome, ${me.displayName}.`}
       />
       <HubHome
-        hub={hub}
+        hub={{ ...hub, events, shopping }}
         voice={voiceConfigured()}
         memberColors={rosterColours(people)}
         shopping={{ add: addShoppingAction, checkOff: checkOffShoppingAction }}

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { berlinDateKey } from "@baumy/core";
-import { createHttpDb, type Queryable } from "@baumy/db";
 import { ActingChip, actingDoneClass } from "@baumy/ui";
 import { cookies } from "next/headers";
 import { ForgetWalkIn } from "@/components/kiosk/forget-cookie";
@@ -12,6 +11,7 @@ import { DashboardHeader } from "@/components/kiosk/dashboard/dashboard-header";
 import { MonthCalendar } from "@/components/kiosk/dashboard/month-calendar";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { getKioskActor } from "@/lib/auth";
+import { householdMembers } from "@/lib/members/household";
 import {
   bountyRows,
   isNewBounty,
@@ -49,10 +49,8 @@ export default async function KioskHomePage({
   const today = berlinDateKey(ctx.now);
   const params = await searchParams;
   const { month, day } = parseMonthParams(params, today);
-  const data = await loadDashboard(
-    ctx,
-    month,
-    createHttpDb() as unknown as Queryable,
+  const data = await loadDashboard(ctx, month, () =>
+    householdMembers(ctx.householdId),
   );
   const bounties = (pick: typeof isUrgentBounty) =>
     data.chores.ok

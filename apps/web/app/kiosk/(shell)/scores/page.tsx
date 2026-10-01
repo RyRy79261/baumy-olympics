@@ -3,10 +3,9 @@ import { redirect } from "next/navigation";
 import { FormMessage, PageHeading, Points, Table, Td, Th } from "@baumy/ui";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { runAction } from "@/lib/actions/registry";
-import { createHttpDb, type Queryable } from "@baumy/db";
 import { StandingName } from "@/components/scores/standing-name";
 import { getKioskActor } from "@/lib/auth";
-import { activeRoster } from "@/lib/members/characters";
+import { householdRoster } from "@/lib/members/household";
 import { gapLabel } from "@/lib/scores/view";
 
 // The season's standings on the kitchen iPad (SPEC §3.2, ADR 0005 §1: the
@@ -20,7 +19,11 @@ export default async function KioskScoresPage() {
   const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
   const ctx = (await kioskRequestCtx(undefined, undefined))!;
-  const standings = await runAction("get_standings", { recent: 0 }, ctx);
+  // Side by side (issue #128); the roster is the avatar bar's read.
+  const [standings, roster] = await Promise.all([
+    runAction("get_standings", { recent: 0 }, ctx),
+    householdRoster(ctx.householdId),
+  ]);
   if (!standings.ok) {
     return (
       <>
@@ -31,10 +34,6 @@ export default async function KioskScoresPage() {
   }
   const data = standings.data;
   const leader = data.standings.find((s) => s.memberId === data.leaderId);
-  const roster = await activeRoster(
-    createHttpDb() as unknown as Queryable,
-    ctx.householdId,
-  );
   return (
     <>
       <PageHeading

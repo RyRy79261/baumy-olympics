@@ -133,18 +133,21 @@ export async function countDisputes(
     gte(disputes.createdAt, input.since),
     lt(disputes.createdAt, input.until),
   );
-  const raised = await db
-    .select({ memberId: disputes.raisedBy, n: count() })
-    .from(disputes)
-    .innerJoin(completions, eq(completions.id, disputes.completionId))
-    .where(inRange)
-    .groupBy(disputes.raisedBy);
-  const against = await db
-    .select({ memberId: completions.doneBy, n: count() })
-    .from(disputes)
-    .innerJoin(completions, eq(completions.id, disputes.completionId))
-    .where(inRange)
-    .groupBy(completions.doneBy);
+  // Both counts at once (issue #128).
+  const [raised, against] = await Promise.all([
+    db
+      .select({ memberId: disputes.raisedBy, n: count() })
+      .from(disputes)
+      .innerJoin(completions, eq(completions.id, disputes.completionId))
+      .where(inRange)
+      .groupBy(disputes.raisedBy),
+    db
+      .select({ memberId: completions.doneBy, n: count() })
+      .from(disputes)
+      .innerJoin(completions, eq(completions.id, disputes.completionId))
+      .where(inRange)
+      .groupBy(completions.doneBy),
+  ]);
 
   const out = new Map<string, DisputeCount>();
   const entry = (memberId: string) => {

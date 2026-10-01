@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { listActiveMembers } from "@baumy/db/members";
+import { householdMembers } from "@/lib/members/household";
 import { Card, FormMessage, PageHeading, buttonClass } from "@baumy/ui";
 import { ClaimList } from "@/components/claims/claim-list";
 import { ChoreGrid } from "@/components/chores/chore-grid";
@@ -47,7 +46,7 @@ export default async function KioskChoresPage({
   const [listed, people, pending] = ctx
     ? await Promise.all([
         runAction("list_chores", {}, ctx),
-        listActiveMembers(createHttpDb() as unknown as Queryable, HOUSEHOLD_ID),
+        householdMembers(HOUSEHOLD_ID),
         runAction("get_pending_confirmations", {}, ctx),
       ])
     : [null, [], null];

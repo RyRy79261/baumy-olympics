@@ -4,7 +4,7 @@ import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { inviteCodeState, listInviteCodes } from "@baumy/db/invite-codes";
 import { listMembers } from "@baumy/db/members";
-import { activeRoster } from "@/lib/members/characters";
+import { householdRoster } from "@/lib/members/household";
 import { Card, PageHeading, linkClass } from "@baumy/ui";
 import { requireAdminPage } from "@/lib/auth";
 import { now } from "@/lib/clock";
@@ -35,7 +35,7 @@ export default async function AdminMembersPage() {
     listMembers(db, HOUSEHOLD_ID),
     listInviteCodes(db, HOUSEHOLD_ID),
     // The same gallery characters as every other screen (the active roster).
-    activeRoster(db, HOUSEHOLD_ID),
+    householdRoster(HOUSEHOLD_ID),
   ]);
   const at = now();
 

@@ -326,25 +326,29 @@ export function createRunner(
       const verdict = await runGate(gate, ctx, def, deps.verifyPin);
       if (!verdict.ok) return verdict;
 
-      // 4. Rate limits: one bucket per actor, one per IP.
+      // 4. Rate limits: one bucket per actor, one per IP. Both are counted
+      // at once (issue #128): each is a database round trip, and every page
+      // runs several actions. Each request counts against both buckets, so a
+      // request refused by one bucket still counts against the other.
       const limits = def.rateLimit ?? DEFAULT_RATE_LIMITS[def.kind];
       const buckets: [string, number][] = [
         [`action:${def.name}:${actorKey(ctx.actor)}`, limits.perMember],
       ];
       if (ctx.ip)
         buckets.push([`action:${def.name}:ip:${ctx.ip}`, limits.perIp]);
-      for (const [key, limit] of buckets) {
-        const rl = await deps.rateLimiter.limit(key, {
-          limit,
-          windowMs: limits.windowMs,
-        });
-        if (!rl.ok) {
-          return fail(
-            "RATE_LIMITED",
-            `Too many tries. Wait ${rl.retryAfterSeconds}s and try again.`,
-            { retryAfterSeconds: rl.retryAfterSeconds },
-          );
-        }
+      const verdicts = await Promise.all(
+        buckets.map(([key, limit]) =>
+          deps.rateLimiter.limit(key, { limit, windowMs: limits.windowMs }),
+        ),
+      );
+      // The actor's bucket is reported first when both are empty.
+      const refused = verdicts.find((rl) => !rl.ok);
+      if (refused) {
+        return fail(
+          "RATE_LIMITED",
+          `Too many tries. Wait ${refused.retryAfterSeconds}s and try again.`,
+          { retryAfterSeconds: refused.retryAfterSeconds },
+        );
       }
 
       if (def.kind === "read") {
