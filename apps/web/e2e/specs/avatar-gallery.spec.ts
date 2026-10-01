@@ -144,6 +144,13 @@ test("an admin adds a character, a new member picks it, every screen draws it", 
   ).toBeVisible();
   await member.page.reload();
   await expectLoadedSprite(member.page.getByTestId("account-menu"));
+  // Settings still shows the form: what they wear, and "None" to take it off.
+  await member.page.goto("/settings");
+  const wearing = member.page.getByTestId("gallery-form");
+  await expect(wearing).toContainText(
+    `You wear ${character}, which has been taken out of the gallery.`,
+  );
+  await expect(wearing.locator('[data-avatar="none"]')).toContainText("None");
 
   await kiosk.context.close();
   await member.context.close();
