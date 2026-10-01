@@ -141,6 +141,13 @@
       "when": 1790705484761,
       "tag": "0019_admin_points_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790883556586,
+      "tag": "0020_kiosk_pairing_requests",
+      "breakpoints": true
     }
   ]
 }
