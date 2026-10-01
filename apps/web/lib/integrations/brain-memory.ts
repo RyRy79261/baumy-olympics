@@ -19,7 +19,10 @@ import type {
 // Brain being DOWN is per browser, not per server, so specs running in
 // parallel do not see each other's outage: a request whose browser carries
 // the cookie `baumy_e2e_brain=down` gets `unavailable` from every call
-// (`downWhenAsked`, in front of the read cache).
+// (`downWhenAsked`, in front of the read cache). With
+// `baumy_e2e_brain=slow` it is up but answers a read of the list only after
+// `BRAIN_SLOW_MS`, as a brain starting cold does (issue #128), so a spec can
+// watch the hub stream its shopping widget in.
 //
 // "Sign in with Baumy" (issue #80): each approval DM brain would send is kept
 // here instead, per Telegram user, so `/api/test/brain/login` can show a spec
@@ -28,8 +31,11 @@ import type {
 // The list lives on globalThis, so every route bundle of one server shares
 // it (as lib/clock.ts does).
 
-/** The cookie a spec sets to take brain down for its own browser. */
+/** The cookie a spec sets to take brain down (or slow) for its own browser. */
 export const BRAIN_DOWN_COOKIE = "baumy_e2e_brain";
+
+/** How long a slow brain takes to read the list. */
+export const BRAIN_SLOW_MS = 3000;
 
 interface Row {
   id: string;
@@ -139,22 +145,38 @@ export function memoryShopping(): ShoppingEntry[] {
   return view();
 }
 
-/** True when this request's browser asked for brain to be down. */
-async function isDown(): Promise<boolean> {
+/** What this request's browser asked brain to be: down, slow, or itself. */
+async function asked(): Promise<string | undefined> {
   try {
-    return (await cookies()).get(BRAIN_DOWN_COOKIE)?.value === "down";
+    return (await cookies()).get(BRAIN_DOWN_COOKIE)?.value;
   } catch {
     // Outside a request (a unit test): brain is up.
-    return false;
+    return undefined;
   }
+}
+
+async function isDown(): Promise<boolean> {
+  return (await asked()) === "down";
 }
 
 const DOWN = { ok: false, reason: "unavailable" } as const;
 
-/** `inner`, but `unavailable` for a browser that asked for brain to be down. */
-export function downWhenAsked(inner: BrainClient): BrainClient {
+/**
+ * `inner`, but `unavailable` for a browser that asked for brain to be down,
+ * and a list read `BRAIN_SLOW_MS` late for one that asked for it slow.
+ */
+export function downWhenAsked(
+  inner: BrainClient,
+  sleep: (ms: number) => Promise<void> = (ms) =>
+    new Promise((r) => setTimeout(r, ms)),
+): BrainClient {
   return {
-    listShopping: async () => ((await isDown()) ? DOWN : inner.listShopping()),
+    listShopping: async () => {
+      const mode = await asked();
+      if (mode === "down") return DOWN;
+      if (mode === "slow") await sleep(BRAIN_SLOW_MS);
+      return inner.listShopping();
+    },
     addShopping: async (items) =>
       (await isDown()) ? DOWN : inner.addShopping(items),
     checkOffShopping: async (items) =>

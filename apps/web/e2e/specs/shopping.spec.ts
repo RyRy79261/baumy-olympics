@@ -193,6 +193,42 @@ test("with brain down the widget says so, and the rest of the hub works", async 
   await expect(row(widget, coffee)).toBeVisible();
 });
 
+test("with brain slow the hub shows everything else first, then the list", async ({
+  page,
+  context,
+}, testInfo) => {
+  // Issue #128: a cold brain took seconds and held the whole hub. The page
+  // now streams the shopping widget in; nothing else waits for it.
+  const project = testInfo.project.name;
+  test.skip(project !== "desktop-chromium", "Once is enough.");
+  await founderAdmin(page, project);
+
+  // Slow for this browser only (BRAIN_SLOW_MS, lib/integrations/brain-memory.ts).
+  await context.addCookies([
+    { name: "baumy_e2e_brain", value: "slow", domain: "localhost", path: "/" },
+  ]);
+  // "commit": the page is there before its last streamed part arrives.
+  await page.goto("/", { waitUntil: "commit" });
+  const widget = page.getByTestId("widget-shopping");
+  await expect(widget).toHaveAttribute("data-status", "loading");
+  await expect(widget).toHaveAttribute("aria-busy", "true");
+  await expect(widget).toContainText("Loading…");
+  for (const id of ["widget-chores", "widget-leaderboard", "widget-notes"]) {
+    await expect(page.getByTestId(id)).toBeVisible();
+  }
+  await expect(page.getByTestId("hub-pot")).toContainText("Pot: €");
+  await expect(widget).toHaveAttribute("data-status", "loading");
+
+  // Then the list streams in, with its quick-add field.
+  await expect(widget).toHaveAttribute("data-status", "ready", {
+    timeout: 15_000,
+  });
+  await expect(widget).not.toHaveAttribute("aria-busy", "true");
+  await expect(widget.getByLabel("Add to the list")).toBeVisible();
+  await expect(widget).not.toContainText("Loading…");
+  await context.clearCookies({ name: "baumy_e2e_brain" });
+});
+
 test("'Baumy, add milk and eggs' is one proposal with both items", async ({
   page,
 }, testInfo) => {
