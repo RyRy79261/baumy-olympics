@@ -75,10 +75,13 @@ async function expectClear(kiosk: Page, label: string) {
     ["date", date],
     ["time", time],
   ] as const) {
-    expect(
-      first.left - box.right,
-      `${label}: room between the ${name} and the Urgent icon`,
-    ).toBeGreaterThanOrEqual(MIN_GAP);
+    // Soft: every size is still measured and shot, then all are reported.
+    expect
+      .soft(
+        first.left - box.right,
+        `${label}: room between the ${name} and the Urgent icon`,
+      )
+      .toBeGreaterThanOrEqual(MIN_GAP);
     expect(box.left, `${label}: the ${name} starts on screen`).toBeGreaterThan(
       0,
     );
@@ -136,12 +139,12 @@ test("the dashboard clock never touches the icons on an iPad", async ({
       [WIDEST_DATE, WIDEST_TIME],
     );
     await expect(kiosk.getByTestId("clock-date")).toHaveText(WIDEST_DATE);
-    await expectClear(kiosk, `${label}, widest`);
     await kiosk
       .locator("header")
       .first()
       .screenshot({ path: join(shots, `header-${label}.png`) });
     await kiosk.screenshot({ path: join(shots, `kiosk-${label}.png`) });
+    await expectClear(kiosk, `${label}, widest`);
   }
 
   await context.close();
