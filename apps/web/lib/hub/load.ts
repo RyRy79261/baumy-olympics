@@ -68,9 +68,50 @@ async function read<T>(
   }
 }
 
+/** The widgets that read our own database. */
+export type HubLocal = Omit<HubData, "events" | "shopping">;
+
+/**
+ * The hub's reads, started side by side. `local` is our database only;
+ * `events` (Google Calendar) and `shopping` (brain) are other services, which
+ * can take seconds when they start cold (issue #128: brain measured 2 to 3.6
+ * seconds), so the page streams those two widgets in instead of waiting for
+ * them. None of the three promises rejects.
+ */
+export function startHub(ctx: RequestCtx): {
+  local: Promise<HubLocal>;
+  events: Promise<HubData["events"]>;
+  shopping: Promise<HubData["shopping"]>;
+} {
+  const events = read(() => runAction("list_events", {}, ctx)).then((r) =>
+    widgetState(
+      r,
+      (d) => upcomingEvents(d.events, ctx.now),
+      "Nothing else on the calendar today.",
+    ),
+  );
+  const shopping = read(() => runAction("list_shopping", {}, ctx)).then(
+    (r): HubData["shopping"] =>
+      r.ok
+        ? { status: "ready", data: r.data.items }
+        : { status: "unavailable", message: r.message },
+  );
+  return { local: loadLocal(ctx), events, shopping };
+}
+
+/** Every widget, once all of them have answered. */
 export async function loadHub(ctx: RequestCtx): Promise<HubData> {
-  const [events, chores, standings, pot, notes, shopping] = await Promise.all([
-    read(() => runAction("list_events", {}, ctx)),
+  const hub = startHub(ctx);
+  const [local, events, shopping] = await Promise.all([
+    hub.local,
+    hub.events,
+    hub.shopping,
+  ]);
+  return { ...local, events, shopping };
+}
+
+async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
+  const [chores, standings, pot, notes] = await Promise.all([
     read(() => runAction("list_chores", {}, ctx)),
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
     read(() => runAction("get_pot", {}, ctx)),
@@ -79,15 +120,9 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
     read(() =>
       runAction("list_notes", { pinnedOnly: true, limit: HUB_NOTES }, ctx),
     ),
-    read(() => runAction("list_shopping", {}, ctx)),
   ]);
   return {
     now: ctx.now.toISOString(),
-    events: widgetState(
-      events,
-      (d) => upcomingEvents(d.events, ctx.now),
-      "Nothing else on the calendar today.",
-    ),
     chores: widgetState(
       chores,
       (d) => dueChores(d.chores, ctx.now),
@@ -120,8 +155,5 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
       new: chores.ok ? chores.data.chores.filter((c) => c.isNew).length : null,
       messages: notes.ok ? notes.data.recentCount : null,
     },
-    shopping: shopping.ok
-      ? { status: "ready", data: shopping.data.items }
-      : { status: "unavailable", message: shopping.message },
   };
 }

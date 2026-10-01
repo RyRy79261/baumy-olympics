@@ -1,8 +1,7 @@
 import "server-only";
 
 import { berlinDateKey } from "@baumy/core";
-import type { Queryable } from "@baumy/db";
-import { listActiveMembers } from "@baumy/db/members";
+import type { KioskMemberWithAvatar } from "@baumy/db/members";
 import type { RequestCtx } from "@/lib/actions/define";
 import { avatarImageView } from "@/lib/avatars/paths";
 import type { ChoreView } from "@/lib/actions/list-chores";
@@ -54,8 +53,11 @@ async function read<T, U>(
 export async function loadDashboard(
   ctx: RequestCtx,
   month: string,
-  /** For the members' looks: a read, so the HTTP driver will do. */
-  db: Queryable,
+  /**
+   * The active members, for their looks: the page passes the request's
+   * shared read (lib/members/household.ts), which the avatar bar made too.
+   */
+  readMembers: () => Promise<KioskMemberWithAvatar[]>,
 ): Promise<DashboardData> {
   const days = monthGridDays(month);
   const [chores, events, notes, members] = await Promise.all([
@@ -71,7 +73,7 @@ export async function loadDashboard(
       () => runAction("list_notes", {}, ctx),
       (d) => ({ notes: d.notes, recentCount: d.recentCount }),
     ),
-    listActiveMembers(db, ctx.householdId),
+    readMembers(),
   ]);
   return {
     now: ctx.now.toISOString(),

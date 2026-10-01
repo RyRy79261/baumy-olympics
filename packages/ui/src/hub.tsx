@@ -6,8 +6,11 @@ import { Sprite, type SpriteState } from "./sprite";
 // the widgets sit in, the clock face and the Baumy button. On the kiosk the grid fills the screen and never scrolls: each
 // widget clips what does not fit, so the page stays one screen at 1180×820.
 
-/** What a widget has to show. */
-export type WidgetStatus = "ready" | "empty" | "unavailable";
+/**
+ * What a widget has to show. `loading` is a widget whose read is still on its
+ * way (the hub streams the ones that wait on another service, issue #128).
+ */
+export type WidgetStatus = "ready" | "empty" | "unavailable" | "loading";
 
 export function Widget({
   title,
@@ -22,7 +25,7 @@ export function Widget({
   title: string;
   /** `ready` shows the children; the others show `message` instead. */
   status: WidgetStatus;
-  /** The sentence for `empty` and `unavailable`. */
+  /** The sentence for `empty`, `unavailable` and `loading`. */
   message?: string;
   /** A link or button in the corner ("All notes"). */
   action?: ReactNode;
@@ -36,6 +39,7 @@ export function Widget({
       aria-labelledby={headingId}
       aria-label={headingId ? undefined : title}
       data-status={status}
+      aria-busy={status === "loading" ? true : undefined}
       className={cx(
         "pixel-frame pixel-frame-4 flex min-h-0 flex-col gap-2 overflow-hidden bg-bm-surface p-4 text-bm-text",
         className,

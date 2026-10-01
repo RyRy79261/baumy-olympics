@@ -31,7 +31,18 @@ export async function activeRoster(
   db: Queryable,
   householdId: string,
 ): Promise<Map<string, MemberLook>> {
-  const people = await listActiveMembers(db, householdId);
+  return rosterFrom(await listActiveMembers(db, householdId));
+}
+
+/** These members' looks, by id, in their order. */
+export function rosterFrom(
+  people: readonly {
+    id: string;
+    displayName: string;
+    color: string;
+    avatarImage: Parameters<typeof avatarImageView>[0];
+  }[],
+): Map<string, MemberLook> {
   return new Map(
     people.map((p) => [
       p.id,

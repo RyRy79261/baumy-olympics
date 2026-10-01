@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { listActiveMembers } from "@baumy/db/members";
 import { listActiveSuggestions } from "@baumy/db/weights";
 import { FormMessage, PageHeading } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { suggestionView } from "@/lib/actions/weights";
 import { requireMemberPage } from "@/lib/auth";
+import { householdMembers } from "@/lib/members/household";
 import { NewBountyButton } from "../admin/chores/chore-forms";
 import { logCompletionAction } from "./actions";
 import { BountyBoard } from "./bounty-board";
@@ -35,7 +35,7 @@ export default async function ChoresPage() {
   const db = createHttpDb() as unknown as Queryable;
   const [listed, people, suggestions, history] = await Promise.all([
     runAction("list_chores", {}, ctx),
-    listActiveMembers(db, HOUSEHOLD_ID),
+    householdMembers(HOUSEHOLD_ID),
     admin ? listActiveSuggestions(db, HOUSEHOLD_ID) : [],
     admin ? runAction("get_points_history", {}, ctx) : null,
   ]);

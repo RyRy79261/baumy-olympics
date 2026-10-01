@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { listActiveMembers } from "@baumy/db/members";
 import { AvatarButton, Button, KioskShell, KioskTopBar } from "@baumy/ui";
 import { BaumySheet } from "@/components/baumy/baumy-sheet";
 import { IdleReset } from "@/components/kiosk/idle-reset";
@@ -14,6 +12,7 @@ import { KioskOverlays } from "@/components/kiosk/overlays";
 import { RegisterServiceWorker } from "@/components/kiosk/service-worker";
 import { ScoreEmote } from "@/components/members/score-emote";
 import { getKioskActor } from "@/lib/auth";
+import { householdMembers } from "@/lib/members/household";
 import { avatarImageView } from "@/lib/avatars/paths";
 import { runSweepAfterResponse } from "@/lib/background-work";
 import { now } from "@/lib/clock";
@@ -47,6 +46,9 @@ export default async function KioskLayout({
 }) {
   const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
+  // The avatar bar's members: one read, shared with the page below
+  // (lib/members/household.ts, issue #128), and only for a paired device.
+  const members = householdMembers(HOUSEHOLD_ID);
   // The kitchen screen is the page loaded most: it runs the daily job's
   // sweep too, at most every 15 minutes (lib/background-work.ts).
   runSweepAfterResponse();
@@ -54,10 +56,7 @@ export default async function KioskLayout({
   const night = kioskNightWindow(
     (await cookies()).get(NIGHT_TEST_COOKIE)?.value,
   );
-  const people = await listActiveMembers(
-    createHttpDb() as unknown as Queryable,
-    HOUSEHOLD_ID,
-  );
+  const people = await members;
 
   const avatars = people.map((p) => (
     <form key={p.id} action={pickMemberAction}>

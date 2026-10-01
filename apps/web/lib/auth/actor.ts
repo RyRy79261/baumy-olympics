@@ -187,19 +187,21 @@ export const getKioskActor = cache(async (): Promise<KioskActor | null> => {
   if (!token || token.length > KIOSK_TOKEN_MAX_LENGTH) return null;
   const device = await findPairedKioskDevice(hashKioskToken(token));
   if (!device) return null;
-  try {
-    await touchKioskDevice(device, now());
-  } catch (err) {
-    console.error("[kiosk] could not record last_seen_at", err);
-  }
   const picked = jar.get(KIOSK_MEMBER_COOKIE)?.value;
-  const member = isMemberId(picked)
-    ? await findActiveMember(
-        createHttpDb() as unknown as Queryable,
-        device.householdId,
-        picked,
-      )
-    : null;
+  // The touch and the picked member's read are independent: side by side
+  // (issue #128).
+  const [, member] = await Promise.all([
+    touchKioskDevice(device, now()).catch((err: unknown) => {
+      console.error("[kiosk] could not record last_seen_at", err);
+    }),
+    isMemberId(picked)
+      ? findActiveMember(
+          createHttpDb() as unknown as Queryable,
+          device.householdId,
+          picked,
+        )
+      : null,
+  ]);
   return {
     kind: "kiosk",
     deviceId: device.id,

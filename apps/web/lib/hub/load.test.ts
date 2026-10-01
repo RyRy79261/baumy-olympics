@@ -27,7 +27,7 @@ import {
 } from "@/lib/integrations/brain-memory";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import { NEW_BOUNTY_MS } from "@/lib/chores/urgency";
-import { HUB_NOTES, loadHub } from "./load";
+import { HUB_NOTES, loadHub, startHub } from "./load";
 
 // The hub's reads through the real runAction on PGlite (issue #20): each
 // widget gets its data, its empty state or its own failure, and one failing
@@ -305,5 +305,41 @@ describe("loadHub", () => {
     );
     expect(hub.standings.status).toBe("ready");
     expect(hub.pot.ok).toBe(true);
+  });
+});
+
+// Issue #128: Google and brain can take seconds when they start cold, so the
+// page streams their two widgets; our own database's widgets never wait.
+describe("startHub", () => {
+  it("answers the database's widgets while Google and brain are still on their way", async () => {
+    await seedChore(db(), SEED_CHORES.trash);
+    const never = new Promise<never>(() => {});
+    setCalendarClientForTests(calendarWith(() => never));
+    setBrainClientForTests({ ...unconfiguredBrain, listShopping: () => never });
+
+    const hub = startHub(ctxFor(sessionActor(ryan)));
+    const local = await hub.local;
+    expect(local.chores.status).not.toBe("unavailable");
+    expect(local.counts.urgent).toEqual(expect.any(Number));
+    expect(local.standings.status).not.toBe("unavailable");
+    expect(local).not.toHaveProperty("events");
+    expect(local).not.toHaveProperty("shopping");
+
+    const pending = Symbol("pending");
+    const settled = (p: Promise<unknown>) =>
+      Promise.race([p, new Promise((r) => setTimeout(() => r(pending), 50))]);
+    expect(await settled(hub.events)).toBe(pending);
+    expect(await settled(hub.shopping)).toBe(pending);
+  });
+
+  it("hands over the calendar and the list once they answer", async () => {
+    setBrainClientForTests(memoryBrain());
+    memoryAdd(["oat milk"]);
+    const hub = startHub(ctxFor(sessionActor(ryan)));
+    expect(await hub.events).toMatchObject({ status: "ready" });
+    expect(await hub.shopping).toMatchObject({
+      status: "ready",
+      data: [expect.objectContaining({ item: "oat milk" })],
+    });
   });
 });

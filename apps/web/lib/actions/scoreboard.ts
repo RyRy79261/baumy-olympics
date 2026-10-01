@@ -132,11 +132,12 @@ type Ranked =
  * mode v1 does not play.
  */
 async function rankSeason(ctx: ActionCtx, scope: SeasonScope): Promise<Ranked> {
-  const { activeIds, nameOf } = await memberNames(ctx.db, ctx.householdId);
-  const scored = scope.row ? await listSeasonScores(ctx.db, scope.row.id) : [];
-  const adjustments = scope.row
-    ? await listSeasonAdjustments(ctx.db, scope.row.id)
-    : [];
+  // Independent reads, side by side (issue #128).
+  const [{ activeIds, nameOf }, scored, adjustments] = await Promise.all([
+    memberNames(ctx.db, ctx.householdId),
+    scope.row ? listSeasonScores(ctx.db, scope.row.id) : [],
+    scope.row ? listSeasonAdjustments(ctx.db, scope.row.id) : [],
+  ]);
   const ranked = seasonStandings({
     prizeMode: scope.view.prizeMode,
     memberIds: activeIds,
@@ -268,24 +269,27 @@ export const getStandings = defineAction({
   }),
   async execute(ctx, input) {
     const scope = await seasonScope(ctx, input.year);
-    const ranked = await rankSeason(ctx, scope);
+    const nowParts = berlinParts(ctx.now);
+    const month = berlinMonthBounds(nowParts.year, nowParts.month);
+    // Every read below needs only the season, so they run side by side
+    // (issue #128).
+    const [ranked, next, disputes, prizeLocked] = await Promise.all([
+      rankSeason(ctx, scope),
+      seasonScope(ctx, scope.view.year + 1),
+      countDisputes(ctx.db, {
+        householdId: ctx.householdId,
+        since: month.startsAt,
+        until: month.endsAt,
+      }),
+      scope.row ? seasonHasCompletions(ctx.db, scope.row.id) : false,
+    ]);
     if (!ranked.ok) return notSupported(scope.view.prizeMode);
     const { nameOf } = ranked;
 
-    const next = await seasonScope(ctx, scope.view.year + 1);
-    const nowParts = berlinParts(ctx.now);
-    const month = berlinMonthBounds(nowParts.year, nowParts.month);
-    const disputes = await countDisputes(ctx.db, {
-      householdId: ctx.householdId,
-      since: month.startsAt,
-      until: month.endsAt,
-    });
     const data: GetStandingsData = {
       season: {
         ...scope.view,
-        prizeLocked: scope.row
-          ? await seasonHasCompletions(ctx.db, scope.row.id)
-          : false,
+        prizeLocked,
         nextSeason: next.view,
       },
       leaderId: ranked.leaderId,
@@ -381,10 +385,10 @@ export const getStreaks = defineAction({
   }),
   async execute(ctx, input) {
     const scope = await seasonScope(ctx, input.year);
-    const { nameOf } = await memberNames(ctx.db, ctx.householdId);
-    const scored = scope.row
-      ? await listSeasonScores(ctx.db, scope.row.id)
-      : [];
+    const [{ nameOf }, scored] = await Promise.all([
+      memberNames(ctx.db, ctx.householdId),
+      scope.row ? listSeasonScores(ctx.db, scope.row.id) : [],
+    ]);
     const choreName = new Map(scored.map((c) => [c.choreId, c.choreName]));
     const view = (r: StreakRun): StreakView => ({
       choreId: r.choreId,
@@ -451,11 +455,11 @@ export const getPot = defineAction({
   input: z.strictObject({ year }),
   async execute(ctx, input) {
     const scope = await seasonScope(ctx, input.year);
-    const ranked = await rankSeason(ctx, scope);
+    const [ranked, rows] = await Promise.all([
+      rankSeason(ctx, scope),
+      scope.row ? listPotContributions(ctx.db, scope.row.id) : [],
+    ]);
     if (!ranked.ok) return notSupported(scope.view.prizeMode);
-    const rows = scope.row
-      ? await listPotContributions(ctx.db, scope.row.id)
-      : [];
 
     const months: PotMonthView[] = [];
     let running = 0;

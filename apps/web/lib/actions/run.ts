@@ -333,18 +333,35 @@ export function createRunner(
       ];
       if (ctx.ip)
         buckets.push([`action:${def.name}:ip:${ctx.ip}`, limits.perIp]);
-      for (const [key, limit] of buckets) {
-        const rl = await deps.rateLimiter.limit(key, {
-          limit,
-          windowMs: limits.windowMs,
-        });
-        if (!rl.ok) {
-          return fail(
-            "RATE_LIMITED",
-            `Too many tries. Wait ${rl.retryAfterSeconds}s and try again.`,
-            { retryAfterSeconds: rl.retryAfterSeconds },
-          );
+      const consume = ([key, limit]: [string, number]) =>
+        deps.rateLimiter.limit(key, { limit, windowMs: limits.windowMs });
+      let refused: Awaited<ReturnType<typeof consume>> | undefined;
+      if (def.kind === "read" && !def.rateLimit) {
+        // A read on the default budget counts both at once (issue #128):
+        // each is a database round trip, and every page runs several reads.
+        // Its budgets are wide, so a read the actor's bucket refuses may
+        // still count against the IP's.
+        const verdicts = await Promise.all(buckets.map(consume));
+        // The actor's bucket is reported first when both are empty.
+        refused = verdicts.find((rl) => !rl.ok);
+      } else {
+        // Writes and tight budgets, one after the other: the IP bucket is
+        // shared (brain's calls come from one server, a house from one home
+        // address), so a request the actor's bucket refused never spends it.
+        for (const bucket of buckets) {
+          const rl = await consume(bucket);
+          if (!rl.ok) {
+            refused = rl;
+            break;
+          }
         }
+      }
+      if (refused) {
+        return fail(
+          "RATE_LIMITED",
+          `Too many tries. Wait ${refused.retryAfterSeconds}s and try again.`,
+          { retryAfterSeconds: refused.retryAfterSeconds },
+        );
       }
 
       if (def.kind === "read") {

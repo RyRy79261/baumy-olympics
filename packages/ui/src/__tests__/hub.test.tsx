@@ -56,6 +56,25 @@ describe("Widget", () => {
     expect(out).toContain('role="alert"');
     expect(out).toContain("Calendar is down.");
   });
+
+  it("says it is loading, busy and quiet, without its children", () => {
+    const out = html(
+      <Widget title="Shopping" status="loading" message="Loading…">
+        <p>not yet</p>
+      </Widget>,
+    );
+    expect(out).toContain('data-status="loading"');
+    expect(out).toContain('aria-busy="true"');
+    expect(out).toContain("Loading…");
+    expect(out).not.toContain("not yet");
+    expect(out).not.toContain('role="alert"');
+  });
+
+  it("is not busy once it has something to show", () => {
+    const out = html(<Widget title="Shopping" status="ready" />);
+    expect(out).toContain('data-status="ready"');
+    expect(out).not.toContain("aria-busy");
+  });
 });
 
 describe("HubGrid", () => {
