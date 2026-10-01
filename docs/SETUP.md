@@ -1076,9 +1076,8 @@ later as a new set.
    name it and **Save to gallery**.
 4. Everyone picks theirs in **Settings → Your character** (a founder can also pick on
    `/join`; someone joining with a code is taken to Settings to pick). Two
-   housemates may pick the same one; tell an agent if you want that refused. Until the gallery
-   has a character, Settings keeps the drawn (hair/skin/shirt) character, and anyone who has not
-   picked still wears theirs.
+   housemates may pick the same one; tell an agent if you want that refused. Anyone who has
+   not picked (or while the gallery is empty) shows as their initial in their colour.
 5. **Archive** takes a character out of the gallery; whoever already wears it keeps it.
    **Restore** puts it back. Nothing is ever deleted.
 
