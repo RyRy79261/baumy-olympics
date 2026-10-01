@@ -9,7 +9,7 @@ import {
   reminders,
 } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
-import { rosterAvatars } from "@baumy/types";
+import { MEMBER_COLORS } from "@baumy/types";
 import {
   FIXED_NOW,
   accountActor,
@@ -179,28 +179,21 @@ describe("create_reminder", () => {
 });
 
 describe("list_reminders", () => {
-  it("draws members who have not chosen in shirts of their own, as the dashboard does", async () => {
-    for (const name of ["Sam", "Mika", "Kim", "Lou"]) {
-      await seedMember(db(), { displayName: name });
-    }
+  it("gives each member their own colour, as the dashboard does", async () => {
+    const sam = await seedMember(db(), {
+      displayName: "Sam",
+      color: MEMBER_COLORS[4],
+    });
     const listed = await list();
-    const shirts = listed.members.map((m) => m.avatar.shirtColor);
-    expect(listed.members).toHaveLength(6);
-    expect(new Set(shirts).size).toBe(6);
+    expect(listed.members.find((m) => m.id === sam)).toEqual({
+      id: sam,
+      displayName: "Sam",
+      color: MEMBER_COLORS[4],
+      sprites: null,
+    });
   });
 
-  it("lists the active reminders with who has seen them, and every active member's character", async () => {
-    const chosen = {
-      hairStyle: "bob",
-      hairColor: "black",
-      skinTone: "tan",
-      shirtColor: "pink",
-    } as const;
-    await t
-      .db()
-      .update(members)
-      .set({ avatar: chosen })
-      .where(eq(members.id, jo));
+  it("lists the active reminders with who has seen them, and every active member", async () => {
     await seedMember(db(), { displayName: "Gone", deactivatedAt: at(-1) });
     const id = await post("Boiler", as(ryan), "Wed 10-16");
     ok(
@@ -216,18 +209,12 @@ describe("list_reminders", () => {
           id: ryan,
           displayName: "Ryan",
           color: "#336699",
-          // The roster's character: the one every screen draws.
-          avatar: rosterAvatars([
-            { id: ryan, avatar: null },
-            { id: jo, avatar: chosen },
-          ]).get(ryan),
           sprites: null,
         },
         {
           id: jo,
           displayName: "Jo",
           color: "#336699",
-          avatar: chosen,
           sprites: null,
         },
       ],

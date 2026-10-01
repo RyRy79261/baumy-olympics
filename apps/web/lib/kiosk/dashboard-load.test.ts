@@ -5,6 +5,7 @@ import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
 import { useTestDb } from "@baumy/db/test-harness";
 import { members } from "@baumy/db/schema";
 import { eq } from "drizzle-orm";
+import { MEMBER_COLORS } from "@baumy/types";
 import {
   FIXED_NOW,
   ctxFor,
@@ -88,18 +89,6 @@ describe("loadDashboard", () => {
       { title: "Pasta", bodyMd: "Who ate it?" },
       ctxFor(sessionActor(ryan)),
     );
-    const character = {
-      hairStyle: "bob",
-      hairColor: "black",
-      skinTone: "tan",
-      shirtColor: "violet",
-    };
-    await t
-      .db()
-      .update(members)
-      .set({ avatar: character })
-      .where(eq(members.id, ryan));
-
     const data = await loadDashboard(kioskCtx(), "2026-10", db());
     expect(data.now).toBe(FIXED_NOW.toISOString());
     expect(data.today).toBe("2026-09-27");
@@ -125,24 +114,26 @@ describe("loadDashboard", () => {
       data: { notes: [{ title: "Pasta", authorId: ryan }], recentCount: 1 },
     });
     expect(data.members).toEqual([
-      { id: ryan, displayName: "Ryan", avatar: character, sprites: null },
+      { id: ryan, displayName: "Ryan", color: "#336699", sprites: null },
     ]);
   });
 
-  it("gives members who have not chosen a character shirts of their own", async () => {
-    const more = [
-      await seedMember(db(), { displayName: "Jo" }),
-      await seedMember(db(), { displayName: "Sam" }),
-      await seedMember(db(), { displayName: "Mika" }),
-    ];
+  it("gives each active member their own colour, in join order", async () => {
+    const jo = await seedMember(db(), {
+      displayName: "Jo",
+      color: MEMBER_COLORS[5],
+    });
+    await seedMember(db(), { displayName: "Gone", deactivatedAt: FIXED_NOW });
+    await t
+      .db()
+      .update(members)
+      .set({ color: MEMBER_COLORS[1] })
+      .where(eq(members.id, ryan));
     const data = await loadDashboard(kioskCtx(), "2026-09", db());
-    expect(data.members.map((m) => m.id).sort()).toEqual(
-      [ryan, ...more].sort(),
-    );
-    const shirts = data.members.map(
-      (m) => (m.avatar as { shirtColor: string }).shirtColor,
-    );
-    expect(new Set(shirts).size).toBe(4);
+    expect(data.members.map((m) => [m.id, m.color])).toEqual([
+      [ryan, MEMBER_COLORS[1]],
+      [jo, MEMBER_COLORS[5]],
+    ]);
   });
 
   it("says the calendar is not connected, and reads everything else", async () => {

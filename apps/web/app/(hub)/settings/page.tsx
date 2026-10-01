@@ -4,21 +4,18 @@ import { eq } from "drizzle-orm";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { members } from "@baumy/db/schema";
-import { Card, FormMessage, PageHeading } from "@baumy/ui";
-import { avatarFor } from "@baumy/types";
+import { Card, FormMessage, MemberCharacter, PageHeading } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { listAvatars } from "@baumy/db/avatars";
 import { avatarImageView } from "@/lib/avatars/paths";
-import { activeCharacters } from "@/lib/members/characters";
 import { telegramBotUsername } from "@/lib/telegram/deep-link";
-import { AvatarForm } from "./avatar-form";
 import { GalleryForm } from "./gallery-form";
 import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
 
-// /settings (SPEC §6.2): the member's own character (ADR 0005 §5), kiosk
-// PIN and Telegram link. Every
+// /settings (SPEC §6.2): the member's own character (a pick from the
+// avatar gallery, issue #111), kiosk PIN and Telegram link. Every
 // action here needs the member's own session (requireSession), never the
 // kiosk.
 
@@ -32,6 +29,7 @@ export default async function SettingsPage() {
       kioskPinHash: members.kioskPinHash,
       kioskPinLockedAt: members.kioskPinLockedAt,
       avatarImageId: members.avatarImageId,
+      color: members.color,
     })
     .from(members)
     .where(eq(members.id, me.memberId));
@@ -42,13 +40,12 @@ export default async function SettingsPage() {
   );
   const db = createHttpDb() as unknown as Queryable;
   // The gallery (issue #111): once it has characters, "Your character" is
-  // a pick from it; until then, the drawn character's options.
+  // a pick from it; until then, and until they pick, they show as their
+  // initial in their colour (issue #116).
   const gallery = await listAvatars(db, HOUSEHOLD_ID);
   const live = gallery.filter((a) => a.archivedAt === null);
   const worn = gallery.find((a) => a.id === row?.avatarImageId);
-  const character =
-    (await activeCharacters(db, HOUSEHOLD_ID)).get(me.memberId) ??
-    avatarFor({ id: me.memberId, avatar: me.avatar ?? null });
+  const colour = row?.color ?? "var(--color-bm-muted)";
 
   return (
     <>
@@ -65,8 +62,8 @@ export default async function SettingsPage() {
         ) : null}
         {live.length > 0 ? (
           <GalleryForm
-            memberId={me.memberId}
-            character={character}
+            displayName={me.displayName}
+            colour={colour}
             options={live.map((a) => ({
               id: a.id,
               name: a.name,
@@ -75,8 +72,29 @@ export default async function SettingsPage() {
             picked={row?.avatarImageId ?? ""}
             archivedName={worn?.archivedAt ? worn.name : undefined}
           />
-        ) : null}
-        <AvatarForm initial={character} secondary={live.length > 0} />
+        ) : (
+          <Card
+            title="Your character"
+            description="How you look on the kitchen screen and in the header."
+          >
+            <div
+              id="character"
+              className="flex items-center gap-4"
+              data-testid="no-gallery"
+            >
+              <MemberCharacter
+                name={me.displayName}
+                colour={colour}
+                scale={3}
+                label={`${me.displayName}'s initial`}
+              />
+              <p className="text-sm text-bm-muted">
+                The household has no characters to pick from yet. Until an admin
+                adds some, you show as your initial in your colour.
+              </p>
+            </div>
+          </Card>
+        )}
         <Card
           title="Security"
           description="Passkeys, two-factor, Google, your password and the devices signed in as you."

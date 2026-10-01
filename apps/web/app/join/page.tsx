@@ -4,8 +4,7 @@ import { isFounderEmail } from "@baumy/auth/env";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { listAvatars } from "@baumy/db/avatars";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { findMemberByAuthUserId, listActiveMembers } from "@baumy/db/members";
-import { newcomerAvatar } from "@baumy/types";
+import { findMemberByAuthUserId } from "@baumy/db/members";
 import { Card, FormMessage, PageHeading, buttonClass } from "@baumy/ui";
 import { requireJoiningPage } from "@/lib/auth";
 import { avatarImageView } from "@/lib/avatars/paths";
@@ -24,12 +23,6 @@ export default async function JoinPage() {
   const db = createHttpDb() as unknown as Queryable;
   const existing = await findMemberByAuthUserId(db, me.userId);
   const founder = isFounderEmail(process.env, me.email);
-  // The character the form starts on: in a shirt no active member wears.
-  // Only this one character reaches the page, not the roster.
-  const initialAvatar = newcomerAvatar(
-    me.userId,
-    await listActiveMembers(db, HOUSEHOLD_ID),
-  );
   // The gallery to pick a character from (issue #111). It depicts real
   // housemates, so only a verified founder sees it here; someone with an
   // invite code picks theirs in Settings once the code has let them in.
@@ -70,11 +63,10 @@ export default async function JoinPage() {
             <FounderForm
               email={me.email}
               emailVerified={me.emailVerified}
-              initialAvatar={initialAvatar}
               gallery={gallery}
             />
           ) : null}
-          <InviteForm initialAvatar={initialAvatar} gallery={[]} />
+          <InviteForm gallery={[]} />
         </>
       )}
     </main>

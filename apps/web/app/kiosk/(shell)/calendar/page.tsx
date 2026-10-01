@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { rosterAvatars } from "@baumy/types";
 import { rosterColours } from "@/lib/members/characters";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -73,7 +72,7 @@ export default async function KioskCalendarPage({
           memberNames={Object.fromEntries(
             people.map((p) => [p.id, p.displayName]),
           )}
-          memberColors={rosterColours(rosterAvatars(people))}
+          memberColors={rosterColours(people)}
           actions={{
             create: kioskCreateEventAction,
             update: kioskUpdateEventAction,
