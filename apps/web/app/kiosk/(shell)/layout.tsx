@@ -39,7 +39,7 @@ import { clearPickAction, pickMemberAction } from "../actions";
 // reminder and screensaver) mount in KioskOverlays, last, over everything.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Kiosk - Baumy" };
+export const metadata: Metadata = { title: "Kiosk" };
 
 export default async function KioskLayout({
   children,

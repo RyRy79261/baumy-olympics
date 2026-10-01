@@ -17,7 +17,7 @@ import {
 // action. The list never holds a token or its hash.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Connections - Baumy Olympics" };
+export const metadata: Metadata = { title: "Connections" };
 
 const when = (d: Date) =>
   d.toLocaleString("en-GB", {

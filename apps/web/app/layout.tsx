@@ -3,6 +3,7 @@ import { Pixelify_Sans, Press_Start_2P, Silkscreen } from "next/font/google";
 import type { ReactNode } from "react";
 import { APP_BACKGROUND } from "@/components/app-icon";
 import { Toaster } from "@/components/toaster";
+import { ROOT_METADATA } from "@/lib/seo";
 import "./globals.css";
 
 // The pixel fonts (ADR 0005 §7), self-hosted by next/font. globals.css maps
@@ -23,8 +24,10 @@ const pixelify = Pixelify_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Baumy Olympics",
-  description: "The Baumschulenweg household hub.",
+  // metadataBase, the "%s · Baumy Olympics" title template, the share
+  // card's words and noindex for every page but the landing page, which
+  // overrides it (issue #122, lib/seo.ts).
+  ...ROOT_METADATA,
   // Added to the iPad's home screen, it opens without Safari's bars (the
   // manifest, app/manifest.ts, says the same to every other browser).
   appleWebApp: { capable: true, title: "Baumy", statusBarStyle: "black" },

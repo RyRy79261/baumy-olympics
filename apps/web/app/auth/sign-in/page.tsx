@@ -14,7 +14,7 @@ import { oauthErrorSentence } from "../messages";
 import { SignInForm, type LastLoginMethod } from "./sign-in-form";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Sign in - Baumy Olympics" };
+export const metadata: Metadata = { title: "Sign in" };
 
 const METHODS: readonly LastLoginMethod[] = ["email", "google", "passkey"];
 

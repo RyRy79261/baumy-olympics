@@ -23,7 +23,7 @@ import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
 // kiosk.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Settings - Baumy Olympics" };
+export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const me = await requireMemberPage();

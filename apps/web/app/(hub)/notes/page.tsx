@@ -17,7 +17,7 @@ import {
 // the sanitising renderer.
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Board - Baumy Olympics" };
+export const metadata: Metadata = { title: "Board" };
 
 export default async function NotesPage() {
   const me = await requireMemberPage();

@@ -13,7 +13,7 @@ import { DisconnectForm } from "./connection-forms";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Connected apps - Baumy Olympics",
+  title: "Connected apps",
 };
 
 const when = (iso: string) =>

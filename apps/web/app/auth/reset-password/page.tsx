@@ -7,7 +7,7 @@ import { ResetPasswordForm } from "./reset-password-form";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Reset password - Baumy Olympics",
+  title: "Reset password",
 };
 
 export default async function ResetPasswordPage({
