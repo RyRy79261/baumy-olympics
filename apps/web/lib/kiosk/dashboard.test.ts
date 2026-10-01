@@ -130,7 +130,7 @@ describe("dueLabel", () => {
   it("says never done, and no points yet for a chore without a weight", () => {
     expect(dueLabel(chore({ state: "due", dueAt: null }), NOW)).toEqual({
       text: "Never done",
-      tone: "late",
+      tone: "later",
     });
     expect(dueLabel(chore({ state: "unavailable", dueAt: null }), NOW)).toEqual(
       { text: "No points yet", tone: "later" },

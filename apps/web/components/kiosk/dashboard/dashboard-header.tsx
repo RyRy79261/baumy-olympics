@@ -55,18 +55,23 @@ function Clock({ serverNow }: { serverNow: string }) {
     );
     return () => window.clearInterval(id);
   }, [serverNow]);
+  // The clock takes the room the icons leave (issue #127): its text scales
+  // with that room (`cqi`), so on a narrower iPad it shrinks instead of
+  // running into the Urgent icon. At 820px wide both are at full size.
+  // "WEDNESDAY 30", the longest line the date wraps to, is about 10.6em of
+  // the label font; "00:00" is about 4.9em of the display font.
   const { date, time } = headerClock(now);
   return (
-    <div className="min-w-0">
+    <div className="@container min-w-0 flex-1">
       <div
         data-testid="clock-date"
-        className="font-label text-[20px] font-bold tracking-wider text-bm-muted uppercase"
+        className="font-label text-[min(20px,9cqi)] font-bold tracking-wider text-bm-muted uppercase"
       >
         {date}
       </div>
       <div
         data-testid="clock-time"
-        className="mt-3 font-display text-[64px] leading-none text-bm-text"
+        className="mt-3 font-display text-[min(64px,19.5cqi)] leading-none whitespace-nowrap text-bm-text"
       >
         {time}
       </div>
@@ -265,9 +270,9 @@ export function DashboardHeader({
   const titleId = `${id}-module`;
 
   return (
-    <header className="flex h-[156px] shrink-0 items-center justify-between px-6">
+    <header className="flex h-[156px] shrink-0 items-center justify-between gap-6 px-6">
       <Clock serverNow={serverNow} />
-      <div className="flex gap-6 pt-2 pr-2">
+      <div className="flex shrink-0 gap-6 pt-2 pr-2">
         <NotificationIcon
           icon="siren"
           label="Urgent"

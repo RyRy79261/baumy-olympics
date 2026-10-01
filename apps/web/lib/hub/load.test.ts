@@ -46,6 +46,24 @@ function calendarWith(list: CalendarClient["list"]): CalendarClient {
 
 let ryan: string;
 
+/**
+ * Trash, added long ago and last done by Ryan 5 days ago: a day past its
+ * 4-day rhythm, so urgent. A chore never done is not (SPEC §12 decision 22).
+ */
+async function seedOverdueTrash() {
+  const { choreId } = await seedChore(db(), {
+    ...SEED_CHORES.trash,
+    createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS - 6 * 24 * HOUR),
+  });
+  const fiveDaysAgo = new Date(FIXED_NOW.getTime() - 5 * 24 * HOUR);
+  const logged = await runAction(
+    "log_completion",
+    { choreId, occurredAt: fiveDaysAgo.toISOString() },
+    ctxFor(sessionActor(ryan), { now: fiveDaysAgo }),
+  );
+  expect(logged.ok).toBe(true);
+}
+
 beforeEach(async () => {
   __resetMemoryRateLimits();
   ryan = await seedMember(db(), { displayName: "Ryan" });
@@ -78,11 +96,10 @@ afterEach(() => {
 
 describe("loadHub", () => {
   it("fills every widget from its action", async () => {
-    // Trash was added long ago; Dishes an hour ago, so it is new.
-    await seedChore(db(), {
-      ...SEED_CHORES.trash,
-      createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS - HOUR),
-    });
+    // Trash was added long ago and last done 5 days ago, a day past its
+    // 4-day rhythm: urgent. Dishes was added an hour ago and never done:
+    // new, not urgent (SPEC §12 decision 22).
+    await seedOverdueTrash();
     await seedChore(db(), {
       ...SEED_CHORES.dishes,
       createdAt: new Date(FIXED_NOW.getTime() - HOUR),
@@ -114,8 +131,12 @@ describe("loadHub", () => {
     expect(hub.chores).toMatchObject({
       status: "ready",
       data: [
-        { name: SEED_CHORES.dishes.name, when: "Never done", isNew: true },
-        { name: SEED_CHORES.trash.name, when: "Never done", isNew: false },
+        {
+          name: SEED_CHORES.trash.name,
+          when: "Due since Sat 26 Sep, 12:00",
+          overdue: true,
+          isNew: false,
+        },
       ],
     });
     expect(hub.standings).toEqual({
@@ -125,7 +146,7 @@ describe("loadHub", () => {
           memberId: ryan,
           displayName: "Ryan",
           rank: 1,
-          points: 0,
+          points: SEED_CHORES.trash.basePoints,
           gap: "Leader",
         },
       ],
@@ -135,9 +156,9 @@ describe("loadHub", () => {
       status: "ready",
       data: [{ id: pinned.ok && pinned.data.note.id, title: "Wifi" }],
     });
-    // Neither was ever done, so both are urgent; only Dishes is new; both
+    // Only Trash is urgent (Dishes was never done); only Dishes is new; both
     // notes are from today.
-    expect(hub.counts).toEqual({ urgent: 2, new: 1, messages: 2 });
+    expect(hub.counts).toEqual({ urgent: 1, new: 1, messages: 2 });
   });
 
   it("counts nothing for a tile whose read failed", async () => {
@@ -171,7 +192,7 @@ describe("loadHub", () => {
   });
 
   it("says the shopping list is unavailable when brain is down, and shows everything else", async () => {
-    await seedChore(db(), SEED_CHORES.trash);
+    await seedOverdueTrash();
     setBrainClientForTests({
       ...unconfiguredBrain,
       listShopping: async () => ({ ok: false, reason: "unavailable" }),
@@ -213,7 +234,7 @@ describe("loadHub", () => {
   });
 
   it("says the calendar is not connected, and shows everything else", async () => {
-    await seedChore(db(), SEED_CHORES.trash);
+    await seedOverdueTrash();
     setCalendarClientForTests(unconfiguredCalendar);
     const hub = await loadHub(ctxFor(sessionActor(ryan)));
     expect(hub.events).toMatchObject({
