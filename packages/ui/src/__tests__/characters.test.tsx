@@ -193,7 +193,9 @@ describe("AvatarButton", () => {
     const out = html(<AvatarButton displayName="ryan" color="#e8743b" />);
     expect(out).toContain("data-member-initial");
     expect(out).toContain(">R</span>");
-    expect(out).toContain("color:#e8743b");
+    // Ink on their colour (initialTileColours).
+    expect(out).toContain("background-color:#e8743b");
+    expect(out).toMatch(/[^-]color:#0b0712/);
     expect(out).not.toContain("data-member-sprite");
     expect(out).toContain(">ryan<");
     // Not picked: no frame in their colour.

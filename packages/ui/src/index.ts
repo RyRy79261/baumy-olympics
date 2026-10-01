@@ -68,7 +68,10 @@ export {
   BUST_MAX_PX,
   CHARACTER_SLOT_PX,
   MemberCharacter,
+  contrastRatio,
   initialOf,
+  initialTileColours,
+  type InitialTileColours,
   spriteFactor,
   spriteFit,
 } from "./member-character";

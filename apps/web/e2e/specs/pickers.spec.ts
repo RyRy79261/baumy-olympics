@@ -60,7 +60,7 @@ test("a newcomer picks a colour on /join and shows as their initial in it", asyn
   const mine = jo.page.getByTestId("account-menu");
   const tile = mine.locator("[data-member-initial]").first();
   await expect(tile).toHaveText("P");
-  await expect(tile).toHaveCSS("color", rgb(ROSE));
+  await expect(tile).toHaveCSS("background-color", rgb(ROSE));
   await expect(mine.locator("[data-housemate]")).toHaveCount(0);
   await jo.context.close();
 
@@ -71,7 +71,7 @@ test("a newcomer picks a colour on /join and shows as their initial in it", asyn
   await card.getByText("Edit name and colour").click();
   const cardTile = card.locator("[data-member-initial]").first();
   await expect(cardTile).toHaveText("P");
-  await expect(cardTile).toHaveCSS("color", rgb(ROSE));
+  await expect(cardTile).toHaveCSS("background-color", rgb(ROSE));
   await expect(tileRadio(card, "Colour", "Rose")).toBeChecked();
   await expect(
     card.getByText(`Only ${name} can change their character`),
