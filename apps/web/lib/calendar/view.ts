@@ -274,7 +274,7 @@ export function parseViewParams(
 
 /**
  * The chip colour of an event nobody in the app added: the house's
- * (packages/ui `HOUSE_COLOUR`, `--color-bm-house`), a grey-violet no shirt
+ * (packages/ui `HOUSE_COLOUR`, `--color-bm-house`), a grey-violet no member colour offered
  * uses, since amber already means consumable (ADR 0005 §8).
  */
 export const HOUSE_EVENT_ACCENT = HOUSE_COLOUR;

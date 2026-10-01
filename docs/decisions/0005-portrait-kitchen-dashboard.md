@@ -29,6 +29,7 @@ The owner approved variant A with the month calendar and the Camp 404 cat ("the 
    - Tapping yours records your acknowledgement. It is a kiosk write attributed to that member without a PIN, because it only says "I read this".
    - The reminder leaves the kiosk once every active member has seen it, or when a member dismisses it for everyone.
 5. **Every member has a 16-bit character.** They choose it in Settings: hair style, hair colour, skin tone and shirt colour. There are defaults, so nobody has to choose. Names come from the members table, and nothing about the people is hard-coded.
+   - [CORRECTION 2026-09-29] Owner rulings 2026-09-29: characters are pre-generated sets in an admin-managed gallery (issue #111), and the drawn (parametric) character is removed ("Burn it", issue #116). A member picks from the gallery in Settings; without a pick they show as their initial in their colour (`members.color`), which is also their colour everywhere. The app never draws a person.
 6. **Screensaver.** The kitchen screen shows a dim night room with a clock, a sleeping Baumy, and 16-bit raccoons that knock over a bin, carry a sock and push a box. It shows during night hours (`KIOSK_NIGHT_HOURS`, replacing the night-mode look) and after 5 minutes untouched. Any tap wakes it, and that tap never reaches the page.
 7. **The art.**
    - **Baumy** is Camp 404's INKBLOT cat (`camp-404 apps/join/components/os/inkblot-cat.ts`) at twice the pixels, through Scale2x, recoloured to the reference photo: a violet-black coat, a violet sheen and a green eye. It is not redrawn. [UNRESOLVED 2026-09-28] Camp 404 records that the sheet's source and licence (bat-cat `cat_sheet.png`) are unconfirmed; the owner should confirm we may ship it.
@@ -42,6 +43,6 @@ The owner approved variant A with the month calendar and the Camp 404 cat ("the 
 
 - The landscape kiosk home (SPEC §3.1, §8) is replaced. `/kiosk` becomes the portrait dashboard. The chores, calendar, notes and shopping pages remain behind the footer nav, restyled.
 - **Migration:** `chores.kind` (default `maintenance`, so existing rows and the seed list stay valid), `members.avatar` (jsonb, nullable), `reminders` and `reminder_acks`.
-- **New actions:** `set_chore_kind` (admin, UI only) or a `kind` field on `manage_chore`, `create_reminder`, `acknowledge_reminder`, `dismiss_reminder` and `update_avatar`.
+- **New actions:** `set_chore_kind` (admin, UI only) or a `kind` field on `manage_chore`, `create_reminder`, `acknowledge_reminder`, `dismiss_reminder` and `update_avatar` ([CORRECTION 2026-09-29] removed by issue #116; `members.avatar` stays in the table, unused).
 - The phone and laptop hub (`/`) and the admin pages take on the same kit, but they keep a normal scrolling layout.
 - The prototype branch is the visual reference. It is never merged.

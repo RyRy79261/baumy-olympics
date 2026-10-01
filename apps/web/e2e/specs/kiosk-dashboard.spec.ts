@@ -229,19 +229,23 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const chip = kiosk.getByTestId("acting-chip");
   await expect(chip.getByTestId("acting-as")).toHaveText(founder);
   await expectKioskTargets(chip);
-  // One character everywhere: the admin page draws the founder exactly as
-  // the kitchen screen does (the same colours, pixel for pixel). The card
-  // also draws them in its Character section, so compare the first drawing.
-  const fills = (scope: Locator) =>
+  // One look everywhere: the admin page shows the founder exactly as the
+  // kitchen screen does (their gallery sprite, or their initial in their
+  // colour). The card also shows them in its Character section, so compare
+  // the first one.
+  const look = (scope: Locator) =>
     scope
-      .locator("[data-housemate]")
+      .locator("[data-member-initial], [data-member-sprite]")
       .first()
-      .locator("path")
-      .evaluateAll((ps) => ps.map((p) => p.getAttribute("fill")).sort());
-  const onKiosk = await fills(chip);
-  expect(onKiosk.length).toBeGreaterThan(3);
+      .evaluate((el) =>
+        el.hasAttribute("data-member-initial")
+          ? `${el.textContent} ${getComputedStyle(el).backgroundColor}`
+          : (el.querySelector("img")?.getAttribute("src") ?? ""),
+      );
+  const onKiosk = await look(chip);
+  expect(onKiosk).not.toBe("");
   await page.goto("/admin/members");
-  expect(await fills(page.getByTestId(`member-${founder}`))).toEqual(onKiosk);
+  expect(await look(page.getByTestId(`member-${founder}`))).toBe(onKiosk);
   const baumy = await openBaumySheet(kiosk);
   await expect(
     baumy

@@ -221,8 +221,8 @@ function MessagesModule({
                 who={
                   <MemberCharacter
                     sprites={who.member?.sprites}
-                    avatar={who.member?.avatar}
-                    memberId={m.authorId}
+                    name={who.member ? who.name : m.authorName}
+                    colour={who.colour}
                     scale={4}
                   />
                 }

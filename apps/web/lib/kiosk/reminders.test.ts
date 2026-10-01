@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { defaultAvatar } from "@baumy/types";
 import type { ListRemindersData, ReminderView } from "@/lib/actions/reminders";
 import {
   kioskShowsReminders,
@@ -13,8 +12,7 @@ import {
 const member = (id: string, displayName: string) => ({
   id,
   displayName,
-  color: "#4ff5e6",
-  avatar: defaultAvatar(id),
+  color: `#0000${id.charCodeAt(0).toString(16).padStart(2, "0")}`,
   sprites: null,
 });
 
@@ -39,7 +37,7 @@ describe("reminderFaces", () => {
     const face = (id: string, displayName: string, seen: boolean) => ({
       id,
       displayName,
-      avatar: defaultAvatar(id),
+      colour: `#0000${id.charCodeAt(0).toString(16).padStart(2, "0")}`,
       sprites: null,
       seen,
     });

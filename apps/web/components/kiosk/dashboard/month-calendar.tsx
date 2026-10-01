@@ -167,8 +167,8 @@ function DaySheet({
                           who.member ? (
                             <MemberCharacter
                               sprites={who.member.sprites}
-                              avatar={who.member.avatar}
-                              memberId={who.member.id}
+                              name={who.name}
+                              colour={who.colour}
                               scale={2}
                             />
                           ) : undefined

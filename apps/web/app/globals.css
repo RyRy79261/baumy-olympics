@@ -30,7 +30,7 @@
   --color-bm-chrome: #0f0918; /* the header and footer bars */
   --color-bm-bubble: #f6ecff;
   --color-bm-bubble-ink: #1a1026;
-  --color-bm-house: #9d90bf; /* the house, not a housemate: no shirt uses it (packages/ui HOUSE_COLOUR) */
+  --color-bm-house: #9d90bf; /* the house, not a housemate: no member colour offered uses it (packages/ui HOUSE_COLOUR) */
 
   --animate-pixel-bob: pixel-bob 1.2s steps(2) infinite;
   --animate-pixel-hop: pixel-hop 0.6s steps(3) infinite;

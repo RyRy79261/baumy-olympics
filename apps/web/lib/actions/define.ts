@@ -14,7 +14,6 @@ import type { ActionFailure } from "./result";
 export const ACTION_NAMES = [
   "whoami",
   "update_my_profile",
-  "update_avatar",
   "choose_avatar",
   "preview_avatar",
   "add_avatar",

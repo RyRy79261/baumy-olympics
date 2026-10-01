@@ -9,7 +9,7 @@ apps/web            Next.js 16 app (hub, kiosk, API, MCP, AI command)
 packages/core       pure domain logic (scoring). No I/O, no Date.now(), no randomness.
 packages/db         Drizzle schema + migrations + per-domain queries + PGlite test harness
 packages/auth       Better Auth config (pinned 1.6.25)
-packages/ui         the pixel UI kit (ADR 0005): tokens in apps/web/app/globals.css, Baumy, glyphs, Housemate
+packages/ui         the pixel UI kit (ADR 0005): tokens in apps/web/app/globals.css, Baumy, glyphs, MemberCharacter
 packages/types      Zod schemas shared across boundaries
 packages/ai-prompts system prompts + model tiers (no SDK imports)
 ```

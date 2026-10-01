@@ -45,17 +45,6 @@ describe("findActiveMemberByAuthUserId", () => {
       householdId: HOUSEHOLD_ID,
       role: "admin",
       displayName: "Ryan",
-      avatar: null,
-    });
-    const avatar = {
-      hairStyle: "spiky",
-      hairColor: "black",
-      skinTone: "deep",
-      shirtColor: "yellow",
-    };
-    await t.db().update(members).set({ avatar }).where(eq(members.id, row.id));
-    await expect(findActiveMemberByAuthUserId("u_1")).resolves.toMatchObject({
-      avatar,
     });
   });
 

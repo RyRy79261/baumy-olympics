@@ -14,11 +14,7 @@ import {
   DEFAULT_AVATAR,
   defaultColorFor,
   isFailure,
-  JOIN_CHARACTER,
-  joinCharacter,
   joiningAccount,
-  PART_CHARACTER,
-  wholeCharacterOrNone,
 } from "./joining";
 import { fail } from "./result";
 
@@ -28,17 +24,14 @@ import { fail } from "./result";
 // address and a password; only the owner of the inbox can confirm it (or
 // Google, which only signs in verified addresses).
 
-const input = z
-  .strictObject({
-    displayName: DisplayName.describe("The name housemates will see."),
-    color: MemberColor.optional().describe("Your colour, as #rrggbb."),
-    avatarSprite: AvatarSprite.optional().describe("Your avatar."),
-    ...JOIN_CHARACTER,
-    avatarImageId: JoinAvatarId.describe(
-      "A character from the household's gallery, if you picked one.",
-    ),
-  })
-  .refine(wholeCharacterOrNone, PART_CHARACTER);
+const input = z.strictObject({
+  displayName: DisplayName.describe("The name housemates will see."),
+  color: MemberColor.optional().describe("Your colour, as #rrggbb."),
+  avatarSprite: AvatarSprite.optional().describe("Your avatar."),
+  avatarImageId: JoinAvatarId.describe(
+    "A character from the household's gallery, if you picked one.",
+  ),
+});
 
 export interface JoinAsFounderData {
   memberId: string;
@@ -56,10 +49,7 @@ export const joinAsFounder = defineAction({
   surfaces: ["ui"],
   requires: "account",
   input,
-  async execute(
-    ctx,
-    { displayName, color, avatarSprite, avatarImageId, ...look },
-  ) {
+  async execute(ctx, { displayName, color, avatarSprite, avatarImageId }) {
     const actor = await joiningAccount(ctx);
     if (isFailure(actor)) return actor;
     if (avatarImageId) {
@@ -85,7 +75,6 @@ export const joinAsFounder = defineAction({
       authUserId: actor.userId,
       displayName,
       avatarSprite: avatarSprite ?? DEFAULT_AVATAR,
-      avatar: joinCharacter(look),
       avatarImageId: avatarImageId ?? null,
       color: color ?? defaultColorFor(actor.userId),
       role: "admin",

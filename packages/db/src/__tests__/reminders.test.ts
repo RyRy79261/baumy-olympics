@@ -95,14 +95,7 @@ describe("insertReminder and findOpenReminder", () => {
 });
 
 describe("listActiveReminders", () => {
-  it("lists the active members by joining, with their stored avatar", async () => {
-    const avatar = {
-      hairStyle: "bob",
-      hairColor: "black",
-      skinTone: "tan",
-      shirtColor: "pink",
-    };
-    await t.db().update(members).set({ avatar }).where(eq(members.id, jo));
+  it("lists the active members by joining, with their colour", async () => {
     await member("Gone", { deactivatedAt: T0 });
     const { members: people, reminders: none } = await listActiveReminders(
       db(),
@@ -113,7 +106,6 @@ describe("listActiveReminders", () => {
         id: ryan,
         displayName: "Ryan",
         color: "#112233",
-        avatar: null,
         avatarImage: null,
         createdAt: at(-60),
       },
@@ -121,7 +113,6 @@ describe("listActiveReminders", () => {
         id: jo,
         displayName: "Jo",
         color: "#112233",
-        avatar,
         avatarImage: null,
         createdAt: at(-30),
       },

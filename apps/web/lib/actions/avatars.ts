@@ -51,7 +51,7 @@ export async function pickableAvatar(
 export interface ChooseAvatarData {
   memberId: string;
   avatarId: string | null;
-  /** The set now worn, or null for the drawn character. */
+  /** The set now worn, or null for none (their initial tile). */
   sprites: AvatarSprites | null;
 }
 
@@ -59,7 +59,7 @@ export const chooseAvatar = defineAction({
   name: "choose_avatar",
   title: "Pick my character from the gallery",
   description:
-    "Sets the signed-in member's own character to one from the household's gallery of pixel characters, or back to their drawn character with null. Only from their own signed-in session.",
+    "Sets the signed-in member's own character to one from the household's gallery of pixel characters, or to none with null (they then show as their initial in their colour). Only from their own signed-in session.",
   consent: "Change your own character",
   kind: "write",
   risk: "safe",

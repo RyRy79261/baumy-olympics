@@ -28,6 +28,14 @@ export function toneColour(tone: DashboardTone): string {
   return `var(--color-bm-${tone})`;
 }
 
+/**
+ * The house's colour: what nobody in particular added (a calendar event, a
+ * message) is drawn in. It is `--color-bm-house` in app/globals.css, and no
+ * member colour offered (`MEMBER_COLORS`) uses it, so the house is never
+ * mistaken for a housemate.
+ */
+export const HOUSE_COLOUR = "#9d90bf";
+
 /** `colour` at `pct`% over transparent: the prototype's `${hex}22` tints. */
 export function tint(colour: string, pct: number): string {
   return `color-mix(in srgb, ${colour} ${pct}%, transparent)`;
@@ -340,7 +348,7 @@ export function MessageRow({
   children,
   ...props
 }: HTMLAttributes<HTMLLIElement> & {
-  /** Their Housemate. */
+  /** Their character (MemberCharacter). */
   who: ReactNode;
   name: string;
   colour: string;
@@ -386,7 +394,7 @@ export function ActingChip({
   name,
   done,
 }: {
-  /** Their Housemate. */
+  /** Their character (MemberCharacter). */
   who: ReactNode;
   name: string;
   /** The "Done" button. */
@@ -566,7 +574,7 @@ export function DayEventRow({
   end: string;
   colour: string;
   title: string;
-  /** Their Housemate and name, or the house's mark. */
+  /** Their character and name, or the house's mark. */
   who: ReactNode;
   dim?: boolean;
 }) {
@@ -613,7 +621,7 @@ export function WhoLine({
   name,
   colour,
 }: {
-  /** Their Housemate; none for the house. */
+  /** Their character; none for the house. */
   who?: ReactNode;
   name: string;
   colour: string;

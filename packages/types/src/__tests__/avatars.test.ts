@@ -48,7 +48,7 @@ describe("AvatarRef and ChooseAvatar", () => {
     ).toMatchObject({ message: "Pick a character from the gallery." });
   });
 
-  it("reads an empty form value, or null, as the drawn character", () => {
+  it("reads an empty form value, or null, as no character", () => {
     expect(ChooseAvatar.parse({ avatarId: ID })).toEqual({ avatarId: ID });
     expect(ChooseAvatar.parse({ avatarId: "" })).toEqual({ avatarId: null });
     expect(ChooseAvatar.parse({ avatarId: null })).toEqual({ avatarId: null });
