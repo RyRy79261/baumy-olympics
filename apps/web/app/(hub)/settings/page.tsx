@@ -10,6 +10,7 @@ import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { listAvatars } from "@baumy/db/avatars";
 import { avatarImageView } from "@/lib/avatars/paths";
+import { showsGalleryForm } from "@/lib/avatars/settings-card";
 import { telegramBotUsername } from "@/lib/telegram/deep-link";
 import { GalleryForm } from "./gallery-form";
 import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
@@ -43,8 +44,7 @@ export default async function SettingsPage() {
   // a pick from it; until then, and until they pick, they show as their
   // initial in their colour (issue #116).
   const gallery = await listAvatars(db, HOUSEHOLD_ID);
-  const live = gallery.filter((a) => a.archivedAt === null);
-  const worn = gallery.find((a) => a.id === row?.avatarImageId);
+  const { show, live, worn } = showsGalleryForm(gallery, row?.avatarImageId);
   const colour = row?.color ?? "var(--color-bm-muted)";
 
   return (
@@ -60,9 +60,7 @@ export default async function SettingsPage() {
             below to unlock it.
           </FormMessage>
         ) : null}
-        {/* An archived character they still wear keeps the form, so they
-            see it and can take it off, even with nothing live to pick. */}
-        {live.length > 0 || worn ? (
+        {show ? (
           <GalleryForm
             displayName={me.displayName}
             colour={colour}
