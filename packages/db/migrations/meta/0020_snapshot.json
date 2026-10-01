@@ -1,5 +1,5 @@
 {
-  "id": "d2c1da22-9e69-42aa-aeeb-6e15992132dc",
+  "id": "12ef0b15-304e-4c5e-ae7d-f3f60f2ab1db",
   "prevId": "711eae27-9395-4101-8a42-26ba8d3ca8bd",
   "version": "7",
   "dialect": "postgresql",
@@ -1852,6 +1852,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "requester_network": {
+          "name": "requester_network",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "status": {
           "name": "status",

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
@@ -8,6 +9,13 @@ import { Card, FormMessage, PageHeading, linkClass } from "@baumy/ui";
 import { requireAdminPage } from "@/lib/auth";
 import { now } from "@/lib/clock";
 import { KIOSK_APPROVE_PATH, formatKioskPairingCode } from "@/lib/kiosk/format";
+import {
+  DIFFERENT_NETWORK_WARNING,
+  askedAgo,
+  differentNetwork,
+  networkPrefix,
+} from "@/lib/kiosk/network";
+import { getClientIp } from "@/lib/rate-limit";
 import { ApproveKioskForm } from "../kiosk-forms";
 
 // /admin/kitchen-screen/approve?code=… (issue #126): where the QR code on
@@ -37,15 +45,19 @@ export default async function ApproveKitchenScreenPage({
     returnTo: `${KIOSK_APPROVE_PATH}?code=${encodeURIComponent(typed)}`,
   });
 
+  const at = now();
   const parsed = KioskPairingCode.safeParse(typed);
   const request = parsed.success
     ? await findKioskPairingByCode(
         createHttpDb() as unknown as Queryable,
         HOUSEHOLD_ID,
         parsed.data,
-        now(),
+        at,
       )
     : null;
+  // The admin's own network, to warn about a code asked for elsewhere (a
+  // link sent to them rather than an iPad in front of them).
+  const mine = networkPrefix(getClientIp(await headers()));
 
   let problem: string | null = null;
   if (!parsed.success) {
@@ -87,9 +99,21 @@ export default async function ApproveKitchenScreenPage({
                 </strong>{" "}
                 <span className="text-bm-muted">· {request.device}</span>
               </p>
-              <p className="text-base text-bm-muted">
-                Check it matches the code on the iPad.
+              <p className="text-base text-bm-muted" data-testid="asked-ago">
+                Asked {askedAgo(request.createdAt, at)}.
               </p>
+              <p className="text-base" data-testid="approve-rule">
+                Only approve a code you can see on the iPad in front of you.
+              </p>
+              {differentNetwork(request.network, mine) ? (
+                <p
+                  role="alert"
+                  data-testid="network-warning"
+                  className="pixel-frame bg-bm-red/10 px-4 py-3 text-base text-bm-red [--pf:var(--color-bm-red)]"
+                >
+                  {DIFFERENT_NETWORK_WARNING}
+                </p>
+              ) : null}
               <ApproveKioskForm code={parsed.data} />
             </div>
           )}

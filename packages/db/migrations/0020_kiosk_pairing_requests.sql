@@ -5,6 +5,7 @@ CREATE TABLE "kiosk_pairing_requests" (
 	"secret_hash" text NOT NULL,
 	"code_hash" text NOT NULL,
 	"device" text NOT NULL,
+	"requester_network" text,
 	"status" "kiosk_pairing_status" DEFAULT 'pending' NOT NULL,
 	"device_id" uuid,
 	"approved_by" uuid,

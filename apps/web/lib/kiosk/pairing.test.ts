@@ -127,7 +127,10 @@ describe("the pairing cookie", () => {
 describe("POST /api/kiosk-pairing/start", () => {
   it("stores a request, retries a taken code, and gives the iPad the code and its secret cookie", async () => {
     const f = fake();
-    const res = await handleStart(post("/api/kiosk-pairing/start"), f.deps);
+    const res = await handleStart(
+      post("/api/kiosk-pairing/start", { "x-forwarded-for": "203.0.113.57" }),
+      f.deps,
+    );
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(await res.json()).toEqual({
@@ -143,8 +146,11 @@ describe("POST /api/kiosk-pairing/start", () => {
       secret: SECRET,
       code: "ABC234",
       device: "Safari on iPad",
+      // The network only, never the full address.
+      network: "203.0.113.0/24",
       now: NOW,
     });
+    expect(JSON.stringify(f.created)).not.toContain("203.0.113.57");
   });
 
   it("gives up with a 500 when every code is taken", async () => {

@@ -12,7 +12,11 @@ How to turn the iPad into the always-on kitchen screen (SPEC §8, issue #29).
       the QR code and open the link.
    3. The phone asks **Make this iPad the kitchen screen?** with the code
       (check it matches the iPad), the browser that asked and the name
-      "Kitchen". Tap **Make it the kitchen screen**.
+      "Kitchen". Tap **Make it the kitchen screen**. Only approve a code
+      you can see on the iPad in front of you: a link someone sent you
+      could be for their own device. If the phone says the code was asked
+      for from a different network (for example, the phone is on mobile
+      data), that is fine only if you are standing at the iPad.
    4. The iPad switches to the kitchen home by itself within a couple of
       seconds.
 

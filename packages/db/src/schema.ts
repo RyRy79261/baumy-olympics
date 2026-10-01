@@ -639,6 +639,13 @@ export const kioskPairingRequests = pgTable(
     secretHash: text("secret_hash").notNull().unique(),
     codeHash: text("code_hash").notNull().unique(),
     device: text("device").notNull(),
+    /**
+     * The network the request came from, as a prefix only ("203.0.113.0/24",
+     * "2001:db8:1::/48"), never the full address: the confirm page warns an
+     * admin approving from a different network (a phished link). Null when
+     * the address was unknown.
+     */
+    requesterNetwork: text("requester_network"),
     status: kioskPairingStatus("status").notNull().default("pending"),
     /** The device row the approval created. */
     deviceId: uuid("device_id").references(() => kioskDevices.id),

@@ -511,7 +511,7 @@ Postgres (concurrent claims and guesses) and end to end in `ipad-portrait`.
       a QR code. Scan it with your phone (signed in as an admin) and tap
       "Make it the kitchen screen"; the iPad pairs itself. No code is typed
       on the iPad any more ([kiosk-setup.md](kiosk-setup.md)). Add `/kiosk`
-      to the home screen. Each housemate sets a kiosk PIN in `/settings` on their own
+      to the home screen. Each housemate sets their personal PIN in `/settings` on their own
       phone, then taps their avatar on the iPad and tries "Check my PIN".
 - [ ] **Keep the iPad awake** until issue #29 adds the wake lock: Settings →
       Display & Brightness → Auto-Lock → Never, and Guided Access if you want

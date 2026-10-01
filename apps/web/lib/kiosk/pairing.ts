@@ -8,6 +8,7 @@ import {
   KIOSK_COOKIE_MAX_AGE_S,
   KIOSK_MEMBER_COOKIE,
 } from "./cookies";
+import { networkPrefix } from "./network";
 
 // Pairing the kitchen iPad by QR code (issue #126, SPEC §6.2): the three
 // routes the unpaired iPad at /kiosk/pair talks to. Like "Sign in with
@@ -46,6 +47,8 @@ export interface NewPairingRequest {
   secret: string;
   code: string;
   device: string;
+  /** The iPad's network prefix (network.ts), never its full address. */
+  network: string | null;
   now: Date;
 }
 
@@ -142,18 +145,27 @@ export async function handleStart(
   const crossSite = rejectCrossSite(req);
   if (crossSite) return crossSite;
   try {
+    const ip = getClientIp(req.headers);
     const tooMany = await limited(
       deps,
-      `kiosk_pair:start:ip:${getClientIp(req.headers)}`,
+      `kiosk_pair:start:ip:${ip}`,
       START_LIMIT,
     );
     if (tooMany) return tooMany;
     const now = deps.now();
     const device = deviceLabel(req.headers.get("user-agent"));
+    // Only the prefix, for the confirm page's "different network" warning.
+    const network = networkPrefix(ip);
     for (let attempt = 0; attempt < MINT_ATTEMPTS; attempt++) {
       const secret = deps.randomSecret();
       const code = deps.newCode();
-      const request = await deps.createRequest({ secret, code, device, now });
+      const request = await deps.createRequest({
+        secret,
+        code,
+        device,
+        network,
+        now,
+      });
       if (!request) continue;
       return json(
         { ok: true, code, expiresAt: request.expiresAt.toISOString() },
