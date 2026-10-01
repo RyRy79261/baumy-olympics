@@ -23,6 +23,8 @@ import {
   KIOSK_WALK_IN_COOKIE,
   KIOSK_WALK_IN_MAX_AGE_S,
 } from "@/lib/kiosk/cookies";
+import { KIOSK_PAIRING_RETENTION_MS } from "@baumy/db/kiosk-pairing";
+import { PAIRING_COOKIE, PAIRING_COOKIE_MAX_AGE_S } from "@/lib/kiosk/pairing";
 import {
   LOGIN_REQUEST_RETENTION_MS,
   LOGIN_REQUEST_TTL_MS,
@@ -50,6 +52,7 @@ const PASSKEY_CHALLENGE_MIN =
   SECURITY_COOKIES.passkeyChallengeMaxAgeSeconds / 60;
 const LOGIN_REQUEST_MIN = LOGIN_REQUEST_TTL_MS / 60_000;
 const LOGIN_REQUEST_HOURS = LOGIN_REQUEST_RETENTION_MS / 3_600_000;
+const KIOSK_PAIRING_HOURS = KIOSK_PAIRING_RETENTION_MS / 3_600_000;
 
 export const metadata: Metadata = { title: "Privacy" };
 
@@ -320,6 +323,16 @@ export default function PrivacyPage() {
             {LOGIN_REQUEST_MIN} minutes). A session made that way is marked with{" "}
             <code>{AUTH_COOKIE_PREFIX}.dont_remember</code> and ends when the
             browser closes, or after a day at most.
+          </li>
+          <li>
+            <code>{PAIRING_COOKIE}</code>: only on an iPad showing the code to
+            become the kitchen screen; it proves an admin&rsquo;s approval is
+            for that iPad, and goes after {PAIRING_COOKIE_MAX_AGE_S / 60}{" "}
+            minutes or once it is paired. The server keeps that request, with
+            the iPad&rsquo;s browser name and its network (the first part of its
+            address only, never the whole address), so the admin approving it is
+            warned if they are on a different network. It is deleted after{" "}
+            {KIOSK_PAIRING_HOURS} hours.
           </li>
           <li>
             <code>{KIOSK_COOKIE}</code>: only on a paired kitchen iPad; it signs

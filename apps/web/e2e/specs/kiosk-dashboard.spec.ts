@@ -102,7 +102,8 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const project = testInfo.project.name;
   // The founder works on a phone and the kiosk is a context of its own at
   // 820×1180 (pairedKiosk), as in hub.spec: the ipad-portrait founder
-  // already pairs close to pair_kiosk's 10 codes per 10 minutes.
+  // already pairs many kiosks (approve_kiosk_pairing allows 20 per 10
+  // minutes).
   test.skip(project !== "mobile-360", "Paired from the phone project.");
   // Its bounties are urgent because they fall due before Berlin midnight
   // (SPEC §12 decision 22); too close to midnight they would not yet be.

@@ -210,8 +210,9 @@ too; the lines are in brain's SETUP.md and the PR bodies).
 
 ### 15. Kitchen iPad
 
-- [ ] **Pair the iPad** (`/admin/members` → "Pair a kiosk", then
-      `/kiosk/pair` on the iPad over HTTPS); each housemate sets a kiosk PIN
+- [ ] **Pair the iPad** (issue #126): open `/kiosk` on the iPad over HTTPS
+      and scan its QR code with your phone, signed in as an admin; tap
+      "Make it the kitchen screen". Each housemate sets their personal PIN
       in `/settings`.
 - [ ] **Set it up** per [kiosk-setup.md](kiosk-setup.md) (home screen,
       Auto-Lock Never, Guided Access), run the **2-hour soak** and Lighthouse,
@@ -505,18 +506,21 @@ Postgres (concurrent claims and guesses) and end to end in `ipad-portrait`.
       so the iPad can pair only over HTTPS (production or a preview URL).
       `http://localhost` works for development; a dev machine reached over
       plain http on the LAN does not.
-- [ ] **After the first production deploy, pair the iPad:** on your phone open
-      `/admin/members` → "Pair a kiosk", name it, create the code; on the iPad
-      open `/kiosk/pair` within 10 minutes and type it. Add `/kiosk` to the
-      home screen. Each housemate sets a kiosk PIN in `/settings` on their own
+- [ ] **After the first production deploy, pair the iPad:**
+      [CORRECTION 2026-10-01, issue #126] open `/kiosk` on the iPad; it shows
+      a QR code. Scan it with your phone (signed in as an admin) and tap
+      "Make it the kitchen screen"; the iPad pairs itself. No code is typed
+      on the iPad any more ([kiosk-setup.md](kiosk-setup.md)). Add `/kiosk`
+      to the home screen. Each housemate sets their personal PIN in `/settings` on their own
       phone, then taps their avatar on the iPad and tries "Check my PIN".
 - [ ] **Keep the iPad awake** until issue #29 adds the wake lock: Settings →
       Display & Brightness → Auto-Lock → Never, and Guided Access if you want
       it locked to the app.
       [CORRECTION 2026-09-27] issue #29 added the wake lock; the full setup
       is [kiosk-setup.md](kiosk-setup.md) (see "Kitchen iPad" below).
-- If the iPad is lost, revoke it on `/admin/members` ("Revoke"); it is sent
-  back to `/kiosk/pair` on its next request.
+- If the iPad is lost, sign it out on `/admin/kitchen-screen` ("Sign out";
+  before issue #126 this was "Revoke" on `/admin/members`); it is sent back
+  to `/kiosk/pair` on its next request.
 
 ## Chores (issue #14)
 

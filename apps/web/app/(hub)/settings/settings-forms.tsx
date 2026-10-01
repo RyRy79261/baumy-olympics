@@ -10,6 +10,7 @@ import {
   FormMessage,
   Input,
 } from "@baumy/ui";
+import { KioskPin } from "@baumy/types";
 import { PixelQr } from "@/components/account/pixel-qr";
 import { useActionForm } from "@/components/use-action-form";
 import { telegramLinkDeepLink } from "@/lib/telegram/deep-link";
@@ -26,27 +27,55 @@ const checkTelegramLink: LinkCheck = async () => {
   return result.ok ? result.data.code : null;
 };
 
-/** set_kiosk_pin: a 4 to 6 digit PIN, typed twice. */
+const PIN_RULE = "Use 4 to 6 digits.";
+
+/**
+ * What to say under the PIN as it is typed (issue #126): a letter or a 7th
+ * digit at once, too few digits once the field is left. Null when it is
+ * fine, or too early to say.
+ */
+export function pinProblem(value: string, left: boolean): string | null {
+  if (value === "" || KioskPin.safeParse(value).success) return null;
+  if (left || /\D/.test(value) || value.length > 6) return PIN_RULE;
+  return null;
+}
+
+/**
+ * set_kiosk_pin: the member's personal PIN, 4 to 6 digits, typed twice. It
+ * is what the kitchen screen asks for before it does something as them; it
+ * has nothing to do with pairing the iPad (issue #126).
+ */
 export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(setKioskPinAction);
   const [mismatch, setMismatch] = useState(false);
+  const [pin, setPin] = useState("");
+  const [left, setLeft] = useState(false);
+  const typedProblem = pinProblem(pin, left);
+  useEffect(() => {
+    // A saved PIN leaves the field empty, like the form's other fields.
+    if (state?.ok) {
+      setPin("");
+      setLeft(false);
+    }
+  }, [state]);
 
   return (
     <Card
-      title="Kiosk PIN"
-      description="The kitchen kiosk asks for it before confirming or disputing something as you."
+      title="Your personal PIN"
+      description="The kitchen screen asks for it before it confirms, disputes or changes something as you. It is yours alone, and it is not for pairing the iPad."
     >
       <form
         action={formAction}
         onSubmit={(e) => {
           const form = e.currentTarget;
-          const pin = form.elements.namedItem("pin") as HTMLInputElement;
           const again =
             form.querySelector<HTMLInputElement>("#kiosk-pin-confirm");
-          const same = pin.value === again?.value;
+          const problem = pinProblem(pin, true);
+          setLeft(true);
+          const same = pin === again?.value;
           setMismatch(!same);
-          if (!same) e.preventDefault();
+          if (problem || !same) e.preventDefault();
         }}
         className="flex flex-col gap-4"
       >
@@ -55,7 +84,7 @@ export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
           id="kiosk-pin"
           label={hasPin ? "New PIN" : "PIN"}
           hint="4 to 6 digits."
-          errors={errors.pin}
+          errors={typedProblem ? [typedProblem] : errors.pin}
         >
           {(control) => (
             <Input
@@ -63,10 +92,12 @@ export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
               name="pin"
               type="password"
               inputMode="numeric"
-              pattern="[0-9]{4,6}"
               autoComplete="off"
               required
               disabled={pending}
+              value={pin}
+              onChange={(e) => setPin(e.currentTarget.value)}
+              onBlur={() => setLeft(true)}
             />
           )}
         </Field>

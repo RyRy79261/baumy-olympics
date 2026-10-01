@@ -14,7 +14,16 @@ import {
   LOGIN_REQUEST_RETENTION_MS,
   insertLoginRequest,
 } from "@baumy/db/login-requests";
-import { completions, loginRequests, seasons } from "@baumy/db/schema";
+import {
+  KIOSK_PAIRING_RETENTION_MS,
+  insertKioskPairingRequest,
+} from "@baumy/db/kiosk-pairing";
+import {
+  completions,
+  kioskPairingRequests,
+  loginRequests,
+  seasons,
+} from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
 import type * as NextServerModule from "next/server";
 import type { BlobStore } from "./photos/blob-store";
@@ -234,6 +243,7 @@ describe("runSweep", () => {
       ["weights", true],
       ["photos", false],
       ["logins", true],
+      ["kiosk_pairings", true],
     ]);
     expect(errors).toHaveBeenCalledWith(
       "[sweep] photos failed: boom with [redacted] inside",
@@ -267,6 +277,31 @@ describe("the logins step", () => {
       .select({ id: loginRequests.id })
       .from(loginRequests);
     expect(left).toEqual([{ id: fresh.id }]);
+  });
+});
+
+describe("the kiosk_pairings step", () => {
+  it("deletes pairing requests older than a day, and keeps newer ones", async () => {
+    const make = (code: string, at: Date) =>
+      insertKioskPairingRequest(db(), {
+        householdId: HOUSEHOLD_ID,
+        secret: `secret-${code}`,
+        code,
+        device: "Safari on iPad",
+        now: at,
+      });
+    const old = new Date(
+      SUNDAY_0230_UTC.getTime() - KIOSK_PAIRING_RETENTION_MS - 1,
+    );
+    await make("OLD234", old);
+    const fresh = await make("NEW234", SUNDAY_0230_UTC);
+    const report = await runSweep(SUNDAY_0230_UTC, { blob: okStore() });
+    expect(detail(report, "kiosk_pairings")).toEqual({ deleted: 1 });
+    const left = await t
+      .db()
+      .select({ id: kioskPairingRequests.id })
+      .from(kioskPairingRequests);
+    expect(left).toEqual([{ id: fresh!.id }]);
   });
 });
 
