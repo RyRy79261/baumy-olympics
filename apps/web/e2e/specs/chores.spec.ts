@@ -32,23 +32,30 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
 
   await addChore(page, { name, basePoints: 20, cooldownHours: 48 });
 
-  // Never done and just added: an urgent, new maintenance bounty. The hub's
-  // Urgent tile opens the board on its tab, and the kind tabs narrow it.
+  // Never done and just added: a new maintenance bounty, but not an urgent
+  // one, since it has no rhythm to be overdue on yet (SPEC §12 decision
+  // 22). The hub's New tile opens the board on its tab, and the other tabs
+  // narrow it.
   await page.goto("/");
-  const urgentTile = page.getByTestId("hub-tile-urgent");
-  await expect(urgentTile).toHaveAccessibleName(/^Urgent: [1-9]\d*$/);
-  await urgentTile.click();
-  await expect(page).toHaveURL(/\/chores\?show=urgent$/);
+  const newTile = page.getByTestId("hub-tile-new");
+  await expect(newTile).toHaveAccessibleName(/^New: [1-9]\d*$/);
+  await newTile.click();
+  await expect(page).toHaveURL(/\/chores\?show=new$/);
   const tabs = page.getByRole("group", { name: "Show" });
-  await expect(tabs.getByRole("button", { name: /^Urgent/ })).toHaveAttribute(
+  await expect(tabs.getByRole("button", { name: /^New/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
   await expect(tile(page, name)).toContainText("New");
-  // Urgent is said once, by the red status line; there is no second mark.
-  await expect(tile(page, name)).toHaveAttribute("data-urgent", "true");
-  await expect(tile(page, name)).not.toContainText("Urgent");
+  await expect(tile(page, name)).toContainText("Never done");
+  await expect(tile(page, name)).toHaveAttribute("data-urgent", "false");
   await expect(tile(page, name)).toContainText("Maintenance");
+  await tabs.getByRole("button", { name: /^Urgent/ }).click();
+  await expect(tabs.getByRole("button", { name: /^Urgent/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByTestId(`chore-${name}`)).toHaveCount(0);
   await tabs.getByRole("button", { name: /^Consumables/ }).click();
   await expect(
     tabs.getByRole("button", { name: /^Consumables/ }),

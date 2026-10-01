@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { addChore } from "../lib/chores";
+import { multiplierPct, pctOf } from "@baumy/core";
+import { addChore, logDoneAgo } from "../lib/chores";
 import { founderAdmin } from "../lib/household";
 import {
   expectKioskTargets,
@@ -80,9 +81,13 @@ async function addEvent(
   await expect(sheet).toBeHidden();
 }
 
+/** Base points for a one-day rhythm at effort 100% (SPEC §4.7, Dishes). */
+const DAILY_POINTS = 10;
+
 test("the kitchen dashboard: icons, modules, the month and its days", async ({
   page,
   browser,
+  request,
 }, testInfo) => {
   const project = testInfo.project.name;
   // The founder works on a phone and the kiosk is a context of its own at
@@ -98,12 +103,16 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const today = berlinDay();
   const tomorrow = berlinDay(1);
 
-  // Two new chores, never done, so due now: urgent and new. One is bought.
+  // Two new chores on a one-day rhythm. One is bought.
   await founderAdmin(page, project);
-  await addChore(page, { name: bins, basePoints: 20, cooldownHours: 0 });
+  await addChore(page, {
+    name: bins,
+    basePoints: DAILY_POINTS,
+    cooldownHours: 0,
+  });
   await addChore(page, {
     name: milk,
-    basePoints: 10,
+    basePoints: DAILY_POINTS,
     cooldownHours: 0,
     kind: "consumable",
   });
@@ -124,6 +133,27 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
     page,
     `iPad ${tag}`,
   );
+
+  // Never done, they are new but not urgent: there is no rhythm to be late
+  // on yet (SPEC §12 decision 22).
+  await kiosk.locator('[data-icon="new"]').click();
+  const newBefore = kiosk.getByRole("dialog", { name: "New bounties" });
+  await expect(newBefore.getByTestId(`bounty-${bins}`)).toContainText(
+    "Never done",
+  );
+  await kiosk.keyboard.press("Escape");
+  await expect(newBefore).toBeHidden();
+  await kiosk.locator('[data-icon="urgent"]').click();
+  const urgentBefore = kiosk.getByRole("dialog", { name: "Urgent" });
+  await expect(urgentBefore).toBeVisible();
+  await expect(urgentBefore.getByTestId(`bounty-${bins}`)).toHaveCount(0);
+  await expect(urgentBefore.getByTestId(`bounty-${milk}`)).toHaveCount(0);
+  await kiosk.keyboard.press("Escape");
+  await expect(urgentBefore).toBeHidden();
+
+  // Done 23h50m ago on their one-day rhythm: due in 10 minutes, so urgent.
+  await logDoneAgo(page, request, [bins, milk], 23 * 60 + 50);
+  await kiosk.reload();
 
   // One screen: the header, the month, the footer, Baumy. No scrolling.
   await expect(kiosk.getByTestId("kiosk-home")).toBeVisible();
@@ -153,8 +183,8 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await expectNoScroll(kiosk);
   await expectKioskTargets(kiosk.locator("main"));
 
-  // Urgent: both bounties, filtered by kind, each with its kind, deadline
-  // and points.
+  // Urgent: both bounties, filtered by kind, each with its kind, whose
+  // streak you would steal, deadline and points.
   const urgent = kiosk.locator('[data-icon="urgent"]');
   expect(Number(await urgent.getAttribute("data-count"))).toBeGreaterThan(1);
   await urgent.click();
@@ -164,9 +194,9 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const binsRow = module.getByTestId(`bounty-${bins}`);
   const milkRow = module.getByTestId(`bounty-${milk}`);
   await expect(binsRow).toContainText("Maintenance");
-  await expect(binsRow).toContainText("no streak yet");
-  await expect(binsRow).toContainText("Never done");
-  await expect(binsRow).toContainText("+20");
+  await expect(binsRow).toContainText(founder);
+  await expect(binsRow).toContainText(/in \d+m|Due now/);
+  await expect(binsRow).toContainText(`+${DAILY_POINTS}`);
   await expect(binsRow).toContainText("new");
   await expect(milkRow).toContainText("Consumable");
   await module.getByRole("button", { name: /^Consumables/ }).click();
@@ -214,9 +244,13 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await expect(log).toBeVisible();
   await log.getByRole("button", { name: "Log it" }).click();
   await expect(log).toBeHidden();
-  await expect(kiosk.getByTestId("score-pop")).toHaveText("+20");
+  // The founder's second in a row: a streak of 2.
+  await expect(kiosk.getByTestId("score-pop")).toHaveText(
+    `+${pctOf(DAILY_POINTS, multiplierPct(2))}`,
+  );
 
-  // Home again: it is not urgent any more.
+  // Home again: done now, it is next due in a day, after midnight, so it is
+  // not urgent any more.
   await kioskNav(kiosk, "Home");
   await expect(kiosk.getByTestId("kiosk-home")).toBeVisible();
   await urgent.click();
