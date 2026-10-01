@@ -1,3 +1,4 @@
+import { MEMBER_COLORS } from "@baumy/types";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AvatarGallery } from "../avatar-gallery";
@@ -7,7 +8,9 @@ import {
   BUST_MAX_PX,
   CHARACTER_SLOT_PX,
   MemberCharacter,
+  contrastRatio,
   initialOf,
+  initialTileColours,
   spriteFactor,
   spriteFit,
 } from "../member-character";
@@ -79,6 +82,55 @@ describe("spriteFit (the bust in small slots)", () => {
   });
 });
 
+describe("initialTileColours", () => {
+  it("reads at 4.5:1 or better on every member colour offered", () => {
+    for (const colour of MEMBER_COLORS) {
+      const paint = initialTileColours(colour);
+      expect(paint.background).toBe(colour);
+      expect(
+        contrastRatio(paint.letter, paint.background),
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("picks a dark or light letter by luminance for any #rrggbb", () => {
+    expect(initialTileColours("#ffff00").letter).toBe("#0b0712");
+    expect(initialTileColours("#1a1a6e").letter).toBe("#f7ecff");
+    // Every colour gets 4.5:1: on its own ground, or in the frame with
+    // light text on the plum when no letter colour reads on it.
+    for (let v = 0; v < 256; v += 5) {
+      for (const hex of [
+        `#${v.toString(16).padStart(2, "0").repeat(3)}`,
+        `#${v.toString(16).padStart(2, "0")}8040`,
+      ]) {
+        const paint = initialTileColours(hex);
+        expect(
+          contrastRatio(paint.letter, paint.background),
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    const grey = initialTileColours("#777777");
+    expect(grey).toEqual({
+      background: "#251838",
+      letter: "#f7ecff",
+      frame: "#777777",
+    });
+  });
+
+  it("puts a colour that is not #rrggbb in the frame only", () => {
+    expect(initialTileColours("var(--color-bm-muted)")).toEqual({
+      background: "#251838",
+      letter: "#f7ecff",
+      frame: "var(--color-bm-muted)",
+    });
+  });
+
+  it("measures contrast as WCAG does", () => {
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);
+    expect(contrastRatio("#ffffff", "#ffffff")).toBe(1);
+  });
+});
+
 describe("initialOf", () => {
   it("is the name's first letter, upper-cased, or ? for no name", () => {
     expect(initialOf("ryan")).toBe("R");
@@ -120,8 +172,9 @@ describe("MemberCharacter", () => {
     );
     expect(html).toContain("data-member-initial");
     expect(html).toContain(">J</span>");
-    expect(html).toContain("color:#3b82c4");
-    expect(html).toContain("color-mix(in srgb, #3b82c4 22%, transparent)");
+    // On their colour, in the letter colour that reads best on it.
+    expect(html).toContain("background-color:#3b82c4");
+    expect(html).toMatch(/[^-]color:#0b0712/);
     // A square the height of the slot, as a sprite would fill.
     expect(html).toContain(`width:${CHARACTER_SLOT_PX * 2}px`);
     expect(html).toContain(`height:${CHARACTER_SLOT_PX * 2}px`);

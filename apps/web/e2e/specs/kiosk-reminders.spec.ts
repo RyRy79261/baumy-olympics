@@ -39,7 +39,7 @@ async function expectInitialTile(scope: Locator, letter: string) {
   const tile = scope.locator("[data-member-initial]").first();
   await expect(tile).toBeVisible();
   await expect(tile).toHaveText(letter);
-  await expect(tile).toHaveCSS("color", rgb(MEMBER_COLORS[0]));
+  await expect(tile).toHaveCSS("background-color", rgb(MEMBER_COLORS[0]));
   await expect(scope.locator("[data-member-sprite]")).toHaveCount(0);
   await expect(scope.locator("[data-housemate]")).toHaveCount(0);
 }

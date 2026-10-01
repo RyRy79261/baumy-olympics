@@ -239,7 +239,7 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
       .first()
       .evaluate((el) =>
         el.hasAttribute("data-member-initial")
-          ? `${el.textContent} ${getComputedStyle(el).color}`
+          ? `${el.textContent} ${getComputedStyle(el).backgroundColor}`
           : (el.querySelector("img")?.getAttribute("src") ?? ""),
       );
   const onKiosk = await look(chip);

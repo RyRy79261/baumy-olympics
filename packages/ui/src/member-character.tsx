@@ -106,9 +106,57 @@ export function initialOf(name: string): string {
   return first ? first.toLocaleUpperCase() : "?";
 }
 
+/** The kit's ink and text colours (app/globals.css `--color-bm-ink`, `-text`). */
+const INK = "#0b0712";
+const TEXT = "#f7ecff";
+const RAISED = "#251838";
+
+function luminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+/** The WCAG contrast ratio of two `#rrggbb` colours, 1 to 21. */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+}
+
+/** What the initial tile is painted with, for one member colour. */
+export interface InitialTileColours {
+  background: string;
+  letter: string;
+  frame: string;
+}
+
 /**
- * A member with no gallery character: a neutral pixel-frame tile, tinted
- * with their colour, with their initial in that colour. Text only.
+ * The initial tile's colours (issue #116): the member's colour as the
+ * ground with the ink or the text colour on it, whichever reads better.
+ * A colour neither reaches 4.5:1 on (a mid grey), or one that is not a
+ * `#rrggbb`, goes in the frame only, with light text on the raised plum.
+ */
+export function initialTileColours(colour: string): InitialTileColours {
+  if (!/^#[0-9a-f]{6}$/i.test(colour)) {
+    return { background: RAISED, letter: TEXT, frame: colour };
+  }
+  const onInk = contrastRatio(colour, INK);
+  const onText = contrastRatio(colour, TEXT);
+  if (Math.max(onInk, onText) < 4.5) {
+    return { background: RAISED, letter: TEXT, frame: colour };
+  }
+  return {
+    background: colour,
+    letter: onInk >= onText ? INK : TEXT,
+    frame: INK,
+  };
+}
+
+/**
+ * A member with no gallery character: a pixel-frame tile with their
+ * initial on their colour, at least 4.5:1. Text only.
  */
 function InitialTile({
   name,
@@ -127,6 +175,7 @@ function InitialTile({
   className?: string;
   style?: CSSProperties;
 }) {
+  const paint = initialTileColours(colour);
   return (
     <span
       data-member-initial
@@ -134,16 +183,17 @@ function InitialTile({
         ? { role: "img", "aria-label": label }
         : { "aria-hidden": true })}
       className={cx(
-        "pixel-frame inline-flex shrink-0 items-center justify-center bg-bm-raised font-display leading-none uppercase [--pf:var(--color-bm-line)]",
+        "pixel-frame inline-flex shrink-0 items-center justify-center font-display leading-none uppercase",
         bob && "motion-safe:animate-pixel-bob",
         className,
       )}
       style={{
         width: px,
         height: px,
-        color: colour,
-        backgroundImage: `linear-gradient(color-mix(in srgb, ${colour} 22%, transparent), color-mix(in srgb, ${colour} 22%, transparent))`,
+        color: paint.letter,
+        backgroundColor: paint.background,
         fontSize: Math.max(8, Math.round(px * 0.5)),
+        ["--pf" as string]: paint.frame,
         ["--pf-w" as string]: `${px >= 48 ? 3 : 2}px`,
         ...style,
       }}
@@ -169,7 +219,7 @@ export function MemberCharacter({
   sprites?: AvatarSprites | null;
   /** Their display name: the initial tile shows its first letter. */
   name?: string;
-  /** Their colour (`members.color`): the initial tile's letter and tint. */
+  /** Their colour (`members.color`): the initial tile's ground. */
   colour?: string;
   /** The slot is `CHARACTER_SLOT_PX * scale` pixels tall. */
   scale?: number;
