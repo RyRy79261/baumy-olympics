@@ -30,10 +30,10 @@ const OptionalAvatarId = z.preprocess(
   AvatarId.nullable(),
 );
 
-/** `choose_avatar`: a gallery character, or null for the drawn one. */
+/** `choose_avatar`: a gallery character, or null to wear none (the initial tile). */
 export const ChooseAvatar = z.strictObject({
   avatarId: OptionalAvatarId.describe(
-    "The gallery character to wear, or null to go back to the drawn one.",
+    "The gallery character to wear, or null to wear none.",
   ),
 });
 
