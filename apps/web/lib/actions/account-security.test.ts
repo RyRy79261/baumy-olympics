@@ -432,6 +432,32 @@ describe("set_first_password", () => {
     expect(stored).not.toContain(password);
   });
 
+  it("needs 'Confirm it's you': a stolen session cannot add a permanent password", async () => {
+    // A passwordless member's session with no window (signed in over 10
+    // minutes ago, or swapped in by Better Auth): a thief holding it must
+    // not give the account a password they then sign in with.
+    const me = await arrange({ stale: true });
+    await seedAccount("u1", "google");
+    expect(await run("set_first_password", { password }, me)).toMatchObject({
+      ok: false,
+      code: "REAUTH_REQUIRED",
+    });
+    // Present before absent: Google is there, and no password was written.
+    const rows = await t.db().select().from(account);
+    expect(rows.map((r) => r.providerId)).toEqual(["google"]);
+    expect(await audits()).toEqual([]);
+
+    await grantStepUp(db(), {
+      sessionId: "here",
+      userId: "u1",
+      method: "passkey",
+      now: FIXED_NOW,
+    });
+    expect(await run("set_first_password", { password }, me)).toMatchObject({
+      ok: true,
+    });
+  });
+
   it("refuses an account that has one, and a short password", async () => {
     const me = await arrange();
     await seedAccount("u1", "credential");

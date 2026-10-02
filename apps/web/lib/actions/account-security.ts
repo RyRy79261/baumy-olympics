@@ -355,7 +355,7 @@ export const setFirstPassword = defineAction({
   name: "set_first_password",
   title: "Add a password",
   description:
-    "Gives an account that signs in only with Google or a passkey its first password, so it can also sign in with its email.",
+    "Gives an account that signs in only with Google or a passkey its first password, so it can also sign in with its email. Needs a recent 'Confirm it's you'.",
   consent: "Add a password to your account",
   kind: "write",
   risk: "safe",
@@ -377,7 +377,9 @@ export const setFirstPassword = defineAction({
       ),
   }),
   async execute(ctx, { password }) {
-    const actor = await liveActor(ctx);
+    // A new way in, and one a thief could then use to open sudo windows
+    // forever: needs "Confirm it's you" (the critic's review of PR #148).
+    const actor = await confirmedActor(ctx);
     if (isFailure(actor)) return actor;
     const { userId } = actor;
     await lockAuthUser(ctx.db, userId);
