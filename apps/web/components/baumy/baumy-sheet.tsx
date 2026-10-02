@@ -109,6 +109,7 @@ export function BaumySheet({
   actingName,
   voice = false,
   cat = false,
+  docked = false,
   who,
 }: {
   kiosk?: boolean;
@@ -122,6 +123,8 @@ export function BaumySheet({
    * scored once the sheet closes. Otherwise the button on its plinth.
    */
   cat?: boolean;
+  /** The hub's button: in the top bar below lg, the corner from lg up. */
+  docked?: boolean;
   /** The kiosk's avatars, while nobody is acting: "Who's asking?". */
   who?: ReactNode;
 }) {
@@ -799,7 +802,7 @@ export function BaumySheet({
           </button>
         </div>
       ) : (
-        <BaumyButton state={mood} onClick={wake} />
+        <BaumyButton state={mood} docked={docked} onClick={wake} />
       )}
       <Dialog open={open} onClose={close} title="Ask Baumy">
         <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">

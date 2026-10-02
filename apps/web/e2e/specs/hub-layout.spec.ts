@@ -12,9 +12,10 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 //   hides it for that member;
 // - the page reads heading, header row (clock and tiles), cards, with even
 //   room between them;
-// - Baumy's button sits in the viewport's bottom-right corner, and from a
-//   portrait tablet up it never covers a card, wherever the page is
-//   scrolled; on a phone the page's end scrolls clear of it.
+// - below lg (a phone, a portrait tablet) Baumy's button sits in the top bar
+//   and the page uses the full width; from lg up it floats in the viewport's
+//   bottom-right corner and never covers a card, wherever the page is
+//   scrolled.
 //
 // Set E2E_SHOTS_DIR to also save the hub at each width (the PR's before and
 // after shots): `hub-<w>.png` is what the screen shows at the top, with the
@@ -22,11 +23,12 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 // button shows where the first screen ends there, not at the page's foot).
 
 const WIDTHS = [
-  { width: 360, height: 780, columns: 1 }, // a phone
-  { width: 768, height: 1024, columns: 1 }, // a tablet, portrait
-  { width: 1024, height: 768, columns: 2 }, // lg: the two columns begin
-  { width: 1280, height: 800, columns: 2 },
-  { width: 1440, height: 900, columns: 2 },
+  { width: 360, height: 780, columns: 1, floats: false }, // a phone
+  { width: 768, height: 1024, columns: 1, floats: false }, // a tablet
+  // lg: the two columns begin, and Baumy moves to the corner.
+  { width: 1024, height: 768, columns: 2, floats: true },
+  { width: 1280, height: 800, columns: 2, floats: true },
+  { width: 1440, height: 900, columns: 2, floats: true },
 ];
 
 /** The hub's cards, in reading order on one column. */
@@ -47,7 +49,7 @@ const CORNER_PX = 32;
 type Rect = { left: number; right: number; top: number; bottom: number };
 type Box = Rect & { id: string; width: number };
 
-/** Every box in viewport pixels, plus page-relative tops for the stacking. */
+/** Every box, in viewport pixels. */
 async function measure(page: Page) {
   return page.evaluate((ids) => {
     const rect = (el: Element) => {
@@ -67,6 +69,13 @@ async function measure(page: Page) {
       glance: rect(document.querySelector('[data-testid="hub-glance"]')!),
       grid: rect(grid),
       baumy: rect(document.querySelector('button[aria-label="Ask Baumy"]')!),
+      header: rect(document.querySelector("header")!),
+      main: (() => {
+        const el = document.querySelector("main")!;
+        const r = el.getBoundingClientRect();
+        const pad = parseFloat(getComputedStyle(el).paddingRight);
+        return r.right - pad;
+      })(),
       viewport: {
         width: document.documentElement.clientWidth,
         height: window.innerHeight,
@@ -178,11 +187,29 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
       expect(order, `${label}: order`).toEqual(CARDS);
     }
 
-    // Baumy's button, in the viewport's bottom-right corner.
     const { baumy, viewport } = m;
     expect(baumy.right, `${label}: Baumy on screen`).toBeLessThanOrEqual(
       viewport.width,
     );
+    if (!size.floats) {
+      // Below lg: in the top bar, and the page has the full width.
+      expect(
+        baumy.top,
+        `${label}: Baumy in the top bar`,
+      ).toBeGreaterThanOrEqual(m.header.top);
+      expect(
+        baumy.bottom,
+        `${label}: Baumy in the top bar`,
+      ).toBeLessThanOrEqual(m.header.bottom);
+      const cardsRight = Math.max(...m.cards.map((c) => c.right));
+      expect(
+        Math.abs(cardsRight - m.main),
+        `${label}: cards use the full width`,
+      ).toBeLessThanOrEqual(1);
+      continue;
+    }
+    // From lg: in the viewport's bottom-right corner, over no card, at the
+    // top of the page and scrolled to its end.
     expect(baumy.bottom, `${label}: Baumy on screen`).toBeLessThanOrEqual(
       viewport.height,
     );
@@ -192,14 +219,10 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
     expect(baumy.bottom, `${label}: Baumy at the bottom`).toBeGreaterThan(
       viewport.height - CORNER_PX,
     );
-    // From a tablet up no card is ever under it: at the top of the page,
-    // and scrolled to the end.
-    if (size.width >= 768) {
-      for (const card of m.cards) {
-        expect
-          .soft(overlaps(baumy, card), `${label}: Baumy over ${card.id}`)
-          .toBe(false);
-      }
+    for (const card of m.cards) {
+      expect
+        .soft(overlaps(baumy, card), `${label}: Baumy over ${card.id}`)
+        .toBe(false);
     }
     await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     const end = await measure(p);

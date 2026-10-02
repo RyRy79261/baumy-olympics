@@ -133,6 +133,22 @@ describe("BaumyButton", () => {
     expect(out).toContain("right-[max(0.75rem,env(safe-area-inset-right))]");
   });
 
+  it("docked, sits in the top bar at 1x below lg and in the corner from lg", () => {
+    const out = html(<BaumyButton docked />);
+    const cls = out.match(/<button[^>]*class="([^"]*)"/)![1]!.split(" ");
+    // Below lg: in the flow, a 44px target, never fixed.
+    expect(cls).toContain("min-h-11");
+    expect(cls).not.toContain("fixed");
+    expect(cls).toContain("lg:fixed");
+    expect(cls).toContain(
+      "lg:bottom-[max(0.75rem,env(safe-area-inset-bottom))]",
+    );
+    // The cat at 1x (34 x 32) below lg, 3x from lg.
+    expect(out).toContain("width:34px;height:32px");
+    expect(out).toMatch(/data-sprite="baumy"[^>]*class="[^"]*lg:hidden/);
+    expect(out).toContain("width:102px;height:96px");
+  });
+
   it("keeps the kiosk grid clear of the corner Baumy sits in", () => {
     expect(html(<HubGrid kiosk />)).toContain("pb-32");
     expect(html(<HubGrid />)).not.toContain("pb-32");
