@@ -156,8 +156,13 @@ export function TelegramLinkForm({
   botUsername: string;
 }) {
   const router = useRouter();
+  // Linking adds a way in: "Confirm it's you" first (issue #135).
+  const stepUp = useStepUp();
   const { state, formAction, pending, requestId } = useActionForm(
-    createTelegramLinkCodeAction,
+    (
+      prev: Parameters<typeof createTelegramLinkCodeAction>[0],
+      form: FormData,
+    ) => stepUp.guard(createTelegramLinkCodeAction)(prev, form),
   );
   const code = state?.ok ? state.data.code : null;
   const phase = useLinkWatch({
@@ -248,6 +253,7 @@ export function TelegramLinkForm({
           </Button>
         )}
       </form>
+      {stepUp.dialog}
     </Card>
   );
 }
