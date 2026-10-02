@@ -110,13 +110,15 @@ export default function PrivacyPage() {
             or a place.
           </li>
           <li>
-            <strong>&quot;Confirm it&apos;s you&quot;:</strong> when you confirm
-            it is you before a sensitive change (for example a kiosk PIN), which
-            way you used (passkey, two-factor code, Telegram or password) and
-            when, for that one signed-in device, so it does not ask again for{" "}
-            {STEP_UP_MIN} minutes. Never the password or the code itself. It
-            goes when that device signs out, and the audit log keeps that you
-            confirmed and how.
+            <strong>&quot;Confirm it&apos;s you&quot;:</strong> when you sign in
+            or confirm it is you before a sensitive change (for example a kiosk
+            PIN), which way you used (passkey, two-factor code, Telegram,
+            password or Google) and when, for that one signed-in device, so it
+            does not ask again for {STEP_UP_MIN} minutes. Never the password or
+            the code itself. It goes when that device signs out, and the audit
+            log keeps that you confirmed and how. For two-factor codes, we also
+            keep which 30-second code you last used to confirm, so the same code
+            cannot be used twice.
           </li>
           <li>
             <strong>Your member profile:</strong> display name, colour, the
