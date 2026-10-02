@@ -135,9 +135,10 @@ export function buildAuthOptions(
     session: {
       expiresIn: AUTH_SESSION.expiresInSeconds,
       updateAge: AUTH_SESSION.updateAgeSeconds,
-      // Better Auth's own "fresh session" check (registering a passkey):
-      // signed in under 10 minutes ago, not its default of a day. The
-      // step-up guard (step-up.ts) also asks for an open window there.
+      // Better Auth's own "fresh session" check (registering a passkey) is
+      // off (0, which Better Auth 1.6.25 reads as off): the step-up window
+      // (step-up.ts) is the only check there, so a member who has just
+      // confirmed it's them may add a passkey however old the session.
       freshAge: AUTH_SESSION.freshAgeSeconds,
       cookieCache: {
         enabled: true,
