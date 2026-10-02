@@ -124,6 +124,12 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
       Math.abs(s.width - (m.heading.right - m.heading.left)),
       `${label}: strip width`,
     ).toBeLessThanOrEqual(1);
+    // One right edge for the strip and the cards.
+    const cardsRight = Math.max(...m.cards.map((c) => c.right));
+    expect(
+      Math.abs(s.x + s.width - cardsRight),
+      `${label}: strip and cards end together`,
+    ).toBeLessThanOrEqual(1);
     expect(s.y + s.height, `${label}: strip above the heading`).toBeLessThan(
       m.heading.top + 1,
     );

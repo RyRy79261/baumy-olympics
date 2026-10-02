@@ -190,6 +190,17 @@ function ShoppingWidget(
   );
 }
 
+/**
+ * The hub page's right gutter. From md (a portrait tablet) up the whole page
+ * (the PIN strip, the heading, the header row and the cards, so they share
+ * one right edge) keeps clear of the corner Baumy's button sits in (fixed,
+ * bottom right), so it never covers a card, a widget's link or the shopping
+ * list's Add, wherever the page is scrolled; from 2xl the page's own margin
+ * is wide enough. On a phone the shell's bottom padding clears it at the end
+ * of the page.
+ */
+export const HUB_GUTTER = "md:pr-36 2xl:pr-0";
+
 /** How many urgent bounties the hub lists before "N more". */
 export const HUB_BOUNTIES = 6;
 
@@ -219,12 +230,7 @@ export function HubHome({
 }) {
   const { chores, standings, pot, notes, counts } = hub;
   return (
-    // From md (a portrait tablet) up the page keeps clear of the corner
-    // Baumy's button sits in (fixed, bottom right), so it never covers a
-    // card, a widget's link or the shopping list's Add, wherever the page
-    // is scrolled; from 2xl the page's own margin is wide enough. On a phone
-    // the shell's bottom padding clears it at the end of the page.
-    <div className="md:pr-36 2xl:pr-0">
+    <div>
       <section
         aria-label="At a glance"
         data-testid="hub-glance"
