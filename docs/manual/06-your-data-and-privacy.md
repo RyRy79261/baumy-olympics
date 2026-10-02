@@ -35,7 +35,7 @@ Proof photos are deleted {{PHOTO_RETENTION_DAYS}} days after their claim settled
 
 ## Seeing, changing or deleting it
 
-To see what the app keeps about you, open **Settings → Your data**: counts and dates (your sign-in methods, devices, completions, notes, proof photos and when each is deleted, audit-log entries, Baumy usage and connected apps), with how long each is kept. Or ask Baumy "what do you keep about me?" on your own phone or computer; it never shows this on the kitchen iPad, and it only ever covers you.
+To see what the app keeps about you, open **Settings → Your data**: counts, dates and names (your sign-in methods, devices, completions, notes, proof photos and when each is deleted, audit-log entries, Baumy usage and connected apps), with how long each is kept. Or ask Baumy "what do you keep about me?" on your own phone or computer; it never shows this on the kitchen iPad, and it only ever covers you.
 
 You can change your name, colour and character yourself in **Settings**. For a full copy of what the app holds about you, or to have something removed, ask the owner. See [seeing, changing and deleting your data](/privacy#seeing-changing-and-deleting-your-data).
 

@@ -15,7 +15,7 @@
   {
     "name": "get_my_data",
     "title": "What Baumy keeps about me",
-    "description": "What the app stores about the member asking, as counts and dates: how they sign in, their signed-in devices, their profile, their completions, notes (deleted ones are kept), proof photos and when each is deleted, audit-log entries naming them, their AI usage and connected apps, plus the retention rules. Only ever about the asker; it never shows IP addresses or anyone else's data. Use it for 'what do you keep about me?'.",
+    "description": "What the app stores about the member asking, as counts, dates and names: how they sign in, their signed-in devices, their profile, their completions, notes (deleted ones are kept), proof photos and when each is deleted, audit-log entries naming them, their AI usage and connected apps, plus the retention rules. Only ever about the asker; it never shows IP addresses or anyone else's data. Use it for 'what do you keep about me?'.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

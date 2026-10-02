@@ -4,7 +4,7 @@ import { Card, linkClass } from "@baumy/ui";
 import type { MyDataView } from "@/lib/actions/get-my-data";
 
 // Settings, "Your data" (issue #144): the same `get_my_data` answer Baumy
-// sums up when asked "what do you keep about me?", as counts and dates.
+// sums up when asked "what do you keep about me?", as counts, dates and names.
 
 const plural = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
@@ -83,7 +83,7 @@ export function YourDataCard({ data }: { data: MyDataView }) {
   return (
     <Card
       title="Your data"
-      description="What Baumy keeps about you, as counts and dates. Only you see this; you can also ask Baumy “what do you keep about me?”."
+      description="What Baumy keeps about you, as counts, dates and names. Only you see this; you can also ask Baumy “what do you keep about me?”."
       data-testid="your-data"
     >
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
