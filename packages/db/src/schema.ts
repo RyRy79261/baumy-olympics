@@ -642,12 +642,21 @@ export const kioskDevices = pgTable(
     pairedAt: timestamp("paired_at", { withTimezone: true }),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /**
+     * Minutes untouched before the screen forgets who is acting (issue
+     * #147), chosen on the kiosk; null is the default (2).
+     */
+    idleMinutes: integer("idle_minutes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (t) => [
     index("kiosk_devices_household_id_idx").on(t.householdId),
+    check(
+      "kiosk_devices_idle_minutes_range",
+      sql`${t.idleMinutes} IS NULL OR ${t.idleMinutes} BETWEEN 1 AND 60`,
+    ),
     // A device is paired exactly when it has a token.
     check(
       "kiosk_devices_paired_has_token",

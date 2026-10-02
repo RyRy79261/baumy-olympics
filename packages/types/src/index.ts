@@ -5,8 +5,11 @@ export { Surface, SURFACES } from "./surface";
 export {
   AVATAR_SPRITES,
   AvatarSprite,
+  DEFAULT_KIOSK_IDLE_MINUTES,
   DISPLAY_NAME_MAX,
   DisplayName,
+  KIOSK_IDLE_MINUTES_CHOICES,
+  KioskIdleMinutes,
   KIOSK_PIN_MAX_DIGITS,
   KIOSK_PIN_MIN_DIGITS,
   KioskPin,
