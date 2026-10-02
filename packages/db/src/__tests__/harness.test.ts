@@ -73,6 +73,7 @@ describe("useTestDb", () => {
       "seasons",
       "service_tokens",
       "session",
+      "step_ups",
       "telegram_link_codes",
       "two_factor",
       "user",
