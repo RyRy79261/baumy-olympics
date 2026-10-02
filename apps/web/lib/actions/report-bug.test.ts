@@ -304,11 +304,7 @@ describe("report_bug", () => {
     for (const reason of ["no_token", "bad_repo"] as const) {
       setGithubIssuesForTests({ ok: false, reason });
       await expect(
-        run(
-          "report_bug",
-          { description: "x" },
-          ctxFor(sessionActor(me)),
-        ),
+        run("report_bug", { description: "x" }, ctxFor(sessionActor(me))),
       ).resolves.toEqual({
         ok: false,
         code: "NOT_CONFIGURED",

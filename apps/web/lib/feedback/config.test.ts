@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_FEEDBACK_REPO,
-  feedbackTracker,
-  filingState,
-} from "./config";
+import { DEFAULT_FEEDBACK_REPO, feedbackTracker, filingState } from "./config";
 
 describe("feedbackTracker", () => {
   it("needs a token, and defaults to this repository", () => {
@@ -30,7 +26,10 @@ describe("feedbackTracker", () => {
     ).toMatchObject({ ok: true, owner: "me", name: "my-repo.x" });
     for (const repo of ["just-a-name", "a/b/c", "a/", "a/b?x=1", "a/../b"]) {
       expect(
-        feedbackTracker({ GITHUB_FEEDBACK_TOKEN: "t", GITHUB_FEEDBACK_REPO: repo }),
+        feedbackTracker({
+          GITHUB_FEEDBACK_TOKEN: "t",
+          GITHUB_FEEDBACK_REPO: repo,
+        }),
       ).toEqual({ ok: false, reason: "bad_repo" });
     }
   });

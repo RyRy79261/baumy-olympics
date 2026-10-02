@@ -69,9 +69,9 @@ export function ReportDiagnosticsPanel({
       <div id={bodyId} hidden={!open} className="flex flex-col gap-2 px-3 pb-3">
         <p className="text-base text-bm-muted">
           This goes on a GitHub issue in the household&apos;s public tracker,
-          readable by anyone. Your name and email are never attached: only
-          what you write, these facts about this device, and your member id,
-          which means nothing outside Baumy but lets an admin see who to ask.
+          readable by anyone. Your name and email are never attached: only what
+          you write, these facts about this device, and your member id, which
+          means nothing outside Baumy but lets an admin see who to ask.
         </p>
 
         {shown === null ? (
@@ -109,7 +109,8 @@ export function ReportDiagnosticsPanel({
                 ))}
               </ul>
               <p className="text-base text-bm-amber">
-                {errors.length} recent {errors.length === 1 ? "error" : "errors"}{" "}
+                {errors.length} recent{" "}
+                {errors.length === 1 ? "error" : "errors"}{" "}
                 {errors.length === 1 ? "is" : "are"} attached. The last{" "}
                 {DIAGNOSTICS_LIMITS.errors} are kept, and they can quote
                 whatever was on screen when they happened.

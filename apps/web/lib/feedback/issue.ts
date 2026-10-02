@@ -57,7 +57,10 @@ function fenced(content: string): string {
  * crafted request could set.
  */
 function inlineCode(value: string): string {
-  return value.replace(/`/g, "").replace(/\s*\n\s*/g, " ").trim();
+  return value
+    .replace(/`/g, "")
+    .replace(/\s*\n\s*/g, " ")
+    .trim();
 }
 
 /**

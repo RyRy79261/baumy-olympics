@@ -76,7 +76,9 @@ function diagnosticsKinds(d: ReportDiagnostics): RedactionKind[] {
   return [
     ...d.environment.flatMap((f) => [f.label, f.value]),
     ...d.errors.flatMap((e) => [e.source, e.message, e.route ?? ""]),
-  ].flatMap((text) => sanitizeReportText(text, REPORT_DESCRIPTION_MAX).redacted);
+  ].flatMap(
+    (text) => sanitizeReportText(text, REPORT_DESCRIPTION_MAX).redacted,
+  );
 }
 
 export const reportBug = defineAction({
@@ -98,7 +100,10 @@ export const reportBug = defineAction({
   async execute(ctx, i) {
     const tracker = githubIssues();
     if (!tracker.ok) {
-      return fail("NOT_CONFIGURED", FEEDBACK_UNAVAILABLE_MESSAGE[tracker.reason]);
+      return fail(
+        "NOT_CONFIGURED",
+        FEEDBACK_UNAVAILABLE_MESSAGE[tracker.reason],
+      );
     }
 
     // Redact once up front: a report that is empty once HTML and PII are

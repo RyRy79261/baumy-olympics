@@ -12,19 +12,22 @@ import {
 import type { ReportBugData } from "@/lib/actions/report-bug";
 import type { ActionResult } from "@/lib/actions/result";
 import { clearClientErrors } from "@/lib/feedback/client-errors";
+import type { SendReport } from "./report-bug-dialog";
 
 // The reporter in the browser (issue #133), after camp-404's
 // report-bug-dialog.test.tsx: what it sends, what it shows back, that the
 // diagnostics go only when ticked and exactly as shown; and the gate: a
 // shake opens it, an uncaught error offers it once, "Not now" holds it.
 
-const reportBugAction = vi.fn<
-  (input: unknown, requestId: string) => Promise<ActionResult<ReportBugData>>
->();
-const kioskReportBugAction = vi.fn<
-  (input: unknown, requestId: string) => Promise<ActionResult<ReportBugData>>
->();
-vi.mock("@/app/feedback/actions", () => ({
+const reportBugAction =
+  vi.fn<
+    (input: unknown, requestId: string) => Promise<ActionResult<ReportBugData>>
+  >();
+const kioskReportBugAction =
+  vi.fn<
+    (input: unknown, requestId: string) => Promise<ActionResult<ReportBugData>>
+  >();
+vi.mock("@/components/feedback/actions", () => ({
   reportBugAction: (i: unknown, r: string) => reportBugAction(i, r),
   kioskReportBugAction: (i: unknown, r: string) => kioskReportBugAction(i, r),
 }));
@@ -101,7 +104,7 @@ const FILED: ActionResult<ReportBugData> = {
 
 describe("ReportBugDialog", () => {
   it("sends the report with one request id per report, and shows the issue", async () => {
-    const send = vi.fn(async () => FILED);
+    const send = vi.fn<SendReport>(async () => FILED);
     await mount(<ReportBugDialog open onClose={() => {}} send={send} />);
     expect(document.body.textContent).toContain("Report a bug");
     expect(button("Send report").disabled).toBe(true);
@@ -126,13 +129,11 @@ describe("ReportBugDialog", () => {
   });
 
   it("keeps the request id across a retry, so a retry is a replay", async () => {
-    const send = vi.fn(
-      async (): Promise<ActionResult<ReportBugData>> => ({
-        ok: false,
-        code: "UNAVAILABLE",
-        message: "Couldn't reach the bug tracker just now.",
-      }),
-    );
+    const send = vi.fn<SendReport>(async () => ({
+      ok: false,
+      code: "UNAVAILABLE",
+      message: "Couldn't reach the bug tracker just now.",
+    }));
     await mount(<ReportBugDialog open onClose={() => {}} send={send} />);
     await type("x");
     await click(button("Send report"));
@@ -140,12 +141,14 @@ describe("ReportBugDialog", () => {
       "Couldn't reach the bug tracker",
     );
     await click(button("Send report"));
-    const ids = send.mock.calls.map((c) => (c as unknown as [unknown, string])[1]);
+    const ids = send.mock.calls.map(
+      (c) => (c as unknown as [unknown, string])[1],
+    );
     expect(ids[0]).toBe(ids[1]);
   });
 
   it("says so when the send itself fails", async () => {
-    const send = vi.fn(async () => {
+    const send = vi.fn<SendReport>(async () => {
       throw new Error("network");
     });
     await mount(<ReportBugDialog open onClose={() => {}} send={send} />);
@@ -157,7 +160,7 @@ describe("ReportBugDialog", () => {
   });
 
   it("offers Improve with AI only when Claude is set up, and sends it ticked", async () => {
-    const send = vi.fn(async () => FILED);
+    const send = vi.fn<SendReport>(async () => FILED);
     await mount(<ReportBugDialog open onClose={() => {}} send={send} />);
     expect(document.getElementById("report-use-ai")).toBeNull();
     act(() => root?.unmount());
@@ -172,7 +175,7 @@ describe("ReportBugDialog", () => {
   });
 
   it("sends no diagnostics unless ticked, and then exactly what it shows", async () => {
-    const send = vi.fn(async () => FILED);
+    const send = vi.fn<SendReport>(async () => FILED);
     await mount(<ReportBugDialog open onClose={() => {}} send={send} />);
     await type("x");
     await click(button("Send report"));

@@ -72,7 +72,9 @@ async function timed(
         }, deps.timeoutMs);
       }),
     ]);
-    return answer ?? { kind: "ok", latencyMs: Math.round(deps.clock() - started) };
+    return (
+      answer ?? { kind: "ok", latencyMs: Math.round(deps.clock() - started) }
+    );
   } catch (err) {
     return {
       kind: "failed",
@@ -95,12 +97,13 @@ async function httpOk(
   return {
     kind: "failed",
     status: res.status,
-    reason:
-      res.status === 401 || res.status === 403 ? "key refused" : "error",
+    reason: res.status === 401 || res.status === 403 ? "key refused" : "error",
   };
 }
 
-export async function probeAll(deps: ProbeDeps = defaultDeps()): Promise<Probes> {
+export async function probeAll(
+  deps: ProbeDeps = defaultDeps(),
+): Promise<Probes> {
   const { env } = deps;
   const test = isTestMode(env);
   const set = (name: string) => Boolean(env[name]?.trim());
@@ -195,7 +198,10 @@ export async function probeAll(deps: ProbeDeps = defaultDeps()): Promise<Probes>
     calendar: { configured: test || calendarSet, reach: calendar },
     claude: { configured: test || set("ANTHROPIC_API_KEY"), reach: claude },
     groq: { configured: test || set("GROQ_API_KEY"), reach: groq },
-    blob: { configured: test || set("BLOB_READ_WRITE_TOKEN"), reach: test ? fake : skip },
+    blob: {
+      configured: test || set("BLOB_READ_WRITE_TOKEN"),
+      reach: test ? fake : skip,
+    },
     bugReports: {
       configured: test || tracker.ok,
       problem: test || tracker.ok ? null : tracker.reason,

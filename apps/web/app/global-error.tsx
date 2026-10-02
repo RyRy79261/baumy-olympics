@@ -37,7 +37,8 @@ export default function GlobalError({
           boxSizing: "border-box",
           background: BG,
           color: TEXT,
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
           textAlign: "center",
         }}
       >
@@ -49,12 +50,10 @@ export default function GlobalError({
             gap: "1rem",
           }}
         >
-          <h1 style={{ margin: 0, fontSize: "1.5rem" }}>
-            Baumy hit a snag.
-          </h1>
+          <h1 style={{ margin: 0, fontSize: "1.5rem" }}>Baumy hit a snag.</h1>
           <p style={{ margin: 0, color: MUTED }}>
-            Something failed before the page could load. Try again; if it
-            keeps happening, tell a household admin.
+            Something failed before the page could load. Try again; if it keeps
+            happening, tell a household admin.
           </p>
           {error.digest ? (
             <p style={{ margin: 0, color: MUTED, fontSize: "0.75rem" }}>

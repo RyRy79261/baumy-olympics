@@ -30,7 +30,11 @@ afterEach(() => {
 describe("structureWithAi", () => {
   it("returns the report from the format tool, on the model ai-prompts names", async () => {
     const { client, create } = returning([
-      { type: "tool_use", name: "format_report", input: { title: "T", summary: "S" } },
+      {
+        type: "tool_use",
+        name: "format_report",
+        input: { title: "T", summary: "S" },
+      },
     ]);
     expect(await structureWithAi("bug", "it broke", client)).toEqual({
       title: "T",
@@ -58,7 +62,10 @@ describe("structureWithAi", () => {
 
   it("is null without a key, without the tool call, or with a bad shape", async () => {
     expect(
-      await structureWithAi("bug", "x", { ok: false, reason: "not_configured" }),
+      await structureWithAi("bug", "x", {
+        ok: false,
+        reason: "not_configured",
+      }),
     ).toBeNull();
     expect(
       await structureWithAi(
@@ -72,7 +79,11 @@ describe("structureWithAi", () => {
         "bug",
         "x",
         returning([
-          { type: "tool_use", name: "format_report", input: { summary: "no title" } },
+          {
+            type: "tool_use",
+            name: "format_report",
+            input: { summary: "no title" },
+          },
         ]).client,
       ),
     ).toBeNull();
