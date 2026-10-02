@@ -66,6 +66,7 @@ export const AUTH_SESSION = {
   expiresInSeconds: 60 * 60 * 24 * 30, // 30 days
   updateAgeSeconds: 60 * 60 * 24, // refreshed at most once a day
   cookieCacheMaxAgeSeconds: 300, // 5 minutes
+  freshAgeSeconds: 600, // a passkey is added within 10 minutes of signing in
 } as const;
 
 /** Every Better Auth cookie is named `baumy.<name>`. */

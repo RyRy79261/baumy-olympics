@@ -18,7 +18,7 @@ import { bearer } from "better-auth/plugins/bearer";
 import { createHttpDb, schema, type Queryable } from "@baumy/db";
 import { forgetTrustedDevices } from "@baumy/db/account-security";
 import { approvalSignIn } from "./approval-sign-in";
-import { stepUpPasskey } from "./step-up";
+import { databaseStepUpStore, stepUp, type StepUpStore } from "./step-up";
 import { sendAuthEmail } from "./email";
 import {
   AUTH_COOKIE_PREFIX,
@@ -52,7 +52,10 @@ export const PLACEHOLDER_SECRET =
  * the drizzle adapter to an HTTP database client (which opens no connection
  * until a query runs). Exported so tests can inspect what an env resolves to.
  */
-export function buildAuthOptions(env: AuthEnv = process.env) {
+export function buildAuthOptions(
+  env: AuthEnv = process.env,
+  stepUpStore: StepUpStore = databaseStepUpStore,
+) {
   const baseURL = resolveBaseURL(env);
   const useSecureCookies = resolveUseSecureCookies(env);
 
@@ -132,6 +135,10 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
     session: {
       expiresIn: AUTH_SESSION.expiresInSeconds,
       updateAge: AUTH_SESSION.updateAgeSeconds,
+      // Better Auth's own "fresh session" check (registering a passkey):
+      // signed in under 10 minutes ago, not its default of a day. The
+      // step-up guard (step-up.ts) also asks for an open window there.
+      freshAge: AUTH_SESSION.freshAgeSeconds,
       cookieCache: {
         enabled: true,
         maxAge: AUTH_SESSION.cookieCacheMaxAgeSeconds,
@@ -188,9 +195,10 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
       // "Sign in with Baumy" (issue #80): a server-only endpoint that makes
       // the session once the member approved it in Telegram.
       approvalSignIn(),
-      // "Confirm it's you" with a passkey (issue #135, ADR 0007): a
-      // server-only check of an assertion that makes no session.
-      stepUpPasskey(resolvePasskeyScope(env)),
+      // "Confirm it's you" (issue #135, ADR 0007): a real sign-in opens the
+      // session's sudo window, Better Auth's security endpoints need one, and
+      // two server-only checks (a passkey, a code) make no session.
+      stepUp(resolvePasskeyScope(env), stepUpStore),
     ],
 
     advanced: {
