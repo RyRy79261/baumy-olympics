@@ -193,6 +193,13 @@ function ChoreEntry({
 }) {
   const title = choreTitle(claim);
   const can = claim.can;
+  // No empty button row (and no gap for it) when nothing applies.
+  const anyButton =
+    can.dispute ||
+    can.withdraw ||
+    can.concede ||
+    can.undo ||
+    (can.resolve && actions.resolve !== undefined);
   const simple = (
     key: "undo" | "withdraw" | "concede",
     label: string,
@@ -224,57 +231,59 @@ function ChoreEntry({
             alt={`Proof photo for ${claim.choreName}`}
           />
         ) : null}
-        <div className="flex flex-wrap items-start gap-3">
-          {can.dispute ? (
-            <DisputeForm
-              claim={claim}
-              action={actions.dispute}
-              kiosk={kiosk}
-              pinLabel={pinLabel}
-            />
-          ) : null}
-          {can.withdraw
-            ? simple(
-                "withdraw",
-                "Withdraw dispute",
-                `Dispute on ${claim.choreName} withdrawn.`,
-              )
-            : null}
-          {can.concede
-            ? simple("concede", "Concede", `Conceded ${claim.choreName}.`)
-            : null}
-          {can.undo
-            ? simple("undo", "Undo", `Undid ${claim.choreName}.`)
-            : null}
-          {can.resolve && actions.resolve ? (
-            <>
-              <AttestedForm
-                action={reporting(actions.resolve, () => `Upheld ${title}.`)}
-                label="Uphold"
+        {anyButton ? (
+          <div className="flex flex-wrap items-start gap-3">
+            {can.dispute ? (
+              <DisputeForm
+                claim={claim}
+                action={actions.dispute}
+                kiosk={kiosk}
                 pinLabel={pinLabel}
-                fields={
-                  <>
-                    <Hidden id={claim.completionId} />
-                    <input type="hidden" name="outcome" value="uphold" />
-                  </>
-                }
-                onResult={QUIET}
               />
-              <AttestedForm
-                action={reporting(actions.resolve, () => `Voided ${title}.`)}
-                label="Void"
-                pinLabel={pinLabel}
-                fields={
-                  <>
-                    <Hidden id={claim.completionId} />
-                    <input type="hidden" name="outcome" value="void" />
-                  </>
-                }
-                onResult={QUIET}
-              />
-            </>
-          ) : null}
-        </div>
+            ) : null}
+            {can.withdraw
+              ? simple(
+                  "withdraw",
+                  "Withdraw dispute",
+                  `Dispute on ${claim.choreName} withdrawn.`,
+                )
+              : null}
+            {can.concede
+              ? simple("concede", "Concede", `Conceded ${claim.choreName}.`)
+              : null}
+            {can.undo
+              ? simple("undo", "Undo", `Undid ${claim.choreName}.`)
+              : null}
+            {can.resolve && actions.resolve ? (
+              <>
+                <AttestedForm
+                  action={reporting(actions.resolve, () => `Upheld ${title}.`)}
+                  label="Uphold"
+                  pinLabel={pinLabel}
+                  fields={
+                    <>
+                      <Hidden id={claim.completionId} />
+                      <input type="hidden" name="outcome" value="uphold" />
+                    </>
+                  }
+                  onResult={QUIET}
+                />
+                <AttestedForm
+                  action={reporting(actions.resolve, () => `Voided ${title}.`)}
+                  label="Void"
+                  pinLabel={pinLabel}
+                  fields={
+                    <>
+                      <Hidden id={claim.completionId} />
+                      <input type="hidden" name="outcome" value="void" />
+                    </>
+                  }
+                  onResult={QUIET}
+                />
+              </>
+            ) : null}
+          </div>
+        ) : null}
         {can.attachPhoto ? (
           <PhotoForm claim={claim} kiosk={kiosk} pinLabel={pinLabel} />
         ) : null}
@@ -316,6 +325,7 @@ function OtherEntry({
             () => `Vetoed. ${entry.choreName}'s points stay as they are.`,
           )}
           label="Veto"
+          variant="danger"
           pinLabel={pinLabel}
           fields={
             <input

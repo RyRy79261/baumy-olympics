@@ -104,7 +104,7 @@ test("on the kiosk's Activity, undo needs no PIN, a dispute asks for one, and no
     kiosk.getByRole("status").filter({ hasText: `Disputed ${chore}.` }),
   ).toBeVisible();
   await expect(kiosk.getByTestId(`activity-dispute-${chore}`)).toContainText(
-    `${partner} disputed ${founder}'s ${chore}: "Still dirty". Open.`,
+    `${partner} disputed ${founder}'s ${chore}: "Still dirty". Still open.`,
   );
 
   await ipad.context.close();

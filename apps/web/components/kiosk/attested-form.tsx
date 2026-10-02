@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Button, Dialog, FormMessage, PinPad } from "@baumy/ui";
+import {
+  Button,
+  Dialog,
+  FormMessage,
+  PinPad,
+  type ButtonVariant,
+} from "@baumy/ui";
 import { useActionForm, type FormAction } from "@/components/use-action-form";
 import type { ActionResult } from "@/lib/actions/result";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
@@ -33,6 +39,7 @@ export function AttestedForm<T>({
   success,
   onResult,
   disabled = false,
+  variant = "primary",
 }: {
   action: FormAction<T>;
   /** The button that starts the request. */
@@ -46,6 +53,8 @@ export function AttestedForm<T>({
   /** Called once per answer that does not ask for a PIN. */
   onResult?: (result: ActionResult<T>) => void;
   disabled?: boolean;
+  /** The start button's look; primary unless given. */
+  variant?: ButtonVariant;
 }) {
   const { state, formAction, pending, requestId } = useActionForm(action);
   const [attempt, setAttempt] = useState(0);
@@ -78,7 +87,12 @@ export function AttestedForm<T>({
     >
       <input type="hidden" name="requestId" value={requestId} />
       {fields}
-      <Button type="submit" size="kiosk" disabled={pending || disabled}>
+      <Button
+        type="submit"
+        size="kiosk"
+        variant={variant}
+        disabled={pending || disabled}
+      >
         {label}
       </Button>
       {state?.ok && success && !onResult ? (

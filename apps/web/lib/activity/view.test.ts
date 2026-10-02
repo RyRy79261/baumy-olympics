@@ -102,7 +102,7 @@ describe("the other entries", () => {
 
   it("says who disputed whose chore, and how it ended", () => {
     expect(entryLine(dispute)).toBe(
-      `Sam disputed Ryan's Trash: "still full". Open.`,
+      `Sam disputed Ryan's Trash: "still full". Still open.`,
     );
     expect(entryLine({ ...dispute, resolution: "withdrawn" })).toMatch(
       /Withdrawn\.$/,
@@ -148,7 +148,11 @@ describe("the other entries", () => {
       outcome: "pending",
       canVeto: true,
     };
-    const change = "20 → 30 pts, cooldown 1 day → 1 day";
+    // The cooldown is named only when it changes.
+    const change = "20 → 30 pts";
+    expect(
+      entryLine({ ...points, event: "applied", toCooldownMinutes: 720 }),
+    ).toBe("New points for Trash applied: 20 → 30 pts, cooldown 1 day → 12 h.");
     expect(entryLine(points)).toBe(
       `Ryan scheduled new points for Trash: ${change}, from ${berlin} unless someone vetoes it. Reason: smelly`,
     );

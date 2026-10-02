@@ -85,7 +85,7 @@ test("E9 in the activity log: dispute, photo, withdraw, then settled", async ({
   await expect(toast(p, `Disputed ${chore}.`)).toBeVisible();
   await expect(claim(p, chore)).toHaveAttribute("data-status", "disputed");
   await expect(p.getByTestId(`activity-dispute-${chore}`)).toContainText(
-    `${partnerName} disputed ${founder}'s ${chore}: "The tub is still grey". Open.`,
+    `${partnerName} disputed ${founder}'s ${chore}: "The tub is still grey". Still open.`,
   );
 
   // The founder sees the dispute and attaches a photo.
