@@ -125,25 +125,13 @@ describe("SPEC §4.6 worked examples", () => {
 });
 
 describe("counted completions", () => {
-  it("counts confirmed, finalized and optimistic pending only", () => {
-    expect(isCounted({ status: "confirmed", confirmMode: "partner" })).toBe(
-      true,
-    );
-    expect(isCounted({ status: "finalized", confirmMode: "partner" })).toBe(
-      true,
-    );
-    expect(isCounted({ status: "pending", confirmMode: "optimistic" })).toBe(
-      true,
-    );
-    expect(isCounted({ status: "pending", confirmMode: "partner" })).toBe(
-      false,
-    );
-    expect(isCounted({ status: "disputed", confirmMode: "optimistic" })).toBe(
-      false,
-    );
-    expect(isCounted({ status: "voided", confirmMode: "optimistic" })).toBe(
-      false,
-    );
+  it("counts confirmed, finalized and pending only", () => {
+    expect(isCounted({ status: "confirmed" })).toBe(true);
+    expect(isCounted({ status: "finalized" })).toBe(true);
+    // A self-claim counts from the moment it is logged (§12 decision 29).
+    expect(isCounted({ status: "pending" })).toBe(true);
+    expect(isCounted({ status: "disputed" })).toBe(false);
+    expect(isCounted({ status: "voided" })).toBe(false);
   });
 
   it("skips uncounted rows without breaking the streak around them", () => {
@@ -154,8 +142,7 @@ describe("counted completions", () => {
         status: "disputed",
       }),
       completion(PARTNER, new Date(start.getTime() + 6 * DAY), {
-        status: "pending",
-        confirmMode: "partner",
+        status: "voided",
       }),
       completion(RYAN, new Date(start.getTime() + 9 * DAY), {
         status: "pending",
@@ -245,9 +232,6 @@ const rowArb = fc.record({
     "disputed",
     "voided",
   ) as fc.Arbitrary<ReplayCompletion["status"]>,
-  confirmMode: fc.constantFrom("optimistic", "partner") as fc.Arbitrary<
-    ReplayCompletion["confirmMode"]
-  >,
 });
 
 const rowsArb = fc.array(rowArb, { maxLength: 40 }).map((rows) =>
@@ -258,7 +242,6 @@ const rowsArb = fc.array(rowArb, { maxLength: 40 }).map((rows) =>
     occurredAt: new Date(RANGE_START + r.offset - (r.offset % (6 * HOUR))),
     loggedAt: new Date(RANGE_START + r.offset + r.logDelay * 60_000),
     status: r.status,
-    confirmMode: r.confirmMode,
   })),
 );
 

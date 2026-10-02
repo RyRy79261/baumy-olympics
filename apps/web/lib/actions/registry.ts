@@ -28,7 +28,6 @@ import { checkKioskPin } from "./check-kiosk-pin";
 import { setKioskIdleMinutesAction } from "./kiosk-idle";
 import {
   concedeCompletion,
-  confirmCompletion,
   disputeCompletion,
   resolveDispute,
   undoCompletion,
@@ -36,7 +35,7 @@ import {
 } from "./confirmations";
 import { createTelegramLinkCode } from "./create-telegram-link-code";
 import { getMyData } from "./get-my-data";
-import { getPendingConfirmations } from "./get-pending-confirmations";
+import { getActivity } from "./get-activity";
 import { getTelegramLinkStatus } from "./get-telegram-link-status";
 import { joinAsFounder } from "./join-as-founder";
 import { linkTelegram } from "./link-telegram";
@@ -152,8 +151,7 @@ export const REGISTRY = {
   manage_chore: manageChore,
   create_bounty: createBounty,
   update_bounty: updateBounty,
-  get_pending_confirmations: getPendingConfirmations,
-  confirm_completion: confirmCompletion,
+  get_activity: getActivity,
   dispute_completion: disputeCompletion,
   undo_completion: undoCompletion,
   withdraw_dispute: withdrawDispute,

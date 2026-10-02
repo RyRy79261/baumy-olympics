@@ -133,7 +133,6 @@ describe("runSweep", () => {
     expect(first.at).toBe(at.toISOString());
     expect(detail(first, "settle")).toEqual({
       finalized: 1,
-      expired: 0,
       timedOut: 0,
     });
     expect(detail(first, "photos")).toEqual({ pruned: 1, failed: 0, due: 1 });
@@ -148,7 +147,6 @@ describe("runSweep", () => {
     const second = await runSweep(at, { blob: store });
     expect(detail(second, "settle")).toEqual({
       finalized: 0,
-      expired: 0,
       timedOut: 0,
     });
     expect(detail(second, "seasons")).toEqual({ closing: 0, closed: 0 });

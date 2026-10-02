@@ -6,7 +6,6 @@ import type { SeasonStatus } from "./validate";
 import {
   challengeWindowEndsAt,
   effectiveStatus,
-  partnerExpiresAt,
   type VerificationRow,
 } from "./verification";
 
@@ -33,9 +32,9 @@ export interface SeasonAt {
   endsAt: Date;
   /**
    * Whether any of the season's completions is still `pending` or `disputed`
-   * by `effectiveStatus` at `now`: a challenge window (or a partner's 72h, or
-   * an admin's ruling on a disputed claim with an in-time photo) is still
-   * open, so the standings may still move.
+   * by `effectiveStatus` at `now`: a challenge window (or an admin's ruling
+   * on a disputed claim with an in-time photo) is still open, so the
+   * standings may still move.
    */
   hasOpenClaims: boolean;
 }
@@ -60,8 +59,8 @@ export function seasonStatusAt(
 
 /**
  * When the claim's verification ended, or null while it is still open at
- * `now`. The latest of the moments that can end it: the challenge window, a
- * confirmation, a partner-mode expiry and the last dispute ruling. Later is
+ * `now`. The latest of the moments that can end it: the challenge window, its
+ * verification (logged by someone else, or upheld) and the last dispute ruling. Later is
  * the safe side: a photo is never pruned before its claim has settled.
  */
 export function verificationEndedAt(
@@ -75,9 +74,6 @@ export function verificationEndedAt(
   const moments = [challengeWindowEndsAt(row, ruleset).getTime()];
   if (row.verifiedAt) moments.push(row.verifiedAt.getTime());
   if (lastDisputeResolvedAt) moments.push(lastDisputeResolvedAt.getTime());
-  if (row.confirmMode === "partner") {
-    moments.push(partnerExpiresAt(row, ruleset).getTime());
-  }
   return new Date(Math.max(...moments));
 }
 

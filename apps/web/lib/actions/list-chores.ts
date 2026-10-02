@@ -6,7 +6,7 @@ import {
   type ChoreDueState,
 } from "@baumy/core";
 import { listChoreBoard } from "@baumy/db/chores";
-import type { ChoreKind, ConfirmMode, ProofMode } from "@baumy/types";
+import type { ChoreKind, ProofMode } from "@baumy/types";
 import { isNewChore, isUrgent } from "@/lib/chores/urgency";
 import { defineAction } from "./define";
 
@@ -36,7 +36,6 @@ export interface ChoreView {
   /** Consumable (buy or refill) or maintenance (clean or fix). */
   kind: ChoreKind;
   proofMode: ProofMode;
-  confirmMode: ConfirmMode;
   effortFactorPct: number;
   archived: boolean;
   /** Null only while no weight is in effect yet. */
@@ -122,7 +121,6 @@ export const listChores = defineAction({
           sprite: c.sprite,
           kind: c.kind,
           proofMode: c.proofMode,
-          confirmMode: c.confirmMode,
           effortFactorPct: c.effortFactorPct,
           archived: c.archivedAt !== null,
           basePoints: c.rule?.basePoints ?? null,

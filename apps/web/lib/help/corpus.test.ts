@@ -129,7 +129,9 @@ describe("what Baumy can do", () => {
     expect(lineOf("create_note")).not.toContain("PIN");
     expect(lineOf("delete_note")).toContain("marked red");
     expect(lineOf("create_bounty")).toContain("Only a household admin");
-    expect(lineOf("confirm_completion")).toContain("never for someone else");
+    expect(lineOf("undo_completion")).toContain("never for someone else");
+    expect(text).toContain("`get_activity`");
+    expect(text).not.toContain("confirm_completion");
     expect(lineOf("log_completion")).toContain("`log_completion`");
     expect(lineOf("log_completion")).not.toContain("PIN");
     expect(lineOf("create_reminder")).not.toContain("PIN");

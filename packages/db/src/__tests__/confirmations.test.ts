@@ -1,14 +1,13 @@
 import { asc, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import type { VerificationEvent } from "@baumy/core";
+import { listActivity, type ActivityChore } from "../activity";
 import { logCompletion } from "../completions";
 import {
   applyCompletionEvent,
   attachCompletionPhoto,
   claimAbilities,
   findCompletionPhoto,
-  listOpenClaims,
-  listSettledClaims,
   loadForVerification,
 } from "../confirmations";
 import { HOUSEHOLD_ID } from "../household";
@@ -19,7 +18,7 @@ import { useTestDb } from "./_harness";
 
 // The honesty layer's write path (SPEC §4.3) on PGlite: each event through
 // `applyCompletionEvent`, the dispute rows it keeps in step, the re-score,
-// photos, and the open-claims read that judges status at `now`.
+// photos, and what a member may do to a claim, judged at `now`.
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -108,6 +107,20 @@ async function disputesOf(completionId: string) {
     .orderBy(asc(disputes.createdAt));
 }
 
+/** The claim's activity entry as it reads at `now`. */
+async function entryAt(completionId: string, now: Date) {
+  const entries = await listActivity(db(), {
+    householdId: HOUSEHOLD_ID,
+    since: at(-48),
+    now,
+    limit: 50,
+  });
+  return entries.find(
+    (e): e is ActivityChore =>
+      e.kind === "chore" && e.completionId === completionId,
+  )!;
+}
+
 async function stored(completionId: string) {
   const [row] = await t
     .db()
@@ -168,46 +181,15 @@ describe("applyCompletionEvent", () => {
     expect((await scoreOf(c.id))!.totalPts).toBe(BATHROOM.basePoints);
 
     // Open until 24.5h, settled after.
-    const openAt = (h: number) =>
-      listOpenClaims(db(), { householdId: HOUSEHOLD_ID, now: at(h) });
-    expect((await openAt(24.4)).map((o) => o.completionId)).toEqual([c.id]);
-    await expect(openAt(24.5)).resolves.toEqual([]);
-    const settled = await listSettledClaims(db(), {
-      householdId: HOUSEHOLD_ID,
-      memberId: ryan,
-      since: at(-1),
-      now: at(24.5),
-      limit: 5,
+    expect(await entryAt(c.id, at(24.4))).toMatchObject({
+      status: "pending",
+      windowEndsAt: at(24.5),
     });
-    expect(settled).toEqual([
-      {
-        completionId: c.id,
-        choreName: BATHROOM.name,
-        loggedAt: NOW,
-        status: "finalized",
-        voidReason: null,
-        totalPts: BATHROOM.basePoints,
-      },
-    ]);
-  });
-
-  it("confirms a partner-mode claim, which scores it and records who verified", async () => {
-    const ryan = await seedPlayer(db());
-    const partner = await seedPlayer(db());
-    const { choreId } = await seedChore(db(), {
-      ...TRASH,
-      confirmMode: "partner",
+    expect(await entryAt(c.id, at(24.5))).toMatchObject({
+      status: "finalized",
+      voidReason: null,
+      totalPts: BATHROOM.basePoints,
     });
-    const c = await claim(choreId, ryan, NOW);
-    expect(await scoreOf(c.id)).toBeNull();
-    const r = ok(await apply(c.id, { type: "confirm", actor: partner }, at(1)));
-    expect(r.completion).toMatchObject({
-      status: "confirmed",
-      verifiedBy: partner,
-      verifiedAt: at(1),
-    });
-    expect(r.disputeResolution).toBeNull();
-    expect((await scoreOf(c.id))!.totalPts).toBe(TRASH.basePoints);
   });
 
   it("concede voids the claim and closes the dispute as conceded", async () => {
@@ -346,14 +328,14 @@ describe("applyCompletionEvent", () => {
     await expect(
       apply(c.id, { type: "dispute", actor: partner, reason: "  " }, at(1)),
     ).resolves.toEqual({ ok: false, code: "REASON_REQUIRED" });
-    // Finalized by time, never written: too late to dispute or confirm.
+    // Finalized by time, never written: too late to dispute.
     await expect(
-      apply(c.id, { type: "confirm", actor: partner }, at(24)),
+      apply(c.id, { type: "dispute", actor: partner, reason: "late" }, at(24)),
     ).resolves.toEqual({ ok: false, code: "INVALID_STATE" });
     await expect(
       apply(
         "00000000-0000-4000-8000-00000000beef",
-        { type: "confirm", actor: partner },
+        { type: "withdraw", actor: partner },
         at(1),
       ),
     ).resolves.toEqual({ ok: false, code: "NOT_FOUND" });
@@ -378,13 +360,7 @@ describe("applyCompletionEvent", () => {
         apply(c.id, { type, actor: partner }, at(3)),
       ).resolves.toEqual({ ok: false, code: "FORBIDDEN" });
     }
-    const open = await listOpenClaims(db(), {
-      householdId: HOUSEHOLD_ID,
-      now: at(30),
-    });
-    expect(open.map((o) => [o.completionId, o.status])).toEqual([
-      [c.id, "disputed"],
-    ]);
+    expect((await entryAt(c.id, at(30))).status).toBe("disputed");
     expect((await stored(c.id)).status).toBe("disputed");
   });
 });
@@ -456,17 +432,14 @@ describe("attachCompletionPhoto", () => {
   });
 });
 
-describe("listOpenClaims and claimAbilities", () => {
-  it("lists pending and disputed claims with names, windows and what each member may do", async () => {
+describe("claimAbilities", () => {
+  it("says what each member may do to a pending and a disputed claim", async () => {
     const ryan = await seedPlayer(db(), "Ryan");
     const partner = await seedPlayer(db(), "Partner");
-    const optimistic = await seedChore(db(), TRASH);
-    const partnerMode = await seedChore(db(), {
-      ...SEED_CHORES.dishes,
-      confirmMode: "partner",
-    });
-    const a = await claim(optimistic.choreId, ryan, NOW);
-    const b = await claim(partnerMode.choreId, ryan, NOW);
+    const trash = await seedChore(db(), TRASH);
+    const dishes = await seedChore(db(), SEED_CHORES.dishes);
+    const a = await claim(trash.choreId, ryan, NOW);
+    const b = await claim(dishes.choreId, ryan, NOW);
     ok(
       await apply(
         a.id,
@@ -474,33 +447,10 @@ describe("listOpenClaims and claimAbilities", () => {
         at(0.05),
       ),
     );
-
-    const open = await listOpenClaims(db(), {
-      householdId: HOUSEHOLD_ID,
-      now: at(0.1),
-    });
-    expect(open.map((o) => o.completionId).sort()).toEqual([a.id, b.id].sort());
-    const oa = open.find((o) => o.completionId === a.id)!;
-    expect(oa).toMatchObject({
-      choreName: TRASH.name,
-      doneByName: "Ryan",
-      loggedByName: "Ryan",
-      status: "disputed",
-      windowEndsAt: at(24),
-      expiresAt: null,
-      totalPts: null,
-      dispute: { raisedBy: partner, raisedByName: "Partner", reason: "hmm" },
-    });
-    const ob = open.find((o) => o.completionId === b.id)!;
-    expect(ob).toMatchObject({
-      status: "pending",
-      finalizesAt: null,
-      expiresAt: at(72),
-      dispute: null,
-    });
+    const oa = await entryAt(a.id, at(0.1));
+    const ob = await entryAt(b.id, at(0.1));
 
     expect(claimAbilities(oa.row, false, ryan, false, at(0.1))).toEqual({
-      confirm: false,
       dispute: false,
       withdraw: false,
       concede: true,
@@ -509,7 +459,6 @@ describe("listOpenClaims and claimAbilities", () => {
       attachPhoto: true,
     });
     expect(claimAbilities(oa.row, false, partner, true, at(0.1))).toEqual({
-      confirm: false,
       dispute: false,
       withdraw: true,
       concede: false,
@@ -518,7 +467,6 @@ describe("listOpenClaims and claimAbilities", () => {
       attachPhoto: false,
     });
     expect(claimAbilities(ob.row, true, partner, false, at(1))).toEqual({
-      confirm: true,
       dispute: true,
       withdraw: false,
       concede: false,
@@ -526,36 +474,18 @@ describe("listOpenClaims and claimAbilities", () => {
       resolve: false,
       attachPhoto: false,
     });
-
-    // The partner-mode claim expires at 72h; the unphotographed dispute is
-    // void at 24h. Neither is open after, whatever is stored.
-    await expect(
-      listOpenClaims(db(), { householdId: HOUSEHOLD_ID, now: at(72) }),
-    ).resolves.toEqual([]);
-    const settled = await listSettledClaims(db(), {
-      householdId: HOUSEHOLD_ID,
-      memberId: ryan,
-      since: at(-1),
-      now: at(72),
-      limit: 1,
+    // Once its window has ended nobody may do anything to it.
+    expect(claimAbilities(ob.row, false, ryan, true, at(24))).toEqual({
+      dispute: false,
+      withdraw: false,
+      concede: false,
+      undo: false,
+      resolve: false,
+      attachPhoto: true,
     });
-    expect(settled).toHaveLength(1);
-    const all = await listSettledClaims(db(), {
-      householdId: HOUSEHOLD_ID,
-      memberId: ryan,
-      since: at(-1),
-      now: at(72),
-      limit: 5,
-    });
-    expect(
-      Object.fromEntries(all.map((s) => [s.completionId, s.voidReason])),
-    ).toEqual({ [a.id]: "disputed", [b.id]: "unconfirmed" });
   });
 
-  it("is empty with no claims, and loads a completion with its open dispute", async () => {
-    await expect(
-      listOpenClaims(db(), { householdId: HOUSEHOLD_ID, now: NOW }),
-    ).resolves.toEqual([]);
+  it("loads a completion with its open dispute", async () => {
     const ryan = await seedPlayer(db());
     const partner = await seedPlayer(db());
     const { choreId } = await seedChore(db(), TRASH);

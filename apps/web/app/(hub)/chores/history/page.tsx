@@ -10,7 +10,7 @@ import { requireMemberPage } from "@/lib/auth";
 // every bounty's points, for every member, grouped by bounty: who set or
 // scheduled it, from what to what, why, when it applies, and whether it
 // landed, is waiting, was vetoed (by whom) or cancelled. The data is
-// `get_points_history`. Vetoing a waiting change is on /inbox.
+// `get_points_history`. Vetoing a waiting change is on /activity.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -37,7 +37,7 @@ export default async function PointsHistoryPage() {
       <PageHeading
         eyebrow="Bounties"
         title="Points history"
-        description="Every change to what the bounties are worth. A scheduled change waits until the Monday it applies, and any member other than the one who scheduled it can veto it on Needs your OK until then."
+        description="Every change to what the bounties are worth. A scheduled change waits until the Monday it applies, and any member other than the one who scheduled it can veto it on Activity until then."
       />
       {!listed.ok ? (
         <FormMessage tone="error">{listed.message}</FormMessage>

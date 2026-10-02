@@ -112,43 +112,26 @@ describe("statusLabel", () => {
 describe("previewFor", () => {
   const trash = {
     basePoints: 20,
-    confirmMode: "optimistic" as const,
     streak: { holderId: "ryan", holderName: "Ryan", length: 3 },
   };
 
   it("extends the holder's own streak", () => {
-    expect(previewFor(trash, "ryan", "ryan")).toEqual({
+    expect(previewFor(trash, "ryan")).toEqual({
       headline: "+35, streak 4",
       totalPts: 35,
       breaks: null,
-      pending: null,
     });
   });
 
   it("names the streak it breaks and the bonus", () => {
-    expect(previewFor(trash, "partner", "ryan")).toEqual({
+    expect(previewFor(trash, "partner")).toEqual({
       headline: "+32, streak 1",
       totalPts: 32,
       breaks: "Breaks Ryan's streak of 3: +12 bonus",
-      pending: null,
     });
   });
 
-  it("warns that a partner-mode self-claim waits, but not a vouched one", () => {
-    const partnerMode = {
-      ...trash,
-      confirmMode: "partner" as const,
-      streak: null,
-    };
-    expect(previewFor(partnerMode, "ryan", "ryan")?.pending).toBe(
-      "Counts once someone else confirms it.",
-    );
-    expect(previewFor(partnerMode, "partner", "ryan")?.pending).toBeNull();
-  });
-
   it("has nothing to preview without points", () => {
-    expect(
-      previewFor({ ...trash, basePoints: null }, "ryan", "ryan"),
-    ).toBeNull();
+    expect(previewFor({ ...trash, basePoints: null }, "ryan")).toBeNull();
   });
 });

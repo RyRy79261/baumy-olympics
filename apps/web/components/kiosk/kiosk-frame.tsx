@@ -32,7 +32,7 @@ export function KioskFrame({
   );
 }
 
-/** The footer nav: Home, Bounties, Calendar, Board, Shop, Scores. */
+/** The footer nav: Home, Bounties, Calendar, Board, Activity, Shop, Scores. */
 export function KioskNav() {
   const pathname = usePathname();
   return (

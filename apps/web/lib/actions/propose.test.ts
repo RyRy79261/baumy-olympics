@@ -86,20 +86,20 @@ describe("proposeAction", () => {
     expect(forSam).toMatchObject({ valid: true, needsPin: false });
     expect(forSam.preview).toMatch(/^Log Trash for Sam/);
 
-    // Sam's claim: Ryan confirms it with no PIN, and disputes it with one.
+    // Sam's claim: Ryan disputes it with a PIN; Sam undoes it with none.
     const logged = await runAction(
       "log_completion",
       { choreId: trash },
       ctxFor(sessionActor(sam), { now: new Date() }),
     );
     if (!logged.ok) throw new Error(logged.message);
-    const confirm = await proposeAction(
-      "confirm_completion",
+    const undo = await proposeAction(
+      "undo_completion",
       { completionId: logged.data.completionId },
-      kiosk,
+      ai(ctxFor(kioskActor(sam))),
       choices,
     );
-    expect(confirm).toMatchObject({ valid: true, needsPin: false });
+    expect(undo).toMatchObject({ valid: true, needsPin: false });
     const dispute = await proposeAction(
       "dispute_completion",
       { completionId: logged.data.completionId, reason: "Still full" },

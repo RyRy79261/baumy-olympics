@@ -69,9 +69,13 @@ export async function checkPinAction(
   return kioskActionForm("check_kiosk_pin", form);
 }
 
-/** The chores page, and the home whose widgets show the due chores. */
+/**
+ * The chores page, the home whose widgets show the due chores, and the
+ * activity log.
+ */
 function revalidateKioskChores(): void {
   revalidatePath("/kiosk/chores");
+  revalidatePath("/kiosk/activity");
   revalidatePath("/kiosk");
 }
 
@@ -89,7 +93,6 @@ type ClaimResult = ActionResult<ClaimEventData>;
 
 async function claimEvent(
   name:
-    | "confirm_completion"
     | "dispute_completion"
     | "undo_completion"
     | "withdraw_dispute"
@@ -101,14 +104,7 @@ async function claimEvent(
   return result;
 }
 
-/** "Needs your OK" on the kiosk: each needs the acting member's PIN. */
-export async function kioskConfirmClaimAction(
-  _prev: ClaimResult | null,
-  form: FormData,
-): Promise<ClaimResult> {
-  return claimEvent("confirm_completion", form);
-}
-
+/** The activity log's buttons on the kiosk: only Dispute needs the PIN. */
 export async function kioskDisputeClaimAction(
   _prev: ClaimResult | null,
   form: FormData,
