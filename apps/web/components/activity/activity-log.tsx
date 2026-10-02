@@ -299,6 +299,7 @@ function OtherEntry({
   return (
     <div
       data-testid={`activity-${entry.kind}-${entry.choreName}`}
+      data-event={entry.kind === "points" ? entry.event : undefined}
       className="flex flex-wrap items-center justify-between gap-3 px-1"
     >
       <p className="text-sm">

@@ -5,7 +5,7 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 // Issue #17 (SPEC §4.4): a chore worth 40 is done again and again within a
 // few seconds, so once the weekly compute runs, /admin/weights suggests 30
 // (the 25% step down) from 6 gaps. The founder edits it to 32 and schedules
-// it; on /inbox the founder cannot veto their own change, and the partner
+// it; in Activity the founder cannot veto their own change, and the partner
 // vetoes it.
 //
 // The founder logs each one for the partner, so each is confirmed at once
@@ -77,21 +77,25 @@ test("a suggestion is scheduled on /admin/weights and vetoed by the partner", as
   await expect(suggestion).toContainText("40 → 32 pts");
 
   // The founder scheduled it, so the founder cannot veto it.
-  await page.goto("/inbox");
-  const mine = page.getByTestId(`scheduled-${chore}`);
-  await expect(mine).toContainText("You scheduled this.");
-  await expect(mine.getByRole("button", { name: /Veto/ })).toHaveCount(0);
+  const scheduledIn = (p: Page) =>
+    p.locator(
+      `[data-testid="activity-points-${chore}"][data-event="scheduled"]`,
+    );
+  await page.goto("/activity");
+  await expect(scheduledIn(page)).toContainText("40 → 32 pts");
+  await expect(scheduledIn(page).getByRole("button")).toHaveCount(0);
 
   // The partner can.
   const p = partner.page;
-  await p.goto("/inbox");
-  const theirs = p.getByTestId(`scheduled-${chore}`);
+  await p.goto("/activity");
+  const theirs = scheduledIn(p);
   await expect(theirs).toContainText("40 → 32 pts");
-  await theirs
-    .getByRole("button", { name: `Veto the ${chore} change` })
-    .click();
+  await theirs.getByRole("button", { name: "Veto" }).click();
   await expect(toast(p, "Vetoed.")).toBeVisible();
-  await expect(p.getByTestId(`scheduled-${chore}`)).toHaveCount(0);
+  await expect(scheduledIn(p).getByRole("button")).toHaveCount(0);
+  await expect(
+    p.locator(`[data-testid="activity-points-${chore}"][data-event="vetoed"]`),
+  ).toContainText(`${partnerName} vetoed new points for ${chore}`);
 
   // It is gone from the admin panel, and the points stay at 40.
   await page.goto("/admin/weights");
