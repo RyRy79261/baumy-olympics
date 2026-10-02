@@ -106,9 +106,9 @@ describe("calendarClient", () => {
       ok: true,
     });
     jar.throws = true;
-    expect(await calendarAsAsked(memoryCalendar()).get("x1234")).toMatchObject(
-      { ok: true },
-    );
+    expect(await calendarAsAsked(memoryCalendar()).get("x1234")).toMatchObject({
+      ok: true,
+    });
   });
 });
 

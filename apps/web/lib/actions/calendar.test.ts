@@ -369,7 +369,9 @@ describe("create_event", () => {
       ).toMatchObject({
         ok: false,
         code: "INVALID_INPUT",
-        issues: [{ path: ["forMemberId"], message: "Pick someone in the house." }],
+        issues: [
+          { path: ["forMemberId"], message: "Pick someone in the house." },
+        ],
       });
     }
     expect(seen).toEqual([]);
