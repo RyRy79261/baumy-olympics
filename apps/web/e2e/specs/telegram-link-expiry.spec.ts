@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { PASSWORD } from "../lib/accounts";
 import { advanceClock, resetClock } from "../lib/clock";
 import { founderAdmin } from "../lib/household";
 
@@ -60,8 +61,15 @@ test("an expired link asks for a new one, on the server's clock", async ({
   await expect(openTelegram).toHaveCount(0);
   await expect(page.getByTestId("telegram-link-code")).toHaveCount(0);
 
-  // A new link waits again.
+  // A new link waits again. Ten minutes on (server time), the sign-in's
+  // "Confirm it's you" window has closed, and linking adds a way in, so it
+  // asks first (issue #135).
   await page.getByRole("button", { name: "Make a new link" }).click();
+  const ask = page.getByRole("dialog", { name: "Confirm it's you" });
+  await expect(ask).toBeVisible();
+  await ask.getByLabel("Your password").fill(PASSWORD);
+  await ask.getByRole("button", { name: "Confirm with password" }).click();
+  await expect(ask).toBeHidden();
   await expect(openTelegram).toBeVisible();
   expect(await openTelegram.getAttribute("href")).not.toBe(first);
   await expect(waiting).toBeVisible();

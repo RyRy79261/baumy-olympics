@@ -3,7 +3,14 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { auditEvents, inviteCodes, members } from "@baumy/db/schema";
+import {
+  auditEvents,
+  inviteCodes,
+  members,
+  session,
+  user,
+} from "@baumy/db/schema";
+import { grantStepUp } from "@baumy/db/step-ups";
 import { useTestDb } from "@baumy/db/test-harness";
 import {
   FIXED_NOW,
@@ -42,6 +49,47 @@ beforeEach(() => {
 async function adminCtx() {
   const id = await seedMember(db(), { role: "admin", displayName: "Admin" });
   return { id, ctx: ctxFor(sessionActor(id, "admin")) };
+}
+
+let sessions = 0;
+/**
+ * An admin with a session row and, unless `confirmed: false`, an open
+ * "Confirm it's you" window (issue #135).
+ */
+async function confirmedAdminCtx({ confirmed = true } = {}) {
+  sessions += 1;
+  const userId = `admin-user-${sessions}`;
+  const sessionId = `admin-sess-${sessions}`;
+  await t
+    .db()
+    .insert(user)
+    .values({ id: userId, name: userId, email: `${userId}@example.com` });
+  await t
+    .db()
+    .insert(session)
+    .values({
+      id: sessionId,
+      token: `tok-${sessionId}`,
+      userId,
+      expiresAt: new Date(FIXED_NOW.getTime() + DAY),
+    });
+  if (confirmed) {
+    await grantStepUp(db(), {
+      sessionId,
+      userId,
+      method: "password",
+      now: FIXED_NOW,
+    });
+  }
+  const id = await seedMember(db(), {
+    role: "admin",
+    displayName: "Admin",
+    authUserId: userId,
+  });
+  return {
+    id,
+    ctx: ctxFor(sessionActor(id, "admin", { userId, sessionId })),
+  };
 }
 
 async function row(id: string) {
@@ -300,8 +348,59 @@ describe("manage_members", () => {
     });
   });
 
+  it("setting a Telegram id needs 'Confirm it's you'; clearing one does not", async () => {
+    // An id set here lets that Telegram account sign in as the member (Sign
+    // in with Baumy) and confirm it's them: a stolen admin session must not
+    // set one, its own or anyone's (the critic's review of PR #148).
+    const { id, ctx } = await confirmedAdminCtx({ confirmed: false });
+    const other = await seedMember(db(), {
+      displayName: "Other",
+      telegramUserId: 5_000_000_201,
+    });
+    for (const memberId of [id, other]) {
+      await expect(
+        runAction(
+          "manage_members",
+          { op: "set_telegram", memberId, telegramUserId: 5_000_000_202 },
+          ctxFor(ctx.actor),
+        ),
+      ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    }
+    // Present before absent: Other keeps its id, the admin gets none.
+    expect((await row(other)).telegramUserId).toBe(5_000_000_201);
+    expect((await row(id)).telegramUserId).toBeNull();
+    expect(await t.db().select().from(auditEvents)).toEqual([]);
+
+    // Clearing takes a way in away: no window needed.
+    await expect(
+      runAction(
+        "manage_members",
+        { op: "set_telegram", memberId: other },
+        ctxFor(ctx.actor),
+      ),
+    ).resolves.toMatchObject({ ok: true, data: { telegramUserId: null } });
+
+    // With a window, setting works.
+    await grantStepUp(db(), {
+      sessionId: (ctx.actor as { sessionId: string }).sessionId,
+      userId: (ctx.actor as { userId: string }).userId,
+      method: "passkey",
+      now: FIXED_NOW,
+    });
+    await expect(
+      runAction(
+        "manage_members",
+        { op: "set_telegram", memberId: other, telegramUserId: 5_000_000_202 },
+        ctxFor(ctx.actor),
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      data: { telegramUserId: 5_000_000_202 },
+    });
+  });
+
   it("sets, moves and clears a Telegram id, refusing one another member holds", async () => {
-    const { id, ctx } = await adminCtx();
+    const { id, ctx } = await confirmedAdminCtx();
     const other = await seedMember(db(), { displayName: "Other" });
     const TG = 5_000_000_101;
     // A form sends the digits as a string.
