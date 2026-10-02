@@ -8,7 +8,8 @@ import { founderAdmin } from "../lib/household";
 // and "Post a reminder" sat far below it, half as wide as the page. At each
 // width the hub's cards stack in their columns with no gap larger than the
 // grid's own, and the reminder is as wide as the cards in its column. On a
-// phone or a tablet there is one column and the reminder stays last.
+// phone or a tablet there is one column, and the reminder comes right after
+// Today there too, so the order seen is the order read and tabbed through.
 //
 // Set E2E_SHOTS_DIR to also save the whole hub at each width (the PR's
 // before and after shots); otherwise they go to the test's own output folder.
@@ -113,15 +114,15 @@ test("the hub's cards stack without gaps at every width", async ({
       .toBeLessThanOrEqual(1);
 
     if (size.columns === 1) {
-      // One column: the cards read in their order, the reminder last.
+      // One column: the cards in their reading order, the reminder after Today.
       const order = [...boxes].sort((a, b) => a.top - b.top).map((b) => b.id);
       expect(order, `${label}: order`).toEqual([
         "widget-chores",
         "widget-events",
+        "post-reminder",
         "widget-leaderboard",
         "widget-notes",
         "widget-shopping",
-        "post-reminder",
       ]);
     }
   }
