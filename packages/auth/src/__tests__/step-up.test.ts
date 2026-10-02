@@ -308,7 +308,7 @@ describe("verifyStepUpPasskey", () => {
           response: { signature: string };
         } & Record<string, unknown>;
         const sig = Buffer.from(r.response.signature, "base64url");
-        sig[sig.length - 1] ^= 0xff;
+        sig.writeUInt8(sig.readUInt8(sig.length - 1) ^ 0xff, sig.length - 1);
         return {
           ...r,
           response: { ...r.response, signature: sig.toString("base64url") },
