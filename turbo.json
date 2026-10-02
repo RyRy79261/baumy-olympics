@@ -36,6 +36,8 @@
     "SIGN_IN_WITH_BAUMY",
     "TELEGRAM_BOT_USERNAME",
     "KIOSK_NIGHT_HOURS",
+    "GITHUB_FEEDBACK_TOKEN",
+    "GITHUB_FEEDBACK_REPO",
     "E2E_*"
   ],
   "tasks": {

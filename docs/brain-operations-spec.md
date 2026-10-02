@@ -1368,7 +1368,7 @@ The house calendar between two Berlin days.
 
 **When to use it.** For "what's on this weekend?", and to find an `eventId` before changing or deleting an event.
 
-**Tool description** (the registry's, verbatim): Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM) and who added it (a member id). Private events are left out.
+**Tool description** (the registry's, verbatim): Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM), who added it and who it is for (member ids; null for the whole house). Private events are left out.
 
 **Examples.**
 
@@ -1393,7 +1393,7 @@ The house calendar between two Berlin days.
 }
 ```
 
-**Returns** (`data`): `events`: id, title, notes, place, all day or not, first and last day, Berlin start and end (HH:MM), who added it.
+**Returns** (`data`): `events`: id, title, notes, place, all day or not, first and last day, Berlin start and end (HH:MM), who added it (`addedBy`) and who it is for (`forMember`, null for the whole house), as member ids.
 
 **Its errors:** `INVALID_INPUT` (400), `NOT_CONFIGURED` (503), `UNAVAILABLE` (503). Every call can also get the endpoint's codes (above).
 
@@ -1407,15 +1407,15 @@ Adds an event to the house Google Calendar.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | any linked member |
+| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
 | Calls out | yes (Google or brain): may answer 503 `NOT_CONFIGURED` or `UNAVAILABLE` |
 
-**When to use it.** When someone asks to add something to the calendar. Resolve the day and time to Berlin `YYYY-MM-DD` and `HH:MM` first; no time means `all_day`.
+**When to use it.** When someone asks to add something to the calendar. Resolve the day and time to Berlin `YYYY-MM-DD` and `HH:MM` first; no time means `all_day`. Only when it is clearly for one housemate ("Anna's dentist"), send their member id (from get_standings) as `forMemberId`; otherwise leave it out, and it is for the whole house.
 
-**Tool description** (the registry's, verbatim): Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date.
+**Tool description** (the registry's, verbatim): Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date. forMemberId names the one member it is for; leave it out (or null) for the whole house.
 
 **Examples.**
 
@@ -1468,6 +1468,19 @@ Adds an event to the house Google Calendar.
       "description": "Timed events: the Berlin wall-clock end, HH:MM (24h), on endDate.",
       "type": "string",
       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+    },
+    "forMemberId": {
+      "description": "Who it is for: one member's id, or null for the whole house. On create, left out is the whole house; on update, left out keeps who it is for.",
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
@@ -1481,7 +1494,7 @@ Adds an event to the house Google Calendar.
 
 **Returns** (`data`): `event`: the event as stored, with its `id`.
 
-**Its errors:** `NOT_CONFIGURED` (503), `UNAVAILABLE` (503). Every call can also get the endpoint's codes (above).
+**Its errors:** `INVALID_INPUT` (400), `NOT_CONFIGURED` (503), `UNAVAILABLE` (503). Every call can also get the endpoint's codes (above).
 
 **Say back:** "Added <title> on <day> <time>."
 
@@ -1493,15 +1506,15 @@ Changes a calendar event; every field is replaced.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | any linked member |
+| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
 | Calls out | yes (Google or brain): may answer 503 `NOT_CONFIGURED` or `UNAVAILABLE` |
 
-**When to use it.** When someone moves or renames an event. Read it with list_events and send ALL its fields, changed and unchanged.
+**When to use it.** When someone moves or renames an event. Read it with list_events and send ALL its fields, changed and unchanged. Leave `forMemberId` out to keep who it is for; send a member id to change it, or null to make it the whole house's.
 
-**Tool description** (the registry's, verbatim): Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event.
+**Tool description** (the registry's, verbatim): Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event, except forMemberId: leave it out to keep who it is for, or null to make it the whole house's.
 
 **Examples.**
 
@@ -1558,6 +1571,19 @@ Changes a calendar event; every field is replaced.
       "description": "Timed events: the Berlin wall-clock end, HH:MM (24h), on endDate.",
       "type": "string",
       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+    },
+    "forMemberId": {
+      "description": "Who it is for: one member's id, or null for the whole house. On create, left out is the whole house; on update, left out keeps who it is for.",
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
@@ -1572,7 +1598,7 @@ Changes a calendar event; every field is replaced.
 
 **Returns** (`data`): `event`: the event as it is now.
 
-**Its errors:** `NOT_FOUND` (404), `NOT_CONFIGURED` (503), `UNAVAILABLE` (503). Every call can also get the endpoint's codes (above).
+**Its errors:** `INVALID_INPUT` (400), `NOT_FOUND` (404), `NOT_CONFIGURED` (503), `UNAVAILABLE` (503). Every call can also get the endpoint's codes (above).
 
 **Say back:** "Moved <title> to <day> <time>."
 
@@ -1584,7 +1610,7 @@ Deletes an event from the house calendar.
 | --- | --- |
 | Kind | `write` |
 | Risk | `destructive`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | any linked member |
+| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -2229,3 +2255,4 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `dismiss_weight`: An admin action: UI only (SPEC §12 decision 10).
 - `add_shopping_items`: The shopping list is brain's own (`baumy_list_items`); brain changes it directly, and Olympics calls brain to do the same.
 - `check_off_shopping_items`: The shopping list is brain's own; brain ticks items off directly.
+- `report_bug`: Files an issue on the public bug tracker from the in-app reporter (a shake, or Settings); a report is the person's own words in the app. Tell them to shake their phone or use Settings → Bugs and feature requests.

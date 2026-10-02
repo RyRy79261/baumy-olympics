@@ -4,7 +4,8 @@
 // Anthropic SDK into their graph.
 //
 // Which tier a route uses is a deliberate choice:
-//   - fast (Haiku 4.5): nothing yet; cheap tidying jobs.
+//   - fast (Haiku 4.5): cheap tidying jobs: the bug reporter's "Improve
+//     with AI" pass (feedback.ts, issue #133).
 //   - quality (Sonnet 5): the Baumy command (`/api/ai/command`). It picks
 //     tools and answers household questions: short turns, where latency and
 //     the per-command price matter more than the last bit of reasoning.

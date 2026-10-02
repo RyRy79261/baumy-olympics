@@ -92,6 +92,7 @@ export const ACTION_NAMES = [
   "create_reminder",
   "acknowledge_reminder",
   "dismiss_reminder",
+  "report_bug",
 ] as const;
 export type ActionName = (typeof ACTION_NAMES)[number];
 

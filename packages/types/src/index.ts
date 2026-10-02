@@ -86,6 +86,7 @@ export {
   EVENT_LOCATION_MAX,
   EVENT_MAX_DAYS,
   EVENT_TITLE_MAX,
+  EventForMember,
   EventKind,
   EventRange,
   LIST_EVENTS_MAX_DAYS,
@@ -131,6 +132,14 @@ export {
   ReminderRef,
   ReminderTitle,
 } from "./reminders";
+export {
+  DIAGNOSTICS_LIMITS,
+  REPORT_DESCRIPTION_MAX,
+  REPORT_KINDS,
+  ReportBugInput,
+  ReportDiagnostics,
+  ReportKind,
+} from "./feedback";
 export {
   LOGIN_CODE_MAX,
   LOGIN_CODE_MIN,

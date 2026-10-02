@@ -9,7 +9,9 @@ import { uiRequestCtx } from "@/lib/actions/ui";
 import { memberOrVisitorPage } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
 import { householdRoster } from "@/lib/members/household";
+import { FeedbackGate } from "@/components/feedback/feedback-gate";
 import { ScoreEmote } from "@/components/members/score-emote";
+import { reportAiAvailable } from "@/lib/feedback/ai";
 import { HubMenu, InboxBadge, NavLinks, type NavItem } from "./nav-links";
 
 // The hub's shell (SPEC §7) around every page for household members. The
@@ -120,6 +122,8 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
         </div>
       ) : null}
       {children}
+      {/* Shake to report, and the "Report this bug" offer (issue #133). */}
+      <FeedbackGate surface="ui" aiAvailable={reportAiAvailable()} />
     </AppShell>
   );
 }

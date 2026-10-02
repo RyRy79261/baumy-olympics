@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { AvatarButton, Button, KioskShell, KioskTopBar } from "@baumy/ui";
 import { BaumySheet } from "@/components/baumy/baumy-sheet";
+import { FeedbackGate } from "@/components/feedback/feedback-gate";
 import { IdleReset } from "@/components/kiosk/idle-reset";
 import { KeepScreenOn } from "@/components/kiosk/keep-screen-on";
 import { KioskFrame, KioskNav } from "@/components/kiosk/kiosk-frame";
@@ -16,6 +17,7 @@ import { householdMembers } from "@/lib/members/household";
 import { avatarImageView } from "@/lib/avatars/paths";
 import { runSweepAfterResponse } from "@/lib/background-work";
 import { now } from "@/lib/clock";
+import { reportAiAvailable } from "@/lib/feedback/ai";
 import { voiceConfigured } from "@/lib/integrations/groq";
 import {
   NIGHT_TEST_COOKIE,
@@ -124,6 +126,17 @@ export default async function KioskLayout({
       {/* Issue #66: the full-screen reminder and the raccoon screensaver
           (at night, and after 5 minutes untouched), over every page. */}
       <KioskOverlays serverNow={at.toISOString()} window={night} />
+      {/* Shake the iPad to report a bug (issue #133), as whoever is
+          acting; the first tap asks iOS for motion events. */}
+      <FeedbackGate
+        surface="kiosk"
+        aiAvailable={reportAiAvailable()}
+        blocked={
+          kiosk.memberId
+            ? null
+            : "Tap your avatar first: a report is filed as the member acting."
+        }
+      />
       <RegisterServiceWorker />
     </KioskShell>
   );

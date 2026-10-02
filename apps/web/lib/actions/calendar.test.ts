@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { eq } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { hashKioskPin } from "@baumy/auth/kiosk-pin";
 import type { Queryable, Tx } from "@baumy/db";
 import { actionRequests, auditEvents } from "@baumy/db/schema";
 import { useTestDb } from "@baumy/db/test-harness";
@@ -31,7 +32,8 @@ import { createRunner, defaultDeps, type RunnerDeps } from "./run";
 // The calendar actions through the real runner on PGlite (issue #19):
 // success, each error code, the surfaces and the permissions, the DST
 // acceptance test, and that no database transaction is open while Google is
-// called (the depth each calendar call sees must be 0).
+// called (the depth each calendar call sees must be 0). The writes are
+// `attested` (issue #134): the kiosk sends the acting member's PIN.
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -60,6 +62,19 @@ function watching(inner: CalendarClient): CalendarClient {
 }
 
 let run: ReturnType<typeof createRunner>;
+
+const PIN = "2580";
+let pinHash: string;
+beforeAll(async () => {
+  pinHash = await hashKioskPin(PIN);
+});
+
+/** A member with a kiosk PIN. */
+const seedPinned = () => seedMember(db(), { kioskPinHash: pinHash });
+
+/** The kiosk acting as `memberId`, with the PIN when given. */
+const atKiosk = (memberId: string, pin?: string) =>
+  ctxFor(kiosk(memberId), { source: "kiosk", ...(pin ? { pin } : {}) });
 
 beforeEach(() => {
   txDepth = 0;
@@ -125,12 +140,12 @@ async function requests() {
 
 describe("create_event", () => {
   it("puts 19:00 Berlin in January and in July at 19:00 (the DST test, from the kiosk)", async () => {
-    const me = await seedMember(db());
+    const me = await seedPinned();
     for (const [date, utc] of [
       ["2027-01-15", "2027-01-15T18:00:00.000Z"],
       ["2027-07-15", "2027-07-15T17:00:00.000Z"],
     ]) {
-      const ctx = ctxFor(kiosk(me), { source: "kiosk" });
+      const ctx = atKiosk(me, PIN);
       const data = ok(await run("create_event", dinner(date!), ctx)) as {
         event: {
           id: string;
@@ -260,8 +275,8 @@ describe("create_event", () => {
     expect(seen).toEqual([]);
   });
 
-  it("needs a member, and a kiosk with someone picked", async () => {
-    const me = await seedMember(db());
+  it("needs a member, and on the kiosk the acting member's PIN", async () => {
+    const me = await seedPinned();
     expect(
       await run(
         "create_event",
@@ -276,6 +291,14 @@ describe("create_event", () => {
         ctxFor(kiosk(), { source: "kiosk" }),
       ),
     ).toMatchObject({ code: "FORBIDDEN" });
+    // The kiosk asks for the PIN, and a wrong one is refused (SPEC §6.2).
+    expect(
+      await run("create_event", dinner("2027-01-15"), atKiosk(me)),
+    ).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
+    expect(
+      await run("create_event", dinner("2027-01-15"), atKiosk(me, "1111")),
+    ).toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
+    expect(seen).toEqual([]);
     // MCP needs the write scope.
     expect(
       await run(
@@ -284,6 +307,7 @@ describe("create_event", () => {
         ctxFor(mcp(me, ["baumy:read"]), { source: "mcp" }),
       ),
     ).toMatchObject({ code: "FORBIDDEN" });
+    // A session, MCP and brain are their own member: no PIN.
     for (const [actor, source] of [
       [mcp(me), "mcp"],
       [brain(me), "brain"],
@@ -299,6 +323,58 @@ describe("create_event", () => {
       ).toMatchObject({ ok: true });
     }
     expect(seen).toHaveLength(3);
+  });
+
+  it("is for one member of the house, or for the house (issue #134)", async () => {
+    const me = await seedMember(db());
+    const anna = await seedMember(db(), { displayName: "Anna" });
+    const forAnna = ok(
+      await run(
+        "create_event",
+        { ...dinner("2027-01-15"), forMemberId: anna },
+        ctxFor(sessionActor(me)),
+      ),
+    ) as { event: { id: string; forMember: string | null; addedBy: string } };
+    expect(forAnna.event).toMatchObject({ forMember: anna, addedBy: me });
+    const listed = ok(
+      await run(
+        "list_events",
+        { from: "2027-01-15" },
+        ctxFor(sessionActor(me)),
+      ),
+    ) as { events: { id: string; forMember: string | null }[] };
+    expect(listed.events).toEqual([
+      expect.objectContaining({ id: forAnna.event.id, forMember: anna }),
+    ]);
+    const house = ok(
+      await run(
+        "create_event",
+        dinner("2027-01-16"),
+        ctxFor(sessionActor(me), { requestId: "house-dinner-1" }),
+      ),
+    ) as { event: { forMember: string | null } };
+    expect(house.event.forMember).toBeNull();
+  });
+
+  it("refuses an event for someone who is not in the house, before Google", async () => {
+    const me = await seedMember(db());
+    const gone = await seedMember(db(), { deactivatedAt: FIXED_NOW });
+    for (const forMemberId of [gone, "6f1c2b9e-3a4d-4e5f-8a9b-0c1d2e3f4a5b"]) {
+      expect(
+        await run(
+          "create_event",
+          { ...dinner("2027-01-15"), forMemberId },
+          ctxFor(sessionActor(me), { requestId: `for-${forMemberId}` }),
+        ),
+      ).toMatchObject({
+        ok: false,
+        code: "INVALID_INPUT",
+        issues: [
+          { path: ["forMemberId"], message: "Pick someone in the house." },
+        ],
+      });
+    }
+    expect(seen).toEqual([]);
   });
 
   it("previews what it will add", async () => {
@@ -521,22 +597,55 @@ describe("update_event", () => {
       ),
     ).toBe('Change "Dinner" to Fri 15 Jan, 19:00–20:30');
   });
+
+  it("previews who it is for when that is said, and refuses a stranger before the card (issue #134)", async () => {
+    const anna = await seedMember(db(), { displayName: "Anna" });
+    const gone = await seedMember(db(), { deactivatedAt: FIXED_NOW });
+    const ctx = { ...ctxFor(sessionActor("m")), db: db() };
+    const change = { ...dinner("2027-01-15"), eventId: "abcde123" } as const;
+    const updatePreview = (forMemberId: string | null) =>
+      REGISTRY.update_event.preview!(ctx, {
+        ...change,
+        kind: "timed",
+        forMemberId,
+      });
+    expect(await updatePreview(anna)).toBe(
+      'Change "Dinner" to Fri 15 Jan, 19:00–20:30 and make it for Anna',
+    );
+    expect(await updatePreview(null)).toBe(
+      'Change "Dinner" to Fri 15 Jan, 19:00–20:30 and make it for everyone',
+    );
+    expect(await updatePreview(gone)).toEqual({
+      invalid: "Pick someone in the house.",
+    });
+    const addPreview = (forMemberId: string | null) =>
+      REGISTRY.create_event.preview!(ctx, {
+        ...dinner("2027-01-15"),
+        kind: "timed",
+        forMemberId,
+      });
+    expect(await addPreview(anna)).toBe(
+      'Add "Dinner" on Fri 15 Jan, 19:00–20:30 for Anna',
+    );
+    expect(await addPreview(null)).toBe(
+      'Add "Dinner" on Fri 15 Jan, 19:00–20:30',
+    );
+    expect(await addPreview("6f1c2b9e-3a4d-4e5f-8a9b-0c1d2e3f4a5b")).toEqual({
+      invalid: "Pick someone in the house.",
+    });
+  });
 });
 
 describe("delete_event", () => {
   it("deletes with no transaction open and audits the title", async () => {
-    const me = await seedMember(db());
-    const ctx = ctxFor(kiosk(me), { source: "kiosk" });
+    const me = await seedPinned();
+    const ctx = atKiosk(me, PIN);
     const { event } = ok(
       await run("create_event", dinner("2027-01-15"), ctx),
     ) as { event: { id: string } };
     seen = [];
     const data = ok(
-      await run(
-        "delete_event",
-        { eventId: event.id },
-        ctxFor(kiosk(me), { source: "kiosk" }),
-      ),
+      await run("delete_event", { eventId: event.id }, atKiosk(me, PIN)),
     );
     expect(data).toEqual({ eventId: event.id, title: "Dinner" });
     expect(seen).toEqual([
@@ -647,6 +756,86 @@ describe("delete_event", () => {
   });
 });
 
+describe("changing and deleting on the kiosk, and who it is for (issue #134)", () => {
+  it("asks the kiosk for the PIN before Google is called", async () => {
+    const me = await seedPinned();
+    const { event } = ok(
+      await run("create_event", dinner("2027-01-15"), atKiosk(me, PIN)),
+    ) as { event: { id: string } };
+    seen = [];
+    expect(
+      await run(
+        "update_event",
+        { ...dinner("2027-01-15"), eventId: event.id, title: "Moved" },
+        atKiosk(me),
+      ),
+    ).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
+    expect(
+      await run("delete_event", { eventId: event.id }, atKiosk(me, "1111")),
+    ).toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
+    expect(seen).toEqual([]);
+    expect(
+      ok(
+        await run(
+          "update_event",
+          { ...dinner("2027-01-15"), eventId: event.id, title: "Moved" },
+          atKiosk(me, PIN),
+        ),
+      ),
+    ).toMatchObject({ event: { title: "Moved" } });
+  });
+
+  it("keeps who it is for when left out, makes it the house's with null, and an undo puts it back", async () => {
+    const me = await seedMember(db());
+    const anna = await seedMember(db(), { displayName: "Anna" });
+    const bo = await seedMember(db(), { displayName: "Bo" });
+    const { event } = ok(
+      await run(
+        "create_event",
+        { ...dinner("2027-01-15"), forMemberId: anna },
+        ctxFor(sessionActor(me)),
+      ),
+    ) as { event: { id: string } };
+    const update = (
+      forMemberId: string | null | undefined,
+      requestId: string,
+    ) =>
+      run(
+        "update_event",
+        {
+          ...dinner("2027-01-15"),
+          eventId: event.id,
+          ...(forMemberId === undefined ? {} : { forMemberId }),
+        },
+        ctxFor(sessionActor(me), { requestId }),
+      );
+    expect(ok(await update(bo, "to-bo-0001"))).toMatchObject({
+      event: { forMember: bo, addedBy: me },
+    });
+    // Left out (an AI, MCP or brain change of the time only): still Bo's.
+    expect(ok(await update(undefined, "keep-bo-001"))).toMatchObject({
+      event: { forMember: bo, addedBy: me },
+    });
+    expect(ok(await update(null, "to-house-01"))).toMatchObject({
+      event: { forMember: null, addedBy: me },
+    });
+    // For Anna, then Bo, but that audit fails: the undo puts Anna back.
+    await update(anna, "to-anna-001");
+    failNextAudit();
+    expect(await update(bo, "to-bo-0002")).toMatchObject({ code: "INTERNAL" });
+    expect(await memoryCalendar().get(event.id)).toMatchObject({
+      ok: true,
+      data: { forMember: anna, member: me },
+    });
+    // Someone who left the house is refused on a change too.
+    const gone = await seedMember(db(), { deactivatedAt: FIXED_NOW });
+    expect(await update(gone, "to-gone-001")).toMatchObject({
+      code: "INVALID_INPUT",
+      issues: [{ path: ["forMemberId"] }],
+    });
+  });
+});
+
 describe("helpers", () => {
   it("turns each failure into a sentence with its code", () => {
     expect(
@@ -680,6 +869,7 @@ describe("helpers", () => {
       allDay: true,
       date: "2027-07-01",
       endDate: "2027-07-01",
+      forMember: undefined,
     });
   });
 });

@@ -72,35 +72,49 @@ export async function uiRequestCtx(
  * Run `name` with a form's fields, as the signed-in user, from the UI. Never
  * throws for a failure the user can act on; Next's redirects still propagate.
  */
+/** Turns a form's input into the action's, for what a form cannot say (a null). */
+export type FormInputMap = (
+  input: Record<string, unknown>,
+) => Record<string, unknown>;
+
 export async function actionForm<N extends ActionName>(
   name: N,
   form: FormData,
+  mapInput: FormInputMap = (i) => i,
 ): Promise<ActionResult<ActionOutput<N>>> {
-  const requestId = form.get("requestId");
-  return actionInput(
-    name,
-    formDataToInput(form),
-    typeof requestId === "string" && requestId !== "" ? requestId : undefined,
-  );
+  try {
+    const requestId = form.get("requestId");
+    const ctx = await uiRequestCtx(
+      typeof requestId === "string" && requestId !== "" ? requestId : undefined,
+    );
+    if (!ctx) return fail("UNAUTHENTICATED", "Sign in to do this.");
+    return await runAction(name, mapInput(formDataToInput(form)), ctx);
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error(`[actionForm:${name}]`, err);
+    return fail("INTERNAL", "Something went wrong. Please try again.");
+  }
 }
 
 /**
- * `actionForm` for an input that is not a form: a JSON value the client built
- * (a WebAuthn assertion, say). The action's Zod schema parses it as for any
- * other surface.
+ * `actionForm` for a client that sends structured input (nested objects a
+ * form cannot carry, such as the bug reporter's diagnostics). The input is
+ * still parsed by the action's own Zod schema.
  */
 export async function actionInput<N extends ActionName>(
   name: N,
   input: unknown,
-  requestId: string | undefined,
+  requestId: unknown,
 ): Promise<ActionResult<ActionOutput<N>>> {
   try {
-    const ctx = await uiRequestCtx(requestId);
+    const ctx = await uiRequestCtx(
+      typeof requestId === "string" && requestId !== "" ? requestId : undefined,
+    );
     if (!ctx) return fail("UNAUTHENTICATED", "Sign in to do this.");
     return await runAction(name, input, ctx);
   } catch (err) {
     unstable_rethrow(err);
-    console.error(`[actionForm:${name}]`, err);
+    console.error(`[actionInput:${name}]`, err);
     return fail("INTERNAL", "Something went wrong. Please try again.");
   }
 }
