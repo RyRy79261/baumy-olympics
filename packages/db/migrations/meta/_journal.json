@@ -155,6 +155,13 @@
       "when": 1790954312701,
       "tag": "0021_step_ups",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790966481850,
+      "tag": "0022_kiosk_idle_minutes",
+      "breakpoints": true
     }
   ]
 }
