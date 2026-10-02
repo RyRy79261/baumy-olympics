@@ -32,7 +32,11 @@ import { LiveClock } from "./live-clock";
 // zero and a link to its slice. Then the urgent bounties and today's agenda
 // in the wide column, the standings with the pot, the pinned notes (the
 // Board) and the shopping list in the narrow one. Each widget keeps its own
-// empty and unavailable state (lib/hub/load.ts).
+// empty and unavailable state (lib/hub/load.ts). The page's own card (Post a
+// reminder) stacks under the wide column's, so the short column leaves no
+// gap (issue #152); on one column it comes last. Below lg the columns are
+// `display: contents`, so every card is a cell of the one-column grid and
+// `order-last` can move the extra card past the narrow column's.
 
 const TILES: {
   key: "urgent" | "new" | "messages";
@@ -203,6 +207,7 @@ export function HubHome({
   memberColors,
   shopping,
   voice = false,
+  children,
 }: {
   hub: HubView;
   /** Member id → colour, for the agenda's bars. */
@@ -210,6 +215,8 @@ export function HubHome({
   shopping: ShoppingActions;
   /** Offer hold-to-speak in the Baumy sheet (a transcriber is configured). */
   voice?: boolean;
+  /** A card of the page's own, stacked last in the wide column. */
+  children?: ReactNode;
 }) {
   const { chores, standings, pot, notes, counts } = hub;
   return (
@@ -252,7 +259,7 @@ export function HubHome({
         data-testid="hub"
         className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
       >
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           <Widget
             id="widget-chores"
             data-testid="widget-chores"
@@ -296,9 +303,13 @@ export function HubHome({
               <EventsWidget events={events} memberColors={memberColors} />
             )}
           </Deferred>
+
+          {children ? (
+            <div className="order-last min-w-0 lg:order-none">{children}</div>
+          ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
           <Widget
             id="widget-leaderboard"
             data-testid="widget-leaderboard"

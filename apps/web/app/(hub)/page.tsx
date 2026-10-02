@@ -62,11 +62,10 @@ export default async function HubPage() {
         voice={voiceConfigured()}
         memberColors={rosterColours(people)}
         shopping={{ add: addShoppingAction, checkOff: checkOffShoppingAction }}
-      />
-      {/* Issue #66: a reminder for the kitchen screen. */}
-      <div className="mt-6 max-w-xl">
+      >
+        {/* Issue #66: a reminder for the kitchen screen. */}
         <PostReminderForm action={createReminderAction} />
-      </div>
+      </HubHome>
     </>
   );
 }
