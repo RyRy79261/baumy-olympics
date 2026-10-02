@@ -56,8 +56,7 @@ const HOUR = 60 * MINUTE;
 /**
  * Live (SPEC §4.1): not voided at `now`, using `effectiveStatus`. That
  * includes disputed rows until their challenge window times out (or for good,
- * if a photo was attached in time) and partner-mode pending rows until they
- * expire unconfirmed.
+ * if a photo was attached in time).
  */
 export function isLive(
   c: ValidatorCompletion,

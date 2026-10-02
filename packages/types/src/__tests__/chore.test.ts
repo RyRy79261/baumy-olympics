@@ -9,7 +9,6 @@ import {
   COMPLETION_NOTE_MAX,
   ChoreName,
   CompletionNote,
-  ConfirmMode,
   CooldownHours,
   DISPUTE_REASON_MAX,
   DisputeReason,
@@ -37,7 +36,6 @@ describe("ChoreName", () => {
 describe("modes", () => {
   it("accept only the pg enum values", () => {
     expect(ProofMode.options).toEqual(["none", "optional", "required"]);
-    expect(ConfirmMode.options).toEqual(["optimistic", "partner"]);
     expect(ProofMode.safeParse("always").success).toBe(false);
   });
 });

@@ -11,7 +11,6 @@ import {
   ChoreIcon,
   ChoreKind,
   ChoreName,
-  ConfirmMode,
   CooldownHours,
   EffortFactorPct,
   ProofMode,
@@ -33,7 +32,6 @@ const settings = {
   basePoints: BasePoints,
   cooldownHours: CooldownHours,
   proofMode: ProofMode,
-  confirmMode: ConfirmMode,
   effortFactorPct: EffortFactorPct,
 };
 
@@ -45,7 +43,6 @@ const input = z.discriminatedUnion(
       ...settings,
       kind: ChoreKind.default("maintenance"),
       proofMode: ProofMode.default("none"),
-      confirmMode: ConfirmMode.default("optimistic"),
       effortFactorPct: EffortFactorPct.default(100),
       // Without one, the chore's sprite is its name's slug (spriteFor).
       sprite: ChoreIcon.optional(),
@@ -102,7 +99,6 @@ export interface NewChore {
   basePoints: number;
   cooldownHours: number;
   proofMode: ProofMode;
-  confirmMode: ConfirmMode;
   effortFactorPct: number;
   /** Without one, the chore's sprite is its name's slug (spriteFor). */
   sprite?: string;
@@ -130,7 +126,6 @@ export async function createChoreBy(
     kind: change.kind,
     sprite: change.sprite ?? spriteFor(change.name),
     proofMode: change.proofMode,
-    confirmMode: change.confirmMode,
     effortFactorPct: change.effortFactorPct,
     basePoints: change.basePoints,
     cooldownMinutes: cooldownMinutesFromHours(change.cooldownHours),
@@ -154,7 +149,7 @@ export const manageChore = defineAction({
   name: "manage_chore",
   title: "Manage chores",
   description:
-    "Creates a household chore, edits its name, kind (consumable or maintenance), icon, points, cooldown, proof mode, confirm mode and effort factor, or archives or restores it.",
+    "Creates a household chore, edits its name, kind (consumable or maintenance), icon, points, cooldown, proof mode and effort factor, or archives or restores it.",
   consent: "Manage the household's chores",
   kind: "write",
   risk: "confirm",
@@ -219,7 +214,6 @@ export const manageChore = defineAction({
           ...(change.kind ? { kind: change.kind } : {}),
           ...(change.sprite ? { sprite: change.sprite } : {}),
           proofMode: change.proofMode,
-          confirmMode: change.confirmMode,
           effortFactorPct: change.effortFactorPct,
         },
         weight:

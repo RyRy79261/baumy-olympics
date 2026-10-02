@@ -30,6 +30,7 @@ On your phone or laptop, the menu has:
 - **Shopping**: the house shopping list, the same one the Telegram group uses.
 - **Scores**: who is winning this season, and the streaks.
 - **Pot**: the money the winner takes at the end of the year.
+- **Activity**: what happened in the house, newest first: chores logged, disputes, bounties added or edited, and points changes. You dispute a chore or veto a points change from here.
 - **Settings**: your name, colour and character, your personal PIN for the kitchen iPad, Telegram, and how you sign in.
 
 The kitchen iPad shows the same household on one big screen. See [the kitchen iPad](/kiosk).

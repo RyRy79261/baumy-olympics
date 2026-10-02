@@ -3,8 +3,8 @@ import { appliesLabel, changeLabel } from "@/lib/weights/view";
 import { VetoWeightButton } from "./weight-forms";
 
 // The weight changes waiting to apply (SPEC §4.4, §12 decision 5: one member
-// schedules, the other has until it applies to veto). Shown on /inbox to
-// every member and on /admin/weights.
+// schedules, the other has until it applies to veto). Shown on
+// /admin/weights; every member vetoes on /activity.
 
 export function ScheduledChanges({
   changes,

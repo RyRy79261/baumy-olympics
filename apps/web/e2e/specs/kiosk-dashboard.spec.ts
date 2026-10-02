@@ -195,6 +195,7 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
     "Bounties",
     "Calendar",
     "Board",
+    "Activity",
     "Shop",
     "Scores",
   ]);

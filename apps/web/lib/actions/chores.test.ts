@@ -145,7 +145,6 @@ describe("list_chores", () => {
       sprite: "trash",
       kind: "maintenance",
       proofMode: "none",
-      confirmMode: "optimistic",
       effortFactorPct: 100,
       archived: false,
       basePoints: TRASH.basePoints,
@@ -355,7 +354,6 @@ describe("log_completion", () => {
       loggedBy: ryan,
       status: "pending",
       occurredAt: FIXED_NOW.toISOString(),
-      counted: true,
       hasPhoto: false,
       totalPts: TRASH.basePoints,
       streakLen: 1,
@@ -491,7 +489,7 @@ describe("log_completion", () => {
     expect(seen).toEqual([20, 25, 30, 32, 24]);
   });
 
-  it("the preview names the streak it breaks, and says a partner-mode claim waits", async () => {
+  it("the preview names the streak it breaks, for yourself or a housemate", async () => {
     ok(
       await runAction(
         "log_completion",
@@ -503,12 +501,9 @@ describe("log_completion", () => {
     await expect(preview(ctx, { choreId: trash })).resolves.toBe(
       "Log Trash for Ryan: +24 (streak 1), breaking Partner's streak of 1 for +4",
     );
-    const { choreId: bathroom } = await seedChore(db(), {
-      ...SEED_CHORES.bathroom,
-      confirmMode: "partner",
-    });
+    const { choreId: bathroom } = await seedChore(db(), SEED_CHORES.bathroom);
     await expect(preview(ctx, { choreId: bathroom })).resolves.toBe(
-      `Log Bathroom for Ryan: +${SEED_CHORES.bathroom.basePoints} (streak 1), once someone else confirms it`,
+      `Log Bathroom for Ryan: +${SEED_CHORES.bathroom.basePoints} (streak 1)`,
     );
     await expect(
       preview(ctx, { choreId: bathroom, doneBy: partner }),
@@ -690,22 +685,22 @@ describe("log_completion", () => {
     ).resolves.toMatchObject({ ok: false, code: "IDEMPOTENCY_CONFLICT" });
   });
 
-  it("a partner-mode self-claim is stored but not counted yet", async () => {
-    const { choreId } = await seedChore(db(), {
-      ...SEED_CHORES.bathroom,
-      confirmMode: "partner",
-    });
-    await expect(
-      runAction("log_completion", { choreId }, ctxFor(sessionActor(ryan))),
-    ).resolves.toMatchObject({
+  it("a self-claim counts at once, while it is still pending (issue #150)", async () => {
+    const { choreId } = await seedChore(db(), SEED_CHORES.bathroom);
+    const r = await runAction(
+      "log_completion",
+      { choreId },
+      ctxFor(sessionActor(ryan)),
+    );
+    expect(r).toMatchObject({
       ok: true,
       data: {
         status: "pending",
-        counted: false,
-        totalPts: null,
-        streakLen: null,
+        totalPts: SEED_CHORES.bathroom.basePoints,
+        streakLen: 1,
       },
     });
+    expect(r.ok && "counted" in r.data).toBe(false);
   });
 
   it("keeps a note", async () => {
@@ -827,7 +822,6 @@ describe("manage_chore", () => {
       sprite: "windows",
       kind: "maintenance",
       proofMode: "none",
-      confirmMode: "optimistic",
       effortFactorPct: 100,
     });
     const [rule] = await t
@@ -875,7 +869,6 @@ describe("manage_chore", () => {
       basePoints: "30",
       cooldownHours: "1",
       proofMode: "optional",
-      confirmMode: "optimistic",
       effortFactorPct: "120",
     };
     const data = ok(
@@ -940,7 +933,6 @@ describe("manage_chore", () => {
       basePoints: String(TRASH.basePoints),
       cooldownHours: String(TRASH.cooldownMinutes / 60),
       proofMode: "none",
-      confirmMode: "optimistic",
       effortFactorPct: "100",
     };
     expect(await kindOf(trash)).toBe("maintenance");
@@ -989,7 +981,6 @@ describe("manage_chore", () => {
       basePoints: String(TRASH.basePoints),
       cooldownHours: String(TRASH.cooldownMinutes / 60),
       proofMode: "none",
-      confirmMode: "optimistic",
       effortFactorPct: "100",
     };
     const before = await spriteOf(trash);
@@ -1021,7 +1012,6 @@ describe("manage_chore", () => {
       choreId: trash,
       name: "Bins",
       proofMode: "none",
-      confirmMode: "optimistic",
       effortFactorPct: "100",
       weight: "keep",
     };

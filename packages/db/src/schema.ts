@@ -58,6 +58,13 @@ export const proofMode = pgEnum("proof_mode", ["none", "optional", "required"]);
  */
 export const choreKind = pgEnum("chore_kind", ["consumable", "maintenance"]);
 
+/**
+ * DEPRECATED (issue #150, SPEC §12 decision 29): there is no confirm mode any
+ * more. Nothing reads or writes `chores.confirm_mode`; migration 0024 set
+ * every chore to `optimistic`. It stays only so the deploy before this one,
+ * still live while this one builds, keeps working, and a rollback stays
+ * possible. A follow-up drops it once this has deployed.
+ */
 export const confirmMode = pgEnum("confirm_mode", ["optimistic", "partner"]);
 
 export const ruleSource = pgEnum("rule_source", [
@@ -107,6 +114,8 @@ export const completionStatus = pgEnum("completion_status", [
   "voided",
 ]);
 
+// `unconfirmed` is history only: a claim of the partner confirm mode that
+// nobody confirmed in 72h. The mode is gone (SPEC §12 decision 29).
 export const voidReason = pgEnum("void_reason", [
   "unconfirmed",
   "conceded",
@@ -766,6 +775,7 @@ export const chores = pgTable(
     sprite: text("sprite").notNull(),
     kind: choreKind("kind").notNull().default("maintenance"),
     proofMode: proofMode("proof_mode").notNull().default("none"),
+    /** DEPRECATED, unused (see `confirmMode`); dropped in a follow-up. */
     confirmMode: confirmMode("confirm_mode").notNull().default("optimistic"),
     effortFactorPct: integer("effort_factor_pct").notNull().default(100),
     archivedAt: timestamp("archived_at", { withTimezone: true }),

@@ -20,6 +20,7 @@ import {
   previewCompletion,
   type LogCompletionInput,
 } from "../completions";
+import { applyCompletionEvent } from "../confirmations";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import {
@@ -129,7 +130,6 @@ describe("seedStarterChores", () => {
         sprite: chores.sprite,
         kind: chores.kind,
         proofMode: chores.proofMode,
-        confirmMode: chores.confirmMode,
         effortFactorPct: chores.effortFactorPct,
         basePoints: choreRuleVersions.basePoints,
         cooldownMinutes: choreRuleVersions.cooldownMinutes,
@@ -147,7 +147,6 @@ describe("seedStarterChores", () => {
         sprite: starter.sprite,
         kind: "maintenance",
         proofMode: "none",
-        confirmMode: "optimistic",
         effortFactorPct: 100,
         basePoints: starter.basePoints,
         cooldownMinutes: starter.cooldownMinutes,
@@ -242,7 +241,6 @@ describe("listChoreBoard", () => {
       sprite: "trash",
       kind: "maintenance",
       proofMode: "none",
-      confirmMode: "optimistic",
       effortFactorPct: 100,
       archivedAt: null,
       createdAt: at(-24),
@@ -276,24 +274,35 @@ describe("listChoreBoard", () => {
 
   it("skips a completion that is no longer live when saying when it was last done", async () => {
     const ryan = await seedPlayer(db());
-    const { choreId } = await seedChore(db(), {
-      ...SEED_CHORES.trash,
-      confirmMode: "partner",
-    });
+    const partner = await seedPlayer(db(), "Partner");
+    const { choreId } = await seedChore(db(), SEED_CHORES.trash);
     await selfClaim(choreId, ryan, at(0));
-    // 72h later nobody confirmed it: it is voided (unconfirmed) at read time.
-    const [live] = await listChoreBoard(db(), {
+    const [counted] = await listChoreBoard(db(), {
       householdId: HOUSEHOLD_ID,
       now: at(1),
     });
+    // A self-claim counts at once (SPEC §12 decision 29).
+    expect(counted?.streak).toMatchObject({ holderId: ryan, length: 1 });
+    const [c] = await t.db().select().from(completions);
+    await applyCompletionEvent(db(), {
+      householdId: HOUSEHOLD_ID,
+      completionId: c!.id,
+      event: { type: "dispute", actor: partner, reason: "still full" },
+      now: at(1),
+    });
+    const [live] = await listChoreBoard(db(), {
+      householdId: HOUSEHOLD_ID,
+      now: at(2),
+    });
     expect(live?.lastDoneAt).toEqual(at(0));
+    // A disputed claim is not counted, so nobody holds a streak.
+    expect(live?.streak).toBeNull();
+    // Its window ended with no photo: voided (disputed) at read time.
     const [expired] = await listChoreBoard(db(), {
       householdId: HOUSEHOLD_ID,
-      now: at(73),
+      now: at(25),
     });
     expect(expired?.lastDoneAt).toBeNull();
-    // Partner-mode pending is not counted, so nobody holds a streak.
-    expect(expired?.streak).toBeNull();
   });
 
   it("leaves archived chores out unless asked, and a future-only weight as null", async () => {
@@ -347,7 +356,6 @@ describe("previewCompletion", () => {
       const logged = await selfClaim(choreId, who, at(h));
       expect(logged.ok).toBe(true);
       if (!logged.ok) return;
-      expect(preview.counted).toBe(true);
       expect(preview.choreName).toBe("Trash");
       const { completionId: _id, ...stored } = logged.score!;
       const { completionId: _pid, ...previewed } = preview.score;
@@ -364,35 +372,26 @@ describe("previewCompletion", () => {
     expect(totals.map((r) => r.total)).toEqual([20, 25, 30, 32, 25, 28]);
   });
 
-  it("says a partner-mode self-claim is not counted yet, and one logged for someone else is", async () => {
+  it("scores a self-claim and one logged for someone else alike", async () => {
     const ryan = await seedPlayer(db());
     const partner = await seedPlayer(db());
-    const { choreId } = await seedChore(db(), {
-      ...SEED_CHORES.bathroom,
-      confirmMode: "partner",
-    });
-    const self = await previewCompletion(db(), {
-      householdId: HOUSEHOLD_ID,
-      choreId,
-      doneBy: ryan,
-      loggedBy: ryan,
-      occurredAt: NOW,
-      now: NOW,
-    });
-    expect(self).toMatchObject({
-      ok: true,
-      counted: false,
-      score: { totalPts: SEED_CHORES.bathroom.basePoints, streakLen: 1 },
-    });
-    const vouched = await previewCompletion(db(), {
-      householdId: HOUSEHOLD_ID,
-      choreId,
-      doneBy: ryan,
-      loggedBy: partner,
-      occurredAt: NOW,
-      now: NOW,
-    });
-    expect(vouched).toMatchObject({ ok: true, counted: true });
+    const { choreId } = await seedChore(db(), SEED_CHORES.bathroom);
+    const score = { totalPts: SEED_CHORES.bathroom.basePoints, streakLen: 1 };
+    for (const loggedBy of [ryan, partner]) {
+      const preview = await previewCompletion(db(), {
+        householdId: HOUSEHOLD_ID,
+        choreId,
+        doneBy: ryan,
+        loggedBy,
+        occurredAt: NOW,
+        now: NOW,
+      });
+      expect(preview).toEqual({
+        ok: true,
+        choreName: "Bathroom",
+        score: expect.objectContaining(score),
+      });
+    }
   });
 
   it("returns the validator's refusal, and the lookups' own", async () => {
@@ -445,7 +444,6 @@ describe("chore admin writes", () => {
         sprite: "windows",
         kind: "consumable",
         proofMode: "optional",
-        confirmMode: "partner",
         effortFactorPct: 150,
         basePoints: 40,
         cooldownMinutes: 3 * 24 * 60,
@@ -458,7 +456,6 @@ describe("chore admin writes", () => {
       sprite: "windows",
       kind: "consumable",
       proofMode: "optional",
-      confirmMode: "partner",
       effortFactorPct: 150,
       archivedAt: null,
     });
@@ -552,36 +549,6 @@ describe("chore admin writes", () => {
       .from(choreRuleVersions)
       .where(eq(choreRuleVersions.effectiveFrom, at(2)));
     expect(after).toEqual([{ basePoints: 35 }]);
-  });
-
-  it("a new confirm mode re-scores every season: unconfirmed self-claims stop counting under partner mode", async () => {
-    const admin = await seedPlayer(db(), "Admin");
-    const ryan = await seedPlayer(db());
-    const { choreId } = await seedChore(db(), SEED_CHORES.dishes);
-    // One in 2025 and one now, both self-claims still stored as pending.
-    await selfClaim(choreId, ryan, new Date("2025-06-01T10:00:00Z"));
-    await selfClaim(choreId, ryan, NOW);
-    const scored = async () =>
-      (await t.db().select().from(completionScores)).length;
-    expect(await scored()).toBe(2);
-
-    const switchTo = (confirmMode: "partner" | "optimistic", hours: number) =>
-      inTx(async (tx) =>
-        updateChore(tx, {
-          householdId: HOUSEHOLD_ID,
-          chore: (await lockChoreRow(tx, HOUSEHOLD_ID, choreId))!,
-          settings: { confirmMode },
-          createdBy: admin,
-          now: at(hours),
-        }),
-      );
-    await expect(switchTo("partner", 1)).resolves.toMatchObject({
-      weightChanged: false,
-      chore: { confirmMode: "partner" },
-    });
-    expect(await scored()).toBe(0);
-    await switchTo("optimistic", 2);
-    expect(await scored()).toBe(2);
   });
 
   it("gives a chore whose only weight is in the future one from now", async () => {

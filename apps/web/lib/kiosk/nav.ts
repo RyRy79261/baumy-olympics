@@ -15,6 +15,8 @@ export const KIOSK_NAV: readonly {
   { href: "/kiosk/chores", label: "Bounties", glyph: "board" },
   { href: "/kiosk/calendar", label: "Calendar", glyph: "calendar" },
   { href: "/kiosk/notes", label: "Board", glyph: "msg" },
+  // What happened in the house (issue #150).
+  { href: "/kiosk/activity", label: "Activity", glyph: "hourglass" },
   { href: "/kiosk/shopping", label: "Shop", glyph: "shop" },
   { href: "/kiosk/scores", label: "Scores", glyph: "trophy" },
 ];

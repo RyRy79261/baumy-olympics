@@ -169,6 +169,13 @@
       "when": 1790969375723,
       "tag": "0023_kiosk_idle_minutes",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790972123919,
+      "tag": "0024_settle_partner_claims",
+      "breakpoints": true
     }
   ]
 }

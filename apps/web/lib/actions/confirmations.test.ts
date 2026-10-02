@@ -21,12 +21,14 @@ import type { Actor } from "@/lib/auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import { claimEventFailure } from "./confirmations";
 import type { RequestCtx } from "./define";
+import type { ActivityChoreView, GetActivityData } from "./get-activity";
 import { REGISTRY, runAction } from "./registry";
 
 // The honesty layer's actions (issue #15, SPEC §4.3) through the real
 // runAction on PGlite: each event's success and error codes, the surfaces,
 // the kiosk PIN, the admin-only ruling, photos that only the upload route can
-// name, and "Needs your OK". E9 and E11 are here end to end.
+// name, and what the activity log offers. There is no confirming (issue
+// #150). E9 and E11 are here end to end.
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -98,6 +100,14 @@ async function score(id: string) {
   return row?.totalPts ?? null;
 }
 
+/** The claim's entry in the activity log, as `ctx`'s member reads it. */
+async function entryOf(id: string, ctx: RequestCtx) {
+  const data: GetActivityData = ok(await runAction("get_activity", {}, ctx));
+  return data.entries.find(
+    (e): e is ActivityChoreView => e.kind === "chore" && e.completionId === id,
+  )!;
+}
+
 async function audits(action: string) {
   const [row] = await t
     .db()
@@ -138,24 +148,19 @@ describe("E9: dispute, photo, withdraw, finalize", () => {
       `/api/blob?pathname=${encodeURIComponent(pathname)}`,
     );
 
-    // Past the window, the photo keeps it disputed; "Needs your OK" shows it.
-    const inbox = ok(
-      await runAction(
-        "get_pending_confirmations",
-        {},
-        me(partner, { now: at(30) }),
-      ),
-    );
-    expect(inbox.claims).toHaveLength(1);
-    expect(inbox.claims[0]).toMatchObject({
+    // Past the window, the photo keeps it disputed; the activity log says so.
+    const entry = await entryOf(id, me(partner, { now: at(30) }));
+    expect(entry).toMatchObject({
       completionId: id,
       status: "disputed",
       photoUrl: photo.photoUrl,
-      dispute: { raisedByName: "Partner", reason: "The tub is still grey" },
-      can: { withdraw: true, confirm: false, concede: false },
-      needsYou: true,
+      dispute: {
+        raisedBy: { memberId: partner, displayName: "Partner" },
+        reason: "The tub is still grey",
+      },
+      can: { withdraw: true, dispute: false, concede: false },
     });
-    expect(JSON.stringify(inbox)).not.toMatch(/blob\.vercel-storage|https?:/);
+    expect(JSON.stringify(entry)).not.toMatch(/blob\.vercel-storage|https?:/);
 
     // Withdrawn at 30h: pending again, finalizing an hour later, re-scored.
     const back = ok(
@@ -172,21 +177,10 @@ describe("E9: dispute, photo, withdraw, finalize", () => {
     });
     expect(await score(id)).toBe(BATHROOM.basePoints);
 
-    const settled = ok(
-      await runAction(
-        "get_pending_confirmations",
-        {},
-        me(ryan, { now: at(31) }),
-      ),
-    );
-    expect(settled.claims).toEqual([]);
-    expect(settled.recent).toEqual([
-      expect.objectContaining({
-        completionId: id,
-        status: "finalized",
-        totalPts: BATHROOM.basePoints,
-      }),
-    ]);
+    expect(await entryOf(id, me(ryan, { now: at(31) }))).toMatchObject({
+      status: "finalized",
+      totalPts: BATHROOM.basePoints,
+    });
   });
 });
 
@@ -213,64 +207,32 @@ describe("E11: a disputed claim still blocks the cooldown", () => {
   });
 });
 
-describe("confirm_completion", () => {
-  it("confirms a partner-mode claim, which scores it", async () => {
-    const { choreId } = await seedChore(db(), {
-      ...TRASH,
-      confirmMode: "partner",
-    });
-    const id = await selfClaim(choreId, ryan);
-    expect(await score(id)).toBeNull();
-    const data = ok(
-      await runAction("confirm_completion", { completionId: id }, me(partner)),
-    );
-    expect(data).toEqual({
-      completionId: id,
-      choreName: TRASH.name,
-      status: "confirmed",
-      disputeResolution: null,
-      finalizesAt: null,
-    });
-    expect(await stored(id)).toMatchObject({ verifiedBy: partner });
-    expect(await score(id)).toBe(TRASH.basePoints);
-    expect(await audits("confirm_completion")).toBe(1);
-  });
-
-  it("refuses the doer, a settled claim and an unknown id, storing nothing", async () => {
+describe("no confirming (issue #150)", () => {
+  it("has no confirm_completion on any surface: a self-claim counts at once", async () => {
+    expect(REGISTRY).toHaveProperty("dispute_completion");
+    expect(REGISTRY).not.toHaveProperty("confirm_completion");
     const { choreId } = await seedChore(db(), TRASH);
     const id = await selfClaim(choreId, ryan);
-    await expect(
-      runAction("confirm_completion", { completionId: id }, me(ryan)),
-    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
-    await expect(
-      runAction(
-        "confirm_completion",
-        { completionId: id },
-        me(partner, { now: at(24) }),
-      ),
-    ).resolves.toMatchObject({ ok: false, code: "INVALID_STATE" });
-    await expect(
-      runAction(
-        "confirm_completion",
-        { completionId: "00000000-0000-4000-8000-00000000beef" },
-        me(partner),
-      ),
-    ).resolves.toMatchObject({ ok: false, code: "NOT_FOUND" });
-    expect(await audits("confirm_completion")).toBe(0);
-    expect((await stored(id)).status).toBe("pending");
-  });
-
-  it("on the kiosk confirms as the acting member with no PIN, even one who never set a PIN (issue #145)", async () => {
-    const { choreId } = await seedChore(db(), TRASH);
-    const id = await selfClaim(choreId, ryan);
-    // Admin has no PIN at all.
-    const ctx = ctxFor(kiosk(admin), { source: "kiosk" });
-    ok(await runAction("confirm_completion", { completionId: id }, ctx));
     expect(await stored(id)).toMatchObject({
-      status: "confirmed",
-      verifiedBy: admin,
+      status: "pending",
+      finalizesAt: at(24),
     });
-    expect(await audits("confirm_completion")).toBe(1);
+    expect(await score(id)).toBe(TRASH.basePoints);
+  });
+});
+
+describe("the kiosk and the other surfaces", () => {
+  it("on the kiosk undoes as the acting member with no PIN, even one who never set a PIN (issue #145)", async () => {
+    const { choreId } = await seedChore(db(), TRASH);
+    // Admin has no PIN at all.
+    const id = await selfClaim(choreId, admin);
+    const ctx = ctxFor(kiosk(admin), { source: "kiosk" });
+    ok(await runAction("undo_completion", { completionId: id }, ctx));
+    expect(await stored(id)).toMatchObject({
+      status: "voided",
+      voidReason: "undone",
+    });
+    expect(await audits("undo_completion")).toBe(1);
   });
 
   it("on the kiosk needs the disputing member's PIN in the request (issue #145)", async () => {
@@ -308,7 +270,7 @@ describe("confirm_completion", () => {
     expect(await audits("dispute_completion")).toBe(0);
   });
 
-  it("is offered on every surface, and MCP needs the write scope", async () => {
+  it("disputes on every other surface, and MCP needs the write scope", async () => {
     const { choreId } = await seedChore(db(), { ...TRASH, cooldownMinutes: 0 });
     const cases: [Actor, RequestCtx["source"]][] = [
       [sessionActor(partner), "ai"],
@@ -322,17 +284,17 @@ describe("confirm_completion", () => {
       const id = await selfClaim(choreId, ryan, at(i));
       await expect(
         runAction(
-          "confirm_completion",
-          { completionId: id },
+          "dispute_completion",
+          { completionId: id, reason: "not done" },
           ctxFor(actor, { source, now: at(i) }),
         ),
-      ).resolves.toMatchObject({ ok: true, data: { status: "confirmed" } });
+      ).resolves.toMatchObject({ ok: true, data: { status: "disputed" } });
     }
     const id = await selfClaim(choreId, ryan, at(5));
     await expect(
       runAction(
-        "confirm_completion",
-        { completionId: id },
+        "dispute_completion",
+        { completionId: id, reason: "not done" },
         ctxFor(
           { kind: "mcp", memberId: partner, scopes: ["baumy:read"] },
           { source: "mcp", now: at(5) },
@@ -343,7 +305,7 @@ describe("confirm_completion", () => {
 });
 
 describe("dispute_completion", () => {
-  it("needs a reason, is refused to the doer, and closes after 24h", async () => {
+  it("needs a reason, is refused to the doer and to unknown claims, and closes after 24h", async () => {
     const { choreId } = await seedChore(db(), TRASH);
     const id = await selfClaim(choreId, ryan);
     const blank = await runAction(
@@ -363,23 +325,27 @@ describe("dispute_completion", () => {
         me(ryan),
       ),
     ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
-    // A partner-mode claim has no finalize time: its window is logged + 24h.
-    const { choreId: p } = await seedChore(db(), {
-      ...SEED_CHORES.dishes,
-      confirmMode: "partner",
-    });
-    const late = await selfClaim(p, ryan);
     await expect(
       runAction(
         "dispute_completion",
-        { completionId: late, reason: "late" },
-        me(partner, { now: at(25) }),
+        { completionId: "00000000-0000-4000-8000-00000000beef", reason: "x" },
+        me(partner),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "NOT_FOUND" });
+    // 24h after logging the claim has settled: too late to dispute.
+    await expect(
+      runAction(
+        "dispute_completion",
+        { completionId: id, reason: "late" },
+        me(partner, { now: at(24) }),
       ),
     ).resolves.toMatchObject({
       ok: false,
-      code: "WINDOW_CLOSED",
-      message: "The 24-hour window to dispute this claim has closed.",
+      code: "INVALID_STATE",
+      message:
+        "This claim can't be disputed any more: it is settled or already disputed.",
     });
+    expect(await audits("dispute_completion")).toBe(0);
     const [n] = await t.db().select({ n: count() }).from(disputes);
     expect(n!.n).toBe(0);
   });
@@ -476,33 +442,15 @@ describe("withdraw, concede and a photo-backed dispute", () => {
         runAction(name, { completionId: id }, me(partner, { now: at(3) })),
       ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
     }
-    const later = ok(
-      await runAction(
-        "get_pending_confirmations",
-        {},
-        me(partner, { now: at(48) }),
-      ),
+    expect((await entryOf(id, me(partner, { now: at(48) }))).status).toBe(
+      "disputed",
     );
-    expect(later.claims.map((c) => [c.completionId, c.status])).toEqual([
-      [id, "disputed"],
-    ]);
     // An unphotographed one, by contrast, is void once the window ends.
     const bare = await disputedClaim(false);
-    const after = ok(
-      await runAction(
-        "get_pending_confirmations",
-        {},
-        me(ryan, { now: at(48) }),
-      ),
-    );
-    expect(after.claims.map((c) => c.completionId)).not.toContain(bare);
-    expect(after.recent).toContainEqual(
-      expect.objectContaining({
-        completionId: bare,
-        status: "voided",
-        voidReason: "disputed",
-      }),
-    );
+    expect(await entryOf(bare, me(ryan, { now: at(48) }))).toMatchObject({
+      status: "voided",
+      voidReason: "disputed",
+    });
   });
 
   it("withdraw is for the disputer; concede is for the doer and voids it", async () => {
@@ -582,16 +530,7 @@ describe("resolve_dispute", () => {
       message: "Admins can't rule on their own claim. Ask another admin.",
     });
 
-    const inbox = ok(
-      await runAction(
-        "get_pending_confirmations",
-        {},
-        adminCtx({ now: at(2) }),
-      ),
-    );
-    const view = inbox.claims.find((c) => c.completionId === a)!;
-    expect(view.can.resolve).toBe(true);
-    expect(view.needsYou).toBe(true);
+    expect((await entryOf(a, adminCtx({ now: at(2) }))).can.resolve).toBe(true);
 
     const upheld = ok(
       await runAction(
@@ -789,61 +728,6 @@ describe("log_completion with proof", () => {
   });
 });
 
-describe("get_pending_confirmations", () => {
-  it("shows each member what they may do, and is empty when nothing is open", async () => {
-    await expect(
-      runAction("get_pending_confirmations", {}, me(ryan)),
-    ).resolves.toEqual({
-      ok: true,
-      data: { claims: [], needsYouCount: 0, recent: [] },
-    });
-    const { choreId } = await seedChore(db(), TRASH);
-    const id = await selfClaim(choreId, ryan);
-    const mine = ok(
-      await runAction(
-        "get_pending_confirmations",
-        {},
-        me(ryan, { now: at(0.1) }),
-      ),
-    );
-    expect(mine.needsYouCount).toBe(0);
-    expect(mine.claims[0]).toMatchObject({
-      completionId: id,
-      doneByName: "Ryan",
-      status: "pending",
-      finalizesAt: at(24).toISOString(),
-      windowEndsAt: at(24).toISOString(),
-      photoUrl: null,
-      totalPts: TRASH.basePoints,
-      can: { undo: true, attachPhoto: true, confirm: false, dispute: false },
-      needsYou: false,
-    });
-    const theirs = ok(
-      await runAction(
-        "get_pending_confirmations",
-        {},
-        me(partner, { now: at(0.1) }),
-      ),
-    );
-    expect(theirs.needsYouCount).toBe(1);
-    expect(theirs.claims[0]!.can).toMatchObject({
-      confirm: true,
-      dispute: true,
-      undo: false,
-      resolve: false,
-    });
-    // On the kiosk, even an admin gets no ruling button.
-    const onKiosk = ok(
-      await runAction(
-        "get_pending_confirmations",
-        {},
-        ctxFor(kiosk(admin), { source: "kiosk", now: at(0.1) }),
-      ),
-    );
-    expect(onKiosk.claims[0]!.can.resolve).toBe(false);
-  });
-});
-
 describe("previews", () => {
   it("say what the event does to whose claim", async () => {
     const { choreId } = await seedChore(db(), TRASH);
@@ -853,9 +737,9 @@ describe("previews", () => {
       const def = REGISTRY[name];
       return def.preview!(ctx, def.input.parse(input) as never);
     };
-    await expect(
-      line("confirm_completion", { completionId: id }),
-    ).resolves.toBe("Confirm Ryan's Trash");
+    await expect(line("undo_completion", { completionId: id })).resolves.toBe(
+      "Undo Ryan's Trash",
+    );
     await expect(
       line("dispute_completion", { completionId: id, reason: "no" }),
     ).resolves.toBe(`Dispute Ryan's Trash: "no"`);
@@ -880,7 +764,7 @@ describe("previews", () => {
 
 describe("claimEventFailure", () => {
   it("has a sentence for a lost race and a blank reason", () => {
-    expect(claimEventFailure("confirm", { ok: false, code: "STALE" })).toEqual({
+    expect(claimEventFailure("undo", { ok: false, code: "STALE" })).toEqual({
       ok: false,
       code: "INVALID_STATE",
       message: "Someone else just changed this claim. Refresh and look again.",
@@ -891,5 +775,9 @@ describe("claimEventFailure", () => {
     expect(
       claimEventFailure("undo", { ok: false, code: "WINDOW_CLOSED" }).message,
     ).toContain("10 minutes");
+    expect(
+      claimEventFailure("dispute", { ok: false, code: "WINDOW_CLOSED" })
+        .message,
+    ).toBe("The 24-hour window to dispute this claim has closed.");
   });
 });

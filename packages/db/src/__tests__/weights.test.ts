@@ -211,7 +211,7 @@ describe("computeSuggestions", () => {
     const nextWeek = new Date(NOW.getTime() + 7 * DAY);
     const m = await measureChore(
       db(),
-      { id: choreId, confirmMode: "optimistic", effortFactorPct: 100 },
+      { id: choreId, effortFactorPct: 100 },
       nextWeek,
     );
     expect(m?.verdict).toMatchObject({ kind: "no_change", rawPoints: 20 });
@@ -235,7 +235,7 @@ describe("computeSuggestions", () => {
     );
     const m = await measureChore(
       db(),
-      { id: choreId, confirmMode: "optimistic", effortFactorPct: 100 },
+      { id: choreId, effortFactorPct: 100 },
       NOW,
     );
     expect(m?.verdict).toEqual({ kind: "insufficient_data", sampleSize: 5 });
@@ -254,7 +254,7 @@ describe("computeSuggestions", () => {
     const ids = await logSeries(choreId, [ryan], Array(7).fill(4));
     const all = await measureChore(
       db(),
-      { id: choreId, confirmMode: "optimistic", effortFactorPct: 100 },
+      { id: choreId, effortFactorPct: 100 },
       NOW,
     );
     expect(all?.measurement.intervals).toHaveLength(7);
@@ -282,7 +282,7 @@ describe("computeSuggestions", () => {
     }
     const after = await measureChore(
       db(),
-      { id: choreId, confirmMode: "optimistic", effortFactorPct: 100 },
+      { id: choreId, effortFactorPct: 100 },
       NOW,
     );
     expect(after?.measurement.rawIntervals).toEqual([
@@ -312,14 +312,14 @@ describe("computeSuggestions", () => {
     expect(logged.ok).toBe(true);
     const withPending = await measureChore(
       db(),
-      { id: choreId, confirmMode: "optimistic", effortFactorPct: 100 },
+      { id: choreId, effortFactorPct: 100 },
       new Date(fresh.getTime() + HOUR),
     );
     expect(withPending?.measurement.rawIntervals).toHaveLength(6);
     // Once it finalizes, it counts.
     const later = await measureChore(
       db(),
-      { id: choreId, confirmMode: "optimistic", effortFactorPct: 100 },
+      { id: choreId, effortFactorPct: 100 },
       new Date(fresh.getTime() + 25 * HOUR),
     );
     expect(later?.measurement.rawIntervals).toHaveLength(7);
@@ -904,7 +904,7 @@ describe("an admin's points change (issue #115)", () => {
     await adminChange(choreId, ryan, { now: new Date(NOW.getTime() + HOUR) });
     const m = await measureChore(
       db(),
-      { id: choreId, confirmMode: "optimistic", effortFactorPct: 100 },
+      { id: choreId, effortFactorPct: 100 },
       new Date(NOW.getTime() + 2 * HOUR),
     );
     expect(m?.referenceMinutes).toBe(median);

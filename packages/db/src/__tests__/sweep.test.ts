@@ -8,7 +8,8 @@ import {
 import { asc, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { logCompletion } from "../completions";
-import { applyCompletionEvent, listOpenClaims } from "../confirmations";
+import { listActivity } from "../activity";
+import { applyCompletionEvent } from "../confirmations";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import { completionScores, completions, disputes, seasons } from "../schema";
@@ -39,7 +40,8 @@ const tx = <T>(fn: (q: Queryable) => Promise<T>) =>
 const HOUR = 60 * 60_000;
 const DAY = 24 * HOUR;
 const WINDOW = RULESET_V1.challengeWindowH * HOUR;
-const EXPIRY = RULESET_V1.partnerConfirmExpiryH * HOUR;
+/** Well after every challenge window of `arrange`. */
+const LATER = 3 * DAY;
 const BACKDATE = RULESET_V1.maxBackdateH * HOUR;
 const RETAIN = PHOTO_RETENTION_DAYS * DAY;
 /** Mon 28 Dec 2026, 08:00 Berlin: the season's last week. */
@@ -92,10 +94,9 @@ const dispute = (actor: string): VerificationEvent => ({
 });
 
 /**
- * Four claims on Mon 28 Dec: an optimistic one (finalizes after 24h), a
- * partner-mode one nobody confirms (voided after 72h), a disputed one with no
- * photo (times out after 24h) and a disputed one with a photo in time (open
- * until someone rules).
+ * Three claims on Mon 28 Dec: an undisputed one (finalizes after 24h), a
+ * disputed one with no photo (times out after 24h) and a disputed one with a
+ * photo in time (open until someone rules).
  */
 async function arrange() {
   const ryan = await seedPlayer(db(), "Ryan");
@@ -103,14 +104,7 @@ async function arrange() {
   const trash = await seedChore(db(), SEED_CHORES.trash);
   const dishes = await seedChore(db(), SEED_CHORES.dishes);
   const bathroom = await seedChore(db(), SEED_CHORES.bathroom);
-  const mop = await seedChore(db(), {
-    name: "Mop",
-    basePoints: 37,
-    cooldownMinutes: 0,
-    confirmMode: "partner",
-  });
   const optimistic = await claim(trash.choreId, ryan, T0);
-  const unconfirmed = await claim(mop.choreId, partner, T0);
   const noPhoto = await claim(dishes.choreId, ryan, T0);
   await event(noPhoto.id, dispute(partner), at(HOUR));
   const withPhoto = await claim(
@@ -120,7 +114,7 @@ async function arrange() {
     "completions/x/proof.webp",
   );
   await event(withPhoto.id, dispute(ryan), at(HOUR));
-  return { ryan, partner, optimistic, unconfirmed, noPhoto, withPhoto };
+  return { ryan, partner, optimistic, noPhoto, withPhoto };
 }
 
 async function statuses() {
@@ -148,27 +142,25 @@ describe("settleDueCompletions", () => {
     // Nothing is due yet.
     expect(await tx((q) => settleDueCompletions(q, at(WINDOW - 1)))).toEqual({
       finalized: 0,
-      expired: 0,
       timedOut: 0,
     });
 
-    const now = at(EXPIRY);
+    const now = at(LATER);
     const before = await scores();
-    const openBefore = await listOpenClaims(db(), {
-      householdId: HOUSEHOLD_ID,
-      now,
-    });
+    const activity = () =>
+      listActivity(db(), {
+        householdId: HOUSEHOLD_ID,
+        since: at(-DAY),
+        now,
+        limit: 50,
+      });
+    const activityBefore = await activity();
     expect(await tx((q) => settleDueCompletions(q, now))).toEqual({
       finalized: 1,
-      expired: 1,
       timedOut: 1,
     });
     const s = await statuses();
     expect(s.get(c.optimistic.id)?.status).toBe("finalized");
-    expect(s.get(c.unconfirmed.id)).toMatchObject({
-      status: "voided",
-      voidReason: "unconfirmed",
-    });
     expect(s.get(c.noPhoto.id)).toMatchObject({
       status: "voided",
       voidReason: "disputed",
@@ -187,14 +179,13 @@ describe("settleDueCompletions", () => {
 
     // Reads were already right before the step ran.
     expect(await scores()).toEqual(before);
-    expect(
-      await listOpenClaims(db(), { householdId: HOUSEHOLD_ID, now }),
-    ).toEqual(openBefore.map((o) => ({ ...o, row: expect.anything() })));
+    const strip = (entries: Awaited<ReturnType<typeof activity>>) =>
+      entries.map((e) => (e.kind === "chore" ? { ...e, row: null } : e));
+    expect(strip(await activity())).toEqual(strip(activityBefore));
 
     // A second run finds nothing to do.
     expect(await tx((q) => settleDueCompletions(q, now))).toEqual({
       finalized: 0,
-      expired: 0,
       timedOut: 0,
     });
     expect(await statuses()).toEqual(s);
@@ -202,13 +193,12 @@ describe("settleDueCompletions", () => {
 
   it("does the work once when two runs overlap", async () => {
     await arrange();
-    const now = at(EXPIRY);
+    const now = at(LATER);
     const [a, b] = await Promise.all([
       tx((q) => settleDueCompletions(q, now)),
       tx((q) => settleDueCompletions(q, now)),
     ]);
     expect(a.finalized + b.finalized).toBe(1);
-    expect(a.expired + b.expired).toBe(1);
     expect(a.timedOut + b.timedOut).toBe(1);
   });
 
@@ -217,9 +207,9 @@ describe("settleDueCompletions", () => {
     const other = "00000000-0000-4000-8000-0000000000ff";
     expect(
       await tx((q) =>
-        settleDueCompletions(q, at(EXPIRY), { householdId: other }),
+        settleDueCompletions(q, at(LATER), { householdId: other }),
       ),
-    ).toEqual({ finalized: 0, expired: 0, timedOut: 0 });
+    ).toEqual({ finalized: 0, timedOut: 0 });
   });
 });
 

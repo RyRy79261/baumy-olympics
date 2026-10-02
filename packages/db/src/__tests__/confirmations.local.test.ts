@@ -107,13 +107,19 @@ function send(
 }
 
 describe("applyCompletionEvent under concurrent requests", () => {
-  it("lets one of a racing confirm and dispute land; the other finds it moved on", async () => {
-    const [ryan, sam, alex] = [await player(), await player(), await player()];
+  it("lets one of a racing withdraw and concede land; the other finds it moved on", async () => {
+    const [ryan, sam] = [await player(), await player()];
     for (let round = 0; round < 3; round += 1) {
       const id = await claimBy(ryan);
+      const disputed = await send(id, {
+        type: "dispute",
+        actor: sam,
+        reason: "not done",
+      });
+      expect(disputed.ok).toBe(true);
       const results = await Promise.all([
-        send(id, { type: "confirm", actor: sam }),
-        send(id, { type: "dispute", actor: alex, reason: "not done" }),
+        send(id, { type: "withdraw", actor: sam }),
+        send(id, { type: "concede", actor: ryan }),
       ]);
       expect(results.filter((r) => r.ok)).toHaveLength(1);
       expect(results.filter((r) => !r.ok)).toEqual([
@@ -123,12 +129,14 @@ describe("applyCompletionEvent under concurrent requests", () => {
         .select({ status: schema.completions.status })
         .from(schema.completions)
         .where(eq(schema.completions.id, id));
-      const disputes = await db()
+      const [dispute] = await db()
         .select()
         .from(schema.disputes)
         .where(eq(schema.disputes.completionId, id));
-      // A dispute row exists exactly when the dispute won.
-      expect(disputes).toHaveLength(row!.status === "disputed" ? 1 : 0);
+      // The dispute closed the way the winner closed it.
+      expect(dispute!.resolution).toBe(
+        row!.status === "pending" ? "withdrawn" : "conceded",
+      );
     }
   });
 

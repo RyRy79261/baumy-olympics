@@ -140,7 +140,7 @@ export function ChoreGrid({
   }, [broken]);
 
   const open = chores.find((c) => c.id === openId) ?? null;
-  const preview = open ? previewFor(open, doneBy, actorId) : null;
+  const preview = open ? previewFor(open, doneBy) : null;
   const nameOf = (id: string) =>
     members.find((m) => m.id === id)?.displayName ?? "someone";
 
@@ -310,9 +310,6 @@ export function ChoreGrid({
               <div data-testid="log-preview" className="flex flex-col gap-1">
                 <p className="text-3xl font-bold">{preview.headline}</p>
                 {preview.breaks ? <p>{preview.breaks}</p> : null}
-                {preview.pending ? (
-                  <p className="text-sm text-bm-muted">{preview.pending}</p>
-                ) : null}
               </div>
             ) : null}
             {doneBy !== actorId ? (
