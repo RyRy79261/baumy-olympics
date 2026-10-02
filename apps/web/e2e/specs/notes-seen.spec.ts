@@ -74,7 +74,8 @@ test("the badge counts unseen notes: opening drops it, an edit brings it back, a
   await sheet.getByRole("button", { name: "Add note" }).click();
   await expect(sheet).toBeHidden();
   expect(await phoneCount(page)).toBe(before + 1);
-  expect(await phoneCount(other)).toBe(otherBefore);
+  // Not new to the writer (and their Board marked the rest seen too).
+  expect(await phoneCount(other)).toBeLessThanOrEqual(otherBefore);
 
   // Opening the Board marks it seen: the founder's count goes down.
   const unseen = before + 1;
@@ -101,6 +102,7 @@ test("the badge counts unseen notes: opening drops it, an edit brings it back, a
   expect(await phoneCount(page)).toBe(afterOpen);
 
   // The founder edits it back: now the other member has not seen it.
+  await page.goto("/notes");
   await page
     .getByRole("button", { name: `Edit ${edited}`, exact: true })
     .click();
