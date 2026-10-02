@@ -4,6 +4,8 @@ import {
   AvatarSprite,
   DISPLAY_NAME_MAX,
   DisplayName,
+  KIOSK_PIN_MAX_DIGITS,
+  KIOSK_PIN_MIN_DIGITS,
   KioskPin,
   MEMBER_COLORS,
   MemberColor,
@@ -57,6 +59,20 @@ describe("KioskPin", () => {
     for (const pin of ["1234", "12345", "123456"]) {
       expect(KioskPin.parse(pin)).toBe(pin);
     }
+  });
+
+  it("takes its length from the digit constants", () => {
+    expect(KIOSK_PIN_MIN_DIGITS).toBe(4);
+    expect(KIOSK_PIN_MAX_DIGITS).toBe(6);
+    expect(KioskPin.safeParse("1".repeat(KIOSK_PIN_MIN_DIGITS)).success).toBe(
+      true,
+    );
+    expect(KioskPin.safeParse("1".repeat(KIOSK_PIN_MAX_DIGITS)).success).toBe(
+      true,
+    );
+    expect(KioskPin.safeParse("12").error?.issues[0]?.message).toBe(
+      "Use 4 to 6 digits.",
+    );
   });
 
   it("refuses short, long and non-digit PINs", () => {
