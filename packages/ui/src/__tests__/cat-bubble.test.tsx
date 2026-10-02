@@ -50,6 +50,14 @@ describe("CatBubble", () => {
     );
     expect(out).toContain('aria-label="Close"');
     expect(out).toContain("size-14");
+    // In the corner, out of the flow: only the first line makes room, so
+    // the cards and buttons keep the whole width (not a float beside them).
+    expect(out).toContain("absolute top-3 right-3");
+    expect(out).not.toContain("float-right");
+    expect(out).toContain(":first-child]:pr-16");
+    expect(html(<CatBubble mode="talk">Hi</CatBubble>)).not.toContain(
+      ":first-child]:pr-16",
+    );
     expect(out).toContain('type="button"');
     expect(out).toContain("×");
     expect(html(<CatBubble mode="says">Hi</CatBubble>)).not.toContain(
