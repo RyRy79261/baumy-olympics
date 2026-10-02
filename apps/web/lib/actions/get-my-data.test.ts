@@ -14,6 +14,7 @@ import {
 import { insertNote, softDeleteNote } from "@baumy/db/notes";
 import {
   account,
+  actionRequests,
   aiUsage,
   auditEvents,
   mcpAccessTokens,
@@ -431,7 +432,7 @@ describe("get_my_data", () => {
     ];
     for (const [actor, label] of others) {
       const res = await get(actor, { source: "ai" });
-      expect(res.ok, label).toBe(false);
+      expect(res, label).toMatchObject({ ok: false, code: "FORBIDDEN" });
     }
     // The same member on their own session gets it.
     expect((await get(me, { source: "ai" })).ok).toBe(true);
@@ -441,7 +442,10 @@ describe("get_my_data", () => {
     const { me } = await arrange();
     for (const source of ["kiosk", "mcp", "brain"] as const) {
       const res = await get(me, { source });
-      expect(res, source).toMatchObject({ ok: false });
+      expect(res, source).toMatchObject({
+        ok: false,
+        code: "SURFACE_FORBIDDEN",
+      });
     }
     expect((await get(me, { source: "ui" })).ok).toBe(true);
     expect(toolSpecs("ai").map((s) => s.name)).toContain("get_my_data");
@@ -455,8 +459,17 @@ describe("get_my_data", () => {
   it("writes nothing to the audit log or the ledger", async () => {
     const { me } = await arrange();
     const before = await t.db().select().from(auditEvents);
-    await get(me);
+    expect(before.length).toBeGreaterThan(0);
+    expect((await get(me)).ok).toBe(true);
     expect(await t.db().select().from(auditEvents)).toHaveLength(before.length);
+    expect(await t.db().select().from(actionRequests)).toEqual([]);
+  });
+
+  it("only reads the member row in the request's household", async () => {
+    const { me } = await arrange();
+    expect((await get(me)).ok).toBe(true);
+    const res = await get(me, { householdId: crypto.randomUUID() });
+    expect(res).toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
 
   it("answers zeros for a member with nothing yet, and dates an app's last use", async () => {
