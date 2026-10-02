@@ -40,7 +40,10 @@ export type Proposer = (
   choices: ProposalChoices,
 ) => Promise<Proposal>;
 
-/** Never called: the attested gate, the only one that checks a PIN, is skipped. */
+/**
+ * Never called: a proposal carries no PIN, so the gates that check one stop
+ * at ATTESTATION_REQUIRED before they would.
+ */
 const noPinHere: PinVerifier = async () => ({ ok: false, reason: "no_pin" });
 
 function asRecord(v: unknown): Record<string, unknown> {
@@ -114,11 +117,17 @@ export function createProposer(
     // Who may approve it: the gate runAction will run, now, so a proposal
     // nobody here can approve (an admin action asked for by a member, or at
     // the kiosk) says so instead of failing on approval. The attested gate
-    // is left for approval, where the kiosk sends the PIN.
+    // is left for approval, where the kiosk sends the PIN; so is the PIN of
+    // a kiosk admin (issue #147), whose gate answers ATTESTATION_REQUIRED
+    // once everything but the PIN is checked.
+    let pinLater = gate === "attested";
     if (gate !== "attested") {
       const allowed = await runGate(gate, ctx, def, noPinHere);
       if (!allowed.ok) {
-        return { ...common, preview, valid: false, error: allowed.message };
+        if (allowed.code === "ATTESTATION_REQUIRED") pinLater = true;
+        else {
+          return { ...common, preview, valid: false, error: allowed.message };
+        }
       }
     }
     // The action itself says this input cannot run now (after the gate:
@@ -130,7 +139,7 @@ export function createProposer(
       ...common,
       preview,
       valid: true,
-      needsPin: ctx.actor.kind === "kiosk" && gate === "attested",
+      needsPin: ctx.actor.kind === "kiosk" && pinLater,
     };
   };
 }

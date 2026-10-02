@@ -214,7 +214,10 @@ export async function handleCommand(
       actor: {
         id: ctx.actor.memberId!,
         displayName: me?.displayName ?? "the acting member",
-        admin: ctx.actor.kind === "member" && ctx.actor.role === "admin",
+        // A kiosk admin may add and edit bounties with their PIN (#147).
+        admin:
+          (ctx.actor.kind === "member" || ctx.actor.kind === "kiosk") &&
+          ctx.actor.role === "admin",
       },
       device: ctx.actor.kind === "kiosk" ? "kiosk" : "phone",
       members: household.members,

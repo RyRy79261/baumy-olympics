@@ -107,20 +107,22 @@ describe("the registry", () => {
     }
   });
 
-  it("keeps admin actions to the ui, except the bounty and pot writes Baumy may propose (issue #107)", () => {
+  it("keeps admin actions to the ui, except the bounty and pot writes Baumy may propose (issue #107) and the kiosk's (issue #147)", () => {
     const admin = entries.filter(([, d]) => d.requires === "admin");
     expect(admin.map(([n]) => n)).toContain("manage_chore");
+    const expected: Record<string, string[]> = {
+      // A kiosk admin with their PIN may add and edit bounties (issue #147).
+      create_bounty: ["ui", "kiosk", "ai", "brain"],
+      update_bounty: ["ui", "kiosk", "ai", "brain"],
+      add_pot_contribution: ["ui", "ai", "brain"],
+      // ...and change a bounty's points.
+      schedule_points_change: ["ui", "kiosk"],
+    };
     for (const [name, def] of admin) {
-      if (
-        ["create_bounty", "update_bounty", "add_pot_contribution"].includes(
-          name,
-        )
-      ) {
-        expect(def.surfaces, name).toEqual(["ui", "ai", "brain"]);
+      expect(def.surfaces, name).toEqual(expected[name] ?? ["ui"]);
+      if (name in expected && name !== "schedule_points_change") {
         expect(def.ownWordOnly, name).toBe(true);
         expect(def.risk, name).toBe("confirm");
-      } else {
-        expect(def.surfaces, name).toEqual(["ui"]);
       }
     }
   });

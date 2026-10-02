@@ -16,6 +16,8 @@ import { isMemberId } from "./cookies";
 export interface PickedMember {
   memberId: string;
   displayName: string;
+  /** Their own role: the kiosk's admin gate reads it (issue #147). */
+  role: "admin" | "member";
 }
 
 export async function pickKioskMember(
@@ -39,6 +41,10 @@ export async function pickKioskMember(
   }
   return {
     ok: true,
-    data: { memberId: member.id, displayName: member.displayName },
+    data: {
+      memberId: member.id,
+      displayName: member.displayName,
+      role: member.role,
+    },
   };
 }

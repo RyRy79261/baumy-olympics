@@ -145,14 +145,15 @@ test("wake lock, idle reset and the offline page", async ({
   await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+  // The screen waits 2 minutes by default with someone picked (issue #147).
   const countdown = kiosk.getByTestId("idle-countdown");
-  await context.clock.fastForward(50_000);
+  await context.clock.fastForward(110_000);
   await expect(countdown).toContainText("back to the start in 10 s");
-  // A touch cancels the countdown and starts the minute again.
+  // A touch cancels the countdown and starts the wait again.
   await kiosk.getByRole("heading", { name: "Bounties", level: 1 }).click();
   await expect(countdown).toHaveCount(0);
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  await context.clock.fastForward(61_000);
+  await context.clock.fastForward(2 * 60_000 + 1_000);
   // Home, and nobody is acting.
   await expect(kiosk).toHaveURL(/\/kiosk$/);
   await expect(kiosk.getByTestId("kiosk-home")).toBeVisible();

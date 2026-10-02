@@ -91,6 +91,23 @@ export const KioskPin = z
     `Use ${KIOSK_PIN_MIN_DIGITS} to ${KIOSK_PIN_MAX_DIGITS} digits.`,
   );
 
+/**
+ * How long the kitchen screen waits, untouched, before it forgets who is
+ * acting (issue #147): the choices offered on the kiosk, in minutes, and the
+ * default for a screen that has never chosen.
+ */
+export const KIOSK_IDLE_MINUTES_CHOICES = [1, 2, 5, 10, 15] as const;
+export const DEFAULT_KIOSK_IDLE_MINUTES = 2;
+
+/** One of those choices. */
+export const KioskIdleMinutes = z
+  .number({ error: "Pick how many minutes." })
+  .int("Pick how many minutes.")
+  .refine(
+    (n) => (KIOSK_IDLE_MINUTES_CHOICES as readonly number[]).includes(n),
+    `Pick ${KIOSK_IDLE_MINUTES_CHOICES.join(", ")} minutes.`,
+  );
+
 /** What a wrong Telegram user id is told, by the server and the browser. */
 export const TELEGRAM_ID_MESSAGE =
   "Use the Telegram user id: digits only, not starting with 0.";

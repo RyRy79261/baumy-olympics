@@ -137,6 +137,7 @@ describe("listActiveMembers and findActiveMember", () => {
       displayName: "A",
       avatarSprite: "cat",
       color: "#112233",
+      role: "member",
     });
     await expect(
       findActiveMember(db(), HOUSEHOLD_ID, gone),

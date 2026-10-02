@@ -126,6 +126,19 @@ export default async function KioskChoresPage({
           </Card>
         </div>
       ) : null}
+      {/* Issue #147: the screen's own settings, with or without a pick. */}
+      <Card
+        title="This screen"
+        description="How long it waits before it forgets who is acting, and, for an admin, a bounty's points."
+        className="mt-6 max-w-xl"
+      >
+        <Link
+          href="/kiosk/settings"
+          className={buttonClass("secondary", "kiosk", "self-start")}
+        >
+          Kitchen screen settings
+        </Link>
+      </Card>
     </>
   );
 }
