@@ -26,6 +26,7 @@ describe("AUTH_SESSION", () => {
       expiresInSeconds: 30 * 24 * 60 * 60,
       updateAgeSeconds: 24 * 60 * 60,
       cookieCacheMaxAgeSeconds: 300,
+      freshAgeSeconds: 600,
     });
   });
 });
