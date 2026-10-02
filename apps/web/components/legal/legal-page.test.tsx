@@ -13,6 +13,7 @@ import {
   PRIVACY_UPDATED,
   TERMS_UPDATED,
   formatUpdated,
+  legalAnchor,
 } from "./legal-page";
 
 // Issue #82: the public privacy and terms pages. They read no session, so
@@ -22,6 +23,36 @@ describe("formatUpdated", () => {
   it("writes an ISO date the way the page shows it", () => {
     expect(formatUpdated("2026-09-28")).toBe("28 September 2026");
     expect(formatUpdated("2027-01-05")).toBe("5 January 2027");
+  });
+});
+
+describe("legalAnchor", () => {
+  it("makes a section title its anchor id", () => {
+    expect(legalAnchor("How long we keep it")).toBe("how-long-we-keep-it");
+    expect(legalAnchor("Seeing, changing and deleting your data")).toBe(
+      "seeing-changing-and-deleting-your-data",
+    );
+    expect(legalAnchor("No ads, no selling, no tracking")).toBe(
+      "no-ads-no-selling-no-tracking",
+    );
+    expect(legalAnchor("Baumy\u2019s rules: don't panic!")).toBe(
+      "baumys-rules-dont-panic",
+    );
+  });
+});
+
+describe("the legal sections' anchors (issue #142)", () => {
+  it.each([
+    ["privacy", <PrivacyPage key="p" />, "how-long-we-keep-it"],
+    ["terms", <TermsPage key="t" />, "points-and-the-pot"],
+  ])("gives every %s section a unique id", (_page, element, sample) => {
+    const out = renderToStaticMarkup(element);
+    const ids = [...out.matchAll(/<section[^>]*\sid="([^"]+)"/g)].map(
+      (m) => m[1],
+    );
+    expect(ids).toContain(sample);
+    expect(ids.length).toBeGreaterThan(5);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 
