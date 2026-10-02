@@ -54,7 +54,6 @@ describe("the brain operations spec", () => {
       );
     }
     for (const name of [
-      "confirm_completion",
       "dispute_completion",
       "undo_completion",
       "withdraw_dispute",

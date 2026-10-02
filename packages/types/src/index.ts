@@ -57,7 +57,6 @@ export {
   ChoreKind,
   ChoreName,
   CompletionNote,
-  ConfirmMode,
   CooldownHours,
   DISPUTE_REASON_MAX,
   DisputeReason,

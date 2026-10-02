@@ -38,7 +38,7 @@ import { isTestMode } from "./test-mode";
 // The steps, each in a transaction of its own, so one failing does not stop
 // the others (the failure is logged, with secrets scrubbed):
 //
-//  1. settle: the ⏱ verification transitions (finalize, partner expiry, a
+//  1. settle: the ⏱ verification transitions (finalize, a
 //     disputed claim's timeout);
 //  2. seasons: `closing` at Dec 31 24:00 Berlin, `closed` with the winner once
 //     every challenge window has passed;

@@ -31,8 +31,8 @@ import { seasonHasOpenClaims, type SeasonRow } from "./seasons";
 // persists what reads already derive from `now`, so correctness never waits
 // on it:
 //
-// - `settleDueCompletions`: the ⏱ transitions of SPEC §4.3 (finalize, the
-//   partner-mode expiry, a disputed claim's timeout);
+// - `settleDueCompletions`: the ⏱ transitions of SPEC §4.3 (finalize, a
+//   disputed claim's timeout);
 // - `closeDueSeasons`: `closing` at Dec 31 24:00 Berlin, `closed` with its
 //   winner once no claim of the season can still move (`seasonStatusAt`);
 // - `listPhotosToPrune` and `clearPrunedPhoto`: proof photos 90 days after
@@ -48,8 +48,6 @@ type Scope = { householdId?: string };
 
 export interface SettleResult {
   finalized: number;
-  /** Partner-mode claims nobody confirmed within 72h. */
-  expired: number;
   /** Disputed claims whose window ended with no photo attached in time. */
   timedOut: number;
 }
@@ -68,11 +66,10 @@ export async function settleDueCompletions(
   now: Date,
   scope: Scope = {},
 ): Promise<SettleResult> {
-  const result: SettleResult = { finalized: 0, expired: 0, timedOut: 0 };
+  const result: SettleResult = { finalized: 0, timedOut: 0 };
   const candidates = await db
-    .select({ completion: completions, confirmMode: chores.confirmMode })
+    .select()
     .from(completions)
-    .innerJoin(chores, eq(chores.id, completions.choreId))
     .where(
       and(
         inArray(completions.status, ["pending", "disputed"]),
@@ -82,8 +79,8 @@ export async function settleDueCompletions(
       ),
     )
     .orderBy(asc(completions.loggedAt), asc(completions.id));
-  for (const { completion: c, confirmMode } of candidates) {
-    if (effectiveStatus({ ...c, confirmMode }, now) === c.status) continue;
+  for (const c of candidates) {
+    if (effectiveStatus(c, now) === c.status) continue;
     const [lockedChore] = await db
       .select({ id: chores.id })
       .from(chores)
@@ -97,7 +94,6 @@ export async function settleDueCompletions(
     if (!fresh) continue;
     const row: VerificationRow = {
       status: fresh.status,
-      confirmMode,
       doneBy: fresh.doneBy,
       loggedBy: fresh.loggedBy,
       loggedAt: fresh.loggedAt,
@@ -126,10 +122,8 @@ export async function settleDueCompletions(
           and(eq(disputes.completionId, fresh.id), isNull(disputes.resolvedAt)),
         );
       result.timedOut += 1;
-    } else if (next.status === "finalized") {
-      result.finalized += 1;
     } else {
-      result.expired += 1;
+      result.finalized += 1;
     }
   }
   return result;
@@ -266,11 +260,9 @@ export async function listPhotosToPrune(
   const rows = await db
     .select({
       completion: completions,
-      confirmMode: chores.confirmMode,
       lastResolvedAt: lastRuling.resolvedAt,
     })
     .from(completions)
-    .innerJoin(chores, eq(chores.id, completions.choreId))
     .leftJoin(lastRuling, eq(lastRuling.completionId, completions.id))
     .where(
       and(
@@ -283,9 +275,9 @@ export async function listPhotosToPrune(
     )
     .orderBy(asc(completions.loggedAt), asc(completions.id));
   const due: PrunablePhoto[] = [];
-  for (const { completion: c, confirmMode, lastResolvedAt } of rows) {
+  for (const { completion: c, lastResolvedAt } of rows) {
     const pruneAt = photoPruneAt(
-      { ...c, confirmMode, disputedBy: null },
+      { ...c, disputedBy: null },
       now,
       lastResolvedAt,
     );

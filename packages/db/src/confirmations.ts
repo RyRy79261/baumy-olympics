@@ -1,31 +1,23 @@
 import {
-  challengeWindowEndsAt,
   effectiveStatus,
-  partnerExpiresAt,
   transition,
   type CompletionStatus,
-  type ConfirmMode,
   type DisputeResolution,
   type ProofMode,
   type TransitionErrorCode,
   type VerificationEvent,
   type VerificationRow,
 } from "@baumy/core";
-import { aliasedTable, and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { lockChoreRow, type ChoreRow } from "./chores";
 import { rescoreLocked, type CompletionRow } from "./completions";
 import type { Queryable } from "./index";
-import {
-  chores,
-  completionScores,
-  completions,
-  disputes,
-  members,
-} from "./schema";
+import { chores, completions, disputes } from "./schema";
 
-// The honesty layer's writes and reads (SPEC §4.3): confirm, dispute,
-// withdraw, concede, undo and resolve, attaching a proof photo, and the open
-// claims a member may act on.
+// The honesty layer's writes (SPEC §4.3): dispute, withdraw, concede, undo
+// and resolve, attaching a proof photo, and what a member may do to a claim.
+// There is no confirming (§12 decision 29). The activity log that lists the
+// claims is activity.ts.
 //
 // Every write follows the completion write path (AGENTS.md "Completion
 // writes"): lock the chore row, read the completion afresh under the lock,
@@ -42,7 +34,6 @@ export interface CompletionForVerification {
   chore: {
     id: string;
     name: string;
-    confirmMode: ConfirmMode;
     proofMode: ProofMode;
   };
   /** The dispute still open on it, if any. */
@@ -51,14 +42,13 @@ export interface CompletionForVerification {
   row: VerificationRow;
 }
 
-function toVerificationRow(
+/** The shape `transition` reads, from a stored row and its open dispute. */
+export function toVerificationRow(
   c: CompletionRow,
-  confirmMode: ConfirmMode,
   raisedBy: string | null,
 ): VerificationRow {
   return {
     status: c.status,
-    confirmMode,
     doneBy: c.doneBy,
     loggedBy: c.loggedBy,
     loggedAt: c.loggedAt,
@@ -85,7 +75,6 @@ export async function loadForVerification(
       chore: {
         id: chores.id,
         name: chores.name,
-        confirmMode: chores.confirmMode,
         proofMode: chores.proofMode,
       },
     })
@@ -110,11 +99,7 @@ export async function loadForVerification(
     completion: found.completion,
     chore: found.chore,
     dispute: dispute ?? null,
-    row: toVerificationRow(
-      found.completion,
-      found.chore.confirmMode,
-      dispute?.raisedBy ?? null,
-    ),
+    row: toVerificationRow(found.completion, dispute?.raisedBy ?? null),
   };
 }
 
@@ -167,8 +152,8 @@ export type CompletionEventResult =
   | CompletionEventFailure;
 
 /**
- * Apply a verification event (SPEC §4.3) to a completion at `now`: confirm,
- * dispute, withdraw, concede, undo or an admin's ruling. The row is judged by
+ * Apply a verification event (SPEC §4.3) to a completion at `now`: dispute,
+ * withdraw, concede, undo or an admin's ruling. The row is judged by
  * `transition` at `now`, written with a compare-and-set on its stored status,
  * the dispute row is opened or closed with it, and the (chore, season) is
  * re-scored, since the counted set may have changed.
@@ -290,7 +275,6 @@ export async function attachCompletionPhoto(
 
 /** Which events a member may apply to a claim right now. */
 export interface ClaimAbilities {
-  confirm: boolean;
   dispute: boolean;
   withdraw: boolean;
   concede: boolean;
@@ -315,7 +299,6 @@ export function claimAbilities(
   const can = (event: VerificationEvent) => transition(row, event, now).ok;
   const status = effectiveStatus(row, now);
   return {
-    confirm: can({ type: "confirm", actor: memberId }),
     dispute: can({ type: "dispute", actor: memberId, reason: "?" }),
     withdraw: can({ type: "withdraw", actor: memberId }),
     concede: can({ type: "concede", actor: memberId }),
@@ -333,209 +316,6 @@ export function claimAbilities(
       status !== "voided" &&
       (memberId === row.doneBy || memberId === row.loggedBy),
   };
-}
-
-/** An open claim (pending or disputed at `now`), as the inbox shows it. */
-export interface OpenClaim {
-  completionId: string;
-  choreId: string;
-  choreName: string;
-  confirmMode: ConfirmMode;
-  doneBy: string;
-  doneByName: string;
-  loggedBy: string;
-  loggedByName: string;
-  occurredAt: Date;
-  loggedAt: Date;
-  /** `effectiveStatus` at `now`: `pending` or `disputed`. */
-  status: "pending" | "disputed";
-  /** When the challenge window ends (disputes close then). */
-  windowEndsAt: Date;
-  /** Optimistic pending: when it finalizes by itself. */
-  finalizesAt: Date | null;
-  /** Partner mode: when it is voided if nobody confirms it. */
-  expiresAt: Date | null;
-  /** The pathname in Blob; callers show it only through /api/blob. */
-  photoPathname: string | null;
-  photoAttachedAt: Date | null;
-  dispute: {
-    raisedBy: string;
-    raisedByName: string;
-    reason: string;
-    raisedAt: Date;
-  } | null;
-  /** The stored score while it counts; null otherwise. */
-  totalPts: number | null;
-  row: VerificationRow;
-}
-
-/**
- * Every claim of the household that is still open at `now`: stored as
- * `pending` or `disputed`, and still so by `effectiveStatus` (a claim that
- * finalized, expired or timed out is not open, whether or not the daily job
- * has written that yet). Oldest first.
- */
-export async function listOpenClaims(
-  db: Queryable,
-  input: { householdId: string; now: Date },
-): Promise<OpenClaim[]> {
-  const doer = aliasedTable(members, "doer");
-  const logger = aliasedTable(members, "logger");
-  const rows = await db
-    .select({
-      completion: completions,
-      choreName: chores.name,
-      confirmMode: chores.confirmMode,
-      doneByName: doer.displayName,
-      loggedByName: logger.displayName,
-      totalPts: completionScores.totalPts,
-    })
-    .from(completions)
-    .innerJoin(chores, eq(chores.id, completions.choreId))
-    .innerJoin(doer, eq(doer.id, completions.doneBy))
-    .innerJoin(logger, eq(logger.id, completions.loggedBy))
-    .leftJoin(
-      completionScores,
-      eq(completionScores.completionId, completions.id),
-    )
-    .where(
-      and(
-        eq(completions.householdId, input.householdId),
-        inArray(completions.status, ["pending", "disputed"]),
-      ),
-    )
-    .orderBy(completions.loggedAt, completions.id);
-  if (rows.length === 0) return [];
-
-  const disputer = aliasedTable(members, "disputer");
-  const open = await db
-    .select({
-      completionId: disputes.completionId,
-      raisedBy: disputes.raisedBy,
-      raisedByName: disputer.displayName,
-      reason: disputes.reason,
-      raisedAt: disputes.createdAt,
-    })
-    .from(disputes)
-    .innerJoin(disputer, eq(disputer.id, disputes.raisedBy))
-    .where(
-      and(
-        isNull(disputes.resolvedAt),
-        inArray(
-          disputes.completionId,
-          rows.map((r) => r.completion.id),
-        ),
-      ),
-    );
-  const disputeOf = new Map(open.map((d) => [d.completionId, d]));
-
-  const claims: OpenClaim[] = [];
-  for (const r of rows) {
-    const c = r.completion;
-    const d = disputeOf.get(c.id) ?? null;
-    const row = toVerificationRow(c, r.confirmMode, d?.raisedBy ?? null);
-    const status = effectiveStatus(row, input.now);
-    if (status !== "pending" && status !== "disputed") continue;
-    claims.push({
-      completionId: c.id,
-      choreId: c.choreId,
-      choreName: r.choreName,
-      confirmMode: r.confirmMode,
-      doneBy: c.doneBy,
-      doneByName: r.doneByName,
-      loggedBy: c.loggedBy,
-      loggedByName: r.loggedByName,
-      occurredAt: c.occurredAt,
-      loggedAt: c.loggedAt,
-      status,
-      windowEndsAt: challengeWindowEndsAt(row),
-      finalizesAt: c.finalizesAt,
-      expiresAt: r.confirmMode === "partner" ? partnerExpiresAt(row) : null,
-      photoPathname: c.photoPathname,
-      photoAttachedAt: c.photoAttachedAt,
-      dispute: d
-        ? {
-            raisedBy: d.raisedBy,
-            raisedByName: d.raisedByName,
-            reason: d.reason,
-            raisedAt: d.raisedAt,
-          }
-        : null,
-      totalPts: r.totalPts,
-      row,
-    });
-  }
-  return claims;
-}
-
-/** A member's own claim that has settled, with how. */
-export interface SettledClaim {
-  completionId: string;
-  choreName: string;
-  loggedAt: Date;
-  /** `effectiveStatus` at `now`: finalized, confirmed or voided. */
-  status: Exclude<CompletionStatus, "pending" | "disputed">;
-  voidReason: CompletionRow["voidReason"];
-  totalPts: number | null;
-}
-
-/**
- * The member's own claims (as doer) logged since `since` that are no longer
- * open at `now`, newest first. The status is `effectiveStatus`, so a claim
- * that finalized an hour ago shows as finalized before the daily job runs.
- */
-export async function listSettledClaims(
-  db: Queryable,
-  input: {
-    householdId: string;
-    memberId: string;
-    since: Date;
-    now: Date;
-    limit: number;
-  },
-): Promise<SettledClaim[]> {
-  const rows = await db
-    .select({
-      completion: completions,
-      choreName: chores.name,
-      confirmMode: chores.confirmMode,
-      totalPts: completionScores.totalPts,
-    })
-    .from(completions)
-    .innerJoin(chores, eq(chores.id, completions.choreId))
-    .leftJoin(
-      completionScores,
-      eq(completionScores.completionId, completions.id),
-    )
-    .where(
-      and(
-        eq(completions.householdId, input.householdId),
-        eq(completions.doneBy, input.memberId),
-        gte(completions.loggedAt, input.since),
-      ),
-    )
-    .orderBy(desc(completions.loggedAt), desc(completions.id));
-  const out: SettledClaim[] = [];
-  for (const r of rows) {
-    const c = r.completion;
-    const row = toVerificationRow(c, r.confirmMode, null);
-    const status = effectiveStatus(row, input.now);
-    if (status === "pending" || status === "disputed") continue;
-    out.push({
-      completionId: c.id,
-      choreName: r.choreName,
-      loggedAt: c.loggedAt,
-      status,
-      voidReason:
-        status === "voided"
-          ? (c.voidReason ??
-            (c.status === "disputed" ? "disputed" : "unconfirmed"))
-          : null,
-      totalPts: status === "voided" ? null : r.totalPts,
-    });
-    if (out.length >= input.limit) break;
-  }
-  return out;
 }
 
 /**

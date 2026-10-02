@@ -123,10 +123,18 @@ export async function openBaumySheet(kiosk: Page): Promise<Locator> {
   return sheet;
 }
 
-/** Open the chores (the grid and "Needs your OK") from the footer nav. */
+/** Open the chores (the grid) from the footer nav. */
 export async function openKioskChores(kiosk: Page) {
   await kioskNav(kiosk, "Bounties");
   await expect(
     kiosk.getByRole("heading", { name: "Bounties", level: 1 }),
+  ).toBeVisible();
+}
+
+/** Open the activity log (issue #150) from the footer nav. */
+export async function openKioskActivity(kiosk: Page) {
+  await kioskNav(kiosk, "Activity");
+  await expect(
+    kiosk.getByRole("heading", { name: "Activity", level: 1 }),
   ).toBeVisible();
 }

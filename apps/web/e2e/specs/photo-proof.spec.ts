@@ -51,8 +51,8 @@ test("a chore that needs photo proof is logged with a photo", async ({
   ).toBeVisible();
 
   // The claim carries its photo, through the proxy.
-  await page.goto("/inbox");
-  const claim = page.getByTestId("your-claims").getByTestId(`claim-${name}`);
+  await page.goto("/activity");
+  const claim = page.getByTestId(`activity-chore-${name}`);
   const photo = claim.getByRole("img", { name: `Proof photo for ${name}` });
   await expect(photo).toHaveAttribute("src", /^\/api\/blob\?pathname=/);
   // Lazy-loaded: it loads once it is on screen.

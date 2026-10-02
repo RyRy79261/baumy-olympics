@@ -87,7 +87,7 @@
   {
     "name": "create_bounty",
     "title": "Add a bounty",
-    "description": "Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none), confirm mode (default optimistic) and effort factor (default 100). Only a household admin may do this, in their own name.",
+    "description": "Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none) and effort factor (default 100). Only a household admin may do this, in their own name.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -130,15 +130,6 @@
           ],
           "description": "Whether a proof photo is none, optional or required."
         },
-        "confirmMode": {
-          "default": "optimistic",
-          "type": "string",
-          "enum": [
-            "optimistic",
-            "partner"
-          ],
-          "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
-        },
         "effortFactorPct": {
           "default": 100,
           "type": "integer",
@@ -161,7 +152,7 @@
   {
     "name": "update_bounty",
     "title": "Edit a bounty",
-    "description": "Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, confirm mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.",
+    "description": "Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -206,14 +197,6 @@
           ],
           "description": "Whether a proof photo is none, optional or required."
         },
-        "confirmMode": {
-          "type": "string",
-          "enum": [
-            "optimistic",
-            "partner"
-          ],
-          "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
-        },
         "effortFactorPct": {
           "type": "integer",
           "minimum": 50,
@@ -232,46 +215,29 @@
     "admin_only": true
   },
   {
-    "name": "get_pending_confirmations",
-    "title": "Claims waiting for an OK",
-    "description": "Lists the household's chore claims still waiting to settle (pending or disputed), with who did and logged each, when its dispute window ends, any open dispute and its reason, and `can`: which of confirm, dispute, withdraw, concede, undo and attach a photo you may do to it now. `needsYou` marks the ones waiting on you. `recent` lists your own claims of the last 7 days that have settled (finalized, confirmed or voided). Times are ISO 8601 in UTC.",
+    "name": "get_activity",
+    "title": "Activity log",
+    "description": "Lists what happened in the house in the last 30 days, newest first: chores logged (who did and logged each, its status, points, any open dispute and when its dispute window ends), disputes raised and how they ended, bounties added or edited, and points changes scheduled, applied or vetoed. A chore entry's `can` says which of dispute, withdraw, concede, undo and attach a photo you may do to it now; a scheduled points change's `canVeto` says whether you may veto it. Times are ISO 8601 in UTC.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
-      "properties": {},
+      "properties": {
+        "limit": {
+          "description": "At most this many entries (default 50).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
       "additionalProperties": false
     },
     "kind": "read",
     "risk": "safe"
   },
   {
-    "name": "confirm_completion",
-    "title": "Confirm a chore",
-    "description": "Confirms a housemate's self-claimed chore that is waiting for an OK (pending), which verifies it. You cannot confirm your own. Refused with INVALID_STATE once it has finalized, expired or been disputed. Get ids from get_pending_confirmations.",
-    "input_schema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "completionId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-          "description": "The completion's id, from get_pending_confirmations."
-        }
-      },
-      "required": [
-        "completionId"
-      ],
-      "additionalProperties": false
-    },
-    "kind": "write",
-    "risk": "confirm",
-    "own_word_only": true
-  },
-  {
     "name": "dispute_completion",
     "title": "Dispute a chore",
-    "description": "Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.",
+    "description": "Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. Get ids from get_activity. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -280,7 +246,7 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-          "description": "The completion's id, from get_pending_confirmations."
+          "description": "The completion's id, from get_activity."
         },
         "reason": {
           "type": "string",
@@ -311,7 +277,7 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-          "description": "The completion's id, from get_pending_confirmations."
+          "description": "The completion's id, from get_activity."
         }
       },
       "required": [
@@ -335,7 +301,7 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-          "description": "The completion's id, from get_pending_confirmations."
+          "description": "The completion's id, from get_activity."
         }
       },
       "required": [
@@ -359,7 +325,7 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-          "description": "The completion's id, from get_pending_confirmations."
+          "description": "The completion's id, from get_activity."
         }
       },
       "required": [

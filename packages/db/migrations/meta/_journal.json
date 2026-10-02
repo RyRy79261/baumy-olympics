@@ -173,8 +173,15 @@
     {
       "idx": 24,
       "version": "7",
-      "when": 1790975709837,
-      "tag": "0024_note_reads",
+      "when": 1790972123919,
+      "tag": "0024_settle_partner_claims",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790980052894,
+      "tag": "0025_note_reads",
       "breakpoints": true
     }
   ]

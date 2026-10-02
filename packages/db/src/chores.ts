@@ -3,7 +3,6 @@ import {
   ruleVersionAt,
   seasonBounds,
   seasonYear,
-  type ConfirmMode,
   type ProofMode,
   type RuleVersion,
 } from "@baumy/core";
@@ -206,7 +205,6 @@ export interface ChoreBoardRow {
   sprite: string;
   kind: ChoreKind;
   proofMode: ProofMode;
-  confirmMode: ConfirmMode;
   effortFactorPct: number;
   archivedAt: Date | null;
   createdAt: Date;
@@ -221,13 +219,13 @@ export interface ChoreBoardRow {
 /**
  * How many rows not stored as voided are looked at to find a chore's last
  * *live* completion (the same bound as completions.ts): only a timed-out
- * dispute or an expired partner-mode claim is not live without being voided.
+ * dispute is not live without being voided.
  */
 const LAST_LIVE_SCAN = 20;
 
 async function lastLiveAt(
   db: Queryable,
-  chore: Pick<ChoreRow, "id" | "confirmMode">,
+  chore: Pick<ChoreRow, "id">,
   now: Date,
 ): Promise<Date | null> {
   const rows = await db
@@ -245,9 +243,7 @@ async function lastLiveAt(
     )
     .orderBy(desc(completions.occurredAt), desc(completions.loggedAt))
     .limit(LAST_LIVE_SCAN);
-  const live = rows.find((r) =>
-    isLive({ ...r, confirmMode: chore.confirmMode }, now),
-  );
+  const live = rows.find((r) => isLive(r, now));
   return live?.occurredAt ?? null;
 }
 
@@ -347,7 +343,6 @@ export async function listChoreBoard(
       sprite: c.sprite,
       kind: c.kind,
       proofMode: c.proofMode,
-      confirmMode: c.confirmMode,
       effortFactorPct: c.effortFactorPct,
       archivedAt: c.archivedAt,
       createdAt: c.createdAt,
@@ -468,22 +463,13 @@ async function putWeight(
   return version!.id;
 }
 
-/** Re-score the given seasons of a chore, or every season it has rows in. */
+/** Re-score the given seasons of a chore. */
 async function rescoreSeasons(
   db: Queryable,
   input: { householdId: string; choreId: string; now: Date },
-  seasonIds?: string[],
+  seasonIds: string[],
 ): Promise<void> {
-  const ids =
-    seasonIds ??
-    (
-      await db
-        .selectDistinct({ seasonId: completions.seasonId })
-        .from(completions)
-        .where(eq(completions.choreId, input.choreId))
-        .orderBy(asc(completions.seasonId))
-    ).map((r) => r.seasonId);
-  for (const seasonId of ids) {
+  for (const seasonId of seasonIds) {
     await rescoreChore(db, { ...input, seasonId });
   }
 }
@@ -536,7 +522,6 @@ export interface ChoreSettings {
   name: string;
   kind: ChoreKind;
   proofMode: ProofMode;
-  confirmMode: ConfirmMode;
   effortFactorPct: number;
 }
 
@@ -559,7 +544,6 @@ export async function createChore(
       sprite: input.sprite,
       kind: input.kind,
       proofMode: input.proofMode,
-      confirmMode: input.confirmMode,
       effortFactorPct: input.effortFactorPct,
       createdAt: input.now,
     })
@@ -582,13 +566,9 @@ export async function createChore(
  * the version in effect now. Returns the new row and whether a rule version
  * was added.
  *
- * Scores stay what a rebuild would make them:
- * - a new weight re-scores the current season, since a completion up to 2
- *   minutes "in the future" (SPEC §4.2) may fall after `now`;
- * - a new confirm mode re-scores every season of the chore, because whether
- *   a stored `pending` self-claim counts depends on it (SPEC §4.1). Switching
- *   to `partner` stops unconfirmed self-claims counting until someone
- *   confirms them; switching back counts them again.
+ * Scores stay what a rebuild would make them: a new weight re-scores the
+ * current season, since a completion up to 2 minutes "in the future" (SPEC
+ * §4.2) may fall after `now`.
  */
 export async function updateChore(
   db: Queryable,
@@ -648,9 +628,7 @@ export async function updateChore(
     choreId: input.chore.id,
     now: input.now,
   };
-  if (row!.confirmMode !== input.chore.confirmMode) {
-    await rescoreSeasons(db, scope);
-  } else if (weightChanged) {
+  if (weightChanged) {
     const season = await findSeason(
       db,
       input.householdId,

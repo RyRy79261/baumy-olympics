@@ -31,7 +31,7 @@ import { fail } from "./result";
 // nobody's points (owner ruling 2026-10-02, SPEC §12 decision 27, issue
 // #145; before, every change asked the PIN).
 //
-// Seen (issue #153, SPEC §12 decision 29): each member has their own seen
+// Seen (issue #153, SPEC §12 decision 30): each member has their own seen
 // state per note (`note_reads`). Opening the Board, or the Messages on the
 // kitchen screen as the picked member, runs `acknowledge_note`; writing a
 // note marks it seen for its writer; an edit makes it unseen again for

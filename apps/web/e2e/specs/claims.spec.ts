@@ -3,10 +3,12 @@ import { addChore, openChore } from "../lib/chores";
 import { advanceClock, resetClock } from "../lib/clock";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 
-// Issue #15, SPEC §4.6 E9 on the phone: the founder self-claims a chore, the
-// partner disputes it with a reason, the founder attaches a photo (shown only
-// through /api/blob), the partner withdraws the dispute, and once the SERVER
-// clock is past the finalize time the claim shows as finalized.
+// Issue #15, SPEC §4.6 E9 on the phone, in the activity log (issue #150):
+// the founder self-claims a chore, which counts at once; the partner finds
+// it in Activity (no inbox, no count, no Confirm) and disputes it with a
+// reason, the founder attaches a photo (shown only through /api/blob), the
+// partner withdraws the dispute, and once the SERVER clock is past the
+// finalize time the entry shows as settled.
 //
 // It moves the shared server clock, so it runs in the server-clock project,
 // one test at a time (playwright.config.ts), and puts the clock back
@@ -26,14 +28,14 @@ test.afterEach(async ({ page }) => {
 });
 
 function claim(page: Page, chore: string) {
-  return page.getByTestId(`claim-${chore}`);
+  return page.getByTestId(`activity-chore-${chore}`);
 }
 
 function toast(page: Page, text: string) {
   return page.getByRole("status").filter({ hasText: text });
 }
 
-test("E9: dispute, photo, withdraw, then finalize", async ({
+test("E9 in the activity log: dispute, photo, withdraw, then settled", async ({
   page,
   browser,
 }, testInfo) => {
@@ -50,22 +52,31 @@ test("E9: dispute, photo, withdraw, then finalize", async ({
   await expect(partner.page).toHaveURL(/\/$/);
   await addChore(page, { name: chore, basePoints: 26, cooldownHours: 84 });
 
-  // The founder self-claims it.
+  // The founder self-claims it: it counts at once.
   await page.goto("/chores");
   const sheet = await openChore(page, chore);
   await sheet.getByRole("button", { name: "Log it" }).click();
   await expect(page.getByTestId("score-pop")).toHaveText("+26");
 
-  // It waits on the partner, who disputes it with a reason.
+  // The partner opens Activity from the nav: a log, not an inbox.
   const p = partner.page;
-  await p.goto("/inbox");
-  await expect(
-    p.getByRole("link", { name: /^Needs your OK \(\d+\)$/ }),
-  ).toBeVisible();
-  let card = p.getByTestId("needs-you").getByTestId(`claim-${chore}`);
+  await p.goto("/");
+  const nav = p.getByRole("navigation", { name: "Main" });
+  await nav.getByRole("link", { name: "Activity", exact: true }).click();
+  await expect(p).toHaveURL(/\/activity$/);
+  await expect(p.getByRole("heading", { name: "Activity" })).toBeVisible();
+  await expect(p.getByRole("link", { name: /Needs your OK/ })).toHaveCount(0);
+  // The bounty the founder added is in the log too.
+  await expect(p.getByTestId(`activity-bounty-${chore}`)).toContainText(
+    `${founder} added the bounty ${chore}.`,
+  );
+  let card = claim(p, chore);
   await expect(card).toContainText(`${founder} did ${chore}`);
-  await expect(card).toContainText("+26, final at");
-  await expect(card.getByRole("button", { name: "Confirm" })).toBeVisible();
+  await expect(card).toContainText("+26. Final at");
+  await expect(card).toHaveAttribute("data-status", "pending");
+  // Dispute, and never Confirm (issue #150).
+  await expect(card.getByRole("button", { name: "Dispute" })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Confirm" })).toHaveCount(0);
   await card.getByRole("button", { name: "Dispute" }).click();
   const send = card.getByRole("button", { name: "Send dispute" });
   await expect(send).toBeDisabled();
@@ -73,10 +84,13 @@ test("E9: dispute, photo, withdraw, then finalize", async ({
   await send.click();
   await expect(toast(p, `Disputed ${chore}.`)).toBeVisible();
   await expect(claim(p, chore)).toHaveAttribute("data-status", "disputed");
+  await expect(p.getByTestId(`activity-dispute-${chore}`)).toContainText(
+    `${partnerName} disputed ${founder}'s ${chore}: "The tub is still grey". Still open.`,
+  );
 
   // The founder sees the dispute and attaches a photo.
-  await page.goto("/inbox");
-  card = page.getByTestId("needs-you").getByTestId(`claim-${chore}`);
+  await page.goto("/activity");
+  card = claim(page, chore);
   await expect(card).toContainText(
     `Disputed by ${partnerName}: "The tub is still grey".`,
   );
@@ -106,26 +120,29 @@ test("E9: dispute, photo, withdraw, then finalize", async ({
   await expect(claim(page, chore)).toContainText("It has a photo");
 
   // The partner withdraws the dispute: pending again.
-  await p.goto("/inbox");
-  card = p.getByTestId("needs-you").getByTestId(`claim-${chore}`);
+  await p.goto("/activity");
+  card = claim(p, chore);
   await expect(
     card.getByRole("img", { name: `Proof photo for ${chore}` }),
   ).toBeVisible();
   await card.getByRole("button", { name: "Withdraw dispute" }).click();
   await expect(toast(p, `Dispute on ${chore} withdrawn.`)).toBeVisible();
   await expect(claim(p, chore)).toHaveAttribute("data-status", "pending");
-
-  // Past the finalize time (logged + 24h), it has settled as finalized.
-  await page.goto("/inbox");
-  await expect(
-    page.getByTestId("your-claims").getByTestId(`claim-${chore}`),
-  ).toBeVisible();
-  await advanceClock(page, 25 * HOUR);
-  await page.goto("/inbox");
-  await expect(claim(page, chore)).toHaveCount(0);
-  await expect(page.getByTestId(`settled-${chore}`)).toHaveText(
-    `${chore}: finalized, +26`,
+  await expect(p.getByTestId(`activity-dispute-${chore}`)).toContainText(
+    "Withdrawn.",
   );
+
+  // Past the finalize time (logged + 24h), it has settled, and nobody may
+  // dispute it any more.
+  await page.goto("/activity");
+  await expect(claim(page, chore)).toHaveAttribute("data-status", "pending");
+  await advanceClock(page, 25 * HOUR);
+  await page.goto("/activity");
+  await expect(claim(page, chore)).toHaveAttribute("data-status", "finalized");
+  await expect(claim(page, chore)).toContainText("+26. Settled.");
+  await p.goto("/activity");
+  await expect(claim(p, chore)).toHaveAttribute("data-status", "finalized");
+  await expect(claim(p, chore).getByRole("button")).toHaveCount(0);
   await resetClock(page);
 
   await partner.context.close();

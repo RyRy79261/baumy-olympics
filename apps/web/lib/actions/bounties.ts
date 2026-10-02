@@ -9,7 +9,6 @@ import {
   BasePoints,
   ChoreKind,
   ChoreName,
-  ConfirmMode,
   CooldownHours,
   EffortFactorPct,
   ProofMode,
@@ -40,9 +39,6 @@ const fields = {
   proofMode: ProofMode.describe(
     "Whether a proof photo is none, optional or required.",
   ),
-  confirmMode: ConfirmMode.describe(
-    "optimistic (counts at once) or partner (counts once a housemate confirms).",
-  ),
   effortFactorPct: EffortFactorPct.describe(
     "The effort factor in percent (100 is normal).",
   ),
@@ -55,7 +51,6 @@ function describeBounty(b: {
   points?: number;
   cooldownHours?: number;
   proofMode?: string;
-  confirmMode?: string;
   effortFactorPct?: number;
 }): string[] {
   const parts: string[] = [];
@@ -66,11 +61,6 @@ function describeBounty(b: {
     parts.push(`every ${b.cooldownHours} h`);
   }
   if (b.proofMode !== undefined) parts.push(`photo ${b.proofMode}`);
-  if (b.confirmMode !== undefined) {
-    parts.push(
-      b.confirmMode === "partner" ? "a housemate confirms" : "counts at once",
-    );
-  }
   if (b.effortFactorPct !== undefined) {
     parts.push(`effort ${b.effortFactorPct}%`);
   }
@@ -81,7 +71,7 @@ export const createBounty = defineAction({
   name: "create_bounty",
   title: "Add a bounty",
   description:
-    "Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none), confirm mode (default optimistic) and effort factor (default 100). Only a household admin may do this, in their own name.",
+    "Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none) and effort factor (default 100). Only a household admin may do this, in their own name.",
   consent: "Add bounties to the board",
   kind: "write",
   risk: "confirm",
@@ -95,7 +85,6 @@ export const createBounty = defineAction({
     points: fields.points,
     cooldownHours: fields.cooldownHours.default(DEFAULT_COOLDOWN_HOURS),
     proofMode: fields.proofMode.default("none"),
-    confirmMode: fields.confirmMode.default("optimistic"),
     effortFactorPct: fields.effortFactorPct.default(100),
   }),
   async preview(_ctx, i) {
@@ -104,7 +93,6 @@ export const createBounty = defineAction({
         ? { cooldownHours: i.cooldownHours }
         : {}),
       ...(i.proofMode !== "none" ? { proofMode: i.proofMode } : {}),
-      ...(i.confirmMode !== "optimistic" ? { confirmMode: i.confirmMode } : {}),
       ...(i.effortFactorPct !== 100
         ? { effortFactorPct: i.effortFactorPct }
         : {}),
@@ -118,7 +106,6 @@ export const createBounty = defineAction({
       basePoints: i.points,
       cooldownHours: i.cooldownHours,
       proofMode: i.proofMode,
-      confirmMode: i.confirmMode,
       effortFactorPct: i.effortFactorPct,
     });
   },
@@ -132,7 +119,6 @@ const updateInput = z
     points: fields.points.optional(),
     cooldownHours: fields.cooldownHours.optional(),
     proofMode: fields.proofMode.optional(),
-    confirmMode: fields.confirmMode.optional(),
     effortFactorPct: fields.effortFactorPct.optional(),
   })
   .refine((i) => Object.keys(i).some((k) => k !== "choreId"), {
@@ -150,7 +136,7 @@ export const updateBounty = defineAction({
   name: "update_bounty",
   title: "Edit a bounty",
   description:
-    "Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, confirm mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.",
+    "Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.",
   consent: "Edit the bounties on the board",
   kind: "write",
   risk: "confirm",
@@ -222,7 +208,6 @@ export const updateBounty = defineAction({
         ...(i.name !== undefined ? { name: i.name } : {}),
         ...(i.kind !== undefined ? { kind: i.kind } : {}),
         ...(i.proofMode !== undefined ? { proofMode: i.proofMode } : {}),
-        ...(i.confirmMode !== undefined ? { confirmMode: i.confirmMode } : {}),
         ...(i.effortFactorPct !== undefined
           ? { effortFactorPct: i.effortFactorPct }
           : {}),

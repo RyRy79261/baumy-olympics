@@ -10,7 +10,7 @@ covers:
   - packages/core/src/scoring/frequency.ts
   - apps/web/lib/chores/urgency.ts
   - apps/web/components/chores/chore-grid.tsx
-  - apps/web/components/claims/claim-list.tsx
+  - apps/web/components/activity/activity-log.tsx
   - apps/web/app/(hub)/chores/history/page.tsx
 ---
 
@@ -35,9 +35,9 @@ Open **Bounties**, pick the chore and tap **Log it**. You can also tell Baumy ("
 
 ## Disputing
 
-When a chore is logged, its points count straight away, shown dimmed as provisional.
+When a chore is logged, its points count straight away, shown dimmed as provisional. There is no confirming: nobody has to OK a chore.
 
-- Another housemate can **dispute** a logged chore within the dispute window, {{CHALLENGE_WINDOW_H}} hours after it was logged, with a reason. If nobody does, the points are final when the window ends. On the kitchen iPad a dispute asks for your personal PIN; nothing else about chores does.
+- Another housemate can **dispute** a logged chore from **Activity** within the dispute window, {{CHALLENGE_WINDOW_H}} hours after it was logged, with a reason. If nobody does, the points are final when the window ends. On the kitchen iPad a dispute asks for your personal PIN; nothing else about chores does.
 - A disputed chore scores nothing while it is disputed. If the person who did it attached a photo in time, it waits for them and the person who disputed (or an admin) to settle it; otherwise it is dropped when the window ends.
 - The person who disputed can **withdraw** the dispute, and the person who did the chore can **concede** it.
 
@@ -56,7 +56,7 @@ So doing a chore over and over pays more and more, and leaving a chore to one pe
 
 Baumy watches how often each bounty is really done. Each week it may suggest new points for one that is done much more or less often than its points expect; a suggestion lands between {{SUGGESTED_POINTS_MIN}} and {{SUGGESTED_POINTS_MAX}} points.
 
-An admin can schedule a suggestion, or set any bounty's points with a reason. A scheduled change lands on a Monday at least {{WEIGHT_VETO_LEAD_H}} hours away, and until then any other member can **veto** it. An admin can also change points at once when they edit a bounty. A change never touches points already scored.
+An admin can schedule a suggestion, or set any bounty's points with a reason. A scheduled change lands on a Monday at least {{WEIGHT_VETO_LEAD_H}} hours away, and until then any other member can **veto** it in **Activity**. An admin can also change points at once when they edit a bounty. A change never touches points already scored.
 
 Every change, who made it and why, is in **Points history** under the bounties board.
 

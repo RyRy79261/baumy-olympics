@@ -146,7 +146,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns:
-      "`completionId`, `choreName`, `doneBy`/`doneByName`, `status`, `counted` (false while a partner-mode claim waits for someone to confirm), `totalPts`, `streakLen`, and a break (`breakPts`, `brokenMemberName`, `brokenLen`) if one happened.",
+      "`completionId`, `choreName`, `doneBy`/`doneByName`, `status`, `totalPts`, `streakLen`, and a break (`breakPts`, `brokenMemberName`, `brokenLen`) if one happened.",
     errors: [
       "COOLDOWN",
       "FUTURE",
@@ -159,41 +159,32 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       "NOT_FOUND",
     ],
     reply:
-      '"Logged <choreName> for <doneByName>: +<totalPts> (streak <streakLen>)", plus "and broke <brokenMemberName>\'s streak of <brokenLen> for +<breakPts>" when there was a break, or "it counts once someone confirms it" when `counted` is false. On COOLDOWN say when it can be logged again (`retryAt`, in Berlin time). On PHOTO_REQUIRED: "that one needs a photo, log it in the app".',
+      '"Logged <choreName> for <doneByName>: +<totalPts> (streak <streakLen>)", plus "and broke <brokenMemberName>\'s streak of <brokenLen> for +<breakPts>" when there was a break. On COOLDOWN say when it can be logged again (`retryAt`, in Berlin time). On PHOTO_REQUIRED: "that one needs a photo, log it in the app".',
   },
-  get_pending_confirmations: {
+  get_activity: {
     purpose:
-      "Lists chore claims still waiting to settle, and what the asker may do to each.",
-    when: 'For "anything waiting on me?", and to find the `completionId` before confirming, disputing, undoing, withdrawing or conceding. Use `can` to offer only what is allowed.',
+      "The activity log: what happened in the house in the last 30 days, newest first (chores logged, disputes, bounties added or edited, points changes scheduled, applied or vetoed), and what the asker may do to each.",
+    when: 'For "what happened today?" or "what did Sam log?", and to find the `completionId` before disputing, undoing, withdrawing or conceding. Use `can` (and `canVeto` on a scheduled points change) to offer only what is allowed. There is no confirming: a self-claim counts at once and settles when its 24-hour window ends.',
     examples: [
       {
-        say: "anything I need to confirm?",
-        call: "get_pending_confirmations {}",
+        say: "what's been happening?",
+        call: "get_activity {}",
+      },
+      {
+        say: "anything I can still dispute?",
+        call: "get_activity {}",
       },
     ],
     returns:
-      "`claims` (pending or disputed; who did and logged each, when its window ends, any dispute and reason, `can`, `needsYou`) and `recent` (the asker's own claims settled in the last 7 days).",
+      "`entries`, newest first, each with a `kind`: `chore` (who did and logged it, `status`, `totalPts`, any open `dispute`, `windowEndsAt` and `can`), `dispute` (who raised it, the reason and its `resolution`), `bounty` (`added` or `edited`, and by whom) or `points` (`scheduled`, `applied` or `vetoed`, from and to, and `canVeto`); and `days`, how far back it reads.",
     errors: [],
     reply:
-      'The ones with `needsYou` first, each as "<doer> did <chore> <when>" with the actions `can` allows.',
-  },
-  confirm_completion: {
-    purpose: "Confirms a housemate's self-claimed chore, which verifies it.",
-    when: 'When someone says a housemate really did it ("yes, Sam did clean the bathroom"). Not for your own claims, and never on behalf of someone else (403): if Jo says Sam did it, Jo confirms it herself.',
-    examples: [
-      {
-        say: "yes Sam did the bathroom",
-        call: 'confirm_completion {"completionId": "<from get_pending_confirmations>"}',
-      },
-    ],
-    returns: "`completionId`, `choreName`, the new `status` and `finalizesAt`.",
-    errors: CLAIM_ERRORS,
-    reply: '"Confirmed <doer>\'s <choreName>."',
+      'A few lines, newest first, each as "<who> <did what> <when>", with the actions `can` allows on the ones the asker may act on.',
   },
   dispute_completion: {
     purpose:
       "Disputes a housemate's self-claimed chore inside its 24-hour window, with a reason.",
-    when: "When someone says a claimed chore was not done. Ask for the reason if none was given; it is required.",
+    when: "When someone says a claimed chore was not done. Ask for the reason if none was given; it is required. Find the `completionId` with get_activity.",
     examples: [
       {
         say: "Sam didn't do the bathroom, it's still dirty",
@@ -362,7 +353,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
   update_bounty: {
     purpose:
       "Edits a bounty as an admin: only the fields sent change. A new weight counts from now.",
-    when: "Only when an admin asks to change a bounty's name, kind, points, cooldown, photo or confirm rule. Find the `choreId` with list_chores. Archiving is done in the app.",
+    when: "Only when an admin asks to change a bounty's name, kind, points, cooldown or photo rule. Find the `choreId` with list_chores. Archiving is done in the app.",
     examples: [
       {
         say: "make the trash worth 30 points",

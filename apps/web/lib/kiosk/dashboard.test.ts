@@ -63,7 +63,6 @@ function chore(over: Partial<ChoreView>): ChoreView {
     sprite: "bin",
     kind: "maintenance",
     proofMode: "none",
-    confirmMode: "optimistic",
     effortFactorPct: 100,
     archived: false,
     basePoints: 10,

@@ -4,12 +4,13 @@ import { KIOSK_NAV, isNavActive } from "./nav";
 // The kitchen screen's footer nav (ADR 0005 §1).
 
 describe("the kiosk footer nav", () => {
-  it("has the six pages in order", () => {
+  it("has the seven pages in order", () => {
     expect(KIOSK_NAV.map((n) => n.label)).toEqual([
       "Home",
       "Bounties",
       "Calendar",
       "Board",
+      "Activity",
       "Shop",
       "Scores",
     ]);

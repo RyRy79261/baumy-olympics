@@ -53,7 +53,7 @@ Each tool carries `risk`:
 - `safe` (for example `create_note`, `link_telegram`, every read): brain may
   run it straight from the conversation.
 - `confirm` (for example `create_event`, `update_event`, `log_completion`,
-  `confirm_completion`, `dispute_completion`, `dismiss_reminder`,
+  `dispute_completion`, `dismiss_reminder`,
   `approve_login`, whose confirm button is the number the member taps in
   the sign-in DM, below): brain shows
   an inline confirm button with what it is about to do, and sends the call
@@ -92,11 +92,11 @@ brain sends `X-Baumy-On-Behalf-Of: <Sam's member id>` with Ryan in
   with a `member_field`: "Jo did the dishes" is `log_completion` with
   `doneBy: <Jo's id>`, which Ryan logs and vouches for. On-behalf would
   record that Jo logged it herself.
-- Never for someone's own word: the claim events (`confirm_completion`,
-  `dispute_completion`, `undo_completion`, `withdraw_dispute`,
-  `concede_completion`, marked `own_word_only` in the tool list) answer 403
-  `FORBIDDEN` on anyone's behalf, before the confirm check, so nobody can
-  confirm their own claim by speaking as a housemate. The sign-in answers
+- Never for someone's own word: the claim events (`dispute_completion`,
+  `undo_completion`, `withdraw_dispute`, `concede_completion`, marked
+  `own_word_only` in the tool list; there is no `confirm_completion` since
+  issue #150) answer 403 `FORBIDDEN` on anyone's behalf, before the confirm
+  check, so nobody can dispute or undo in a housemate's name. The sign-in answers
   (`approve_login`, `deny_login`) are `own_word_only` too. Everything
   else, notes included, works on a housemate's behalf.
 - Admin actions stay unavailable, on anyone's behalf: the three brain gets
