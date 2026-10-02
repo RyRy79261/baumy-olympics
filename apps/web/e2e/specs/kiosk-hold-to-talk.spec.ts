@@ -185,3 +185,142 @@ test("tap the cat, hold to talk, see the answer and confirm, and stay", async ({
   await expect(sheet.getByLabel("Message to Baumy")).toBeVisible();
   await ipad.context.close();
 });
+
+// Issue #155: the bubble closes on a tap outside it (the microphone off,
+// nothing sent), and on its "×"; a tap inside it, or another finger while
+// one holds "Hold to talk", never closes it. With E2E_SHOTS_DIR set, each
+// state is kept at the kiosk's 820×1180 and at a phone's 360×780.
+test("the bubble closes on a tap outside or its ×, never during a hold", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(project !== "mobile-360", "Paired from the phone project.");
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const chore = `Teapot ${suffix}`;
+  await founderAdmin(page, project);
+  await addChore(page, { name: chore, basePoints: 7, cooldownHours: 0 });
+  const ipad = await pairedKiosk(browser, page, `Bubble iPad ${suffix}`);
+  await ipad.context.grantPermissions(["microphone"]);
+  const kiosk = ipad.page;
+  // Keep every microphone stream the page opens, to see it turned off.
+  await kiosk.addInitScript(() => {
+    const md = navigator.mediaDevices;
+    const real = md.getUserMedia.bind(md);
+    const streams: MediaStream[] = [];
+    (window as unknown as { __streams: MediaStream[] }).__streams = streams;
+    md.getUserMedia = async (c) => {
+      const s = await real(c);
+      streams.push(s);
+      return s;
+    };
+  });
+  await kiosk.reload();
+  const micLive = () =>
+    kiosk.evaluate(() =>
+      (window as unknown as { __streams: MediaStream[] }).__streams.some((s) =>
+        s.getTracks().some((t) => t.readyState === "live"),
+      ),
+    );
+  const founder = `Founder ${project}`;
+  const cat = kiosk.getByRole("button", { name: "Ask Baumy" });
+  const bubble = kiosk.getByTestId("cat-bubble");
+  const close = bubble.getByRole("button", { name: "Close" });
+  const holdButton = bubble.getByTestId("hold-to-talk");
+  // Somewhere on the dashboard away from the bubble and the cat: the header.
+  const outside = { x: 40, y: 40 };
+
+  async function shots(name: string) {
+    const dir = process.env.E2E_SHOTS_DIR;
+    if (!dir) return;
+    await kiosk.screenshot({ path: `${dir}/kiosk-${name}.png` });
+    await kiosk.setViewportSize({ width: 360, height: 780 });
+    await kiosk.screenshot({ path: `${dir}/phone-${name}.png` });
+    await kiosk.setViewportSize({ width: 820, height: 1180 });
+  }
+
+  // Open: tapped in, ready to talk, the microphone open.
+  await cat.tap();
+  await bubble.getByRole("button", { name: founder, exact: true }).tap();
+  await expect(bubble).toHaveAttribute("data-mode", "talk");
+  await expect(holdButton).toHaveAttribute("data-state", "idle");
+  await expect(close).toBeVisible();
+  // The × is a kiosk target, like every button in the bubble.
+  await expectKioskTargets(bubble);
+  await expect.poll(micLive).toBe(true);
+  await shots("1-talk");
+
+  // A tap inside the bubble leaves it be.
+  await bubble.getByText(/Hold the button and talk/).tap();
+  await expect(bubble).toHaveAttribute("data-mode", "talk");
+
+  // The ×: closed, and the microphone off.
+  await close.tap();
+  await expect(bubble).toHaveCount(0);
+  await expect.poll(micLive).toBe(false);
+
+  // A tap outside: closed the same way, still on the dashboard.
+  await cat.tap();
+  await expect(bubble).toHaveAttribute("data-mode", "talk");
+  await expect.poll(micLive).toBe(true);
+  await kiosk.touchscreen.tap(outside.x, outside.y);
+  await expect(bubble).toHaveCount(0);
+  await expect.poll(micLive).toBe(false);
+  expect(new URL(kiosk.url()).pathname).toBe("/kiosk");
+
+  // A hold with a second finger landing outside: still listening, and
+  // letting go sends it and answers in the bubble.
+  await cat.tap();
+  await expect(holdButton).toHaveAttribute("data-state", "idle");
+  const box = (await holdButton.boundingBox())!;
+  const finger = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const transcribed = kiosk.waitForResponse("**/api/ai/transcribe");
+  const cdp = await ipad.context.newCDPSession(kiosk);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ ...finger, id: 1 }],
+  });
+  await expect(bubble).toHaveAttribute("data-mode", "listening");
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [
+      { ...finger, id: 1 },
+      { ...outside, id: 2 },
+    ],
+  });
+  await kiosk.waitForTimeout(900);
+  await expect(bubble).toHaveAttribute("data-mode", "listening");
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await cdp.detach();
+  expect((await transcribed).status()).toBe(200);
+  await expect(bubble).toHaveAttribute("data-mode", "answer");
+  await expect(bubble).toContainText(
+    /is winning with \d+ points|Nobody is ahead/,
+  );
+  await shots("2-answer");
+
+  // The cards, for the owner's screenshots; a tap outside closes them
+  // unconfirmed.
+  await ipad.context.addCookies([
+    {
+      name: "baumy_e2e_transcript",
+      value: encodeURIComponent(`I cleaned the ${chore}`),
+      url: new URL(kiosk.url()).origin,
+    },
+  ]);
+  const again = kiosk.waitForResponse("**/api/ai/transcribe");
+  await touchHold(kiosk, ipad.context, holdButton, () =>
+    kiosk.waitForTimeout(900),
+  );
+  expect((await again).status()).toBe(200);
+  await expect(bubble.getByTestId("suggestion-log_completion")).toContainText(
+    `Log ${chore} for ${founder}: +7`,
+  );
+  await shots("3-cards");
+  await kiosk.touchscreen.tap(outside.x, outside.y);
+  await expect(bubble).toHaveCount(0);
+  await ipad.context.close();
+});
