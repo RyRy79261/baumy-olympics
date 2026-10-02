@@ -7,7 +7,7 @@ import {
 } from "@baumy/core";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Queryable } from "./index";
-import { chores, completions, seasons } from "./schema";
+import { completions, seasons } from "./schema";
 
 // Seasons (SPEC §4.1, §4.5): one per Berlin calendar year, created lazily the
 // first time a write needs it (a completion, an adjustment, a pot contribution

@@ -57,7 +57,7 @@ plus `issues` (with `INVALID_INPUT`), `retryAt` (with `COOLDOWN`) or
 | ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | 400    | `INVALID_INPUT`                 | A bug on our side or a bad slot: `issues` says which field or header. Ask the person to rephrase.             |
 | 401    | `UNAUTHENTICATED`               | Olympics is not (correctly) connected. "Baumy Olympics isn't connected to me yet."                            |
-| 403    | `FORBIDDEN`                     | Not allowed for this member (for example disputing your own claim). Show `message`.                          |
+| 403    | `FORBIDDEN`                     | Not allowed for this member (for example disputing your own claim). Show `message`.                           |
 | 403    | `SURFACE_FORBIDDEN`             | Not Baumy's to do (admin or app-only). "That's done in the Olympics app."                                     |
 | 403    | `TELEGRAM_NOT_LINKED`           | "Link your Telegram first: Olympics → Settings → Link Telegram, then tap Start here (or DM me /link <code>)." |
 | 404    | `UNKNOWN_ACTION`, `NOT_FOUND`   | No such action, or the thing (event, note, reminder, claim, housemate) is gone. Show `message`.               |
