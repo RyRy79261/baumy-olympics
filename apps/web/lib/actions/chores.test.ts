@@ -418,26 +418,16 @@ describe("log_completion", () => {
     ).resolves.toMatchObject({ ok: true, data: { status: "pending" } });
   });
 
-  it("on the kiosk, logging for someone else needs the logger's PIN in the same request", async () => {
+  it("on the kiosk, logging for someone else needs no PIN, and still vouches (issue #145)", async () => {
     const input = { choreId: trash, doneBy: partner };
     const ctx = ctxFor(kiosk(ryan, "Ryan"), { source: "kiosk" });
-    await expect(runAction("log_completion", input, ctx)).resolves.toEqual({
-      ok: false,
-      code: "ATTESTATION_REQUIRED",
-      message: "Enter your PIN to do this.",
-    });
-    await expect(
-      runAction("log_completion", input, { ...ctx, pin: "0000" }),
-    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
     await expect(tally()).resolves.toEqual({
       completions: 0,
       audits: 0,
       requests: 0,
     });
 
-    const data = ok(
-      await runAction("log_completion", input, { ...ctx, pin: PIN }),
-    );
+    const data = ok(await runAction("log_completion", input, ctx));
     expect(data).toMatchObject({
       doneBy: partner,
       doneByName: "Partner",

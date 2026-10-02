@@ -376,30 +376,53 @@ describe("POST /api/actions/run", () => {
     expect(ledger).toMatchObject({ source: "ai", status: "done" });
   });
 
-  it("on the kiosk, confirming someone's completion needs the PIN", async () => {
+  it("on the kiosk, disputing someone's completion needs the PIN (issue #145)", async () => {
     const logged = await runAction(
       "log_completion",
       { choreId: trash },
       ctxFor(sessionActor(sam), { now: new Date() }),
     );
     if (!logged.ok) throw new Error(logged.message);
-    const confirm = (pin?: string) =>
+    const dispute = (pin?: string) =>
       post({
-        name: "confirm_completion",
-        input: { completionId: logged.data.completionId },
-        requestId: "confirm-proposal-1",
+        name: "dispute_completion",
+        input: { completionId: logged.data.completionId, reason: "Still full" },
+        requestId: "dispute-proposal-1",
         surface: "kiosk",
         ...(pin ? { pin } : {}),
       });
 
-    const noPin = await body(await handleRunAction(confirm(), runDeps));
+    const noPin = await body(await handleRunAction(dispute(), runDeps));
     expect(noPin).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
-    const wrong = await body(await handleRunAction(confirm("1111"), runDeps));
+    const wrong = await body(await handleRunAction(dispute("1111"), runDeps));
     expect(wrong).toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
     const [before] = await t.db().select().from(completions);
     expect(before!.status).toBe("pending");
 
-    const ok = await body(await handleRunAction(confirm(PIN), runDeps));
+    const ok = await body(await handleRunAction(dispute(PIN), runDeps));
+    expect(ok.ok).toBe(true);
+    const [after] = await t.db().select().from(completions);
+    expect(after!.status).toBe("disputed");
+  });
+
+  it("on the kiosk, confirming someone's completion needs no PIN (issue #145)", async () => {
+    const logged = await runAction(
+      "log_completion",
+      { choreId: trash },
+      ctxFor(sessionActor(sam), { now: new Date() }),
+    );
+    if (!logged.ok) throw new Error(logged.message);
+    const ok = await body(
+      await handleRunAction(
+        post({
+          name: "confirm_completion",
+          input: { completionId: logged.data.completionId },
+          requestId: "confirm-proposal-1",
+          surface: "kiosk",
+        }),
+        runDeps,
+      ),
+    );
     expect(ok.ok).toBe(true);
     const [after] = await t.db().select().from(completions);
     expect(after!.status).toBe("confirmed");
@@ -480,8 +503,20 @@ describe("POST /api/ai/proposal", () => {
     expect(await completionCount()).toBe(0);
   });
 
-  it("flags the PIN on the kiosk", async () => {
+  it("flags the PIN on the kiosk for a dispute, not for vouching (issue #145)", async () => {
     const res = await handleProposal(
+      post({
+        name: "dispute_completion",
+        input: {
+          completionId: "00000000-0000-4000-8000-00000000beef",
+          reason: "Still full",
+        },
+        surface: "kiosk",
+      }),
+      deps(),
+    );
+    expect(((await res.json()) as { data: Proposal }).data.needsPin).toBe(true);
+    const vouch = await handleProposal(
       post({
         name: "log_completion",
         input: { choreId: trash, doneBy: sam },
@@ -489,7 +524,9 @@ describe("POST /api/ai/proposal", () => {
       }),
       deps(),
     );
-    expect(((await res.json()) as { data: Proposal }).data.needsPin).toBe(true);
+    expect(((await vouch.json()) as { data: Proposal }).data.needsPin).toBe(
+      false,
+    );
   });
 
   it("refuses bad requests and answers 500 when the household cannot be read", async () => {

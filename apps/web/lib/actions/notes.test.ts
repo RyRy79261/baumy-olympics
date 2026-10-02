@@ -21,8 +21,8 @@ import { REGISTRY, runAction } from "./registry";
 // The note actions through the real runAction on PGlite (issue #20):
 // list_notes, create_note, update_note, pin_note and delete_note. Success,
 // every error code, the surfaces, and the permissions: any member may change
-// any note, the kiosk needs the acting member's PIN for every change, and
-// delete never reaches MCP or brain.
+// any note, the kiosk writes as the acting member with no PIN (owner ruling
+// 2026-10-02, issue #145), and delete never reaches MCP or brain.
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -139,20 +139,25 @@ describe("create_note", () => {
     expect(await t.db().select().from(notes)).toHaveLength(0);
   });
 
-  it("needs the acting member's PIN on the kiosk", async () => {
-    expect(
-      await runAction("create_note", { title: "Hi" }, kiosk(ryan)),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
-    expect(
-      await runAction("create_note", { title: "Hi" }, kiosk(ryan, "0000")),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
-    expect(await t.db().select().from(notes)).toHaveLength(0);
-    const note = await add("Hi", {}, kiosk(ryan, PIN));
-    expect(note.authorId).toBe(ryan);
+  it("needs no PIN on the kiosk, even from a member who never set one", async () => {
+    // Issue #145: Partner has no PIN at all, and writes a note as themself.
+    const note = await add("Hi", {}, kiosk(partner));
+    expect(note.authorId).toBe(partner);
     const [audit] = await audits(note.id);
-    expect(audit).toMatchObject({ source: "kiosk", actorMemberId: ryan });
-    // The PIN is request metadata: it never reaches the ledger or the audit.
-    expect(JSON.stringify(audit!.payload)).not.toContain(PIN);
+    expect(audit).toMatchObject({ source: "kiosk", actorMemberId: partner });
+    // A PIN sent along anyway is not checked, so even a wrong one is fine.
+    expect((await add("Hey", {}, kiosk(ryan, "0000"))).authorId).toBe(ryan);
+  });
+
+  it("refuses a kiosk with nobody picked", async () => {
+    const nobody = ctxFor(
+      { kind: "kiosk", deviceId: "dev-1" },
+      { source: "kiosk" },
+    );
+    expect(
+      await runAction("create_note", { title: "Hi" }, nobody),
+    ).toMatchObject({ ok: false, code: "FORBIDDEN" });
+    expect(await t.db().select().from(notes)).toHaveLength(0);
   });
 
   it("works from MCP with the write scope, and from brain", async () => {
@@ -329,21 +334,14 @@ describe("update_note", () => {
     expect(claims).toEqual([]);
   });
 
-  it("needs the PIN on the kiosk", async () => {
+  it("needs no PIN on the kiosk", async () => {
     const note = await add("Wifi");
-    expect(
-      await runAction(
-        "update_note",
-        { noteId: note.id, title: "Wifi 2" },
-        kiosk(ryan),
-      ),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
     expect(
       ok(
         await runAction(
           "update_note",
           { noteId: note.id, title: "Wifi 2" },
-          kiosk(ryan, PIN),
+          kiosk(partner),
         ),
       ).note.title,
     ).toBe("Wifi 2");
@@ -404,21 +402,14 @@ describe("pin_note", () => {
     ).toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
 
-  it("needs the PIN on the kiosk", async () => {
+  it("needs no PIN on the kiosk", async () => {
     const note = await add("Wifi");
-    expect(
-      await runAction(
-        "pin_note",
-        { noteId: note.id, pinned: true },
-        kiosk(ryan),
-      ),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
     expect(
       ok(
         await runAction(
           "pin_note",
           { noteId: note.id, pinned: true },
-          kiosk(ryan, PIN),
+          kiosk(partner),
         ),
       ).note.pinned,
     ).toBe(true);
@@ -489,12 +480,10 @@ describe("delete_note", () => {
     expect(ok(await runAction("list_notes", {}, as(ryan))).notes).toEqual([]);
   });
 
-  it("needs the PIN on the kiosk", async () => {
+  it("needs no PIN on the kiosk", async () => {
     const note = await add("Wifi");
-    expect(
-      await runAction("delete_note", { noteId: note.id }, kiosk(ryan)),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
-    ok(await runAction("delete_note", { noteId: note.id }, kiosk(ryan, PIN)));
+    ok(await runAction("delete_note", { noteId: note.id }, kiosk(partner)));
+    expect(ok(await runAction("list_notes", {}, as(ryan))).notes).toEqual([]);
   });
 
   it("previews which note goes", async () => {

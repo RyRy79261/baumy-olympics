@@ -260,32 +260,52 @@ describe("confirm_completion", () => {
     expect((await stored(id)).status).toBe("pending");
   });
 
-  it("on the kiosk needs the confirming member's PIN in the request", async () => {
+  it("on the kiosk confirms as the acting member with no PIN, even one who never set a PIN (issue #145)", async () => {
     const { choreId } = await seedChore(db(), TRASH);
     const id = await selfClaim(choreId, ryan);
-    const ctx = ctxFor(kiosk(partner), { source: "kiosk" });
-    await expect(
-      runAction("confirm_completion", { completionId: id }, ctx),
-    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
-    await expect(
-      runAction(
-        "confirm_completion",
-        { completionId: id },
-        { ...ctx, pin: "0000" },
-      ),
-    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
-    expect((await stored(id)).status).toBe("pending");
-    ok(
-      await runAction(
-        "confirm_completion",
-        { completionId: id },
-        { ...ctx, pin: PIN },
-      ),
-    );
+    // Admin has no PIN at all.
+    const ctx = ctxFor(kiosk(admin), { source: "kiosk" });
+    ok(await runAction("confirm_completion", { completionId: id }, ctx));
     expect(await stored(id)).toMatchObject({
       status: "confirmed",
-      verifiedBy: partner,
+      verifiedBy: admin,
     });
+    expect(await audits("confirm_completion")).toBe(1);
+  });
+
+  it("on the kiosk needs the disputing member's PIN in the request (issue #145)", async () => {
+    const { choreId } = await seedChore(db(), TRASH);
+    const id = await selfClaim(choreId, ryan);
+    const dispute = { completionId: id, reason: "Still full" };
+    const ctx = ctxFor(kiosk(partner), { source: "kiosk" });
+    await expect(
+      runAction("dispute_completion", dispute, ctx),
+    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
+    await expect(
+      runAction("dispute_completion", dispute, { ...ctx, pin: "0000" }),
+    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
+    expect((await stored(id)).status).toBe("pending");
+    ok(await runAction("dispute_completion", dispute, { ...ctx, pin: PIN }));
+    expect((await stored(id)).status).toBe("disputed");
+  });
+
+  it("still refuses a dispute from a member with no PIN on the kiosk, PIN or not (issue #145)", async () => {
+    const { choreId } = await seedChore(db(), TRASH);
+    const id = await selfClaim(choreId, ryan);
+    const dispute = { completionId: id, reason: "Still full" };
+    const ctx = ctxFor(kiosk(admin), { source: "kiosk" });
+    await expect(
+      runAction("dispute_completion", dispute, ctx),
+    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
+    await expect(
+      runAction("dispute_completion", dispute, { ...ctx, pin: PIN }),
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "PIN_NOT_SET",
+      message: expect.stringContaining("haven't set a personal PIN"),
+    });
+    expect((await stored(id)).status).toBe("pending");
+    expect(await audits("dispute_completion")).toBe(0);
   });
 
   it("is offered on every surface, and MCP needs the write scope", async () => {

@@ -43,9 +43,10 @@ import { fail, type ActionFailure } from "./result";
 // Private and confidential events are never shown, and cannot be changed or
 // deleted from here: the calendar is shared, and the kitchen screen is too.
 //
-// The writes are `attested` (SPEC §6.2: on the kiosk, changing calendar
-// entries takes the acting member's PIN; issue #134). A session, MCP and
-// brain are their own member, so only the kiosk is asked for a PIN.
+// The writes are `member`: on the kiosk the acting member changes the
+// calendar with no PIN, since an event touches nobody's points (owner ruling
+// 2026-10-02, SPEC §12 decision 26, issue #145; issue #134 had made them
+// `attested`).
 
 /** The calendar's failures as sentences people can act on. */
 export function calendarFailure(r: CalendarFailure): ActionFailure {
@@ -235,7 +236,7 @@ export const createEvent = defineAction({
   kind: "write",
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: "attested",
+  requires: "member",
   transactional: false,
   input: NewCalendarEvent,
   async preview(ctx, i) {
@@ -282,7 +283,7 @@ export const updateEvent = defineAction({
   kind: "write",
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: "attested",
+  requires: "member",
   transactional: false,
   input: CalendarEventUpdate,
   async preview(ctx, i) {
@@ -326,7 +327,7 @@ export const deleteEvent = defineAction({
   risk: "destructive",
   // Brain behind its confirm button (issue #70); never MCP.
   surfaces: ["ui", "kiosk", "ai", "brain"],
-  requires: "attested",
+  requires: "member",
   transactional: false,
   input: z.strictObject({
     eventId: CalendarEventId.describe("The event's id, from list_events."),

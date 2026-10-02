@@ -23,9 +23,10 @@ import { fail } from "./result";
 // Household notes (SPEC §3.5, issue #20): short shared notes with a markdown
 // body, an optional colour and a pin that puts them on the hub and the
 // kitchen screen. Any member may add, change, pin or delete any note; it is
-// the household's board. On the kiosk every change needs the acting
-// member's PIN (SPEC §6.2), which is what `attested` means there; a phone
-// session, MCP or brain is its own member and passes as it is.
+// the household's board. Every write is `member`: on the kiosk the acting
+// member (the avatar tapped) writes it with no PIN, since a note touches
+// nobody's points (owner ruling 2026-10-02, SPEC §12 decision 26, issue
+// #145; before, every change asked the PIN).
 //
 // Note bodies are data. They are shown only through the sanitising markdown
 // renderer (packages/ui `MarkdownBody`), and the AI sees them inside tool
@@ -128,7 +129,7 @@ export const createNote = defineAction({
   kind: "write",
   risk: "safe",
   surfaces: ALL_SURFACES,
-  requires: "attested",
+  requires: "member",
   input: NewNote,
   async preview(_ctx, i) {
     return `Add the note "${i.title}"${i.pinned ? " and pin it" : ""}`;
@@ -157,7 +158,7 @@ export const updateNote = defineAction({
   kind: "write",
   risk: "confirm",
   surfaces: ALL_SURFACES,
-  requires: "attested",
+  requires: "member",
   input: NoteUpdate,
   async preview(ctx, i) {
     const was = await findNote(ctx.db, ctx.householdId, i.noteId);
@@ -189,7 +190,7 @@ export const pinNote = defineAction({
   kind: "write",
   risk: "safe",
   surfaces: ALL_SURFACES,
-  requires: "attested",
+  requires: "member",
   input: NotePin,
   async preview(ctx, i) {
     const note = await findNote(ctx.db, ctx.householdId, i.noteId);
@@ -224,7 +225,7 @@ export const deleteNote = defineAction({
   risk: "destructive",
   // Brain behind its confirm button (issue #70); never MCP.
   surfaces: ["ui", "kiosk", "ai", "brain"],
-  requires: "attested",
+  requires: "member",
   input: NoteRef,
   async preview(ctx, i) {
     const note = await findNote(ctx.db, ctx.householdId, i.noteId);
