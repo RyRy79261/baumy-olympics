@@ -8,7 +8,6 @@ import {
   effectiveStatus,
   initialVerification,
   isVerified,
-  partnerExpiresAt,
   settle,
   transition,
   type VerificationEvent,
@@ -21,19 +20,14 @@ const ADMIN = "member-admin";
 const WINDOW = RULESET_V1.challengeWindowH * HOUR;
 const GRACE = RULESET_V1.withdrawGraceH * HOUR;
 const UNDO = RULESET_V1.undoWindowMin * MINUTE;
-const EXPIRY = RULESET_V1.partnerConfirmExpiryH * HOUR;
 
 const loggedAt = berlin(2026, 9, 21, 8);
 const at = (ms: number) => new Date(loggedAt.getTime() + ms);
 
-function selfClaim(
-  confirmMode: "optimistic" | "partner" = "optimistic",
-  photoAttachedAt: Date | null = null,
-): VerificationRow {
+function selfClaim(photoAttachedAt: Date | null = null): VerificationRow {
   return initialVerification({
     doneBy: RYAN,
     loggedBy: RYAN,
-    confirmMode,
     loggedAt,
     photoAttachedAt,
   });
@@ -57,11 +51,13 @@ const dispute = (actor = PARTNER): VerificationEvent => ({
   reason: "the bin is still full",
 });
 
-function disputed(
-  confirmMode: "optimistic" | "partner" = "optimistic",
-  when = at(HOUR),
-): VerificationRow {
-  return apply(selfClaim(confirmMode), dispute(), when);
+function disputed(when = at(HOUR)): VerificationRow {
+  return apply(selfClaim(), dispute(), when);
+}
+
+/** Logged by the partner for Ryan: verified when it is created. */
+function loggedForRyan(): VerificationRow {
+  return initialVerification({ doneBy: RYAN, loggedBy: PARTNER, loggedAt });
 }
 
 describe("initialVerification", () => {
@@ -69,7 +65,6 @@ describe("initialVerification", () => {
     const row = initialVerification({
       doneBy: RYAN,
       loggedBy: PARTNER,
-      confirmMode: "partner",
       loggedAt,
     });
     expect(row).toMatchObject({
@@ -82,8 +77,8 @@ describe("initialVerification", () => {
     expect(isVerified(row)).toBe(true);
   });
 
-  it("starts an optimistic self-claim as pending until logged_at + 24h", () => {
-    const row = selfClaim("optimistic", loggedAt);
+  it("starts a self-claim as pending (counted) until logged_at + 24h", () => {
+    const row = selfClaim(loggedAt);
     expect(row).toMatchObject({
       status: "pending",
       finalizesAt: at(WINDOW),
@@ -91,61 +86,16 @@ describe("initialVerification", () => {
       photoAttachedAt: loggedAt,
     });
     expect(isVerified(row)).toBe(false);
-  });
-
-  it("starts a partner self-claim as pending with no finalizes_at", () => {
-    const row = selfClaim("partner");
-    expect(row).toMatchObject({ status: "pending", finalizesAt: null });
-    expect(partnerExpiresAt(row)).toEqual(at(EXPIRY));
     expect(challengeWindowEndsAt(row)).toEqual(at(WINDOW));
   });
 });
 
 describe("SPEC §4.3 transition table", () => {
-  it("pending → confirmed when another member confirms (either mode)", () => {
-    for (const mode of ["optimistic", "partner"] as const) {
-      const row = apply(
-        selfClaim(mode),
-        { type: "confirm", actor: PARTNER },
-        at(HOUR),
-      );
-      expect(row).toMatchObject({
-        status: "confirmed",
-        verifiedBy: PARTNER,
-        verifiedAt: at(HOUR),
-      });
-      expect(isVerified(row)).toBe(true);
-    }
-  });
-
-  it("pending: the doer cannot confirm their own claim", () => {
-    expect(
-      transition(selfClaim(), { type: "confirm", actor: RYAN }, at(HOUR)),
-    ).toEqual({ ok: false, code: "FORBIDDEN" });
-  });
-
-  it("⏱ pending (optimistic) → finalized once finalizes_at <= now", () => {
+  it("⏱ pending → finalized once finalizes_at <= now", () => {
     const row = selfClaim();
     expect(effectiveStatus(row, at(WINDOW - 1))).toBe("pending");
     expect(effectiveStatus(row, at(WINDOW))).toBe("finalized");
     expect(settle(row, at(WINDOW))).toEqual({ ...row, status: "finalized" });
-    // Too late to confirm: time already moved it on.
-    expect(
-      transition(row, { type: "confirm", actor: PARTNER }, at(WINDOW)),
-    ).toEqual({ ok: false, code: "INVALID_STATE" });
-  });
-
-  it("⏱ pending (partner) → voided (unconfirmed) after 72h", () => {
-    const row = selfClaim("partner");
-    expect(effectiveStatus(row, at(EXPIRY - 1))).toBe("pending");
-    expect(effectiveStatus(row, at(EXPIRY))).toBe("voided");
-    expect(settle(row, at(EXPIRY))).toMatchObject({
-      status: "voided",
-      voidReason: "unconfirmed",
-    });
-    expect(
-      transition(row, { type: "confirm", actor: PARTNER }, at(EXPIRY)),
-    ).toEqual({ ok: false, code: "INVALID_STATE" });
   });
 
   it("pending → disputed when another member disputes inside the window", () => {
@@ -154,15 +104,16 @@ describe("SPEC §4.3 transition table", () => {
   });
 
   it("pending: a dispute outside the window, by the doer, or with no reason fails", () => {
-    // Optimistic: at the window's end the claim has already finalized.
+    // At the window's end the claim has already finalized.
     expect(transition(selfClaim(), dispute(), at(WINDOW))).toEqual({
       ok: false,
       code: "INVALID_STATE",
     });
-    // Partner: still pending at 30h, but the challenge window is over.
-    const partner = selfClaim("partner");
-    expect(effectiveStatus(partner, at(30 * HOUR))).toBe("pending");
-    expect(transition(partner, dispute(), at(30 * HOUR))).toEqual({
+    // A pending row stored with no finalizes_at (none is written any more)
+    // still closes to disputes 24h after logging.
+    const legacy = { ...selfClaim(), finalizesAt: null };
+    expect(effectiveStatus(legacy, at(30 * HOUR))).toBe("pending");
+    expect(transition(legacy, dispute(), at(30 * HOUR))).toEqual({
       ok: false,
       code: "WINDOW_CLOSED",
     });
@@ -207,13 +158,14 @@ describe("SPEC §4.3 transition table", () => {
     );
   });
 
-  it("disputed → pending on withdraw keeps a partner claim without finalizes_at", () => {
+  it("disputed → pending on withdraw gives a row with no finalizes_at one", () => {
+    const legacy = { ...disputed(), finalizesAt: null };
     const row = apply(
-      disputed("partner"),
+      legacy,
       { type: "withdraw", actor: PARTNER },
       at(2 * HOUR),
     );
-    expect(row).toMatchObject({ status: "pending", finalizesAt: null });
+    expect(row).toMatchObject({ status: "pending", finalizesAt: at(WINDOW) });
   });
 
   it("disputed: only the disputer can withdraw", () => {
@@ -290,7 +242,7 @@ describe("SPEC §4.3 transition table", () => {
   });
 
   it("a photo attached at logging counts as in time", () => {
-    const row = apply(selfClaim("optimistic", loggedAt), dispute(), at(HOUR));
+    const row = apply(selfClaim(loggedAt), dispute(), at(HOUR));
     expect(effectiveStatus(row, at(WINDOW + DAY))).toBe("disputed");
     // A later attach keeps the first time.
     expect(attachPhoto(row, at(WINDOW + DAY))).toBe(row);
@@ -308,7 +260,7 @@ describe("SPEC §4.3 transition table", () => {
       row: { status: "voided", voidReason: "undone" },
     });
     const fromDispute = transition(
-      disputed("optimistic", at(MINUTE)),
+      disputed(at(MINUTE)),
       { type: "undo", actor: RYAN },
       at(5 * MINUTE),
     );
@@ -380,15 +332,10 @@ describe("SPEC §4.3 transition table", () => {
   });
 
   it("returns INVALID_STATE for every event outside its from-states", () => {
-    const confirmed = apply(
-      selfClaim(),
-      { type: "confirm", actor: PARTNER },
-      at(HOUR),
-    );
+    const confirmed = loggedForRyan();
     const voided = apply(selfClaim(), { type: "undo", actor: RYAN }, at(1));
     const finalized = settle(selfClaim(), at(WINDOW));
     const events: VerificationEvent[] = [
-      { type: "confirm", actor: PARTNER },
       dispute(),
       { type: "withdraw", actor: PARTNER },
       { type: "concede", actor: RYAN },
@@ -404,14 +351,14 @@ describe("SPEC §4.3 transition table", () => {
       }
     }
     // Pending rows cannot be withdrawn, conceded or resolved.
-    for (const e of events.slice(2, 4).concat(events[5]!)) {
+    for (const e of events.slice(1, 3).concat(events[4]!)) {
       expect(transition(selfClaim(), e, at(HOUR))).toEqual({
         ok: false,
         code: "INVALID_STATE",
       });
     }
-    // A disputed row cannot be confirmed or disputed again.
-    for (const e of events.slice(0, 2)) {
+    // A disputed row cannot be disputed again.
+    for (const e of events.slice(0, 1)) {
       expect(transition(disputed(), e, at(2 * HOUR))).toEqual({
         ok: false,
         code: "INVALID_STATE",
@@ -420,11 +367,7 @@ describe("SPEC §4.3 transition table", () => {
   });
 
   it("settle leaves rows with nothing due untouched", () => {
-    const confirmed = apply(
-      selfClaim(),
-      { type: "confirm", actor: PARTNER },
-      at(HOUR),
-    );
+    const confirmed = loggedForRyan();
     expect(settle(confirmed, at(10 * DAY))).toBe(confirmed);
     expect(settle(selfClaim(), at(HOUR))).toEqual(selfClaim());
   });
@@ -439,7 +382,6 @@ describe("SPEC §4.6 worked example E9", () => {
     occurredAt: new Date(doneAt.getTime() - 4 * DAY),
     loggedAt: new Date(doneAt.getTime() - 4 * DAY),
     status: "confirmed",
-    confirmMode: "optimistic",
   };
   const asReplay = (row: VerificationRow): ReplayCompletion => ({
     id: "c-e9-1",
@@ -447,7 +389,6 @@ describe("SPEC §4.6 worked example E9", () => {
     occurredAt: doneAt,
     loggedAt: row.loggedAt,
     status: row.status,
-    confirmMode: row.confirmMode,
   });
   const score = (row: VerificationRow) =>
     replayChore([earlier, asReplay(row)], [BATHROOM]).map((s) => [
@@ -499,7 +440,6 @@ const SPAN = 5 * DAY;
 
 const memberArb = fc.constantFrom(...MEMBERS);
 const eventArb: fc.Arbitrary<VerificationEvent> = fc.oneof(
-  fc.record({ type: fc.constant("confirm" as const), actor: memberArb }),
   fc.record({
     type: fc.constant("dispute" as const),
     actor: memberArb,
@@ -530,7 +470,6 @@ interface Step {
 interface Claim {
   doneBy: string;
   loggedBy: string;
-  confirmMode: "optimistic" | "partner";
   photo: boolean;
   gapMin: number;
   steps: Step[];
@@ -553,7 +492,6 @@ const historyArb: fc.Arbitrary<Claim[]> = fc.array(
   fc.record({
     doneBy: memberArb,
     loggedBy: memberArb,
-    confirmMode: fc.constantFrom("optimistic" as const, "partner" as const),
     photo: fc.boolean(),
     gapMin: fc.integer({ min: 0, max: 3 * 24 * 60 }),
     steps: fc.array(stepArb, { maxLength: 8 }),
@@ -583,7 +521,6 @@ function play(history: Claim[], t: number, withSettle: boolean) {
     let row = initialVerification({
       doneBy: h.doneBy,
       loggedBy: h.loggedBy,
-      confirmMode: h.confirmMode,
       loggedAt: logged,
       photoAttachedAt: h.photo ? logged : null,
     });
@@ -612,7 +549,6 @@ const toReplay = ({ id, occurredAt, row }: Timed): ReplayCompletion => ({
   occurredAt,
   loggedAt: row.loggedAt,
   status: row.status,
-  confirmMode: row.confirmMode,
 });
 
 const RULES = [{ ...BATHROOM, effectiveFrom: new Date(0) }];
