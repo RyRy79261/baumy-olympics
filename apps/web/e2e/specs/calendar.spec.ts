@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { founderAdmin } from "../lib/household";
-import { expectKioskTargets, kioskNav, pairedKiosk } from "../lib/kiosk";
 
 // Issue #19, against the in-memory calendar that stands in for Google under
 // E2E_TEST_MODE=1 (lib/integrations/calendar-memory.ts). The fake takes the
@@ -39,7 +38,10 @@ test("add, edit and delete an event on /calendar", async ({
   page,
 }, testInfo) => {
   const project = testInfo.project.name;
-  test.skip(project === "ipad-portrait", "The kiosk has its own spec below.");
+  test.skip(
+    project === "ipad-portrait",
+    "The kiosk has its own spec, kiosk-calendar.spec.ts.",
+  );
   const tag = Math.random().toString(36).slice(2, 8);
   const title = `Dinner ${tag}`;
   const renamed = `Supper ${tag}`;
@@ -85,6 +87,11 @@ test("add, edit and delete an event on /calendar", async ({
   await expect(edit.getByTestId("event-when")).toHaveText(
     "Fri 15 Jan, 19:00–20:30",
   );
+  // Nobody was picked: it is for the whole house (issue #134).
+  await expect(edit.getByTestId("event-for-name")).toHaveText("Everyone");
+  await expect(
+    edit.getByRole("radio", { name: "Everyone", exact: true }),
+  ).toBeChecked();
   await edit.getByLabel("Title").fill(renamed);
   await edit.getByLabel("Starts").fill("19:30");
   await edit.getByRole("button", { name: "Save" }).click();
@@ -113,86 +120,4 @@ test("add, edit and delete an event on /calendar", async ({
   await confirm.getByRole("button", { name: "Delete event" }).click();
   await expect(confirm).toBeHidden();
   await expect(eventButton(page, renamed)).toHaveCount(0);
-});
-
-test("on the kiosk, 19:00 in January and in July both stay 19:00", async ({
-  page,
-  browser,
-}, testInfo) => {
-  const project = testInfo.project.name;
-  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
-  const tag = Math.random().toString(36).slice(2, 8);
-  const founder = `Founder ${project}`;
-
-  await founderAdmin(page, project);
-  const ipad = await pairedKiosk(browser, page, `iPad cal ${tag}`);
-  const kiosk = ipad.page;
-  await kioskNav(kiosk, "Calendar");
-  await expect(
-    kiosk.getByRole("heading", { name: "Calendar", level: 1 }),
-  ).toBeVisible();
-  await kiosk.getByRole("button", { name: founder, exact: true }).click();
-  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-
-  // A six-week month fits the portrait screen above the footer: no scroll.
-  await kiosk.goto("/kiosk/calendar?view=month&date=2026-11-10");
-  const lastWeek = kiosk.getByTestId("day-2026-12-06");
-  await expect(lastWeek).toBeVisible();
-  const fits = await kiosk.evaluate(() => {
-    const main = document.querySelector("main")!;
-    const nav = document.querySelector('nav[aria-label="Kiosk"]')!;
-    const last = document.querySelector('[data-testid="day-2026-12-06"]')!;
-    return {
-      scroll: main.scrollHeight <= main.clientHeight,
-      above:
-        last.getBoundingClientRect().bottom <= nav.getBoundingClientRect().top,
-    };
-  });
-  expect(fits).toEqual({ scroll: true, above: true });
-
-  for (const [date, label] of [
-    ["2027-01-15", "Fri 15 Jan"],
-    ["2027-07-15", "Thu 15 Jul"],
-  ] as const) {
-    const title = `Kiosk ${date} ${tag}`;
-    await kiosk.goto(`/kiosk/calendar?view=day&date=${date}`);
-    await kiosk.getByRole("button", { name: "New event" }).click();
-    const sheet = kiosk.getByRole("dialog", { name: "New event" });
-    await expectKioskTargets(sheet);
-    await sheet.getByLabel("Title").fill(title);
-    await sheet.getByLabel("Date").fill(date);
-    await sheet.getByLabel("Starts").fill("19:00");
-    await sheet.getByLabel("Ends").fill("20:00");
-    await sheet.getByRole("button", { name: "Add event" }).click();
-    await expect(sheet).toBeHidden();
-    await expect(eventButton(kiosk, title)).toContainText("19:00");
-
-    // The kiosk's month (the prototype's): each day is one big target that
-    // opens it, and its events are one-line chips, not buttons.
-    await kiosk.goto(`/kiosk/calendar?view=month&date=${date}`);
-    const cell = kiosk.getByTestId(`day-${date}`);
-    const open = cell.getByRole("link", {
-      name: new RegExp(`^${label}: \\d+ events?$`),
-    });
-    await expect(open).toBeVisible();
-    const box = (await open.boundingBox())!;
-    expect(box.width).toBeGreaterThanOrEqual(56);
-    expect(box.height).toBeGreaterThanOrEqual(56);
-    await expect(eventButton(cell, title)).toHaveCount(0);
-    await open.click();
-    await expect(kiosk).toHaveURL(new RegExp(`view=day&date=${date}$`));
-    await expect(eventButton(kiosk, title)).toContainText("19:00");
-
-    // The phone reads it back from the calendar at 19:00 too, added by the
-    // member acting on the kiosk.
-    await page.goto(`/calendar?view=day&date=${date}`);
-    await eventButton(page, title).click();
-    const details = page.getByRole("dialog", { name: `Edit ${title}` });
-    await expect(details.getByTestId("event-when")).toHaveText(
-      `${label}, 19:00–20:00`,
-    );
-    await expect(details.getByTestId("event-added-by")).toHaveText(founder);
-    await details.getByRole("button", { name: "Cancel" }).click();
-  }
-  await ipad.context.close();
 });
