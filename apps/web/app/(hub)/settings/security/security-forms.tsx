@@ -190,42 +190,48 @@ function ChangePasswordForm() {
 }
 
 function FirstPasswordForm() {
+  // A first password is a new way in: "Confirm it's you" first (issue #135).
+  const stepUp = useStepUp();
   const { state, formAction, pending, requestId, errors } = useActionForm(
-    setFirstPasswordAction,
+    (prev: Parameters<typeof setFirstPasswordAction>[0], form: FormData) =>
+      stepUp.guard(setFirstPasswordAction)(prev, form),
   );
   return (
-    <form action={formAction} className="flex flex-col gap-4">
-      <input type="hidden" name="requestId" value={requestId} />
-      <Field
-        id="first-password"
-        label="New password"
-        hint={`At least ${PASSWORD_MIN_LENGTH} characters. Passphrases welcome.`}
-        errors={errors.password}
-      >
-        {(control) => (
-          <Input
-            {...control}
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            minLength={PASSWORD_MIN_LENGTH}
-            maxLength={PASSWORD_MAX_LENGTH}
-            required
-            disabled={pending}
-          />
-        )}
-      </Field>
-      {state?.ok ? (
-        <FormMessage tone="success">
-          Password added. You can sign in with it now.
-        </FormMessage>
-      ) : state && state.code !== "INVALID_INPUT" ? (
-        <FormMessage tone="error">{state.message}</FormMessage>
-      ) : null}
-      <Button type="submit" className="self-start" disabled={pending}>
-        {pending ? "Adding..." : "Add password"}
-      </Button>
-    </form>
+    <>
+      <form action={formAction} className="flex flex-col gap-4">
+        <input type="hidden" name="requestId" value={requestId} />
+        <Field
+          id="first-password"
+          label="New password"
+          hint={`At least ${PASSWORD_MIN_LENGTH} characters. Passphrases welcome.`}
+          errors={errors.password}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
+              required
+              disabled={pending}
+            />
+          )}
+        </Field>
+        {state?.ok ? (
+          <FormMessage tone="success">
+            Password added. You can sign in with it now.
+          </FormMessage>
+        ) : state && state.code !== "INVALID_INPUT" ? (
+          <FormMessage tone="error">{state.message}</FormMessage>
+        ) : null}
+        <Button type="submit" className="self-start" disabled={pending}>
+          {pending ? "Adding..." : "Add password"}
+        </Button>
+      </form>
+      {stepUp.dialog}
+    </>
   );
 }
 
