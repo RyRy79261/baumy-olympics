@@ -68,8 +68,9 @@ export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
 
   return (
     <Card
+      id="pin"
       title="Your personal PIN"
-      description="The kitchen screen asks for it before it confirms, disputes or changes something as you. It is yours alone, and it is not for pairing the iPad."
+      description="The kitchen screen asks for it only before it disputes a chore as you; everything else there needs none. It is yours alone, and it is not for pairing the iPad."
     >
       <form
         action={formAction}

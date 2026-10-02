@@ -5,6 +5,8 @@ import { householdMembers } from "@/lib/members/household";
 import { PageHeading } from "@baumy/ui";
 import { HubHome } from "@/components/hub/hub-home";
 import { PostReminderForm } from "@/components/hub/post-reminder-form";
+import { SetPinNudge } from "@/components/hub/set-pin-nudge";
+import { actingMemberHasPin } from "@/lib/kiosk/acting-pin";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { memberOrVisitorPage } from "@/lib/auth";
 import {
@@ -36,9 +38,12 @@ export default async function HubPage() {
   // Google's and brain's widgets stream in (issue #128): the page waits only
   // for our own database.
   const { local, events, shopping } = startHub(ctx);
-  const [hub, people] = await Promise.all([
+  const [hub, people, hasPin] = await Promise.all([
     local,
     householdMembers(HOUSEHOLD_ID),
+    // After joining, the member is nudged to set their personal PIN until
+    // they do (issue #145).
+    actingMemberHasPin(HOUSEHOLD_ID, me.memberId),
   ]);
   return (
     <>
@@ -47,6 +52,11 @@ export default async function HubPage() {
         title="Hub"
         description={`Welcome, ${me.displayName}.`}
       />
+      {hasPin ? null : (
+        <div className="mb-6 max-w-xl">
+          <SetPinNudge />
+        </div>
+      )}
       <HubHome
         hub={{ ...hub, events, shopping }}
         voice={voiceConfigured()}
