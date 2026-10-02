@@ -152,10 +152,9 @@ test("on the kiosk, a member with no PIN adds and unpins a note", async ({
   // After joining, the hub nudges them to set their personal PIN.
   const nudge = member.page.getByTestId("set-pin-nudge");
   await expect(nudge).toContainText("Set your personal PIN");
-  await expect(nudge.getByRole("link", { name: "Set it now" })).toHaveAttribute(
-    "href",
-    "/settings#pin",
-  );
+  await expect(
+    nudge.getByRole("link", { name: "Set it", exact: true }),
+  ).toHaveAttribute("href", "/settings#pin");
 
   const ipad = await pairedKiosk(browser, page, `iPad ${suffix}`);
   const kiosk = ipad.page;
