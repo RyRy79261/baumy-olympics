@@ -274,18 +274,24 @@ export async function listActiveMembers(
   return withAvatarImages(db, rows);
 }
 
+/** An active member, with their role (the kiosk's admin gate, issue #147). */
+export interface ActiveMemberRow extends KioskMember {
+  role: "admin" | "member";
+}
+
 /** One active member of the household, or null. */
 export async function findActiveMember(
   db: Queryable,
   householdId: string,
   memberId: string,
-): Promise<KioskMember | null> {
+): Promise<ActiveMemberRow | null> {
   const [row] = await db
     .select({
       id: members.id,
       displayName: members.displayName,
       avatarSprite: members.avatarSprite,
       color: members.color,
+      role: members.role,
     })
     .from(members)
     .where(

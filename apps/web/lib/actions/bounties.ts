@@ -85,7 +85,8 @@ export const createBounty = defineAction({
   consent: "Add bounties to the board",
   kind: "write",
   risk: "confirm",
-  surfaces: ["ui", "ai", "brain"],
+  // The kiosk too, for an admin with their PIN (issue #147).
+  surfaces: ["ui", "kiosk", "ai", "brain"],
   requires: "admin",
   ownWordOnly: true,
   input: z.strictObject({
@@ -153,7 +154,8 @@ export const updateBounty = defineAction({
   consent: "Edit the bounties on the board",
   kind: "write",
   risk: "confirm",
-  surfaces: ["ui", "ai", "brain"],
+  // The kiosk too, for an admin with their PIN (issue #147).
+  surfaces: ["ui", "kiosk", "ai", "brain"],
   requires: "admin",
   ownWordOnly: true,
   input: updateInput,

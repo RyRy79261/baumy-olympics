@@ -25,6 +25,7 @@ import {
 import { createBounty, updateBounty } from "./bounties";
 import { createEvent, deleteEvent, listEvents, updateEvent } from "./calendar";
 import { checkKioskPin } from "./check-kiosk-pin";
+import { setKioskIdleMinutesAction } from "./kiosk-idle";
 import {
   concedeCompletion,
   confirmCompletion,
@@ -144,6 +145,7 @@ export const REGISTRY = {
   rotate_service_token: rotateServiceToken,
   revoke_service_token: revokeServiceTokenAction,
   check_kiosk_pin: checkKioskPin,
+  set_kiosk_idle_minutes: setKioskIdleMinutesAction,
   list_chores: listChores,
   log_completion: logCompletionAction,
   manage_chore: manageChore,
