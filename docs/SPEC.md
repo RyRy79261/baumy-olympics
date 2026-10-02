@@ -905,7 +905,7 @@ Decided 2026-10-02 (issue #135, ADR 0007):
 
 Decided 2026-10-02 (issue #144):
 
-24. **A member can ask what is kept about them.** A self-only `get_my_data` read, on the `ui` and `ai` surfaces with a real session (never the kiosk), with no member field, returning counts and dates and never IPs (§3.6). It is the one `session` action offered beyond the UI, because it only reads the asker's own data and the AI command runs on their own session.
+26. **A member can ask what is kept about them.** A self-only `get_my_data` read, on the `ui` and `ai` surfaces with a real session (never the kiosk), with no member field, returning counts and dates and never IPs (§3.6). It is the one `session` action offered beyond the UI, because it only reads the asker's own data and the AI command runs on their own session.
 
 Still open:
 
