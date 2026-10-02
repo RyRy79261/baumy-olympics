@@ -34,9 +34,8 @@ import { LiveClock } from "./live-clock";
 // Board) and the shopping list in the narrow one. Each widget keeps its own
 // empty and unavailable state (lib/hub/load.ts). The page's own card (Post a
 // reminder) stacks under the wide column's, so the short column leaves no
-// gap (issue #152); on one column it comes last. Below lg the columns are
-// `display: contents`, so every card is a cell of the one-column grid and
-// `order-last` can move the extra card past the narrow column's.
+// gap (issue #152). It comes right after Today at every width, so what is
+// seen and what is read or tabbed through keep one order.
 
 const TILES: {
   key: "urgent" | "new" | "messages";
@@ -259,7 +258,7 @@ export function HubHome({
         data-testid="hub"
         className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
       >
-        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <Widget
             id="widget-chores"
             data-testid="widget-chores"
@@ -304,12 +303,10 @@ export function HubHome({
             )}
           </Deferred>
 
-          {children ? (
-            <div className="order-last min-w-0 lg:order-none">{children}</div>
-          ) : null}
+          {children}
         </div>
 
-        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <Widget
             id="widget-leaderboard"
             data-testid="widget-leaderboard"
