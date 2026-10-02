@@ -122,6 +122,55 @@ export function CatButton({
   );
 }
 
+export type HoldState = "idle" | "opening" | "recording";
+
+const HOLD_LABEL: Record<HoldState, string> = {
+  idle: "Hold to talk",
+  opening: "Opening the microphone…",
+  recording: "Release to send",
+};
+
+/**
+ * The kitchen cat's "Hold to talk" (issue #132): a big bubble button held
+ * while speaking. While it is held it turns red, pulses and shows the level
+ * bars, so the kitchen can see Baumy is listening. No text selection, callout
+ * or scrolling from a long press, so an iPad hold stays a hold. The pointer
+ * wiring is the app's.
+ */
+export function HoldToTalk({
+  state,
+  level,
+  className,
+  type = "button",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  state: HoldState;
+  /** The microphone's level, 0…1, for the bars while recording. */
+  level: number;
+}) {
+  const recording = state === "recording";
+  return (
+    <button
+      type={type}
+      aria-pressed={recording}
+      aria-busy={state === "opening" || undefined}
+      data-state={state}
+      data-testid="hold-to-talk"
+      className={cx(
+        "relative flex h-24 w-full touch-none items-center justify-center gap-4 font-label text-[18px] font-bold uppercase select-none [-webkit-touch-callout:none] [-webkit-user-select:none] disabled:opacity-50",
+        recording
+          ? "bg-[#b8243a] text-white outline-4 outline-offset-2 outline-[#ff5a7a] motion-safe:animate-pulse"
+          : "bg-bm-bubble-ink text-white",
+        className,
+      )}
+      {...props}
+    >
+      {recording ? <LevelBars level={level} /> : null}
+      <span>{HOLD_LABEL[state]}</span>
+    </button>
+  );
+}
+
 /** "Type instead": a small link-like button under the bubble's actions. */
 export function CatLink({
   className,
