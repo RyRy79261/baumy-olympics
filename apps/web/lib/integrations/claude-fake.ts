@@ -12,9 +12,11 @@ import type { MessageParams } from "./claude";
 //
 //   - "who's winning?" (win, lead, standings, score): reads get_standings,
 //     then answers with the leader;
-//   - "confirm …": reads get_pending_confirmations, then proposes
-//     confirm_completion for the claim the asker may confirm whose chore the
-//     text names (else the first one);
+//   - "confirm …" or "dispute …": reads get_pending_confirmations, then
+//     proposes confirm_completion (or dispute_completion, with the reason
+//     "Baumy heard it was not done") for the claim the asker may confirm
+//     (or dispute) whose chore the text names (else the first one);
+//   - "add a note: <title>": proposes create_note (issue #145);
 //   - "I did/took/cleaned … the <chore>": reads list_chores, then proposes
 //     log_completion for every chore named in the text (the longest names
 //     first), or asks which chore when none is;
@@ -45,6 +47,9 @@ export function shoppingItemsNamed(said: string): string[] {
     .map((s) => s.trim())
     .filter((s) => s !== "");
 }
+
+/** "add a note: Bins go out Tuesday" → the note's title. */
+const NOTE = /\b(?:add|make|write)\s+(?:a\s+)?note[:\s]+(.+?)[\s.!?]*$/i;
 
 /** "add a bounty for Recycling paper, 15 points" → its name and points. */
 const ADD_BOUNTY =
@@ -198,7 +203,21 @@ export async function fakeClaude(
     );
   }
 
-  if (/\bconfirm\b/.test(said)) {
+  const note = offered.has("create_note") ? NOTE.exec(original) : null;
+  if (note) {
+    const title = note[1]!.trim();
+    return message(
+      model,
+      [
+        text(`I've lined up the note "${title}". Tap Confirm all.`),
+        toolUse("create_note", { title }),
+      ],
+      "tool_use",
+    );
+  }
+
+  const disputing = /\bdispute\b/.test(said);
+  if (disputing || /\bconfirm\b/.test(said)) {
     const pending = reads.get("get_pending_confirmations") as
       | {
           data?: {
@@ -206,7 +225,7 @@ export async function fakeClaude(
               completionId: string;
               choreName: string;
               doneByName: string;
-              can: { confirm?: boolean };
+              can: { confirm?: boolean; dispute?: boolean };
             }[];
           };
         }
@@ -218,7 +237,9 @@ export async function fakeClaude(
         "tool_use",
       );
     }
-    const mine = (pending.data?.claims ?? []).filter((c) => c.can.confirm);
+    const mine = (pending.data?.claims ?? []).filter((c) =>
+      disputing ? c.can.dispute : c.can.confirm,
+    );
     // The claim whose chore the text names, else the first one.
     const claim =
       mine.find((c) => said.includes(c.choreName.toLowerCase())) ?? mine[0];
@@ -233,9 +254,14 @@ export async function fakeClaude(
       model,
       [
         text(
-          `I've lined up confirming ${claim.doneByName}'s ${claim.choreName}.`,
+          `I've lined up ${disputing ? "disputing" : "confirming"} ${claim.doneByName}'s ${claim.choreName}.`,
         ),
-        toolUse("confirm_completion", { completionId: claim.completionId }),
+        disputing
+          ? toolUse("dispute_completion", {
+              completionId: claim.completionId,
+              reason: "Baumy heard it was not done",
+            })
+          : toolUse("confirm_completion", { completionId: claim.completionId }),
       ],
       "tool_use",
     );
