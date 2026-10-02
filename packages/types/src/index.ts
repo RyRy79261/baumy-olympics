@@ -7,6 +7,8 @@ export {
   AvatarSprite,
   DISPLAY_NAME_MAX,
   DisplayName,
+  KIOSK_PIN_MAX_DIGITS,
+  KIOSK_PIN_MIN_DIGITS,
   KioskPin,
   MEMBER_COLORS,
   MEMBER_COLOR_NAMES,
