@@ -79,7 +79,9 @@ Tap the cat (and your avatar, if nobody is tapped in): the bubble shows a
 big **Hold to talk**. Hold it while you speak, the button turns red with
 moving bars, and let go: Baumy's answer and its cards (Confirm all,
 Cancel) show in the same bubble, and Hold to talk is there again for the
-next thing. Done, or a tap on the cat, closes it.
+next thing. Done, or a tap on the cat, closes it. A clip stops at 45
+seconds; if Baumy heard only silence it says "I didn't hear anything —
+hold and speak." and sends nothing.
 
 The first tap asks for the microphone. iPadOS shows "Allow … to use your
 microphone?": tap **Allow**. To stop it asking, Settings → Apps → Safari
@@ -96,7 +98,9 @@ setting and reload.
   avatar and goes back to the kitchen home, from any kiosk page, and closes
   any open sheet or PIN pad. The last 10 seconds show a countdown; any
   touch cancels it. On the home, a day sheet or module left open closes,
-  and another month left showing goes back to this one.
+  and another month left showing goes back to this one. Holding "Hold to
+  talk", and Baumy working on the answer, do not count as untouched: the
+  minute starts again when the answer is there.
 - **Night mode.** From 23:00 to 06:30 Berlin time it dims to a sleeping
   Baumy and a big clock. A touch wakes it; after a minute untouched it goes
   back to sleep; 06:30 wakes it for good. The hours are
