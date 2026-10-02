@@ -63,6 +63,7 @@ describe("useTestDb", () => {
       "mcp_auth_codes",
       "mcp_oauth_clients",
       "members",
+      "note_reads",
       "notes",
       "passkey",
       "point_adjustments",
