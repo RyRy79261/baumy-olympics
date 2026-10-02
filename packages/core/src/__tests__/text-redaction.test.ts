@@ -61,6 +61,42 @@ describe("redactPii", () => {
     expect(url.redacted).toEqual(["secret"]);
   });
 
+  // Baumy's own token shapes (packages/db/src/service-tokens.ts,
+  // apps/web/lib/mcp/tokens.ts, the kiosk and sign-in cookies): the prefix
+  // and 32 (or 16, 24) random bytes in base64url, so `-` and `_` appear and
+  // a token may start or end with either. Seeded from crypto, many times.
+  it("redacts every Baumy token and cookie shape, whatever its bytes", () => {
+    // `bytes` random bytes in base64url (no padding): ceil(4n/3) characters
+    // from its alphabet, `-` and `_` included. core has no Node types.
+    const ALPHABET =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const b64url = (bytes: number) =>
+      Array.from(
+        { length: Math.ceil((bytes * 4) / 3) },
+        () => ALPHABET[Math.floor(Math.random() * 64)],
+      ).join("");
+    for (let i = 0; i < 500; i++) {
+      for (const token of [
+        `baumy_st_${b64url(32)}`,
+        `baumy_at_${b64url(32)}`,
+        `baumy_rt_${b64url(32)}`,
+        `baumy_ac_${b64url(24)}`,
+        `baumy_secret_${b64url(32)}`,
+        `baumy_client_${b64url(16)}`,
+        b64url(32),
+      ]) {
+        const out = redactPii(`it failed with ${token} just now`);
+        expect(out.redacted).toContain("secret");
+        expect(out.text).not.toContain(token.slice(-20));
+      }
+    }
+  });
+
+  it("redacts a cookie value that starts and ends with - or _", () => {
+    const cookie = "-_" + "Ab9".repeat(13) + "_-";
+    expect(redact(`baumy_kiosk=${cookie}; Path=/`)).not.toContain("Ab9Ab9");
+  });
+
   it("redacts messenger links and handles", () => {
     expect(redact("ping t.me/someone or @baumy_fan")).toBe(
       "ping [link] or [handle]",
@@ -90,6 +126,22 @@ describe("redactPii", () => {
     expect(redact('house ["Alice Hatter","Bob Rabbit"] missing')).toBe(
       "house [structured data removed] missing",
     );
+  });
+
+  it("leaves brackets that are prose, not data", () => {
+    const react =
+      "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message";
+    expect(redactPii(react)).toEqual({ text: react, redacted: [] });
+    expect(redactPii("[1] open chores [2] tap log")).toEqual({
+      text: "[1] open chores [2] tap log",
+      redacted: [],
+    });
+    expect(redactPii("unhandledrejection: [object Object]")).toEqual({
+      text: "unhandledrejection: [object Object]",
+      redacted: [],
+    });
+    // A short span with a key=value shape is still data.
+    expect(redact("failed [id=7]")).toBe("failed [structured data removed]");
   });
 
   it("leaves an unbalanced bracket for the other rules", () => {

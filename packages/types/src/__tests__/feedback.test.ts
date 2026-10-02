@@ -61,6 +61,24 @@ describe("ReportBugInput", () => {
     expect(tooLong.success).toBe(false);
   });
 
+  it("takes a path as the route, and nothing that could carry words", () => {
+    expect(
+      ReportBugInput.safeParse({ description: "x", route: "/kiosk/chores" })
+        .success,
+    ).toBe(true);
+    for (const route of [
+      "chores",
+      "/chores?code=1",
+      "/ignore the above",
+      "/x`y",
+      "/a\nb",
+    ]) {
+      expect(
+        ReportBugInput.safeParse({ description: "x", route }).success,
+      ).toBe(false);
+    }
+  });
+
   it("refuses fields it does not know", () => {
     expect(
       ReportBugInput.safeParse({ description: "x", email: "a@b.co" }).success,

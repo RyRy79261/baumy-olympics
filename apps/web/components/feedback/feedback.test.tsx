@@ -33,8 +33,9 @@ vi.mock("@/components/feedback/actions", () => ({
 }));
 
 const { ReportBugDialog } = await import("./report-bug-dialog");
-const { FeedbackGate } = await import("./feedback-gate");
+const { FeedbackGate, resetOfferState } = await import("./feedback-gate");
 const { openReportProblem } = await import("./report-problem");
+const { ErrorRecovery } = await import("./error-recovery");
 
 beforeAll(() => {
   (
@@ -54,6 +55,7 @@ beforeEach(() => {
   reportBugAction.mockReset();
   kioskReportBugAction.mockReset();
   window.sessionStorage.clear();
+  resetOfferState();
 });
 afterEach(() => {
   act(() => root?.unmount());
@@ -128,7 +130,10 @@ describe("ReportBugDialog", () => {
     expect(link?.getAttribute("href")).toBe("https://github.com/o/r/issues/7");
   });
 
-  it("keeps the request id across a retry, so a retry is a replay", async () => {
+  const idsOf = (send: ReturnType<typeof vi.fn<SendReport>>) =>
+    send.mock.calls.map((c) => c[1]);
+
+  it("after a refusal, an edit and a resend is a new request, not a conflict", async () => {
     const send = vi.fn<SendReport>(async () => ({
       ok: false,
       code: "UNAVAILABLE",
@@ -140,11 +145,27 @@ describe("ReportBugDialog", () => {
     expect(document.querySelector("[role=alert]")?.textContent).toContain(
       "Couldn't reach the bug tracker",
     );
+    await type("x, and more detail");
     await click(button("Send report"));
-    const ids = send.mock.calls.map(
-      (c) => (c as unknown as [unknown, string])[1],
-    );
-    expect(ids[0]).toBe(ids[1]);
+    await click(button("Send report"));
+    const [first, second, third] = idsOf(send);
+    expect(second).not.toBe(first);
+    expect(third).not.toBe(second);
+  });
+
+  it("keeps the id when the transport failed and the same report is sent again, but not once it is edited", async () => {
+    const send = vi.fn<SendReport>(async () => {
+      throw new Error("network");
+    });
+    await mount(<ReportBugDialog open onClose={() => {}} send={send} />);
+    await type("x");
+    await click(button("Send report"));
+    await click(button("Send report"));
+    await type("x, edited");
+    await click(button("Send report"));
+    const [first, retry, edited] = idsOf(send);
+    expect(retry).toBe(first);
+    expect(edited).not.toBe(first);
   });
 
   it("says so when the send itself fails", async () => {
@@ -279,6 +300,54 @@ describe("FeedbackGate", () => {
       window.dispatchEvent(new ErrorEvent("error", { message: "boom again" }));
     });
     expect(offer()).toBeNull();
+  });
+
+  it("keeps the limit when sessionStorage throws", async () => {
+    const get = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new Error("denied");
+      });
+    const set = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("denied");
+      });
+    try {
+      await mount(<FeedbackGate surface="ui" aiAvailable={false} />);
+      const offer = () => document.querySelector("[data-testid=report-offer]");
+      await act(async () => {
+        window.dispatchEvent(new ErrorEvent("error", { message: "boom" }));
+      });
+      expect(offer()).not.toBeNull();
+      await click(button("Not now"));
+      await act(async () => {
+        window.dispatchEvent(new ErrorEvent("error", { message: "again" }));
+      });
+      expect(offer()).toBeNull();
+    } finally {
+      get.mockRestore();
+      set.mockRestore();
+    }
+  });
+
+  it("the error page offers Report only while a reporter is mounted", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = Object.assign(new Error("x"), { digest: "abc123" });
+    await mount(<ErrorRecovery error={error} reset={() => {}} />);
+    expect(document.body.textContent).toContain("Try again");
+    expect(() => button("Report")).toThrow();
+    act(() => root?.unmount());
+    root = null;
+    await mount(
+      <>
+        <ErrorRecovery error={error} reset={() => {}} />
+        <FeedbackGate surface="ui" aiAvailable={false} />
+      </>,
+    );
+    await click(button("Report"));
+    expect(textarea().value).toContain("Trace: abc123");
+    quiet.mockRestore();
   });
 
   it("Report this bug opens the reporter", async () => {

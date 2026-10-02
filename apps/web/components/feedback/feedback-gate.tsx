@@ -22,6 +22,7 @@ import {
 import { ReportBugDialog } from "./report-bug-dialog";
 import {
   REPORT_PROBLEM_EVENT,
+  registerReporter,
   type ReportProblemRequest,
 } from "./report-problem";
 import {
@@ -49,23 +50,34 @@ import {
 
 const OFFER_STATE_KEY = "baumy:report-offer";
 
-function readOfferState(): OfferState {
+/**
+ * The state in memory too: when sessionStorage throws (private mode, a
+ * storage quota), the limit still holds for as long as the page lives.
+ */
+let memoryOfferState: OfferState = NO_OFFER_YET;
+
+export function readOfferState(): OfferState {
   try {
     const raw = window.sessionStorage.getItem(OFFER_STATE_KEY);
-    return raw
-      ? { ...NO_OFFER_YET, ...(JSON.parse(raw) as OfferState) }
-      : NO_OFFER_YET;
+    if (raw) return { ...NO_OFFER_YET, ...(JSON.parse(raw) as OfferState) };
   } catch {
-    return NO_OFFER_YET;
+    // Fall back to memory below.
   }
+  return memoryOfferState;
 }
 
-function writeOfferState(state: OfferState): void {
+export function writeOfferState(state: OfferState): void {
+  memoryOfferState = state;
   try {
     window.sessionStorage.setItem(OFFER_STATE_KEY, JSON.stringify(state));
   } catch {
-    // Private mode: the limit then lasts as long as the page.
+    // Memory holds it.
   }
+}
+
+/** Tests only. */
+export function resetOfferState(): void {
+  memoryOfferState = NO_OFFER_YET;
 }
 
 export function FeedbackGate({
@@ -96,6 +108,7 @@ export function FeedbackGate({
   }, []);
 
   useEffect(() => installClientErrorCapture(), []);
+  useEffect(() => registerReporter(), []);
 
   useShakeGesture({ enabled: !open, onShake: () => openReporter() });
 

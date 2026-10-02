@@ -14,6 +14,31 @@ export interface ReportProblemRequest {
   kind?: ReportKind;
 }
 
+// Whether a reporter is mounted to hear the request. The hub layout mounts
+// one only for a signed-in member, so an error page shown to a signed-out
+// visitor must not offer a Report button that does nothing.
+let mounted = 0;
+const watchers = new Set<() => void>();
+
+/** FeedbackGate calls this while it is mounted. Returns the unregister. */
+export function registerReporter(): () => void {
+  mounted += 1;
+  watchers.forEach((w) => w());
+  return () => {
+    mounted -= 1;
+    watchers.forEach((w) => w());
+  };
+}
+
+export function subscribeReporter(watcher: () => void): () => void {
+  watchers.add(watcher);
+  return () => watchers.delete(watcher);
+}
+
+export function reporterMounted(): boolean {
+  return mounted > 0;
+}
+
 export function openReportProblem(request: ReportProblemRequest = {}): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(

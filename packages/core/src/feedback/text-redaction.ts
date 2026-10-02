@@ -43,6 +43,14 @@ const RULES: readonly {
   to: string;
 }[] = [
   // --- Secrets ---
+  // Baumy's own tokens: service tokens (`baumy_st_…`) and MCP tokens
+  // (`baumy_at_…`, `baumy_rt_…`, `baumy_ac_…`, `baumy_secret_…`,
+  // `baumy_client_…`), all `baumy_<kind>_<base64url>`.
+  {
+    kind: "secret",
+    pattern: /\bbaumy_[a-z]+_[A-Za-z0-9_-]{20,}/g,
+    to: "[secret]",
+  },
   {
     kind: "secret",
     pattern: /\bBearer\s+[A-Za-z0-9._-]+/gi,
@@ -92,6 +100,15 @@ const RULES: readonly {
     pattern:
       /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
     to: "[uuid]",
+  },
+  // Base64url runs: a kiosk or sign-in cookie is 32 random bytes, 43
+  // characters with `-` and `_`. No word boundary, since a run that starts
+  // or ends with `-` or `_` has none. After the UUID rule, whose 36
+  // characters would otherwise match.
+  {
+    kind: "secret",
+    pattern: /[A-Za-z0-9_-]{32,}/g,
+    to: "[redacted]",
   },
   // International phone numbers: every trailing digit group goes, so the last
   // one cannot leak ("+49 151 2345 6789" → "[phone]", not "[phone] 6789").
@@ -147,6 +164,19 @@ const PLACEHOLDERS: ReadonlyMap<string, RedactionKind> = new Map([
 const MAX_STRUCTURED_SPAN = 4_000;
 
 /**
+ * Whether a balanced bracket span is data rather than prose: it has
+ * `"key":` or `key=value` shapes, or is longer than a short aside. `[]`,
+ * `[1]`, the `args[]` of a React error URL and `[object Object]` are not.
+ */
+function looksStructured(span: string): boolean {
+  if (/^\[\d*\]$/.test(span)) return false;
+  if (/"[^"]*"\s*:/.test(span) || /[A-Za-z_]\w*=[^\s&]/.test(span)) {
+    return true;
+  }
+  return span.length > 20;
+}
+
+/**
  * Remove JSON objects and arrays, nested contents included. A serialised
  * roster inside an error message carries names no pattern can recognise, so
  * the whole structure goes. A depth-counting scan, not a regex: a regex
@@ -189,7 +219,7 @@ function stripStructuredData(text: string, found: Set<RedactionKind>): string {
         }
       }
     }
-    if (end === -1) {
+    if (end === -1 || !looksStructured(text.slice(i, end + 1))) {
       out += char;
       i += 1;
       continue;

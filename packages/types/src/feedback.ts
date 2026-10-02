@@ -60,8 +60,15 @@ export const ReportBugInput = z.strictObject({
       REPORT_DESCRIPTION_MAX,
       `Keep it to ${REPORT_DESCRIPTION_MAX} characters.`,
     ),
-  /** The in-app path it was filed from, never the query string. */
-  route: z.string().max(300).optional(),
+  /**
+   * The in-app path it was filed from, never the query string. A path's
+   * characters only: it is published outside the untrusted markers.
+   */
+  route: z
+    .string()
+    .max(300)
+    .regex(/^\/[A-Za-z0-9/_.-]*$/, "A path, like /chores.")
+    .optional(),
   /** "Improve with AI": restructure the report before filing. */
   useAi: z.boolean().optional(),
   /** Only when the member ticked the box, and exactly what they saw. */
