@@ -12,6 +12,7 @@ import {
 } from "@baumy/db/login-requests";
 import { members, session } from "@baumy/db/schema";
 import {
+  claimTotpStep,
   grantStepUp,
   hasVerifiedTotp,
   type StepUpMethod,
@@ -176,7 +177,7 @@ const Proof = z.discriminatedUnion("method", [
 const REFUSED: Record<StepUpMethod, string> = {
   passkey:
     "That passkey didn't confirm it's you. Try again, or use another way.",
-  totp: "That code didn't match. Check your app and try again.",
+  totp: "That code didn't match, or was already used. Wait for the next one and try again.",
   baumy:
     "That Telegram request wasn't approved, or was already used. Start again.",
   password: "That password is not right.",
@@ -212,12 +213,17 @@ export const confirmIdentity = defineAction({
       case "password":
         proven = await verifyPasswordStepUp(proof.password);
         break;
-      case "totp":
-        // Better Auth's verify-totp would turn on an unfinished enrolment.
+      case "totp": {
+        // Only a finished enrolment, and each 30-second code once: a code
+        // read over the member's shoulder cannot be typed again (issue #135).
+        const step = (await hasVerifiedTotp(ctx.db, userId))
+          ? await verifyTotpStepUp(proof.code)
+          : null;
         proven =
-          (await hasVerifiedTotp(ctx.db, userId)) &&
-          (await verifyTotpStepUp(proof.code));
+          step !== null &&
+          (await claimTotpStep(ctx.db, { userId, step, now: ctx.now }));
         break;
+      }
       case "passkey":
         proven = await verifyPasskeyStepUp(proof.response);
         break;

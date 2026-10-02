@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Queryable } from "../index";
-import { session, stepUps, twoFactor, user } from "../schema";
+import { session, stepUpTotpSteps, stepUps, twoFactor, user } from "../schema";
 import {
   STEP_UP_WINDOW_MS,
+  claimTotpStep,
   findStepUp,
   grantStepUp,
+  grantStepUpIfLive,
   hasVerifiedTotp,
 } from "../step-ups";
 import { useTestDb } from "./_harness";
@@ -175,5 +177,50 @@ describe("hasVerifiedTotp", () => {
         verified: true,
       });
     expect(await hasVerifiedTotp(db(), on)).toBe(true);
+  });
+});
+
+describe("grantStepUpIfLive", () => {
+  it("opens a window only for a session that exists and is the user's", async () => {
+    const userId = await account();
+    const mine = await sessionOf(userId);
+    const stranger = await account();
+    const grant = (sessionId: string, who: string) =>
+      grantStepUpIfLive(db(), {
+        sessionId,
+        userId: who,
+        method: "backup_code",
+        now: NOW,
+      });
+    expect(await grant("gone", userId)).toBe(false);
+    expect(await grant(mine, stranger)).toBe(false);
+    expect(await t.db().select().from(stepUps)).toEqual([]);
+    expect(await grant(mine, userId)).toBe(true);
+    expect(
+      await findStepUp(db(), { sessionId: mine, userId, now: NOW }),
+    ).toEqual({ method: "backup_code", expiresAt: at(STEP_UP_WINDOW_MS) });
+  });
+});
+
+describe("claimTotpStep", () => {
+  it("takes each time step once, and never an older one", async () => {
+    const userId = await account();
+    const other = await account();
+    const claim = (id: string, step: number) =>
+      claimTotpStep(db(), { userId: id, step, now: NOW });
+    expect(await claim(userId, 100)).toBe(true);
+    // The same code again, or one from an earlier step: refused.
+    expect(await claim(userId, 100)).toBe(false);
+    expect(await claim(userId, 99)).toBe(false);
+    // Another account is counted on its own.
+    expect(await claim(other, 100)).toBe(true);
+    expect(await claim(userId, 101)).toBe(true);
+    expect(await claim(userId, 101)).toBe(false);
+    const [row] = await t
+      .db()
+      .select()
+      .from(stepUpTotpSteps)
+      .where(eq(stepUpTotpSteps.userId, userId));
+    expect(row?.lastStep).toBe(101);
   });
 });

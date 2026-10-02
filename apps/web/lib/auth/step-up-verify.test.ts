@@ -20,7 +20,7 @@ vi.mock("@baumy/auth", () => {
     getAuth: () => ({
       api: {
         verifyPassword: endpoint("verifyPassword"),
-        verifyTOTP: endpoint("verifyTOTP"),
+        verifyStepUpTotp: endpoint("verifyStepUpTotp"),
         verifyStepUpPasskey: endpoint("verifyStepUpPasskey"),
       },
     }),
@@ -39,27 +39,42 @@ beforeEach(() => {
 });
 
 describe.each([
-  ["verifyPassword", () => verifyPasswordStepUp("pw"), { password: "pw" }],
-  ["verifyTOTP", () => verifyTotpStepUp("123456"), { code: "123456" }],
+  [
+    "verifyPassword",
+    () => verifyPasswordStepUp("pw"),
+    { password: "pw" },
+    true,
+    false,
+  ],
+  // The code's answer is the time step it matched, so it is used once.
+  [
+    "verifyStepUpTotp",
+    () => verifyTotpStepUp("123456"),
+    { code: "123456" },
+    77,
+    null,
+  ],
   [
     "verifyStepUpPasskey",
     () => verifyPasskeyStepUp({ id: "cred" }),
     { response: { id: "cred" } },
+    true,
+    false,
   ],
-] as const)("%s", (endpoint, run, body) => {
-  it("is true when Better Auth accepts it for this request's session", async () => {
-    answer = async () => ({});
-    await expect(run()).resolves.toBe(true);
+] as const)("%s", (endpoint, run, body, accepted, refused) => {
+  it("answers what Better Auth accepted for this request's session", async () => {
+    answer = async () => ({ step: 77 });
+    await expect(run()).resolves.toBe(accepted);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ endpoint, body });
     expect(calls[0]!.headers.get("cookie")).toBe("baumy.session_token=x");
   });
 
-  it("is false for a refusal", async () => {
+  it("answers a refusal as no", async () => {
     answer = failWith(401);
-    await expect(run()).resolves.toBe(false);
+    await expect(run()).resolves.toBe(refused);
     answer = failWith(400);
-    await expect(run()).resolves.toBe(false);
+    await expect(run()).resolves.toBe(refused);
   });
 
   it("throws an outage", async () => {

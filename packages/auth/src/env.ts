@@ -66,6 +66,11 @@ export const AUTH_SESSION = {
   expiresInSeconds: 60 * 60 * 24 * 30, // 30 days
   updateAgeSeconds: 60 * 60 * 24, // refreshed at most once a day
   cookieCacheMaxAgeSeconds: 300, // 5 minutes
+  // Better Auth's "fresh session" check off (0): its only user here is
+  // registering a passkey, which the step-up window guards instead
+  // (step-up.ts). Its default (a day) let a stolen session add a passkey;
+  // 600 refused a member who had just confirmed it's them.
+  freshAgeSeconds: 0,
 } as const;
 
 /** Every Better Auth cookie is named `baumy.<name>`. */

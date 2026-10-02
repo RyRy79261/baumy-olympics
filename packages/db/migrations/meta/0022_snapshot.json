@@ -1,5 +1,5 @@
 {
-  "id": "9b373c85-a58e-4402-8a02-772bdf32df94",
+  "id": "66bb0f3b-88a8-41a0-a432-70346f0d6aa4",
   "prevId": "669091c8-22e9-42a5-b553-b280575247ea",
   "version": "7",
   "dialect": "postgresql",
@@ -1739,12 +1739,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "idle_minutes": {
-          "name": "idle_minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1817,10 +1811,6 @@
       },
       "policies": {},
       "checkConstraints": {
-        "kiosk_devices_idle_minutes_range": {
-          "name": "kiosk_devices_idle_minutes_range",
-          "value": "\"kiosk_devices\".\"idle_minutes\" IS NULL OR \"kiosk_devices\".\"idle_minutes\" BETWEEN 1 AND 60"
-        },
         "kiosk_devices_paired_has_token": {
           "name": "kiosk_devices_paired_has_token",
           "value": "(\"kiosk_devices\".\"paired_at\" IS NULL) = (\"kiosk_devices\".\"token_hash\" IS NULL)"
@@ -3773,6 +3763,51 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.step_up_totp_steps": {
+      "name": "step_up_totp_steps",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "last_step": {
+          "name": "last_step",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "step_up_totp_steps_user_id_user_id_fk": {
+          "name": "step_up_totp_steps_user_id_user_id_fk",
+          "tableFrom": "step_up_totp_steps",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.step_ups": {
       "name": "step_ups",
       "schema": "",
@@ -3843,7 +3878,7 @@
       "checkConstraints": {
         "step_ups_method": {
           "name": "step_ups_method",
-          "value": "\"step_ups\".\"method\" IN ('passkey', 'totp', 'baumy', 'password')"
+          "value": "\"step_ups\".\"method\" IN ('passkey', 'totp', 'baumy', 'password', 'google', 'backup_code')"
         }
       },
       "isRLSEnabled": false

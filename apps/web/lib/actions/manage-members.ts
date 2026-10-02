@@ -13,6 +13,7 @@ import {
   MemberRole,
   TelegramUserId,
 } from "@baumy/types";
+import { confirmedActor, isFailure } from "./account-security";
 import { defineAction } from "./define";
 import { fail } from "./result";
 
@@ -89,6 +90,15 @@ export const manageMembers = defineAction({
   requires: "admin",
   input,
   async execute(ctx, change) {
+    // Setting a Telegram id lets that Telegram account sign in as the member
+    // ("Sign in with Baumy") and confirm it's them, so it needs "Confirm it's
+    // you" (issue #135, the critic's review of PR #148); clearing one takes a
+    // way in away and does not. Whether admins should set it for others at
+    // all is the owner's call [UNRESOLVED 2026-10-02, ADR 0007].
+    if (change.op === "set_telegram" && change.telegramUserId != null) {
+      const confirmed = await confirmedActor(ctx);
+      if (isFailure(confirmed)) return confirmed;
+    }
     // Anything that can remove an admin takes the admin locks first.
     const removesAdmin =
       change.op === "deactivate" ||

@@ -24,12 +24,12 @@ import { fail } from "./result";
 // audit row names only the token, and only its sha256 reaches the database
 // (packages/db/src/service-tokens.ts, shared with the CLI).
 //
-// ORDER MATTERS in `confirmedActor`: the sudo window is read BEFORE
-// `liveActor` share-locks the session row. Before issue #135 the password was
-// checked here by Better Auth's verifyPassword, which reads the session on
-// its own connection and may refresh it (an UPDATE of that row); holding
-// `FOR SHARE` on it first hung the request (PR #105 review). The proofs now
-// run in `confirm_identity`, which keeps the same order.
+// Before issue #135 the password was checked here by Better Auth's
+// verifyPassword, which reads the session on its own connection and may
+// refresh it (an UPDATE of that row); holding `FOR SHARE` on it first hung
+// the request (PR #105 review). The proofs now run in `confirm_identity`,
+// which checks them BEFORE it takes that lock; `confirmedActor` here only
+// reads our own tables.
 
 /** What every token minted here may do: call the brain surface. */
 export const SERVICE_TOKEN_SCOPES = [BRAIN_SCOPE];
