@@ -225,8 +225,9 @@ export default function PrivacyPage() {
             Anthropic receives what you typed (or the transcript of what you
             said), the date and time, your member name, the housemates&apos;
             names and the chores, and whatever the app looks up to answer (for
-            example chores, scores, notes, calendar events or the shopping
-            list).
+            example chores, scores, notes, calendar events, the shopping list
+            or, when you ask what is kept about you, the counts and dates in
+            that summary).
           </li>
           <li>
             <strong>Groq:</strong> when you hold the microphone, Groq receives
@@ -415,6 +416,13 @@ export default function PrivacyPage() {
           <li>
             You can change your display name, colour and character yourself in
             Settings.
+          </li>
+          <li>
+            Settings, Your data, shows a summary of what is kept about you, as
+            counts and dates (never an IP address), with the rules above; Baumy
+            tells you the same when you ask &quot;what do you keep about
+            me?&quot; on your own phone or computer. Only you see it, never the
+            kitchen screen.
           </li>
           <li>
             To leave, ask the admin. They can switch off your membership in the
