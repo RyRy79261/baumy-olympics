@@ -19,11 +19,11 @@ The iPad on the kitchen wall is the house's shared screen. Its home shows the da
 
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
 
-After {{KIOSK_IDLE_SECONDS}} seconds untouched, the screen forgets who was acting and goes back home by itself; the last few seconds show a countdown, and any touch cancels it.
+After {{KIOSK_IDLE_DEFAULT_MIN}} minutes untouched, the screen forgets who was acting and goes back home by itself; the last few seconds show a countdown, and any touch cancels it. To change how long it waits, tap your avatar, open **Bounties → Kitchen screen settings** and pick {{KIOSK_IDLE_CHOICES_MIN}} minutes; it is saved for this screen.
 
 ## Your personal PIN
 
-The kitchen screen is shared, but almost everything there runs as whoever tapped their avatar, with no PIN: logging a chore (for yourself or someone else), confirming, undoing, notes, the calendar, the shopping list and Baumy. The iPad asks for **your personal PIN** only before it **disputes** a chore as you. Your own settings are only changed on your phone.
+The kitchen screen is shared, but almost everything there runs as whoever tapped their avatar, with no PIN: logging a chore (for yourself or someone else), confirming, undoing, notes, the calendar, the shopping list and Baumy. The iPad asks for **your personal PIN** only before it **disputes** a chore as you, and, for an admin, before it adds or edits a bounty or changes a bounty's points. Your own settings are only changed on your phone.
 
 If you have not set a PIN, the iPad never shows a PIN pad you cannot use: it says "<your name> hasn't set a personal PIN yet" with a QR code that opens Settings on your phone. When you ask Baumy for several things, **Confirm all** does the rest and leaves only the dispute waiting. After you join, the hub reminds you to set one.
 
@@ -45,6 +45,15 @@ Something everyone must read (a plumber coming, the water off) can be posted as 
 
 - After {{SCREENSAVER_IDLE_MIN}} minutes untouched in the day, and every night from {{NIGHT_START}} to {{NIGHT_END}}, it shows the raccoon screensaver with a big clock. A tap wakes it; the tap never presses anything underneath.
 - With no internet it says "No connection" and comes back by itself.
+
+## Admin things on the iPad
+
+An admin can do a few admin things on the kitchen iPad, after tapping their own avatar, each with their personal PIN:
+
+- **Add or edit a bounty**: ask Baumy ("add a bounty for the recycling, 15 points"); **Confirm all** asks for your PIN.
+- **Change a bounty's points**: **Bounties → Kitchen screen settings → Change a bounty's points**. Like on your phone, the change waits for the next Monday at least {{WEIGHT_VETO_LEAD_H}} hours ahead, so the others can veto it.
+
+Everything else an admin does (members, the pot, archiving a bounty, pairing) stays on your phone.
 
 ## Pairing the iPad
 

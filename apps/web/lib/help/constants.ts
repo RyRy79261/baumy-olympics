@@ -5,10 +5,15 @@ import {
 } from "@baumy/core";
 import { KIOSK_PAIRING_TTL_MS } from "@baumy/db/kiosk-pairing";
 import { TELEGRAM_LINK_CODE_TTL_MS } from "@baumy/db/telegram-link-codes";
-import { KIOSK_PIN_MAX_DIGITS, KIOSK_PIN_MIN_DIGITS } from "@baumy/types";
+import {
+  DEFAULT_KIOSK_IDLE_MINUTES,
+  KIOSK_IDLE_MINUTES_CHOICES,
+  KIOSK_PIN_MAX_DIGITS,
+  KIOSK_PIN_MIN_DIGITS,
+} from "@baumy/types";
 import { MAX_RECORDING_MS } from "@/lib/ai/voice";
 import { NEW_BOUNTY_MS } from "@/lib/chores/urgency";
-import { KIOSK_IDLE_MS, SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
+import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import { DEFAULT_NIGHT_WINDOW } from "@/lib/kiosk/night";
 import { DEFAULT_TELEGRAM_BOT_USERNAME } from "@/lib/telegram/deep-link";
 
@@ -51,7 +56,8 @@ export const HELP_CONSTANTS: Readonly<Record<string, string | number>> = {
   KIOSK_PAIRING_CODE_MIN: KIOSK_PAIRING_TTL_MS / MINUTE_MS,
   KIOSK_PIN_MIN_DIGITS,
   KIOSK_PIN_MAX_DIGITS,
-  KIOSK_IDLE_SECONDS: KIOSK_IDLE_MS / 1000,
+  KIOSK_IDLE_DEFAULT_MIN: DEFAULT_KIOSK_IDLE_MINUTES,
+  KIOSK_IDLE_CHOICES_MIN: KIOSK_IDLE_MINUTES_CHOICES.join(", "),
   SCREENSAVER_IDLE_MIN: SCREENSAVER_IDLE_MS / MINUTE_MS,
   NIGHT_START: clockTime(DEFAULT_NIGHT_WINDOW.startMin),
   NIGHT_END: clockTime(DEFAULT_NIGHT_WINDOW.endMin),
