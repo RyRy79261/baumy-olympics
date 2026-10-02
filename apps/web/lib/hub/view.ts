@@ -172,8 +172,8 @@ export function clockLines(now: Date): { time: string; date: string } {
 
 /**
  * The hub's three counts (ADR 0005 §1): urgent bounties, new bounties, and
- * messages, the notes added or edited in the last 24 hours (list_notes'
- * `recentCount`). Null when the read behind it failed: the tile then says
+ * messages, the notes this member has not seen since their words last
+ * changed (list_notes' `unseenCount`, issue #153). Null when the read behind it failed: the tile then says
  * so instead of showing a zero.
  */
 export interface HubCounts {

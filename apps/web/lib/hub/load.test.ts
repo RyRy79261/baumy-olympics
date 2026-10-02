@@ -2,6 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
 import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
+import { HOUSEHOLD_ID } from "@baumy/db/household";
+import { insertNote } from "@baumy/db/notes";
 import { useTestDb } from "@baumy/db/test-harness";
 import {
   FIXED_NOW,
@@ -110,11 +112,16 @@ describe("loadHub", () => {
       { title: "Wifi", bodyMd: "guest", pinned: true },
       ctxFor(sessionActor(ryan)),
     );
-    await runAction(
-      "create_note",
-      { title: "Loose" },
-      ctxFor(sessionActor(ryan)),
-    );
+    // Written straight to the table, so nobody has seen it yet.
+    await insertNote(db(), {
+      householdId: HOUSEHOLD_ID,
+      authorId: ryan,
+      title: "Loose",
+      bodyMd: "",
+      color: null,
+      pinned: false,
+      now: FIXED_NOW,
+    });
     const hub = await loadHub(ctxFor(sessionActor(ryan)));
     expect(hub.now).toBe(FIXED_NOW.toISOString());
     expect(hub.events).toEqual({
@@ -157,9 +164,9 @@ describe("loadHub", () => {
       status: "ready",
       data: [{ id: pinned.ok && pinned.data.note.id, title: "Wifi" }],
     });
-    // Only Trash is urgent (Dishes was never done); only Dishes is new; both
-    // notes are from today.
-    expect(hub.counts).toEqual({ urgent: 1, new: 1, messages: 2 });
+    // Only Trash is urgent (Dishes was never done); only Dishes is new; of
+    // the notes, Ryan has seen only the one he wrote through create_note.
+    expect(hub.counts).toEqual({ urgent: 1, new: 1, messages: 1 });
   });
 
   it("counts nothing for a tile whose read failed", async () => {

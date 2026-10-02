@@ -1,11 +1,28 @@
-import { and, count, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  sql,
+  type SQL,
+} from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import type { Queryable } from "./index";
-import { members, notes } from "./schema";
+import { members, noteReads, notes } from "./schema";
 
 // Household notes (SPEC §3.5, §5 `notes`). Every function takes the caller's
 // handle (the action's transaction for writes), and none writes an audit row:
 // runAction does that (AGENTS.md). A deleted note (`deleted_at` set) is gone
 // as far as every function here is concerned; nothing brings it back.
+//
+// Seen (issue #153, `note_reads`): a member has seen a note while their
+// `seen_at` is at or after the moment its words last changed (`edited_at`,
+// else `created_at`). An edit therefore makes it unseen again for everyone
+// who has not opened it since. Pinning is not an edit, so it never does.
 
 export interface NoteRow {
   id: string;
@@ -19,6 +36,22 @@ export interface NoteRow {
   updatedAt: Date;
   /** When its words last changed: `edited_at`, else when it was added. */
   editedAt: Date;
+  /**
+   * The active members who have seen its words as they are now, in the
+   * order they joined.
+   */
+  seenBy: string[];
+}
+
+/** When a note's words last changed. */
+const editedAtSql = sql`coalesce(${notes.editedAt}, ${notes.createdAt})`;
+
+/**
+ * Whether `member` (a member id, or a column holding one) has seen the
+ * note's words as they are now.
+ */
+function seenBy(member: PgColumn | string): SQL {
+  return sql`exists (select 1 from ${noteReads} where ${noteReads.noteId} = ${notes.id} and ${noteReads.memberId} = ${member} and ${noteReads.seenAt} >= ${editedAtSql})`;
 }
 
 const noteColumns = {
@@ -31,9 +64,7 @@ const noteColumns = {
   authorName: members.displayName,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt,
-  editedAt: sql<Date>`coalesce(${notes.editedAt}, ${notes.createdAt})`
-    .mapWith(notes.createdAt)
-    .as("edited_at"),
+  editedAt: sql<Date>`${editedAtSql}`.mapWith(notes.createdAt).as("edited_at"),
 };
 
 function live(householdId: string, id?: string) {
@@ -44,12 +75,40 @@ function live(householdId: string, id?: string) {
   );
 }
 
+/** Each note's `seenBy`: the reads of its current words by active members. */
+async function withSeenBy(
+  db: Queryable,
+  rows: Omit<NoteRow, "seenBy">[],
+): Promise<NoteRow[]> {
+  if (rows.length === 0) return [];
+  const reads = await db
+    .select({ noteId: noteReads.noteId, memberId: noteReads.memberId })
+    .from(noteReads)
+    .innerJoin(notes, eq(notes.id, noteReads.noteId))
+    .innerJoin(members, eq(members.id, noteReads.memberId))
+    .where(
+      and(
+        inArray(
+          noteReads.noteId,
+          rows.map((r) => r.id),
+        ),
+        isNull(members.deactivatedAt),
+        gte(noteReads.seenAt, editedAtSql),
+      ),
+    )
+    .orderBy(asc(members.createdAt), asc(members.id));
+  return rows.map((r) => ({
+    ...r,
+    seenBy: reads.filter((x) => x.noteId === r.id).map((x) => x.memberId),
+  }));
+}
+
 /** The live notes, pinned first, then the most recently changed. */
 export async function listNotes(
   db: Queryable,
   input: { householdId: string; pinnedOnly?: boolean; limit: number },
 ): Promise<NoteRow[]> {
-  return db
+  const rows = await db
     .select(noteColumns)
     .from(notes)
     .innerJoin(members, eq(members.id, notes.authorId))
@@ -61,26 +120,85 @@ export async function listNotes(
     )
     .orderBy(desc(notes.pinned), desc(notes.updatedAt), desc(notes.id))
     .limit(input.limit);
+  return withSeenBy(db, rows);
 }
 
 /**
- * How many live notes were added or had their words edited after `since`
- * (the Messages count, ADR 0005 §3). Pinning and unpinning are not edits.
+ * How many live notes this member has not seen as they are now (the phone's
+ * Messages count, issue #153), over every note.
  */
-export async function countNotesEditedSince(
+export async function countUnseenNotes(
   db: Queryable,
-  input: { householdId: string; since: Date },
+  input: { householdId: string; memberId: string },
+): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(notes)
+    .where(and(live(input.householdId), sql`not ${seenBy(input.memberId)}`));
+  return Number(row?.n ?? 0);
+}
+
+/**
+ * How many live notes at least one active member has not seen as they are
+ * now: the kitchen screen's Messages count, which shows a number until every
+ * member has read the message (issue #153).
+ */
+export async function countNotesUnseenByAnyone(
+  db: Queryable,
+  householdId: string,
 ): Promise<number> {
   const [row] = await db
     .select({ n: count() })
     .from(notes)
     .where(
       and(
-        live(input.householdId),
-        gt(sql`coalesce(${notes.editedAt}, ${notes.createdAt})`, input.since),
+        live(householdId),
+        sql`exists (select 1 from ${members} where ${and(
+          eq(members.householdId, householdId),
+          isNull(members.deactivatedAt),
+        )} and not ${seenBy(members.id)})`,
       ),
     );
   return Number(row?.n ?? 0);
+}
+
+/**
+ * Mark live notes of the household as seen by a member at `now`. Seeing one
+ * again moves `seen_at` forward, never back. Returns the ids it marked, in
+ * the order given and without repeats; a note that is deleted, not there or
+ * another household's is left out.
+ */
+export async function markNotesSeen(
+  db: Queryable,
+  input: {
+    householdId: string;
+    memberId: string;
+    noteIds: readonly string[];
+    now: Date;
+  },
+): Promise<string[]> {
+  if (input.noteIds.length === 0) return [];
+  const found = await db
+    .select({ id: notes.id })
+    .from(notes)
+    .where(and(live(input.householdId), inArray(notes.id, [...input.noteIds])));
+  const there = new Set(found.map((n) => n.id));
+  const marked = [...new Set(input.noteIds)].filter((id) => there.has(id));
+  if (marked.length === 0) return [];
+  await db
+    .insert(noteReads)
+    .values(
+      marked.map((noteId) => ({
+        noteId,
+        memberId: input.memberId,
+        seenAt: input.now,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [noteReads.noteId, noteReads.memberId],
+      set: { seenAt: sql`greatest(${noteReads.seenAt}, excluded.seen_at)` },
+    });
+  return marked;
 }
 
 /** One live note of the household, or null (missing, deleted, elsewhere). */
@@ -89,12 +207,13 @@ export async function findNote(
   householdId: string,
   id: string,
 ): Promise<NoteRow | null> {
-  const [row] = await db
+  const rows = await db
     .select(noteColumns)
     .from(notes)
     .innerJoin(members, eq(members.id, notes.authorId))
     .where(live(householdId, id))
     .limit(1);
+  const [row] = await withSeenBy(db, rows);
   return row ?? null;
 }
 
