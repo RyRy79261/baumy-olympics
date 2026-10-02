@@ -193,7 +193,8 @@ too; the lines are in brain's SETUP.md and the PR bodies).
 - [ ] **Create brain's service token** on production: Admin → Connections
       (`/admin/connections`) → Create token (name `baumy-brain`). It is
       shown once, with a Copy button; if you signed in over 10 minutes ago
-      it asks for your password. (The terminal alternative is under
+      it asks you to confirm it's you (a passkey, your two-factor code, a
+      Telegram tap or your password). (The terminal alternative is under
       [Brain actions endpoint](#brain-actions-endpoint-and-telegram-linking-issue-27).)
 - [ ] **Review and merge baumy-brain PR #8** (Olympics client, `/link`,
       calendar/chore intents, issue #28). Reviewed overnight; two fixes
@@ -989,8 +990,11 @@ tokens against Docker Postgres.
       (`/admin/connections`) and press **Create token** with the name
       `baumy-brain`. The token is shown once, with a Copy button; only its
       hash is stored, and neither the audit trail nor the request ledger
-      keeps it. It asks for your password unless you signed in within the
-      last 10 minutes (Google-only: sign out and in again first).
+      keeps it. Unless you signed in within the last 10 minutes it asks
+      you to confirm it's you, with any way you have: a passkey, your
+      two-factor code, a Sign in with Baumy tap, your password or Google
+      [CORRECTION 2026-10-02, issue #135: it used to ask for the password
+      only].
 
       The terminal still works, from a checkout of `main` with the direct
       (unpooled) Neon string:

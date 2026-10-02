@@ -77,6 +77,12 @@ import { createRunner } from "./run";
 import { getPot, getStandings, getStreaks } from "./scoreboard";
 import { setKioskPin } from "./set-kiosk-pin";
 import {
+  confirmIdentity,
+  getBaumyConfirmation,
+  getStepUp,
+  requestBaumyConfirmation,
+} from "./step-up";
+import {
   addShoppingItems,
   checkOffShoppingItems,
   listShopping,
@@ -125,6 +131,10 @@ export const REGISTRY = {
   remove_passkey: removePasskey,
   unlink_google: unlinkGoogle,
   set_first_password: setFirstPassword,
+  get_step_up: getStepUp,
+  confirm_identity: confirmIdentity,
+  request_baumy_confirmation: requestBaumyConfirmation,
+  get_baumy_confirmation: getBaumyConfirmation,
   approve_kiosk_pairing: approveKioskPairing,
   rename_kiosk: renameKiosk,
   revoke_kiosk: revokeKiosk,

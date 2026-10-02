@@ -532,7 +532,7 @@ describe("check_kiosk_pin: attestation on the kiosk", () => {
     // Their own session sets a new PIN: the lock and the counters go.
     const reset = await runAction(
       "set_kiosk_pin",
-      { pin: "2468", currentPassword: undefined },
+      { pin: "2468" },
       ctxFor(
         sessionActor(me, "member", {
           sessionCreatedAt: FIXED_NOW.toISOString(),

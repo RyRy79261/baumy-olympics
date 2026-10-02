@@ -70,7 +70,11 @@ describe("approve_login", () => {
     );
     expect(res).toEqual({
       ok: true,
-      data: { outcome: "approved", device: "Chrome on macOS" },
+      data: {
+        outcome: "approved",
+        device: "Chrome on macOS",
+        purpose: "sign_in",
+      },
     });
     expect(await row()).toMatchObject({
       status: "approved",
@@ -98,7 +102,11 @@ describe("approve_login", () => {
     // A success, so the transaction keeps the denial.
     expect(res).toEqual({
       ok: true,
-      data: { outcome: "blocked", device: "Chrome on macOS" },
+      data: {
+        outcome: "blocked",
+        device: "Chrome on macOS",
+        purpose: "sign_in",
+      },
     });
     expect(await row()).toMatchObject({
       status: "denied",
@@ -251,7 +259,11 @@ describe("deny_login", () => {
     );
     expect(res).toEqual({
       ok: true,
-      data: { outcome: "denied", device: "Chrome on macOS" },
+      data: {
+        outcome: "denied",
+        device: "Chrome on macOS",
+        purpose: "sign_in",
+      },
     });
     expect(await row()).toMatchObject({
       status: "denied",

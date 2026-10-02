@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import type { Queryable } from "./index";
 import { loginRequests, members, user } from "./schema";
@@ -7,6 +7,12 @@ import { loginRequests, members, user } from "./schema";
 // address; brain DMs the member's linked Telegram account, and the tap
 // approves or denies it (`approve_login`, `deny_login`). The browser holds the
 // only copy of a random secret and trades it once for a session.
+//
+// The same rows also carry "Confirm it's you" (issue #135, ADR 0007): a
+// `step_up` request is made from a session already signed in, for that
+// session, and its approval opens that session's sudo window (step-ups.ts)
+// instead of making a session. The sign-in path never sees a step-up row, and
+// the step-up path never sees a sign-in row.
 //
 // Every step is ONE statement whose WHERE is the whole test, so a replayed or
 // concurrent step finds no row. These functions take the caller's handle and
@@ -34,6 +40,8 @@ export type LoginRequestState =
   "pending" | "approved" | "denied" | "expired" | "used";
 
 export type LoginDenyReason = "denied" | "wrong_code";
+
+export type LoginRequestPurpose = "sign_in" | "step_up";
 
 /**
  * The stored form of a browser secret: sha256 hex. The secret is 32 random
@@ -171,7 +179,12 @@ export async function findLoginRequestBySecret(
       expiresAt: loginRequests.expiresAt,
     })
     .from(loginRequests)
-    .where(eq(loginRequests.secretHash, hashLoginSecret(secret)))
+    .where(
+      and(
+        eq(loginRequests.secretHash, hashLoginSecret(secret)),
+        eq(loginRequests.purpose, "sign_in"),
+      ),
+    )
     .limit(1);
   return row ? { id: row.id, state: loginRequestState(row, now) } : null;
 }
@@ -181,6 +194,7 @@ export interface LockedLoginRequest {
   code: number;
   device: string;
   state: LoginRequestState;
+  purpose: LoginRequestPurpose;
 }
 
 /**
@@ -201,6 +215,7 @@ export async function lockLoginRequest(
       device: loginRequests.device,
       status: loginRequests.status,
       expiresAt: loginRequests.expiresAt,
+      purpose: loginRequests.purpose,
     })
     .from(loginRequests)
     .where(and(eq(loginRequests.id, id), eq(loginRequests.memberId, memberId)))
@@ -211,6 +226,7 @@ export async function lockLoginRequest(
     code: row.code,
     device: row.device,
     state: loginRequestState(row, now),
+    purpose: row.purpose,
   };
 }
 
@@ -260,6 +276,7 @@ export async function claimApprovedLoginRequest(
     .where(
       and(
         eq(loginRequests.secretHash, hashLoginSecret(secret)),
+        eq(loginRequests.purpose, "sign_in"),
         eq(loginRequests.status, "approved"),
         isNotNull(loginRequests.memberId),
         gt(
@@ -281,6 +298,97 @@ export async function claimApprovedLoginRequest(
     memberId: claimed.memberId,
     authUserId: member.authUserId,
   };
+}
+
+export interface NewStepUpRequest {
+  memberId: string;
+  /** The session asking; only it can use the approval. */
+  sessionId: string;
+  code: number;
+  choices: number[];
+  device: string;
+  now: Date;
+}
+
+/**
+ * Store a "Confirm it's you" request for one session, pending for
+ * `LOGIN_REQUEST_TTL_MS`. Its secret is random and never handed out: the
+ * session cookie, not a request cookie, is what binds it to the browser.
+ */
+export async function insertStepUpRequest(
+  db: Queryable,
+  input: NewStepUpRequest,
+): Promise<{ id: string; expiresAt: Date }> {
+  const expiresAt = new Date(input.now.getTime() + LOGIN_REQUEST_TTL_MS);
+  const [row] = await db
+    .insert(loginRequests)
+    .values({
+      memberId: input.memberId,
+      sessionId: input.sessionId,
+      purpose: "step_up",
+      secretHash: hashLoginSecret(randomBytes(32).toString("base64url")),
+      code: input.code,
+      choices: input.choices,
+      device: input.device,
+      createdAt: input.now,
+      expiresAt,
+    })
+    .returning({ id: loginRequests.id });
+  return { id: row!.id, expiresAt };
+}
+
+/**
+ * Where the step-up request `id` of `sessionId` stands; null when the session
+ * has no such request (another session's reads as none).
+ */
+export async function findStepUpRequest(
+  db: Queryable,
+  input: { id: string; sessionId: string; now: Date },
+): Promise<LoginRequestState | null> {
+  const [row] = await db
+    .select({
+      status: loginRequests.status,
+      expiresAt: loginRequests.expiresAt,
+    })
+    .from(loginRequests)
+    .where(
+      and(
+        eq(loginRequests.id, input.id),
+        eq(loginRequests.sessionId, input.sessionId),
+        eq(loginRequests.purpose, "step_up"),
+      ),
+    )
+    .limit(1);
+  return row ? loginRequestState(row, input.now) : null;
+}
+
+/**
+ * Use an approved step-up request, once: ONE `UPDATE … RETURNING` whose WHERE
+ * is the whole test (this id, this session, this member, approved, not past
+ * its time plus the grace). False for anything else.
+ */
+export async function claimApprovedStepUpRequest(
+  db: Queryable,
+  input: { id: string; sessionId: string; memberId: string; now: Date },
+): Promise<boolean> {
+  const rows = await db
+    .update(loginRequests)
+    .set({ status: "used", usedAt: input.now })
+    .where(
+      and(
+        eq(loginRequests.id, input.id),
+        eq(loginRequests.sessionId, input.sessionId),
+        eq(loginRequests.memberId, input.memberId),
+        eq(loginRequests.purpose, "step_up"),
+        eq(loginRequests.status, "approved"),
+        gt(
+          loginRequests.expiresAt,
+          new Date(input.now.getTime() - LOGIN_EXCHANGE_GRACE_MS),
+        ),
+      ),
+    )
+    .returning({ id: loginRequests.id });
+  return rows.length > 0;
 }
 
 /** Delete requests created before `before` (the daily sweep). */

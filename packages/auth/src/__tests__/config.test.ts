@@ -54,6 +54,7 @@ describe("buildAuthOptions", () => {
       "baumy-trusted-devices",
       "baumy-new-way-in",
       "baumy-approval-sign-in",
+      "baumy-step-up",
     ]);
     expect(options.plugins[0]?.options).toEqual({ requireSignature: true });
   });

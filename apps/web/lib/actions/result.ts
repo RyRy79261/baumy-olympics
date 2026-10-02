@@ -62,8 +62,13 @@ export type DomainErrorCode =
   | "EMAIL_NOT_VERIFIED"
   /** The change would leave the household without an active admin. */
   | "LAST_ADMIN"
-  /** Needs the current password or a session under 10 minutes old. */
+  /**
+   * Needs "Confirm it's you" first (issue #135): a session under 10 minutes
+   * old, or one confirmed in the last 10 minutes (`requireRecentAuth`).
+   */
   | "REAUTH_REQUIRED"
+  /** "Confirm it's you": the passkey, code, tap or password was not accepted. */
+  | "STEP_UP_FAILED"
   /** Settings, Security: the change would leave the account no way in. */
   | "LAST_SIGN_IN_METHOD"
   /** `set_first_password` on an account that already has one. */

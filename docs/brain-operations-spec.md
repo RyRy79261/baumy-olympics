@@ -385,11 +385,11 @@ Approves a 'Sign in with Baumy' request with the number the member tapped in the
 }
 ```
 
-**Returns** (`data`): `outcome`: `approved` (the browser signs in now) or `blocked` (that was not the number on the screen, so the sign-in was refused and Sign in with Baumy is off for this member for 15 minutes); `device`, e.g. `Chrome on macOS`.
+**Returns** (`data`): `outcome`: `approved` (the browser signs in now) or `blocked` (that was not the number on the screen, so the sign-in was refused and Sign in with Baumy is off for this member for 15 minutes); `device`, e.g. `Chrome on macOS`; `purpose`: `sign_in`, or `step_up` when the DM was a "Confirm it's you" request (`purpose: "step_up"` in the login-approval call): the member is already signed in on that device and is confirming a sensitive change there (issue #135). Approving one signs nobody in.
 
 **Its errors:** `NOT_FOUND` (404), `INVALID_STATE` (422). Every call can also get the endpoint's codes (above).
 
-**Say back:** Edit the DM, dropping the buttons. approved: "✅ Signed in on <device>." blocked: "🚫 That wasn't the number on the screen, so I blocked this sign-in. If it wasn't you, nothing happened; sign in with your password if it was." NOT_FOUND or INVALID_STATE: show `message`.
+**Say back:** Edit the DM, dropping the buttons. approved: "✅ Signed in on <device>." (`step_up`: "✅ Confirmed it's you on <device>.") blocked: "🚫 That wasn't the number on the screen, so I blocked this sign-in. If it wasn't you, nothing happened; sign in with your password if it was." (`step_up`: "🚫 That wasn't the number on the screen, so I didn't confirm it.") NOT_FOUND or INVALID_STATE: show `message`.
 
 ### `deny_login`: Deny a sign-in
 
@@ -431,11 +431,11 @@ Denies a 'Sign in with Baumy' request: the member tapped Deny.
 }
 ```
 
-**Returns** (`data`): `outcome`: `denied` (Sign in with Baumy is then off for this member for 15 minutes); `device`.
+**Returns** (`data`): `outcome`: `denied` (Sign in with Baumy is then off for this member for 15 minutes); `device`; `purpose` (`sign_in` or `step_up`, as for approve_login).
 
 **Its errors:** `NOT_FOUND` (404), `INVALID_STATE` (422). Every call can also get the endpoint's codes (above).
 
-**Say back:** Edit the DM, dropping the buttons: "✖️ Denied the sign-in on <device>." NOT_FOUND or INVALID_STATE: show `message`.
+**Say back:** Edit the DM, dropping the buttons: "✖️ Denied the sign-in on <device>." (`step_up`: "✖️ Didn't confirm it on <device>.") NOT_FOUND or INVALID_STATE: show `message`.
 
 ### `list_chores`: List chores
 
@@ -2234,6 +2234,10 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `remove_passkey`: The member's own account settings: only in the app, signed in.
 - `unlink_google`: The member's own account settings: only in the app, signed in.
 - `set_first_password`: The member's own account settings: only in the app, signed in.
+- `get_step_up`: The member's own account settings: only in the app, signed in.
+- `confirm_identity`: The member's own account settings: only in the app, signed in.
+- `request_baumy_confirmation`: The member's own account settings: only in the app, signed in.
+- `get_baumy_confirmation`: The member's own account settings: only in the app, signed in.
 - `approve_kiosk_pairing`: An admin action: UI only (SPEC §12 decision 10).
 - `rename_kiosk`: An admin action: UI only (SPEC §12 decision 10).
 - `revoke_kiosk`: An admin action: UI only (SPEC §12 decision 10).

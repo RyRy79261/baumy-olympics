@@ -18,6 +18,7 @@ import { bearer } from "better-auth/plugins/bearer";
 import { createHttpDb, schema, type Queryable } from "@baumy/db";
 import { forgetTrustedDevices } from "@baumy/db/account-security";
 import { approvalSignIn } from "./approval-sign-in";
+import { stepUpPasskey } from "./step-up";
 import { sendAuthEmail } from "./email";
 import {
   AUTH_COOKIE_PREFIX,
@@ -26,6 +27,7 @@ import {
   canDeliverAuthEmail,
   isGoogleConfigured,
   resolveBaseURL,
+  resolvePasskeyScope,
   resolveRateLimit,
   resolveTrustedOrigins,
   resolveUseSecureCookies,
@@ -186,6 +188,9 @@ export function buildAuthOptions(env: AuthEnv = process.env) {
       // "Sign in with Baumy" (issue #80): a server-only endpoint that makes
       // the session once the member approved it in Telegram.
       approvalSignIn(),
+      // "Confirm it's you" with a passkey (issue #135, ADR 0007): a
+      // server-only check of an assertion that makes no session.
+      stepUpPasskey(resolvePasskeyScope(env)),
     ],
 
     advanced: {

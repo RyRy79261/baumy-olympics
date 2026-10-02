@@ -1,13 +1,16 @@
 // @vitest-environment node
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { Queryable } from "@baumy/db";
 import {
   actionRequests,
   auditEvents,
   members,
+  session,
   telegramLinkCodes,
+  user,
 } from "@baumy/db/schema";
+import { grantStepUp } from "@baumy/db/step-ups";
 import {
   TELEGRAM_LINK_CODE_TTL_MS,
   hashTelegramLinkCode,
@@ -28,11 +31,6 @@ import type { Actor } from "@/lib/auth";
 // set_kiosk_pin and create_telegram_link_code. Both need the member's own
 // session: never the kiosk, MCP or brain.
 
-const verifyPassword = vi.fn(async (_pw: string) => false);
-vi.mock("@/lib/auth/password-check", () => ({
-  verifyCurrentPassword: (pw: string) => verifyPassword(pw),
-}));
-
 const { runAction } = await import("./registry");
 
 const t = useTestDb();
@@ -41,9 +39,33 @@ const MIN = 60_000;
 
 beforeEach(() => {
   __resetMemoryRateLimits();
-  verifyPassword.mockReset();
-  verifyPassword.mockResolvedValue(false);
 });
+
+let sessions = 0;
+/**
+ * A member's session with a real `session` row (signed in an hour ago), so
+ * it can hold a sudo window.
+ */
+async function sessionWithRow(memberId: string) {
+  sessions += 1;
+  const userId = `settings-user-${sessions}`;
+  const sessionId = `settings-sess-${sessions}`;
+  await t
+    .db()
+    .insert(user)
+    .values({ id: userId, name: userId, email: `${userId}@example.com` });
+  await t
+    .db()
+    .insert(session)
+    .values({
+      id: sessionId,
+      token: `tok-${sessionId}`,
+      userId,
+      createdAt: new Date(FIXED_NOW.getTime() - 60 * MIN),
+      expiresAt: new Date(FIXED_NOW.getTime() + 24 * 60 * MIN),
+    });
+  return sessionActor(memberId, "member", { userId, sessionId });
+}
 
 async function row(id: string) {
   const [r] = await t.db().select().from(members).where(eq(members.id, id));
@@ -82,16 +104,14 @@ describe("set_kiosk_pin", () => {
     await expect(verifyKioskPin("4321", stored.kioskPinHash!)).resolves.toBe(
       true,
     );
-    expect(verifyPassword).not.toHaveBeenCalled();
   });
 
-  it("keeps the PIN and the password out of the ledger and the audit row", async () => {
+  it("keeps the PIN out of the ledger and the audit row", async () => {
     const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
-    verifyPassword.mockResolvedValue(true);
     await runAction(
       "set_kiosk_pin",
-      { pin: "987654", currentPassword: "correct horse battery" },
-      ctxFor(signedIn(me, 120)),
+      { pin: "987654" },
+      ctxFor(signedIn(me, 1)),
     );
     const ledger = await t.db().select().from(actionRequests);
     const audits = await t.db().select().from(auditEvents);
@@ -104,50 +124,46 @@ describe("set_kiosk_pin", () => {
     ]);
     const everything = JSON.stringify([ledger, audits]);
     expect(everything).not.toContain("987654");
-    expect(everything).not.toContain("correct horse");
   });
 
-  it("changing a PIN needs the password when the session is 10 minutes old or more", async () => {
+  it("changing a PIN needs 'Confirm it's you' when the session is 10 minutes old or more", async () => {
     const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
-    const noPassword = await runAction(
-      "set_kiosk_pin",
-      { pin: "1111" },
-      ctxFor(signedIn(me, 10)),
-    );
-    expect(noPassword).toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
-
-    const wrong = await runAction(
-      "set_kiosk_pin",
-      { pin: "1111", currentPassword: "wrong" },
-      ctxFor(signedIn(me, 60)),
-    );
-    expect(wrong).toEqual({
-      ok: false,
-      code: "REAUTH_REQUIRED",
-      message: "That password is not right.",
-    });
-    expect(verifyPassword).toHaveBeenCalledWith("wrong");
+    await expect(
+      runAction("set_kiosk_pin", { pin: "1111" }, ctxFor(signedIn(me, 10))),
+    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
     expect((await row(me)).kioskPinHash).toBe("scrypt$old");
 
-    verifyPassword.mockResolvedValue(true);
+    const actor = await sessionWithRow(me);
     await expect(
-      runAction(
-        "set_kiosk_pin",
-        { pin: "1111", currentPassword: "right" },
-        ctxFor(signedIn(me, 60)),
-      ),
+      runAction("set_kiosk_pin", { pin: "1111" }, ctxFor(actor)),
+    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    await grantStepUp(db(), {
+      sessionId: actor.sessionId!,
+      userId: actor.userId,
+      method: "totp",
+      now: FIXED_NOW,
+    });
+    await expect(
+      runAction("set_kiosk_pin", { pin: "1111" }, ctxFor(actor)),
     ).resolves.toEqual({ ok: true, data: { changed: true } });
     await expect(
       verifyKioskPin("1111", (await row(me)).kioskPinHash!),
     ).resolves.toBe(true);
+    // The old password field is gone.
+    await expect(
+      runAction(
+        "set_kiosk_pin",
+        { pin: "1111", currentPassword: "x" },
+        ctxFor(actor),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
   });
 
-  it("a session under 10 minutes old may change the PIN without the password", async () => {
+  it("a session under 10 minutes old may change the PIN without confirming", async () => {
     const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
     await expect(
       runAction("set_kiosk_pin", { pin: "2222" }, ctxFor(signedIn(me, 9))),
     ).resolves.toEqual({ ok: true, data: { changed: true } });
-    expect(verifyPassword).not.toHaveBeenCalled();
   });
 
   it("a session dated in the future does not count as fresh", async () => {

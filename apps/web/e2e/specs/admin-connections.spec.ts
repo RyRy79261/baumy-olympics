@@ -4,7 +4,6 @@ import {
   type APIRequestContext,
   type Page,
 } from "@playwright/test";
-import { PASSWORD } from "../lib/accounts";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 import { openAdminMenu } from "../lib/nav";
 
@@ -42,12 +41,13 @@ test("an admin creates, rotates and revokes a service token, each shown once", a
     page.getByRole("heading", { name: "Connections", level: 1 }),
   ).toBeVisible();
 
-  // Create. The password is only needed after 10 minutes; it is right anyway.
+  // Create. A sign-in this fresh counts as "Confirm it's you" (issue #135),
+  // so no dialog opens (confirm-its-you.spec.ts covers the dialog).
   const create = page.locator("form").filter({
     has: page.getByRole("button", { name: "Create token" }),
   });
   await create.getByLabel("Name").fill(name);
-  await create.getByLabel("Your password").fill(PASSWORD);
+  await expect(create.getByLabel("Your password")).toHaveCount(0);
   await create.getByRole("button", { name: "Create token" }).click();
   const shown = page.getByTestId("service-token-plaintext");
   await expect(shown).toHaveText(/^baumy_st_/);
@@ -68,7 +68,6 @@ test("an admin creates, rotates and revokes a service token, each shown once", a
   // shows exactly one token, the new one, never the dead one beside it.
   await live.getByRole("button", { name: `Rotate ${name}` }).click();
   await expect(live.getByText(`Rotate ${name}?`)).toBeVisible();
-  await live.getByLabel("Your password").fill(PASSWORD);
   await live.getByRole("button", { name: "Yes, rotate" }).click();
   await expect(shown).not.toHaveText(first);
   await expect(shown).toHaveCount(1);
