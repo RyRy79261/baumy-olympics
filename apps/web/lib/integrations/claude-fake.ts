@@ -22,7 +22,9 @@ import type { MessageParams } from "./claude";
 //     with every item named (issue #26);
 //   - "add a bounty for <name>, <N> points": proposes create_bounty
 //     (issue #107);
-//   - "put €<X> in the pot": proposes add_pot_contribution (issue #107).
+//   - "put €<X> in the pot": proposes add_pot_contribution (issue #107);
+//   - "what do you keep about me?": reads get_my_data, then sums it up with
+//     the retention rules and the privacy page (issue #144).
 //
 // Anything else gets a short help line and no tool. It never touches the
 // database itself: everything it knows comes from the tool results.
@@ -68,6 +70,38 @@ const POT_AMOUNT =
 
 export function potAmountNamed(said: string): string | null {
   return POT_AMOUNT.exec(said)?.[1] ?? null;
+}
+
+/** "what do you keep about me?", "what data do you have on me?". */
+const MY_DATA =
+  /\b(keep|kept|store|stored|know|have|hold)\b.*\b(about|on)\s+me\b|\bmy data\b/;
+
+interface MyDataLike {
+  sessions: { count: number };
+  completions: { total: number };
+  notes: { written: number; deletedKept: number };
+  photos: { stored: number };
+  auditEntries: number;
+  ai: { commands: number };
+  retention: { photoDays: number; policyUrl: string };
+}
+
+const plural = (n: number, one: string, many = `${one}s`) =>
+  `${n} ${n === 1 ? one : many}`;
+
+/** The fake's plain summary of a get_my_data result. */
+export function myDataSummary(d: MyDataLike): string {
+  return (
+    `Here's what I keep about you: ${plural(d.completions.total, "completion")}, ` +
+    `${plural(d.notes.written, "note")} (${d.notes.deletedKept} deleted but kept), ` +
+    `${plural(d.photos.stored, "proof photo")}, ` +
+    `${plural(d.auditEntries, "audit-log entry", "audit-log entries")}, ` +
+    `${plural(d.ai.commands, "Baumy command")} and ` +
+    `${plural(d.sessions.count, "signed-in device")}. ` +
+    `Proof photos are deleted ${d.retention.photoDays} days after their claim settles; ` +
+    "everything else stays while the household uses the app. " +
+    `The full policy is at ${d.retention.policyUrl}.`
+  );
 }
 
 let seq = 0;
@@ -162,6 +196,25 @@ export async function fakeClaude(
   const offered = new Set(
     (params.tools ?? []).map((t) => ("name" in t ? t.name : "")),
   );
+
+  if (MY_DATA.test(said) && offered.has("get_my_data")) {
+    const mine = reads.get("get_my_data") as
+      { ok: boolean; data?: MyDataLike } | undefined;
+    if (!mine) {
+      return message(model, [toolUse("get_my_data", {})], "tool_use");
+    }
+    return message(
+      model,
+      [
+        text(
+          mine.data
+            ? myDataSummary(mine.data)
+            : "I can only show that on your own phone, signed in. The policy is at /privacy.",
+        ),
+      ],
+      "end_turn",
+    );
+  }
 
   if (
     /\b(win|wins|winning|lead|leads|leading|standings|score|scores)\b/.test(
