@@ -149,7 +149,9 @@ export {
   CatLink,
   CatSays,
   CatText,
+  HoldToTalk,
   LevelBars,
+  type HoldState,
 } from "./cat-bubble";
 export {
   BADGE_COLOURS,
