@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, Card, Field, FormMessage, Input } from "@baumy/ui";
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "@baumy/auth/password";
+import { useStepUp } from "@/components/account/confirm-its-you";
 import { useActionForm } from "@/components/use-action-form";
 import type { PasskeyView, SessionView } from "@/lib/actions/account-security";
 import { authClient } from "@/lib/auth-client";
@@ -243,8 +244,9 @@ export function GoogleCard({
       ? "Linking Google didn't finish. It must be the Google account with this email."
       : null,
   );
+  const stepUp = useStepUp();
   const unlink = useActionForm<Out<"unlink_google">>(async (prev, form) => {
-    const result = await unlinkGoogleAction(prev, form);
+    const result = await stepUp.guard(unlinkGoogleAction)(prev, form);
     if (result.ok) toast.success("Google is unlinked.");
     else toast.error(result.message);
     setConfirming(false);
@@ -316,6 +318,7 @@ export function GoogleCard({
           {pending ? "Opening Google..." : "Link Google"}
         </Button>
       )}
+      {stepUp.dialog}
     </Card>
   );
 }
@@ -329,8 +332,9 @@ function PasskeyRow({ pk }: { pk: PasskeyView }) {
     if (result.ok) setRenaming(false);
     return result;
   });
+  const stepUp = useStepUp();
   const remove = useActionForm<Out<"remove_passkey">>(async (prev, form) => {
-    const result = await removePasskeyAction(prev, form);
+    const result = await stepUp.guard(removePasskeyAction)(prev, form);
     if (result.ok) toast.success("Passkey removed.");
     else {
       toast.error(result.message);
@@ -432,6 +436,7 @@ function PasskeyRow({ pk }: { pk: PasskeyView }) {
           )}
         </>
       )}
+      {stepUp.dialog}
     </li>
   );
 }

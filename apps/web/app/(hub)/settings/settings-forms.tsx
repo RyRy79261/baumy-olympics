@@ -11,6 +11,7 @@ import {
   Input,
 } from "@baumy/ui";
 import { KioskPin } from "@baumy/types";
+import { useStepUp } from "@/components/account/confirm-its-you";
 import { PixelQr } from "@/components/account/pixel-qr";
 import { useActionForm } from "@/components/use-action-form";
 import { telegramLinkDeepLink } from "@/lib/telegram/deep-link";
@@ -46,8 +47,13 @@ export function pinProblem(value: string, left: boolean): string | null {
  * has nothing to do with pairing the iPad (issue #126).
  */
 export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
-  const { state, formAction, pending, requestId, errors } =
-    useActionForm(setKioskPinAction);
+  // Changing a PIN needs "Confirm it's you" (issue #135): the dialog opens
+  // when the action asks for it, then the PIN is sent again.
+  const stepUp = useStepUp();
+  const { state, formAction, pending, requestId, errors } = useActionForm(
+    (prev: Parameters<typeof setKioskPinAction>[0], form: FormData) =>
+      stepUp.guard(setKioskPinAction)(prev, form),
+  );
   const [mismatch, setMismatch] = useState(false);
   const [pin, setPin] = useState("");
   const [left, setLeft] = useState(false);
@@ -118,24 +124,6 @@ export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
             />
           )}
         </Field>
-        {hasPin ? (
-          <Field
-            id="kiosk-current-password"
-            label="Your account password"
-            hint="Not needed within 10 minutes of signing in."
-            errors={errors.currentPassword}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                name="currentPassword"
-                type="password"
-                autoComplete="current-password"
-                disabled={pending}
-              />
-            )}
-          </Field>
-        ) : null}
         {state?.ok ? (
           <FormMessage tone="success">
             {state.data.changed ? "PIN changed." : "PIN saved."}
@@ -147,6 +135,7 @@ export function KioskPinForm({ hasPin }: { hasPin: boolean }) {
           {pending ? "Saving..." : hasPin ? "Change PIN" : "Set PIN"}
         </Button>
       </form>
+      {stepUp.dialog}
     </Card>
   );
 }
