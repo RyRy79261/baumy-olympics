@@ -138,7 +138,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>The board:</strong> notes (title, text, colour, author) and
-            reminders, with who has read each reminder.
+            reminders, with who has read each note and each reminder, and when.
           </li>
           <li>
             <strong>Proof photos</strong> you attach to a chore.

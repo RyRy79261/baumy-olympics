@@ -6,6 +6,7 @@ import {
   NOTE_LIST_MAX,
   NOTE_TITLE_MAX,
   NewNote,
+  NoteAcknowledge,
   NoteColorChoice,
   NoteFlag,
   NotePin,
@@ -103,6 +104,32 @@ describe("ListNotesInput", () => {
     });
     expect(ListNotesInput.safeParse({ limit: 0 }).success).toBe(false);
     expect(ListNotesInput.safeParse({ limit: NOTE_LIST_MAX + 1 }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("NoteAcknowledge", () => {
+  const OTHER = "0d6f1c2e-5b4a-4c3d-9e8f-0a1b2c3d4e5f";
+
+  it("takes one id (a form) or a list (JSON, a repeated field)", () => {
+    expect(NoteAcknowledge.parse({ noteIds: ID })).toEqual({ noteIds: [ID] });
+    expect(NoteAcknowledge.parse({ noteIds: [ID, OTHER] })).toEqual({
+      noteIds: [ID, OTHER],
+    });
+  });
+
+  it("needs at least one real id, and at most a page of them", () => {
+    expect(NoteAcknowledge.safeParse({}).success).toBe(false);
+    expect(NoteAcknowledge.safeParse({ noteIds: [] }).success).toBe(false);
+    expect(NoteAcknowledge.safeParse({ noteIds: "nope" }).success).toBe(false);
+    expect(NoteAcknowledge.safeParse({ noteIds: 5 }).success).toBe(false);
+    expect(
+      NoteAcknowledge.safeParse({
+        noteIds: Array.from({ length: NOTE_LIST_MAX + 1 }, () => ID),
+      }).success,
+    ).toBe(false);
+    expect(NoteAcknowledge.safeParse({ noteIds: [ID], extra: 1 }).success).toBe(
       false,
     );
   });
