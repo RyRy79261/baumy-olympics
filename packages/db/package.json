@@ -33,7 +33,8 @@
     "./mcp-oauth": "./src/mcp-oauth.ts",
     "./service-tokens": "./src/service-tokens.ts",
     "./account-security": "./src/account-security.ts",
-    "./step-ups": "./src/step-ups.ts"
+    "./step-ups": "./src/step-ups.ts",
+    "./my-data": "./src/my-data.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

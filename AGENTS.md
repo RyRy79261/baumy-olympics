@@ -25,6 +25,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 | `pnpm db:local:test`                                    | Run the `*.local.test.ts` files (db, web) that need Docker Postgres.        |
 | `pnpm --filter @baumy/db db:generate`                   | Generate a migration after editing `schema.ts`.                             |
 | `pnpm brain:spec`                                       | Regenerate `docs/brain-operations-spec.md` from the action registry.        |
+| `pnpm help:corpus`                                      | Regenerate `docs/help-corpus.generated.md` from `docs/manual/` and code.    |
 | `pnpm --filter @baumy/web logo:png`                     | Rewrite `design/logo/` from the badge grid after changing the badge.        |
 | `pnpm turbo run format:check lint typecheck test build` | **The gate.** Run it before every push.                                     |
 | `E2E_SERVE=build ./scripts/e2e-local.sh [specs/<area>]` | Run Playwright against Docker Postgres.                                     |
@@ -127,6 +128,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
 
 - Measure before you claim, and attribute a failure before you blame something for it.
 - If you change behaviour, fix the doc in the same PR, or mark the doc `[CORRECTION yyyy-mm-dd]` or `[UNRESOLVED yyyy-mm-dd]`.
+- A change a housemate would notice updates `docs/manual/` in the same PR, then `pnpm help:corpus` (SPEC §3.8). Write numbers there as `{{NAME}}` placeholders from `lib/help/constants.ts`, and keep security internals (rate limits, PIN lockout) out.
 - Owner rulings go into `docs/decisions/` or SPEC §12 (decisions and open questions), dated.
 
 ## Reference repos (copy patterns, cite the path in the PR)

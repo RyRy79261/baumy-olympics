@@ -19,12 +19,13 @@ import { showsGalleryForm } from "@/lib/avatars/settings-card";
 import { telegramBotUsername } from "@/lib/telegram/deep-link";
 import { GalleryForm } from "./gallery-form";
 import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
+import { YourDataCard } from "./your-data-card";
 
 // /settings (SPEC §6.2): the member's own character (a pick from the
 // avatar gallery, issue #111), kiosk PIN and Telegram link. Every
 // action here needs the member's own session (requireSession), never the
-// kiosk. Also the bug reporter's card (issue #133) and, for admins, the
-// way to System status.
+// kiosk. "Your data" shows get_my_data (issue #144). Also the bug
+// reporter's card (issue #133) and, for admins, the way to System status.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Settings" };
@@ -32,8 +33,8 @@ export const metadata: Metadata = { title: "Settings" };
 export default async function SettingsPage() {
   const me = await requireMemberPage();
   const db = createHttpDb() as unknown as Queryable;
-  // Three independent reads, side by side (issue #128).
-  const [[row], telegram, gallery] = await Promise.all([
+  // Four independent reads, side by side (issue #128).
+  const [[row], telegram, gallery, myData] = await Promise.all([
     db
       .select({
         kioskPinHash: members.kioskPinHash,
@@ -50,6 +51,9 @@ export default async function SettingsPage() {
     // a pick from it; until then, and until they pick, they show as their
     // initial in their colour (issue #116).
     listAvatars(db, HOUSEHOLD_ID),
+    // "Your data" (issue #144): what Baumy answers "what do you keep about
+    // me?" with.
+    uiRequestCtx(undefined).then((ctx) => runAction("get_my_data", {}, ctx!)),
   ]);
   const { show, live, worn } = showsGalleryForm(gallery, row?.avatarImageId);
   const colour = row?.color ?? "var(--color-bm-muted)";
@@ -59,7 +63,7 @@ export default async function SettingsPage() {
     <>
       <PageHeading
         title="Settings"
-        description="Your character, your sign-in security, your personal PIN, your Telegram link and your connected apps."
+        description="Your character, your sign-in security, your personal PIN, your Telegram link, your connected apps and what Baumy keeps about you."
       />
       <div className="flex max-w-xl flex-col gap-6">
         {row?.kioskPinLockedAt ? (
@@ -124,6 +128,7 @@ export default async function SettingsPage() {
             Manage connected apps
           </Link>
         </Card>
+        {myData.ok ? <YourDataCard data={myData.data} /> : null}
         <ReportSettingsCard
           filing={filingState(process.env, isTestMode())}
           repo={tracker.ok ? tracker.repo : null}
