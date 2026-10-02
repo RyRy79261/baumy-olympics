@@ -60,6 +60,7 @@ const PIN_STOP_CODES: ReadonlySet<string> = new Set([
   "ATTESTATION_FAILED",
   "RATE_LIMITED",
   "PIN_LOCKED",
+  "PIN_NOT_SET",
 ]);
 
 export function stopsPin(code: string): boolean {

@@ -8,6 +8,7 @@ import {
   visibleRows,
   type ReviewRow,
 } from "@/lib/ai/review";
+import { NoPinNotice } from "@/components/kiosk/no-pin-notice";
 import { SuggestionCard } from "./suggestion-card";
 
 // Everything Baumy wants to do, as suggestion cards with exactly two main
@@ -19,6 +20,10 @@ import { SuggestionCard } from "./suggestion-card";
 //   order; the cards show "Done" or the sentence it failed with. On the
 //   kiosk, when any of them vouches for someone, it first opens the PinPad
 //   once for the acting member, and that PIN goes with those requests.
+//   An acting member with no personal PIN never sees the PinPad (issue
+//   #145): Confirm all runs the cards that need no PIN, and the others
+//   wait under "<Name> hasn't set a personal PIN yet" and a QR code to
+//   Settings.
 // - While a card's edit is open or being checked, Confirm all waits: the
 //   edit replaces the card under a new proposal id, and running both would
 //   save it twice.
@@ -31,6 +36,10 @@ export interface SuggestionCardsProps {
   bubble?: boolean;
   /** "Ryan's PIN". */
   pinLabel: string;
+  /** Whether the acting member has a personal PIN (kiosk; default true). */
+  hasPin?: boolean;
+  /** The acting member, for "Felix hasn't set a personal PIN yet". */
+  actingName?: string;
   /** While Confirm all runs. */
   busy: boolean;
   onConfirmAll: (pin?: string) => void;
@@ -45,6 +54,8 @@ export function SuggestionCards({
   kiosk,
   bubble = false,
   pinLabel,
+  hasPin = true,
+  actingName,
   busy,
   onConfirmAll,
   onCancel,
@@ -75,11 +86,20 @@ export function SuggestionCards({
 
   const confirm = () => {
     if (editing) return;
-    if (confirmNeedsPin(rows, kiosk)) setPinOpen(true);
+    if (!confirmNeedsPin(rows, kiosk)) onConfirmAll();
+    else if (hasPin) setPinOpen(true);
+    // No PinPad for a PIN that was never set: the rest run now, and the
+    // PIN cards wait with why.
     else onConfirmAll();
   };
 
   const label = busy ? "Saving…" : "Confirm all";
+  // Once Confirm all has left PIN cards waiting (each says why).
+  const showNoPin =
+    kiosk &&
+    !hasPin &&
+    !busy &&
+    targets.some((r) => r.needsPin && r.message !== undefined);
 
   const actions =
     targets.length === 0 && anySaved ? (
@@ -149,6 +169,7 @@ export function SuggestionCards({
           Finish the edit (Check it, or Back) before Confirm all.
         </p>
       ) : null}
+      {showNoPin ? <NoPinNotice name={actingName} /> : null}
       {pinOpen ? (
         <form
           aria-label={pinLabel}

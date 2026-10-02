@@ -25,6 +25,7 @@ const NOW = Date.parse("2026-09-28T10:00:00.000Z");
 const { closeOpenDialogs } = await import("@/components/kiosk/idle-reset");
 const { KIOSK_IDLE_MS } = await import("@/lib/kiosk/constants");
 const { isKioskBusy } = await import("@/lib/kiosk/busy");
+const { ActingPinProvider } = await import("@/components/kiosk/acting-pin");
 
 beforeAll(() => {
   (
@@ -305,20 +306,37 @@ describe("BaumySheet on the kitchen dashboard", () => {
 
   let div: HTMLDivElement;
   function mountCat(
-    props: { actingName?: string; voice?: boolean; who?: React.ReactNode } = {},
+    props: {
+      actingName?: string;
+      voice?: boolean;
+      who?: React.ReactNode;
+      /** The kiosk shell's "has a personal PIN" for the acting member. */
+      hasPin?: boolean;
+    } = {},
   ) {
     div = document.createElement("div");
     document.body.append(div);
     root = createRoot(div);
+    const sheet = (
+      <BaumySheet
+        kiosk
+        cat
+        voice={props.voice ?? true}
+        actingName={props.actingName}
+        who={props.who}
+      />
+    );
     act(() =>
       root!.render(
-        <BaumySheet
-          kiosk
-          cat
-          voice={props.voice ?? true}
-          actingName={props.actingName}
-          who={props.who}
-        />,
+        props.hasPin === undefined ? (
+          sheet
+        ) : (
+          <ActingPinProvider
+            value={{ name: props.actingName, hasPin: props.hasPin }}
+          >
+            {sheet}
+          </ActingPinProvider>
+        ),
       ),
     );
   }
@@ -749,6 +767,70 @@ describe("BaumySheet on the kitchen dashboard", () => {
       ),
     ).toEqual(["saved", "saved", "pending"]);
     expect(document.body.textContent).toContain("Saved: +10 points.");
+  });
+
+  it("saves a note with no PIN for a member who has none, and leaves the dispute card waiting with the QR (issue #145)", async () => {
+    const note = {
+      ...proposal,
+      name: "create_note",
+      preview: 'Add the note "Bins out"',
+    };
+    const confirm = {
+      ...proposal,
+      proposalId: "p2",
+      name: "dispute_completion",
+      preview: 'Dispute Sam\'s Trash: "Still full"',
+      needsPin: true,
+    };
+    fetchMock.mockImplementation(async (url: string) =>
+      url === "/api/actions/run"
+        ? json({ ok: true, data: { noteId: "n1" } })
+        : json({
+            ok: true,
+            data: {
+              reply: "Lined up.",
+              proposals: [note, confirm],
+              choices: { members: [], chores: [] },
+            },
+          }),
+    );
+    mountCat({ actingName: "Felix", voice: false, hasPin: false });
+    act(() => cat().click());
+    const input = document.querySelector<HTMLInputElement>("#baumy-text")!;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      set.call(input, "note bins out, and dispute Sam's trash");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => button("Send").click());
+    await settle();
+    await act(async () => button("Confirm all").click());
+    await settle(10);
+    // No PinPad: the note ran at once, and the dispute card never went out.
+    expect(
+      document.querySelector('[role="group"][aria-label="Felix\'s PIN"]'),
+    ).toBeNull();
+    const runs = fetchMock.mock.calls
+      .filter((c) => c[0] === "/api/actions/run")
+      .map((c) => JSON.parse((c[1] as RequestInit).body as string));
+    expect(runs).toEqual([expect.objectContaining({ requestId: "p1" })]);
+    expect(runs[0]).not.toHaveProperty("pin");
+    expect(
+      [...document.querySelectorAll("li[data-testid^=suggestion-]")].map((li) =>
+        li.getAttribute("data-state"),
+      ),
+    ).toEqual(["saved", "pending"]);
+    const notice = document.querySelector('[data-testid="no-pin-notice"]');
+    expect(notice).not.toBeNull();
+    expect(notice!.textContent).toContain(
+      "Felix hasn't set a personal PIN yet",
+    );
+    expect(
+      notice!.querySelector('[aria-label^="QR code: set your personal PIN"]'),
+    ).not.toBeNull();
   });
 
   it("sends a wrong PIN once, never to every card that needs it", async () => {

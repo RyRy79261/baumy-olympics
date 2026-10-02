@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { AvatarButton, Button, KioskShell, KioskTopBar } from "@baumy/ui";
 import { BaumySheet } from "@/components/baumy/baumy-sheet";
+import { ActingPinProvider } from "@/components/kiosk/acting-pin";
 import { FeedbackGate } from "@/components/feedback/feedback-gate";
 import { IdleReset } from "@/components/kiosk/idle-reset";
 import { KeepScreenOn } from "@/components/kiosk/keep-screen-on";
@@ -19,6 +20,7 @@ import { runSweepAfterResponse } from "@/lib/background-work";
 import { now } from "@/lib/clock";
 import { reportAiAvailable } from "@/lib/feedback/ai";
 import { voiceConfigured } from "@/lib/integrations/groq";
+import { actingMemberHasPin } from "@/lib/kiosk/acting-pin";
 import {
   NIGHT_TEST_COOKIE,
   isNightAt,
@@ -58,7 +60,13 @@ export default async function KioskLayout({
   const night = kioskNightWindow(
     (await cookies()).get(NIGHT_TEST_COOKIE)?.value,
   );
-  const people = await members;
+  // Whether the acting member has a personal PIN (issue #145): a form that
+  // needs one shows "<Name> hasn't set a personal PIN yet" instead of a
+  // PinPad they cannot use. One boolean, for the member picked here.
+  const [people, hasPin] = await Promise.all([
+    members,
+    actingMemberHasPin(HOUSEHOLD_ID, kiosk.memberId),
+  ]);
 
   const avatars = people.map((p) => (
     <form key={p.id} action={pickMemberAction}>
@@ -85,59 +93,63 @@ export default async function KioskLayout({
   ));
 
   return (
-    <KioskShell
-      skin={isNightAt(at, night) ? "night" : "day"}
-      footer={<KioskNav />}
-      corner={
-        <BaumySheet
-          kiosk
-          cat
-          actingName={kiosk.displayName}
-          voice={voiceConfigured()}
-          who={avatars}
-        />
-      }
-    >
-      <KioskFrame
-        top={
-          <KioskTopBar
-            avatars={avatars}
-            status={
-              kiosk.memberId ? (
-                <>
-                  <span data-testid="acting-as">{kiosk.displayName}</span>
-                  <form action={clearPickAction}>
-                    <Button type="submit" size="kiosk" variant="secondary">
-                      Done
-                    </Button>
-                  </form>
-                </>
-              ) : (
-                <span className="text-base text-bm-muted">Tap your avatar</span>
-              )
-            }
+    <ActingPinProvider value={{ name: kiosk.displayName, hasPin }}>
+      <KioskShell
+        skin={isNightAt(at, night) ? "night" : "day"}
+        footer={<KioskNav />}
+        corner={
+          <BaumySheet
+            kiosk
+            cat
+            actingName={kiosk.displayName}
+            voice={voiceConfigured()}
+            who={avatars}
           />
         }
       >
-        {children}
-      </KioskFrame>
-      <KeepScreenOn />
-      <IdleReset memberPicked={Boolean(kiosk.memberId)} />
-      {/* Issue #66: the full-screen reminder and the raccoon screensaver
+        <KioskFrame
+          top={
+            <KioskTopBar
+              avatars={avatars}
+              status={
+                kiosk.memberId ? (
+                  <>
+                    <span data-testid="acting-as">{kiosk.displayName}</span>
+                    <form action={clearPickAction}>
+                      <Button type="submit" size="kiosk" variant="secondary">
+                        Done
+                      </Button>
+                    </form>
+                  </>
+                ) : (
+                  <span className="text-base text-bm-muted">
+                    Tap your avatar
+                  </span>
+                )
+              }
+            />
+          }
+        >
+          {children}
+        </KioskFrame>
+        <KeepScreenOn />
+        <IdleReset memberPicked={Boolean(kiosk.memberId)} />
+        {/* Issue #66: the full-screen reminder and the raccoon screensaver
           (at night, and after 5 minutes untouched), over every page. */}
-      <KioskOverlays serverNow={at.toISOString()} window={night} />
-      {/* Shake the iPad to report a bug (issue #133), as whoever is
+        <KioskOverlays serverNow={at.toISOString()} window={night} />
+        {/* Shake the iPad to report a bug (issue #133), as whoever is
           acting; the first tap asks iOS for motion events. */}
-      <FeedbackGate
-        surface="kiosk"
-        aiAvailable={reportAiAvailable()}
-        blocked={
-          kiosk.memberId
-            ? null
-            : "Tap your avatar first: a report is filed as the member acting."
-        }
-      />
-      <RegisterServiceWorker />
-    </KioskShell>
+        <FeedbackGate
+          surface="kiosk"
+          aiAvailable={reportAiAvailable()}
+          blocked={
+            kiosk.memberId
+              ? null
+              : "Tap your avatar first: a report is filed as the member acting."
+          }
+        />
+        <RegisterServiceWorker />
+      </KioskShell>
+    </ActingPinProvider>
   );
 }

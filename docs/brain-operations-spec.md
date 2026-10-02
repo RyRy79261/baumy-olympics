@@ -488,7 +488,7 @@ Logs that someone did a chore, and scores it.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | any linked member; logging for someone else (`doneBy`) vouches for them, which brain may do as the asker (on the kiosk it would need a PIN). |
+| Who may | any linked member |
 | On a housemate's behalf | no (400): name the housemate in `doneBy` instead |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -782,7 +782,7 @@ Confirms a housemate's self-claimed chore, which verifies it.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -883,7 +883,7 @@ Undoes a chore the asker logged, within 10 minutes of logging it.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -930,7 +930,7 @@ Withdraws a dispute the asker raised; the claim counts again.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -977,7 +977,7 @@ Concedes a dispute on the asker's own claim; it is voided.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -1407,7 +1407,7 @@ Adds an event to the house Google Calendar.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -1506,7 +1506,7 @@ Changes a calendar event; every field is replaced.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -1610,7 +1610,7 @@ Deletes an event from the house calendar.
 | --- | --- |
 | Kind | `write` |
 | Risk | `destructive`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -1717,7 +1717,7 @@ Posts a note on the household message board.
 | --- | --- |
 | Kind | `write` |
 | Risk | `safe`: runs straight away for the asker; on a housemate's behalf it needs `X-Baumy-Confirmed: 1` |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -1805,7 +1805,7 @@ Rewrites a note: title, body and colour are all replaced.
 | --- | --- |
 | Kind | `write` |
 | Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -1884,7 +1884,7 @@ Pins a note to the hub and the kitchen screen, or unpins it.
 | --- | --- |
 | Kind | `write` |
 | Risk | `safe`: runs straight away for the asker; on a housemate's behalf it needs `X-Baumy-Confirmed: 1` |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
@@ -1948,7 +1948,7 @@ Deletes a note for everyone.
 | --- | --- |
 | Kind | `write` |
 | Risk | `destructive`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | the member themself: brain counts as the member (the kiosk would need their PIN) |
+| Who may | any linked member |
 | On a housemate's behalf | yes, with `X-Baumy-On-Behalf-Of` and the asker's confirm tap |
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |

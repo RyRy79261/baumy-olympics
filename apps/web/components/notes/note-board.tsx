@@ -33,9 +33,9 @@ import { toast, toastActionError } from "@/lib/ui/toast";
 // The household's notes (SPEC §3.5), the same on the phone (/notes) and on
 // the kiosk (/kiosk/notes, acting as the member whose avatar was tapped).
 // Each note is a sticky note with its markdown body, rendered ONLY through
-// MarkdownBody, the sanitising renderer. On the kiosk every change asks for
-// the acting member's PIN in the request that makes it; on a phone the
-// session vouches and no pad opens.
+// MarkdownBody, the sanitising renderer. On the kiosk every change runs as
+// the acting member with no PIN (owner ruling 2026-10-02, issue #145); the
+// forms stay AttestedForms, so a PIN would be asked if the gate wanted one.
 //
 // Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
@@ -185,7 +185,7 @@ export function NoteBoard({
   );
 }
 
-/** Pin or unpin, one tap; on the kiosk the tap asks for the PIN. */
+/** Pin or unpin, one tap. */
 function PinForm({
   note,
   action,

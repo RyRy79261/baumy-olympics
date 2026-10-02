@@ -44,6 +44,8 @@ import {
   PIN_PROMPT_CODES,
 } from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
+import { useActingPin } from "@/components/kiosk/acting-pin";
+import { noPinHeadline } from "@/components/kiosk/no-pin-notice";
 import { setKioskBusy } from "@/lib/kiosk/busy";
 import { announceScore } from "@/lib/ui/scored";
 import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
@@ -160,6 +162,18 @@ export function BaumySheet({
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
 
+  // Whether the acting member has a personal PIN (the kiosk shell's
+  // boolean, issue #145), or the gate has just said they have none: then
+  // Confirm all runs the cards that need no PIN and leaves the others
+  // waiting with "<Name> hasn't set a personal PIN yet", never a PinPad.
+  const acting = useActingPin();
+  const [pinMissing, setPinMissing] = useState(false);
+  useEffect(() => setPinMissing(false), [acting.name, acting.hasPin]);
+  const hasPin = acting.hasPin && !pinMissing;
+  const hasPinRef = useRef(hasPin);
+  hasPinRef.current = hasPin;
+  const noPinMessage = `${noPinHeadline(acting.name ?? actingName)}.`;
+
   const update = (id: string, patch: Partial<ReviewRow>) =>
     setRows((rs) =>
       rs.map((r) => (r.proposal.proposalId === id ? { ...r, ...patch } : r)),
@@ -243,7 +257,16 @@ export function BaumySheet({
       return null;
     }
     if (kiosk && asksForPin(result, PIN_PROMPT_CODES)) {
-      update(id, { state: "pending", needsPin: true, message: result.message });
+      const none = !result.ok && result.code === "PIN_NOT_SET";
+      if (none) {
+        hasPinRef.current = false;
+        setPinMissing(true);
+      }
+      update(id, {
+        state: "pending",
+        needsPin: true,
+        message: none ? noPinMessage : result.message,
+      });
       return result.code;
     }
     update(id, { state: "failed", message: result.message });
@@ -268,6 +291,11 @@ export function BaumySheet({
           (r) => r.proposal.proposalId === target.proposal.proposalId,
         );
         if (!row || !canApprove(row)) continue;
+        // Nobody can type a PIN that was never set: the card waits.
+        if (kiosk && row.needsPin && !hasPinRef.current) {
+          update(row.proposal.proposalId, { message: noPinMessage });
+          continue;
+        }
         if (row.needsPin && pin !== undefined && pinLeft === undefined) {
           continue;
         }
@@ -618,6 +646,8 @@ export function BaumySheet({
         kiosk={kiosk}
         bubble
         pinLabel={pinLabel}
+        hasPin={hasPin}
+        actingName={acting.name ?? actingName}
         busy={bulk}
         onConfirmAll={(pin) => void catConfirmAll(pin)}
         onCancel={catCancel}
@@ -793,6 +823,8 @@ export function BaumySheet({
               rows={rows}
               kiosk={kiosk}
               pinLabel={pinLabel}
+              hasPin={hasPin}
+              actingName={acting.name ?? actingName}
               busy={bulk}
               onConfirmAll={(pin) => void confirmAll(pin)}
               onCancel={sheetCancel}

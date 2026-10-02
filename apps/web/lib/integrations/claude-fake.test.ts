@@ -186,6 +186,62 @@ describe("fakeClaude", () => {
     expect(text(none)).toContain("nothing waiting");
   });
 
+  it("proposes disputing the claim named, with a reason", async () => {
+    const m = await fakeClaude(
+      afterRead("dispute the mop", "get_pending_confirmations", {
+        ok: true,
+        data: {
+          claims: [
+            {
+              completionId: "z1",
+              choreName: "Trash",
+              doneByName: "Sam",
+              can: { confirm: true, dispute: true },
+            },
+            {
+              completionId: "z2",
+              choreName: "Mop",
+              doneByName: "Sam",
+              can: { confirm: true, dispute: true },
+            },
+            {
+              completionId: "z3",
+              choreName: "Mop",
+              doneByName: "Me",
+              can: { dispute: false },
+            },
+          ],
+        },
+      }),
+    );
+    expect(uses(m)[0]).toMatchObject({
+      name: "dispute_completion",
+      input: { completionId: "z2", reason: "Baumy heard it was not done" },
+    });
+    expect(text(m)).toContain("disputing Sam's Mop");
+  });
+
+  it("proposes a note when create_note is offered (issue #145)", async () => {
+    const notes = [
+      { name: "create_note", input_schema: { type: "object" as const } },
+      { name: "add_shopping_items", input_schema: { type: "object" as const } },
+    ];
+    const m = await fakeClaude(
+      params(
+        [{ role: "user", content: "Add a note: Bins out Tuesday." }],
+        notes,
+      ),
+    );
+    expect(uses(m).map((u) => [u.name, u.input])).toEqual([
+      ["create_note", { title: "Bins out Tuesday" }],
+    ]);
+    // Not offered: no note.
+    const off = await fakeClaude(
+      params([{ role: "user", content: "add a note: Bins out" }]),
+    );
+    expect(uses(off).map((u) => u.name)).not.toContain("create_note");
+  });
+
   it("proposes ONE add_shopping_items with every item named", async () => {
     const shop = [
       { name: "add_shopping_items", input_schema: { type: "object" as const } },

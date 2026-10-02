@@ -26,8 +26,8 @@ import { CheckPinForm } from "./check-pin-form";
 // attested request.
 //
 // Above the grid, the "Needs your OK" banner (SPEC §4.3): the claims waiting
-// on the acting member, and their own open ones (undo, add a photo). Every
-// button there asks for their PIN.
+// on the acting member, and their own open ones (undo, add a photo). Only
+// Dispute asks for their PIN (owner ruling 2026-10-02, issue #145).
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Bounties · Kiosk" };

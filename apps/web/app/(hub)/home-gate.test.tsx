@@ -36,6 +36,10 @@ vi.mock("./shopping/actions", () => ({
   checkOffShoppingAction: vi.fn(),
 }));
 vi.mock("@/lib/integrations/groq", () => ({ voiceConfigured: () => false }));
+const hasPin = vi.fn(async () => true);
+vi.mock("@/lib/kiosk/acting-pin", () => ({
+  actingMemberHasPin: (...a: unknown[]) => hasPin(...(a as [])),
+}));
 vi.mock("@/lib/actions/registry", () => ({ runAction: vi.fn() }));
 vi.mock("@/lib/background-work", () => ({ runSweepAfterResponse: vi.fn() }));
 vi.mock("@/lib/members/characters", () => ({
@@ -90,6 +94,21 @@ describe("/", () => {
     expect(out).toContain('data-testid="hub-home"');
     expect(out).toContain("Welcome, Ada.");
     expect(out).not.toContain("private household app");
+    expect(out).not.toContain("set-pin-nudge");
+  });
+
+  it("nudges a member with no personal PIN to set one (issue #145)", async () => {
+    memberOrVisitorPage.mockResolvedValue(member);
+    hasPin.mockResolvedValueOnce(false);
+    startHub.mockReturnValue({
+      local: Promise.resolve({}),
+      events: new Promise(() => {}),
+      shopping: new Promise(() => {}),
+    });
+    const out = renderToStaticMarkup(await HubPage());
+    expect(out).toContain('data-testid="set-pin-nudge"');
+    expect(out).toContain('href="/settings#pin"');
+    expect(hasPin).toHaveBeenCalledWith(expect.anything(), "m1");
   });
 
   it("describes the app in its metadata", () => {

@@ -33,7 +33,8 @@ import { createRunner, defaultDeps, type RunnerDeps } from "./run";
 // success, each error code, the surfaces and the permissions, the DST
 // acceptance test, and that no database transaction is open while Google is
 // called (the depth each calendar call sees must be 0). The writes are
-// `attested` (issue #134): the kiosk sends the acting member's PIN.
+// `member` (owner ruling 2026-10-02, issue #145): the kiosk's acting member
+// changes the calendar with no PIN, even one who never set a PIN.
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -275,7 +276,7 @@ describe("create_event", () => {
     expect(seen).toEqual([]);
   });
 
-  it("needs a member, and on the kiosk the acting member's PIN", async () => {
+  it("needs a member, and on the kiosk no PIN", async () => {
     const me = await seedPinned();
     expect(
       await run(
@@ -291,13 +292,6 @@ describe("create_event", () => {
         ctxFor(kiosk(), { source: "kiosk" }),
       ),
     ).toMatchObject({ code: "FORBIDDEN" });
-    // The kiosk asks for the PIN, and a wrong one is refused (SPEC §6.2).
-    expect(
-      await run("create_event", dinner("2027-01-15"), atKiosk(me)),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
-    expect(
-      await run("create_event", dinner("2027-01-15"), atKiosk(me, "1111")),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
     expect(seen).toEqual([]);
     // MCP needs the write scope.
     expect(
@@ -307,11 +301,13 @@ describe("create_event", () => {
         ctxFor(mcp(me, ["baumy:read"]), { source: "mcp" }),
       ),
     ).toMatchObject({ code: "FORBIDDEN" });
-    // A session, MCP and brain are their own member: no PIN.
+    // A session, MCP and brain are their own member, and the kiosk's acting
+    // member needs no PIN either (issue #145).
     for (const [actor, source] of [
       [mcp(me), "mcp"],
       [brain(me), "brain"],
       [sessionActor(me), "ai"],
+      [kiosk(me), "kiosk"],
     ] as const) {
       expect(
         await run(
@@ -322,7 +318,7 @@ describe("create_event", () => {
         source,
       ).toMatchObject({ ok: true });
     }
-    expect(seen).toHaveLength(3);
+    expect(seen).toHaveLength(4);
   });
 
   it("is for one member of the house, or for the house (issue #134)", async () => {
@@ -757,32 +753,32 @@ describe("delete_event", () => {
 });
 
 describe("changing and deleting on the kiosk, and who it is for (issue #134)", () => {
-  it("asks the kiosk for the PIN before Google is called", async () => {
-    const me = await seedPinned();
+  it("adds, changes and deletes on the kiosk with no PIN, for a member who never set one (issue #145)", async () => {
+    const me = await seedMember(db(), { displayName: "Felix" });
     const { event } = ok(
-      await run("create_event", dinner("2027-01-15"), atKiosk(me, PIN)),
-    ) as { event: { id: string } };
-    seen = [];
-    expect(
-      await run(
-        "update_event",
-        { ...dinner("2027-01-15"), eventId: event.id, title: "Moved" },
-        atKiosk(me),
-      ),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
-    expect(
-      await run("delete_event", { eventId: event.id }, atKiosk(me, "1111")),
-    ).toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
-    expect(seen).toEqual([]);
+      await run("create_event", dinner("2027-01-15"), atKiosk(me)),
+    ) as { event: { id: string; addedBy: string } };
+    expect(event.addedBy).toBe(me);
     expect(
       ok(
         await run(
           "update_event",
           { ...dinner("2027-01-15"), eventId: event.id, title: "Moved" },
-          atKiosk(me, PIN),
+          atKiosk(me),
         ),
       ),
     ).toMatchObject({ event: { title: "Moved" } });
+    // A PIN sent along anyway is not checked: even a wrong one is fine.
+    expect(
+      ok(await run("delete_event", { eventId: event.id }, atKiosk(me, "1111"))),
+    ).toEqual({ eventId: event.id, title: "Moved" });
+    const kioskAudits = (await audits()).filter((a) => a.source === "kiosk");
+    expect(kioskAudits.map((a) => a.action)).toEqual([
+      "create_event",
+      "update_event",
+      "delete_event",
+    ]);
+    expect(kioskAudits.every((a) => a.actorMemberId === me)).toBe(true);
   });
 
   it("keeps who it is for when left out, makes it the house's with null, and an undo puts it back", async () => {
