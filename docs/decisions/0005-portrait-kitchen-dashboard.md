@@ -23,7 +23,7 @@ The owner approved variant A with the month calendar and the Camp 404 cat ("the 
    - **Urgent** means state `due` and overdue, or falling due before Berlin midnight today. This is `list_chores`' existing split.
      - [CORRECTION 2026-10-01] Owner ruling (SPEC §12 decision 22, issue #127): urgent means overdue on the chore's own rhythm, its last completion plus the larger of the interval its weight implies and its cooldown. A chore never done, or with no rhythm, is never urgent; a never-done chore is only available, and New while recent.
    - **New** means created in the last 3 days.
-3. **Messages are the notes board.** The Messages icon counts notes created or changed in the last 24 hours, and its module lists them. [CORRECTION 2026-10-02, issue #153, SPEC §12 decision 29] It counts the notes not every active member has seen since their words last changed, and its module lists those.
+3. **Messages are the notes board.** The Messages icon counts notes created or changed in the last 24 hours, and its module lists them. [CORRECTION 2026-10-02, issue #153, SPEC §12 decision 30] It counts the notes not every active member has seen since their words last changed, and its module lists those.
 4. **Reminders are a new, small feature.**
    - A member (UI, AI, brain or kiosk) posts a reminder: a title and a short body.
    - The kiosk shows it **full-screen**, with every active member as their 16-bit character and a big "Seen" button under each.

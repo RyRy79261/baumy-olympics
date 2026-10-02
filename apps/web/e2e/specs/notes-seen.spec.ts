@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 import { kioskNav, pairedKiosk } from "../lib/kiosk";
 
@@ -45,12 +45,27 @@ async function openAndSee(
   expect((await seen).ok()).toBe(true);
 }
 
+/**
+ * `target` stays on screen for a while: nothing re-renders it away. (A
+ * refresh after the mark lands well after the network goes quiet, so a
+ * single look straight after it would pass either way.)
+ */
+async function stillShown(target: Locator, ms = 4000) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    await expect(target).toBeVisible({ timeout: 1 });
+    await target.page().waitForTimeout(250);
+  }
+}
+
 test("the badge counts unseen notes: opening drops it, an edit brings it back, and the kiosk counts until everyone has read", async ({
   page,
   browser,
 }, testInfo) => {
   const project = testInfo.project.name;
   test.skip(project !== "server-clock", "Runs alone, in server-clock.");
+  // Every member of the household reads the note in turn on the kiosk.
+  test.slow();
   const suffix = Math.random().toString(36).slice(2, 8);
   const reader = `Reader ${suffix}`;
   const title = `Boiler ${suffix}`;
@@ -175,18 +190,38 @@ test("the badge counts unseen notes: opening drops it, an edit brings it back, a
     )
   ).filter((n) => n !== founder && n !== reader);
   expect(names.length).toBeGreaterThan(0);
-  for (const name of names) {
+  const count = async () =>
+    Number((await icon.getAttribute("data-count")) ?? 0);
+  for (const [i, name] of names.entries()) {
     await openMessagesAs(name);
+    const shown = await count();
     await openAndSee(kiosk, "/kiosk", () => icon.click());
-    // Still listed while this member was reading it.
-    await expect(message).toBeVisible();
+    // Still listed while this member reads it, even the last of them: once
+    // the page has settled after the mark, the open box has not changed
+    // under them, nor has the count.
+    await kiosk.waitForLoadState("networkidle");
+    // The last reader is the one whose mark empties the list: hold there.
+    if (i === names.length - 1) await stillShown(message);
+    else await expect(message).toBeVisible();
+    expect(await count()).toBe(shown);
     await module.getByRole("button", { name: "Close" }).click();
     await expect(module).toBeHidden();
+    if (i < names.length - 1) {
+      // Others have still not read it: closing re-reads, and it stays.
+      await kiosk.waitForLoadState("networkidle");
+      await icon.click();
+      await expect(message).toBeVisible();
+      await module.getByRole("button", { name: "Close" }).click();
+      await expect(module).toBeHidden();
+    }
   }
+  // Everyone has read it: closing the box refreshed the page, and the
+  // kitchen's count dropped.
+  await expect.poll(count).toBeLessThan(kioskBefore);
+  await icon.click();
+  await expect(module).toBeVisible();
+  await expect(message).toHaveCount(0);
   await kiosk.reload();
-  await expect
-    .poll(async () => Number((await icon.getAttribute("data-count")) ?? 0))
-    .toBeLessThan(kioskBefore);
   await icon.click();
   await expect(module).toBeVisible();
   await expect(message).toHaveCount(0);

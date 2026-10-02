@@ -333,6 +333,38 @@ describe("seen notes (issue #153)", () => {
     expect(await t.db().select().from(noteReads)).toHaveLength(1);
   });
 
+  it("waits only for this household's members, and counts only its notes", async () => {
+    const a = await add("A", { now: at(0) });
+    await see(author, [a], at(1));
+    await see(sam, [a], at(1));
+    expect(await unseenByAnyone()).toBe(0);
+    const [other] = await t
+      .db()
+      .insert(households)
+      .values({ name: "Next door" })
+      .returning({ id: households.id });
+    const [neighbour] = await t
+      .db()
+      .insert(members)
+      .values({
+        householdId: other!.id,
+        displayName: "Neighbour",
+        avatarSprite: "cat",
+        color: "#778899",
+      })
+      .returning({ id: members.id });
+    // Next door's member has not read our note, and it still counts as read
+    // by everyone here; next door has no notes to count.
+    expect(await unseenByAnyone()).toBe(0);
+    expect(await countNotesUnseenByAnyone(db(), other!.id)).toBe(0);
+    expect(
+      await countUnseenNotes(db(), {
+        householdId: other!.id,
+        memberId: neighbour!.id,
+      }),
+    ).toBe(0);
+  });
+
   it("never counts a deleted note", async () => {
     const a = await add("A");
     expect(await unseen(sam)).toBe(1);
