@@ -2228,6 +2228,7 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `list_mcp_connections`: The member's own account settings: only in the app, signed in.
 - `revoke_mcp_connection`: The member's own account settings: only in the app, signed in.
 - `get_account_security`: The member's own account settings: only in the app, signed in.
+- `get_my_data`: The member's own account settings: only in the app, signed in.
 - `revoke_session`: The member's own account settings: only in the app, signed in.
 - `revoke_other_sessions`: The member's own account settings: only in the app, signed in.
 - `rename_passkey`: The member's own account settings: only in the app, signed in.
