@@ -1415,7 +1415,7 @@ Adds an event to the house Google Calendar.
 
 **When to use it.** When someone asks to add something to the calendar. Resolve the day and time to Berlin `YYYY-MM-DD` and `HH:MM` first; no time means `all_day`. Only when it is clearly for one housemate ("Anna's dentist"), send their member id (from get_standings) as `forMemberId`; otherwise leave it out, and it is for the whole house.
 
-**Tool description** (the registry's, verbatim): Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date. forMemberId names the one member it is for; leave it out for the whole house.
+**Tool description** (the registry's, verbatim): Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date. forMemberId names the one member it is for; leave it out (or null) for the whole house.
 
 **Examples.**
 
@@ -1470,10 +1470,17 @@ Adds an event to the house Google Calendar.
       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
     },
     "forMemberId": {
-      "description": "Who it is for: one member's id. Leave it out when it is for the whole house.",
-      "type": "string",
-      "format": "uuid",
-      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      "description": "Who it is for: one member's id, or null for the whole house. On create, left out is the whole house; on update, left out keeps who it is for.",
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
@@ -1505,9 +1512,9 @@ Changes a calendar event; every field is replaced.
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
 | Calls out | yes (Google or brain): may answer 503 `NOT_CONFIGURED` or `UNAVAILABLE` |
 
-**When to use it.** When someone moves or renames an event. Read it with list_events and send ALL its fields, changed and unchanged: `forMemberId` too (its `forMember`), or it becomes the whole house's.
+**When to use it.** When someone moves or renames an event. Read it with list_events and send ALL its fields, changed and unchanged. Leave `forMemberId` out to keep who it is for; send a member id to change it, or null to make it the whole house's.
 
-**Tool description** (the registry's, verbatim): Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event (leaving out forMemberId makes it for the whole house).
+**Tool description** (the registry's, verbatim): Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event, except forMemberId: leave it out to keep who it is for, or null to make it the whole house's.
 
 **Examples.**
 
@@ -1566,10 +1573,17 @@ Changes a calendar event; every field is replaced.
       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
     },
     "forMemberId": {
-      "description": "Who it is for: one member's id. Leave it out when it is for the whole house.",
-      "type": "string",
-      "format": "uuid",
-      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      "description": "Who it is for: one member's id, or null for the whole house. On create, left out is the whole house; on update, left out keeps who it is for.",
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

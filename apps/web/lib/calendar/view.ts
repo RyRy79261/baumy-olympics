@@ -150,6 +150,21 @@ export function agendaDays(
     : days.filter(busy);
 }
 
+/**
+ * What the event form's "Everyone" sends (issue #134): a form cannot send a
+ * null, and leaving the field out means "keep who it is for" on an update.
+ */
+export const FOR_EVERYONE = "everyone";
+
+/** An event form's input as the actions take it: "Everyone" is null. */
+export function eventFormInput(
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  return input.forMemberId === FOR_EVERYONE
+    ? { ...input, forMemberId: null }
+    : input;
+}
+
 export const CALENDAR_VIEWS = ["day", "week", "month"] as const;
 export type CalendarViewKind = (typeof CALENDAR_VIEWS)[number];
 

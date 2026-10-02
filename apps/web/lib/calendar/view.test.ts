@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  FOR_EVERYONE,
+  eventFormInput,
   HOUSE_EVENT_ACCENT,
   agendaDays,
   eventAccent,
@@ -266,5 +268,18 @@ describe("agendaDays", () => {
       "2027-01-11",
       "2027-01-15",
     ]);
+  });
+});
+
+describe("eventFormInput (issue #134)", () => {
+  it("turns the form's Everyone into null, and leaves anything else", () => {
+    expect(FOR_EVERYONE).toBe("everyone");
+    expect(eventFormInput({ title: "x", forMemberId: FOR_EVERYONE })).toEqual({
+      title: "x",
+      forMemberId: null,
+    });
+    const anna = { title: "x", forMemberId: "m-1" };
+    expect(eventFormInput(anna)).toBe(anna);
+    expect(eventFormInput({ title: "x" })).toEqual({ title: "x" });
   });
 });

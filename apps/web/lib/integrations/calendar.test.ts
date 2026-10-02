@@ -223,6 +223,13 @@ describe("the fake calendar", () => {
       ok: true,
       data: { member: "m-1", forMember: "m-2" },
     });
+    // Not said: kept.
+    expect(
+      await c.update("for00001", {
+        ...at19("2027-01-15"),
+        forMember: undefined,
+      }),
+    ).toMatchObject({ ok: true, data: { member: "m-1", forMember: "m-2" } });
     expect(
       await c.update("for00001", { ...at19("2027-01-15"), forMember: null }),
     ).toMatchObject({ ok: true, data: { member: "m-1", forMember: null } });

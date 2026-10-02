@@ -25,7 +25,7 @@ import {
   type FormAction,
 } from "@/components/use-action-form";
 import type { CalendarWriteData } from "@/lib/actions/calendar";
-import type { CalendarEventView } from "@/lib/calendar/view";
+import { FOR_EVERYONE, type CalendarEventView } from "@/lib/calendar/view";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
 import { HOUSE_COLOUR, type DashboardMember } from "@/lib/kiosk/dashboard";
 
@@ -40,8 +40,8 @@ import { HOUSE_COLOUR, type DashboardMember } from "@/lib/kiosk/dashboard";
 // uncontrolled fields after each action, and a PIN prompt sends them twice.
 // On a phone the session vouches and the pad never opens.
 
-/** The "for" value that means the whole house: posts nothing. */
-const HOUSE = "";
+/** The "for" value that means the whole house (null, once it arrives). */
+const HOUSE = FOR_EVERYONE;
 
 export function EventForm({
   event,

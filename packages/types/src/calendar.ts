@@ -104,9 +104,11 @@ export const eventFieldsShape = {
   endTime: CalendarTime.optional().describe(
     "Timed events: the Berlin wall-clock end, HH:MM (24h), on endDate.",
   ),
-  forMemberId: EventForMember.optional().describe(
-    "Who it is for: one member's id. Leave it out when it is for the whole house.",
-  ),
+  forMemberId: EventForMember.nullable()
+    .optional()
+    .describe(
+      "Who it is for: one member's id, or null for the whole house. On create, left out is the whole house; on update, left out keeps who it is for.",
+    ),
 };
 
 type EventFields = {

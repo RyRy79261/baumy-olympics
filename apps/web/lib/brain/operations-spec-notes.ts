@@ -401,7 +401,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
   },
   update_event: {
     purpose: "Changes a calendar event; every field is replaced.",
-    when: "When someone moves or renames an event. Read it with list_events and send ALL its fields, changed and unchanged: `forMemberId` too (its `forMember`), or it becomes the whole house's.",
+    when: "When someone moves or renames an event. Read it with list_events and send ALL its fields, changed and unchanged. Leave `forMemberId` out to keep who it is for; send a member id to change it, or null to make it the whole house's.",
     examples: [
       {
         say: "move dinner with Anna to 20:00",
