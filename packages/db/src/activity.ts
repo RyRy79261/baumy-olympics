@@ -127,6 +127,12 @@ export interface ActivityPoints {
   reason: string | null;
   /** Still scheduled at `now`, so another member may veto it. */
   vetoable: boolean;
+  /**
+   * What became of the change at `now`: still `pending`, `applied` (at
+   * `applies_at`), `vetoed`, or `cancelled` (an admin cancelled it, or a
+   * newer change replaced it).
+   */
+  outcome: "pending" | "applied" | "vetoed" | "cancelled";
 }
 
 export type ActivityEntry =
@@ -334,6 +340,8 @@ export async function listActivity(
   }
 
   for (const { s, choreName } of pointRows) {
+    const pending =
+      s.status === "scheduled" && s.appliesAt!.getTime() > now.getTime();
     const base = {
       kind: "points" as const,
       suggestionId: s.id,
@@ -346,8 +354,14 @@ export async function listActivity(
       toCooldownMinutes: s.scheduledCooldownMinutes!,
       appliesAt: s.appliesAt!,
       reason: s.reason,
-      vetoable:
-        s.status === "scheduled" && s.appliesAt!.getTime() > now.getTime(),
+      vetoable: pending,
+      outcome: pending
+        ? ("pending" as const)
+        : s.status === "applied" || s.status === "scheduled"
+          ? ("applied" as const)
+          : s.status === "vetoed"
+            ? ("vetoed" as const)
+            : ("cancelled" as const),
     };
     const inWindow = (t: Date | null): t is Date =>
       t !== null &&
