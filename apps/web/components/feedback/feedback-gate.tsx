@@ -15,7 +15,10 @@ import {
   snoozed,
   type OfferState,
 } from "@/lib/feedback/offer";
-import { kioskReportBugAction, reportBugAction } from "@/components/feedback/actions";
+import {
+  kioskReportBugAction,
+  reportBugAction,
+} from "@/components/feedback/actions";
 import { ReportBugDialog } from "./report-bug-dialog";
 import {
   REPORT_PROBLEM_EVENT,
