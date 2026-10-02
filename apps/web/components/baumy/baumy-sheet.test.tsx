@@ -497,6 +497,94 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(track.stop).toHaveBeenCalled();
   });
 
+  describe("closing the bubble (issue #155)", () => {
+    /** A pointerdown on `el`, as a tap or click starts. */
+    const touch = (el: Element) =>
+      act(() => {
+        el.dispatchEvent(
+          new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+        );
+      });
+    const closeButton = () =>
+      bubble()!.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!;
+    function outside() {
+      const el = document.createElement("button");
+      el.textContent = "Elsewhere";
+      document.body.append(el);
+      return el;
+    }
+
+    async function openTalking() {
+      const track = { stop: vi.fn() };
+      getUserMedia.mockResolvedValue({ getTracks: () => [track] });
+      mountCat({ actingName: "Ryan" });
+      await act(async () => cat().click());
+      await settle();
+      expect(bubble()!.dataset.mode).toBe("talk");
+      return track;
+    }
+
+    it("closes on a tap outside, the microphone off and nothing sent", async () => {
+      heardAndAnswered("Bins it is.", [proposal]);
+      const track = await openTalking();
+      const elsewhere = outside();
+      expect(track.stop).not.toHaveBeenCalled();
+      touch(elsewhere);
+      expect(bubble()).toBeNull();
+      expect(track.stop).toHaveBeenCalled();
+      await settle(300);
+      expect(fetchMock).not.toHaveBeenCalled();
+      // Closed, it listens no more: the next tap anywhere does nothing.
+      touch(elsewhere);
+      expect(bubble()).toBeNull();
+    });
+
+    it("closes on its ×, the microphone off", async () => {
+      const track = await openTalking();
+      const x = closeButton();
+      expect(x.textContent).toBe("×");
+      await act(async () => x.click());
+      expect(bubble()).toBeNull();
+      expect(track.stop).toHaveBeenCalled();
+    });
+
+    it("stays open for a tap inside it, or on the cat's own toggle", async () => {
+      await openTalking();
+      touch(bubble()!.querySelector("[data-bubble]")!);
+      touch(bubble()!.querySelector("p")!);
+      expect(bubble()!.dataset.mode).toBe("talk");
+      // The cat's tap is its own toggle: the pointerdown does not close it
+      // first (else the click would open it again).
+      touch(cat());
+      expect(bubble()).not.toBeNull();
+      await act(async () => cat().click());
+      expect(bubble()).toBeNull();
+    });
+
+    it("never interrupts a hold: a tap elsewhere while held is ignored", async () => {
+      heardAndAnswered("Bins it is.", [proposal]);
+      const track = await openTalking();
+      press(hold());
+      expect(bubble()!.dataset.mode).toBe("listening");
+      touch(outside());
+      expect(bubble()!.dataset.mode).toBe("listening");
+      expect(track.stop).not.toHaveBeenCalled();
+      await settle(300);
+      lift(hold());
+      await settle();
+      await settle();
+      // The hold was heard and answered, in the bubble still open.
+      expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+        "/api/ai/transcribe",
+        "/api/ai/command",
+      ]);
+      expect(bubble()!.dataset.mode).toBe("answer");
+      // Let go, a tap elsewhere closes it again.
+      touch(outside());
+      expect(bubble()).toBeNull();
+    });
+  });
+
   it("says to hold for a hold too short to hear, and stays", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
