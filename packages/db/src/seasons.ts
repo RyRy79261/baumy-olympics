@@ -7,7 +7,7 @@ import {
 } from "@baumy/core";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Queryable } from "./index";
-import { chores, completions, seasons } from "./schema";
+import { completions, seasons } from "./schema";
 
 // Seasons (SPEC §4.1, §4.5): one per Berlin calendar year, created lazily the
 // first time a write needs it (a completion, an adjustment, a pot contribution
@@ -92,13 +92,11 @@ export async function seasonHasOpenClaims(
   const rows = await db
     .select({
       status: completions.status,
-      confirmMode: chores.confirmMode,
       loggedAt: completions.loggedAt,
       finalizesAt: completions.finalizesAt,
       photoAttachedAt: completions.photoAttachedAt,
     })
     .from(completions)
-    .innerJoin(chores, eq(chores.id, completions.choreId))
     .where(
       and(
         eq(completions.seasonId, seasonId),

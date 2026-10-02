@@ -427,19 +427,19 @@ describe("POST /api/actions/run", () => {
     expect(after!.status).toBe("disputed");
   });
 
-  it("on the kiosk, confirming someone's completion needs no PIN (issue #145)", async () => {
+  it("on the kiosk, undoing your own completion needs no PIN (issue #145)", async () => {
     const logged = await runAction(
       "log_completion",
       { choreId: trash },
-      ctxFor(sessionActor(sam), { now: new Date() }),
+      ctxFor(sessionActor(ryan), { now: new Date() }),
     );
     if (!logged.ok) throw new Error(logged.message);
     const ok = await body(
       await handleRunAction(
         post({
-          name: "confirm_completion",
+          name: "undo_completion",
           input: { completionId: logged.data.completionId },
-          requestId: "confirm-proposal-1",
+          requestId: "undo-proposal-1",
           surface: "kiosk",
         }),
         runDeps,
@@ -447,8 +447,8 @@ describe("POST /api/actions/run", () => {
     );
     expect(ok.ok).toBe(true);
     const [after] = await t.db().select().from(completions);
-    expect(after!.status).toBe("confirmed");
-    expect(after!.verifiedBy).toBe(ryan);
+    expect(after!.status).toBe("voided");
+    expect(after!.voidReason).toBe("undone");
   });
 
   it("never sends a PIN from the phone", async () => {

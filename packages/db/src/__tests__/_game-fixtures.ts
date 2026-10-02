@@ -52,7 +52,6 @@ export interface SeedChoreInput {
   name: string;
   basePoints: number;
   cooldownMinutes: number;
-  confirmMode?: "optimistic" | "partner";
   proofMode?: "none" | "optional" | "required";
   archivedAt?: Date | null;
   effectiveFrom?: Date;
@@ -73,7 +72,6 @@ export async function seedChore(
       householdId: input.householdId ?? HOUSEHOLD_ID,
       name: input.name,
       sprite: input.name.toLowerCase(),
-      confirmMode: input.confirmMode ?? "optimistic",
       proofMode: input.proofMode ?? "none",
       archivedAt: input.archivedAt ?? null,
       ...(input.kind ? { kind: input.kind } : {}),

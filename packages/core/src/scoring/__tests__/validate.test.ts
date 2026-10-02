@@ -14,13 +14,12 @@ function row(
   occurredAt: Date,
   overrides: Partial<ValidatorCompletion> = {},
 ): ValidatorCompletion {
-  const { id, loggedAt, status, confirmMode } = completion("x", occurredAt);
+  const { id, loggedAt, status } = completion("x", occurredAt);
   return {
     id,
     occurredAt,
     loggedAt,
     status,
-    confirmMode,
     finalizesAt: null,
     photoAttachedAt: null,
     ...overrides,
@@ -163,10 +162,10 @@ describe("validateNewCompletion", () => {
     ).toThrow(NoRuleVersionError);
   });
 
-  it("ignores voided and expired partner-pending rows", () => {
+  it("ignores voided and timed-out disputed rows", () => {
     const at = new Date(last.getTime() + 4 * DAY);
-    const expiredLoggedAt = new Date(
-      at.getTime() - RULESET_V1.partnerConfirmExpiryH * HOUR,
+    const timedOutLoggedAt = new Date(
+      at.getTime() - RULESET_V1.challengeWindowH * HOUR,
     );
     expect(
       validateNewCompletion(
@@ -176,10 +175,9 @@ describe("validateNewCompletion", () => {
           completions: [
             row(last),
             row(new Date(at.getTime() - HOUR), { status: "voided" }),
-            row(expiredLoggedAt, {
-              status: "pending",
-              confirmMode: "partner",
-              loggedAt: expiredLoggedAt,
+            row(timedOutLoggedAt, {
+              status: "disputed",
+              loggedAt: timedOutLoggedAt,
             }),
           ],
         }),
@@ -285,15 +283,6 @@ describe("validateNewCompletion", () => {
 
 describe("isLive", () => {
   const loggedAt = berlin(2026, 9, 21, 8);
-  const expiry = new Date(
-    loggedAt.getTime() + RULESET_V1.partnerConfirmExpiryH * HOUR,
-  );
-
-  it("keeps partner-pending rows live until 72h after logging", () => {
-    const c = row(loggedAt, { status: "pending", confirmMode: "partner" });
-    expect(isLive(c, new Date(expiry.getTime() - 1))).toBe(true);
-    expect(isLive(c, expiry)).toBe(false);
-  });
 
   it("keeps a disputed row live until its challenge window times out", () => {
     const windowEnd = new Date(

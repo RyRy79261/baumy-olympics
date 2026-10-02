@@ -411,7 +411,7 @@ describe("the brain endpoint on PGlite", () => {
     expect(await who.json()).toMatchObject({ data: { memberId: jo } });
   });
 
-  it("never confirms, disputes, undoes, withdraws or concedes a claim on someone's behalf", async () => {
+  it("never disputes, undoes, withdraws or concedes a claim on someone's behalf", async () => {
     const ryan = await seedMember(db(), { telegramUserId: TG });
     const jo = await seedMember(db(), { displayName: "Jo" });
     const [chore] = await t
@@ -419,9 +419,8 @@ describe("the brain endpoint on PGlite", () => {
       .insert(chores)
       .values({
         householdId: HOUSEHOLD_ID,
-        name: "Partner chore",
-        sprite: "partner-chore",
-        confirmMode: "partner",
+        name: "Bins",
+        sprite: "bins",
       })
       .returning({ id: chores.id });
     await t
@@ -445,15 +444,11 @@ describe("the brain endpoint on PGlite", () => {
       },
     );
     expect(logged.status).toBe(200);
-    const { completionId, counted } = (
-      (await logged.json()) as {
-        data: { completionId: string; counted: boolean };
-      }
+    const { completionId } = (
+      (await logged.json()) as { data: { completionId: string } }
     ).data;
-    expect(counted).toBe(false);
 
     for (const [name, input] of [
-      ["confirm_completion", { completionId }],
       ["dispute_completion", { completionId, reason: "Not done" }],
       ["undo_completion", { completionId }],
       ["withdraw_dispute", { completionId }],
