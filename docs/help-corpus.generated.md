@@ -163,11 +163,11 @@ The iPad on the kitchen wall is the house's shared screen. Its home shows the da
 
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
 
-After 60 seconds untouched, the screen forgets who was acting and goes back home by itself; the last few seconds show a countdown, and any touch cancels it.
+After 2 minutes untouched, the screen forgets who was acting and goes back home by itself; the last few seconds show a countdown, and any touch cancels it. To change how long it waits, tap your avatar, open **Bounties → Kitchen screen settings** and pick 1, 2, 5, 10, 15 minutes; it is saved for this screen.
 
 ### Your personal PIN
 
-The kitchen screen is shared, but almost everything there runs as whoever tapped their avatar, with no PIN: logging a chore (for yourself or someone else), confirming, undoing, notes, the calendar, the shopping list and Baumy. The iPad asks for **your personal PIN** only before it **disputes** a chore as you. Your own settings are only changed on your phone.
+The kitchen screen is shared, but almost everything there runs as whoever tapped their avatar, with no PIN: logging a chore (for yourself or someone else), confirming, undoing, notes, the calendar, the shopping list and Baumy. The iPad asks for **your personal PIN** only before it **disputes** a chore as you, and, for an admin, before it adds or edits a bounty or changes a bounty's points. Your own settings are only changed on your phone.
 
 If you have not set a PIN, the iPad never shows a PIN pad you cannot use: it says "<your name> hasn't set a personal PIN yet" with a QR code that opens Settings on your phone. When you ask Baumy for several things, **Confirm all** does the rest and leaves only the dispute waiting. After you join, the hub reminds you to set one.
 
@@ -189,6 +189,15 @@ Something everyone must read (a plumber coming, the water off) can be posted as 
 
 - After 5 minutes untouched in the day, and every night from 23:00 to 06:30, it shows the raccoon screensaver with a big clock. A tap wakes it; the tap never presses anything underneath.
 - With no internet it says "No connection" and comes back by itself.
+
+### Admin things on the iPad
+
+An admin can do a few admin things on the kitchen iPad, after tapping their own avatar, each with their personal PIN:
+
+- **Add or edit a bounty**: ask Baumy ("add a bounty for the recycling, 15 points"); **Confirm all** asks for your PIN.
+- **Change a bounty's points**: **Bounties → Kitchen screen settings → Change a bounty's points**. Like on your phone, the change waits for the next Monday at least 48 hours ahead, so the others can veto it.
+
+Everything else an admin does (members, the pot, archiving a bounty, pairing) stays on your phone.
 
 ### Pairing the iPad
 
@@ -420,7 +429,7 @@ Only cookies the app needs to work. None of them track you, so there is no cooki
 - `baumy_login_request`: only while you sign in with Baumy from Telegram; it proves the approval is for this browser, and goes after 150 seconds (a request lasts 2 minutes). A session made that way is marked with `baumy.dont_remember` and ends when the browser closes, or after a day at most.
 - `baumy_kiosk_pairing`: only on an iPad showing the code to become the kitchen screen; it proves an admin’s approval is for that iPad, and goes after 11 minutes or once it is paired. The server keeps that request, with the iPad’s browser name and its network (the first part of its address only, never the whole address), so the admin approving it is warned if they are on a different network. It is deleted after 24 hours.
 - `baumy_kiosk`: only on a paired kitchen iPad; it signs the device in, for a year.
-- `baumy_kiosk_member`: on the kitchen iPad, who tapped their avatar (a member id, never a PIN), for at most 10 minutes.
+- `baumy_kiosk_member`: on the kitchen iPad, who tapped their avatar (a member id, never a PIN), for at most 20 minutes.
 - `baumy_kiosk_walk_in`: on the kitchen iPad, the member who just tapped their avatar (a member id), so their character walks in once; the screen clears it straight away, and it lasts 60 seconds at most.
 - `baumy_refresh`: set by the kitchen screen for 10 seconds so its refresh fetches a fresh shopping list.
 
