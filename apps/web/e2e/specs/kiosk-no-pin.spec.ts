@@ -5,7 +5,7 @@ import { openBaumySheet, openKioskChores, pairedKiosk } from "../lib/kiosk";
 
 // Issue #145, as the household hit it: Charl talked to the kitchen cat and
 // it asked for a PIN he never set. Now (owner ruling 2026-10-02, SPEC §12
-// decision 26) a member with no PIN asks Baumy for a note, and Confirm all
+// decision 27) a member with no PIN asks Baumy for a note, and Confirm all
 // saves it with no PinPad; confirming a housemate's chore needs none
 // either. Only a dispute needs the PIN, and for him the card waits under
 // "Charl hasn't set a personal PIN yet" with a QR code to Settings, never a

@@ -170,7 +170,7 @@ export const logCompletionAction = defineAction({
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
   // No PIN on the kiosk, even logging for someone else (owner ruling
-  // 2026-10-02, SPEC §12 decision 26, issue #145; it was `attested` when
+  // 2026-10-02, SPEC §12 decision 27, issue #145; it was `attested` when
   // doneBy named someone else). The vouch is still recorded: loggedBy is
   // the member picked on the kiosk.
   requires: "member",

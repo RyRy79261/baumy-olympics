@@ -11,7 +11,7 @@ import {
 // Issue #15 on the kitchen iPad: the founder self-claims a chore on the
 // kiosk; when the partner taps their avatar, the "Needs your OK" banner shows
 // it. Since the owner's ruling of 2026-10-02 (issue #145, SPEC §12 decision
-// 26) only a dispute asks for the PIN: the founder (who never set a PIN)
+// 27) only a dispute asks for the PIN: the founder (who never set a PIN)
 // undoes one of their own claims and the partner confirms one with no PIN,
 // then disputes the last with theirs.
 

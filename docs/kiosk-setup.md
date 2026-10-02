@@ -28,7 +28,7 @@ How to turn the iPad into the always-on kitchen screen (SPEC §8, issue #29).
    This is not the **personal PIN** in Settings: that is each housemate's
    own 4 to 6 digits, which the kitchen screen asks for only before it
    disputes a chore as them (owner ruling 2026-10-02, SPEC §12 decision
-   26). Everything else there (logging, confirming, notes, the calendar,
+   27). Everything else there (logging, confirming, notes, the calendar,
    shopping, Baumy) runs as whoever tapped their avatar, with no PIN.
    Pairing needs no PIN.
 
