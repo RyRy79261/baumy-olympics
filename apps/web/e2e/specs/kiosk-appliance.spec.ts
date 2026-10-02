@@ -4,7 +4,7 @@ import { openKioskChores, pairedKiosk } from "../lib/kiosk";
 
 // Issue #29 on the kitchen iPad (ipad-portrait): the web app manifest and
 // icons that make the home-screen app open full screen in portrait, the
-// screen wake lock and its notice, the 60-second idle reset (with its
+// screen wake lock, the 60-second idle reset (with its
 // countdown, from any kiosk page), and the offline page. Night mode moves
 // the server clock, so it is kiosk-night.spec.ts (the server-clock project).
 
@@ -122,22 +122,24 @@ test("wake lock, idle reset and the offline page", async ({
     kiosk.getByRole("heading", { name: "Kitchen", level: 1 }),
   ).toBeVisible();
 
-  // The wake lock: refused, so the corner tag says the screen may sleep ...
-  const notice = kiosk.getByTestId("wake-lock-notice");
-  await expect(notice).toHaveText("Screen may sleep");
+  // The wake lock: refused, and the kiosk says nothing about it (no corner
+  // tag, by the household's ask) ...
+  const wake = kiosk.getByTestId("wake-lock");
+  await expect(wake).toHaveAttribute("data-status", "denied");
+  await expect(kiosk.getByText("Screen may sleep")).toHaveCount(0);
   // ... held once the browser allows it (asked again on visibilitychange) ...
   await kiosk.evaluate(() => {
     (window as unknown as { __wake: { allow: boolean } }).__wake.allow = true;
   });
   await visibilityChange(kiosk);
-  await expect(notice).toHaveCount(0);
-  // ... and the notice is back the moment the browser lets it go.
+  await expect(wake).toHaveAttribute("data-status", "held");
+  // ... and asked for again after the browser lets it go.
   await kiosk.evaluate(() =>
     (window as unknown as { __wake: { drop(): void } }).__wake.drop(),
   );
-  await expect(notice).toHaveText("Screen may sleep");
+  await expect(wake).toHaveAttribute("data-status", "released");
   await visibilityChange(kiosk);
-  await expect(notice).toHaveCount(0);
+  await expect(wake).toHaveAttribute("data-status", "held");
 
   // Idle reset: someone opens the chores and taps in, then walks away.
   await openKioskChores(kiosk);
