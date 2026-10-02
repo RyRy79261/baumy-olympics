@@ -81,6 +81,7 @@ beforeEach(async () => {
           end: iso(8),
           private: false,
           member: null,
+          forMember: null,
         },
       ],
     })),

@@ -35,6 +35,8 @@ export interface CalendarEventView {
   when: string;
   /** The member who added it in the app, or null. */
   addedBy: string | null;
+  /** The member it is for (issue #134), or null for the whole house. */
+  forMember: string | null;
 }
 
 /** The fields of a calendar event this needs (the adapter's CalendarEvent). */
@@ -47,6 +49,7 @@ export interface EventLike {
   start: string;
   end: string;
   member: string | null;
+  forMember?: string | null;
 }
 
 /** How long an event is on the calendar, for people. */
@@ -97,6 +100,7 @@ export function eventView(e: EventLike): CalendarEventView {
     ...base,
     when: whenLabel(base),
     addedBy: e.member,
+    forMember: e.forMember ?? null,
   };
 }
 
@@ -147,29 +151,18 @@ export function agendaDays(
 }
 
 /**
- * How many chips a kitchen-screen month cell shows before "+N more", until
- * the cell has been measured (`kioskMonthChips`).
+ * What the event form's "Everyone" sends (issue #134): a form cannot send a
+ * null, and leaving the field out means "keep who it is for" on an update.
  */
-export const KIOSK_MONTH_CHIPS = 3;
+export const FOR_EVERYONE = "everyone";
 
-// A kiosk month cell's geometry (packages/ui CalendarDayCell, CalendarChip,
-// CalendarMore), in px: frame and padding, the date, a chip and the gap.
-const CELL_CHROME = 4 + 12 + 24;
-const CHIP = 28;
-const GAP = 4;
-const MORE = 16;
-
-/**
- * How many rows of chips a kitchen-screen month cell `cellHeight` px tall
- * shows, so the page fits the screen (820×1180) and never scrolls: every
- * chip when they all fit, else as many as fit beside "+N more" (at least a
- * "+N more" on its own).
- */
-export function kioskMonthChips(cellHeight: number, events: number): number {
-  const room = cellHeight - CELL_CHROME;
-  const all = Math.floor((room + GAP) / (CHIP + GAP));
-  if (events <= all) return events;
-  return Math.max(0, Math.floor((room - MORE) / (CHIP + GAP)));
+/** An event form's input as the actions take it: "Everyone" is null. */
+export function eventFormInput(
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  return input.forMemberId === FOR_EVERYONE
+    ? { ...input, forMemberId: null }
+    : input;
 }
 
 export const CALENDAR_VIEWS = ["day", "week", "month"] as const;

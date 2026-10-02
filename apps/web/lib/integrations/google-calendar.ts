@@ -30,7 +30,8 @@ import { redactSecrets } from "@/lib/redact";
 //   wrong for half the year in Berlin. An all-day event's end date is
 //   exclusive, as Google's is.
 // - The member who made the event is kept in
-//   `extendedProperties.private.baumyMember`.
+//   `extendedProperties.private.baumyMember`, and the member it is for
+//   (issue #134) in `baumyFor`: an empty string, or no key, is the house.
 // - Updates use PATCH.
 
 export const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -42,6 +43,8 @@ export const READ_SCOPE =
 export const WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 /** The private extended property that names the member who made an event. */
 export const MEMBER_PROPERTY = "baumyMember";
+/** The private extended property that names the member an event is for. */
+export const FOR_PROPERTY = "baumyFor";
 /** How long each Google request may take. */
 export const CALENDAR_TIMEOUT_MS = 5000;
 /** How long one read is reused, per server instance. */
@@ -80,6 +83,8 @@ export interface CalendarEvent {
   private: boolean;
   /** The member who made it in the app, or null. */
   member: string | null;
+  /** The member it is for, or null for the whole house. */
+  forMember: string | null;
 }
 
 /** What the app writes: Berlin days and wall-clock times. */
@@ -96,6 +101,11 @@ export interface EventSpec {
   startTime?: string;
   /** Timed only: "HH:MM" on `endDate`. */
   endTime?: string;
+  /**
+   * The member it is for, or null for the whole house. Undefined on an
+   * update keeps who it is for (the PATCH leaves `baumyFor` alone).
+   */
+  forMember?: string | null;
 }
 
 /** A half-open range of instants. */
@@ -227,7 +237,12 @@ export function insertBody(eventId: string, spec: EventSpec, memberId: string) {
     ...(spec.description ? { description: spec.description } : {}),
     ...(spec.location ? { location: spec.location } : {}),
     ...eventTimes(spec),
-    extendedProperties: { private: { [MEMBER_PROPERTY]: memberId } },
+    extendedProperties: {
+      private: {
+        [MEMBER_PROPERTY]: memberId,
+        ...(spec.forMember ? { [FOR_PROPERTY]: spec.forMember } : {}),
+      },
+    },
   };
 }
 
@@ -236,16 +251,38 @@ export function insertBody(eventId: string, spec: EventSpec, memberId: string) {
  * after its undo deleted it) into the event asked for, confirmed again.
  */
 export function resurrectBody(spec: EventSpec) {
-  return { ...patchBody(spec), status: "confirmed" as const };
+  return {
+    ...patchBody({ ...spec, forMember: spec.forMember ?? null }),
+    status: "confirmed" as const,
+  };
 }
 
-/** The events.patch body: every field the sheet edits, cleared when empty. */
-export function patchBody(spec: EventSpec) {
+/**
+ * The events.patch body: every field the sheet edits, cleared when empty.
+ * Google merges `extendedProperties.private` key by key, so this sets who it
+ * is for ("" for the house) and leaves who made it alone; with `forMember`
+ * undefined it sends no key, and who it is for stays as it was.
+ */
+export function patchBody(spec: EventSpec): {
+  summary: string;
+  description: string;
+  location: string;
+  start: GoogleTime;
+  end: GoogleTime;
+  extendedProperties?: { private: Record<string, string> };
+} {
   return {
     summary: spec.title,
     description: spec.description ?? "",
     location: spec.location ?? "",
     ...eventTimes(spec, true),
+    ...(spec.forMember === undefined
+      ? {}
+      : {
+          extendedProperties: {
+            private: { [FOR_PROPERTY]: spec.forMember ?? "" },
+          },
+        }),
   };
 }
 
@@ -294,6 +331,7 @@ export function fromGoogle(item: GoogleEvent): CalendarEvent | null {
     private:
       item.visibility === "private" || item.visibility === "confidential",
     member: item.extendedProperties?.private?.[MEMBER_PROPERTY]?.trim() || null,
+    forMember: item.extendedProperties?.private?.[FOR_PROPERTY]?.trim() || null,
   };
 }
 
