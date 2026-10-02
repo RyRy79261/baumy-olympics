@@ -1,7 +1,7 @@
 import "server-only";
 
 import { isTestMode } from "@/lib/test-mode";
-import { memoryCalendar } from "./calendar-memory";
+import { calendarAsAsked, memoryCalendar } from "./calendar-memory";
 import {
   calendarConfig,
   googleCalendar,
@@ -10,7 +10,8 @@ import {
 } from "./google-calendar";
 
 // Which calendar this environment talks to (SPEC §6.4, §10): the in-memory
-// fake under E2E_TEST_MODE=1, Google when all three GOOGLE_CALENDAR_* are
+// fake under E2E_TEST_MODE=1 (unconnected or down for a browser carrying
+// the `baumy_e2e_calendar` cookie, issue #134), Google when all three GOOGLE_CALENDAR_* are
 // set, and otherwise one that answers `not_configured` to everything, so the
 // page says the calendar is not connected rather than failing.
 
@@ -34,7 +35,7 @@ export function setCalendarClientForTests(client: CalendarClient | null): void {
 
 export function calendarClient(env: EnvBag = process.env): CalendarClient {
   if (override) return override;
-  if (isTestMode(env)) return memoryCalendar();
+  if (isTestMode(env)) return calendarAsAsked(memoryCalendar());
   const config = calendarConfig(env);
   return config ? googleCalendar(config, { env }) : unconfiguredCalendar;
 }

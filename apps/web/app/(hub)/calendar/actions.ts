@@ -6,6 +6,7 @@ import type {
   DeleteEventData,
 } from "@/lib/actions/calendar";
 import type { ActionResult } from "@/lib/actions/result";
+import { eventFormInput } from "@/lib/calendar/view";
 import { actionForm } from "@/lib/actions/ui";
 
 // /calendar's server actions: thin wrappers around the registry (SPEC §3.3).
@@ -18,7 +19,7 @@ export async function createEventAction(
   _prev: WriteResult | null,
   form: FormData,
 ): Promise<WriteResult> {
-  const result = await actionForm("create_event", form);
+  const result = await actionForm("create_event", form, eventFormInput);
   if (result.ok) revalidatePath("/calendar");
   return result;
 }
@@ -27,7 +28,7 @@ export async function updateEventAction(
   _prev: WriteResult | null,
   form: FormData,
 ): Promise<WriteResult> {
-  const result = await actionForm("update_event", form);
+  const result = await actionForm("update_event", form, eventFormInput);
   if (result.ok) revalidatePath("/calendar");
   return result;
 }

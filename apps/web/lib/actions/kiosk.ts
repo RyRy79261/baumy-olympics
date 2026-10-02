@@ -10,7 +10,7 @@ import { getClientIp } from "@/lib/rate-limit";
 import type { ActionName, RequestCtx } from "./define";
 import { runAction, type ActionOutput } from "./registry";
 import { fail, type ActionResult } from "./result";
-import { formDataToInput } from "./ui";
+import { formDataToInput, type FormInputMap } from "./ui";
 
 // The kiosk adapter (SPEC §6.3, §8): like the UI adapter (ui.ts), but the
 // actor is the paired DEVICE with the member whose avatar was tapped, and the
@@ -62,6 +62,7 @@ export async function kioskActionForm<N extends ActionName>(
   name: N,
   form: FormData,
   actAs?: PickedMember,
+  mapInput: FormInputMap = (i) => i,
 ): Promise<ActionResult<ActionOutput<N>>> {
   try {
     const ctx = await kioskRequestCtx(
@@ -72,7 +73,7 @@ export async function kioskActionForm<N extends ActionName>(
     if (!ctx) return fail("UNAUTHENTICATED", NOT_PAIRED_MESSAGE);
     const input = formDataToInput(form);
     delete input[PIN_FIELD];
-    return await runAction(name, input, ctx);
+    return await runAction(name, mapInput(input), ctx);
   } catch (err) {
     unstable_rethrow(err);
     console.error(`[kioskActionForm:${name}]`, err);
@@ -116,6 +117,29 @@ export async function kioskActionAsFace<N extends ActionName>(
   } catch (err) {
     unstable_rethrow(err);
     console.error(`[kioskActionAsFace:${name}]`, err);
+    return fail("INTERNAL", "Something went wrong. Please try again.");
+  }
+}
+
+/**
+ * `kioskActionForm` for structured input (ui.ts `actionInput`), as the
+ * member who is acting on the kiosk. No PIN travels this way.
+ */
+export async function kioskActionInput<N extends ActionName>(
+  name: N,
+  input: unknown,
+  requestId: unknown,
+): Promise<ActionResult<ActionOutput<N>>> {
+  try {
+    const ctx = await kioskRequestCtx(
+      typeof requestId === "string" && requestId !== "" ? requestId : undefined,
+      undefined,
+    );
+    if (!ctx) return fail("UNAUTHENTICATED", NOT_PAIRED_MESSAGE);
+    return await runAction(name, input, ctx);
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error(`[kioskActionInput:${name}]`, err);
     return fail("INTERNAL", "Something went wrong. Please try again.");
   }
 }

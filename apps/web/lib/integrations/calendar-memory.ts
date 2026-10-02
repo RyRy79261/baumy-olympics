@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cookies } from "next/headers";
 import { BERLIN_TZ, berlinDateTimeToUtc } from "@baumy/core";
 import {
   fromGoogle,
@@ -8,6 +9,7 @@ import {
   resurrectBody,
   type CalendarClient,
   type CalendarEvent,
+  type CalendarFailure,
   type GoogleEvent,
 } from "./google-calendar";
 
@@ -66,6 +68,28 @@ function live(id: string): GoogleEvent | undefined {
   return e && e.status !== "cancelled" ? e : undefined;
 }
 
+/** Google's PATCH: `extendedProperties.private` merges key by key. */
+function patched(
+  e: GoogleEvent,
+  body: ReturnType<typeof patchBody>,
+): GoogleEvent {
+  return {
+    ...e,
+    summary: body.summary,
+    description: body.description || undefined,
+    location: body.location || undefined,
+    start: stored(body.start),
+    end: stored(body.end),
+    extendedProperties: {
+      ...e.extendedProperties,
+      private: {
+        ...e.extendedProperties?.private,
+        ...body.extendedProperties?.private,
+      },
+    },
+  };
+}
+
 function read(e: GoogleEvent): CalendarEvent {
   return fromGoogle(e)!;
 }
@@ -107,13 +131,8 @@ export function memoryCalendar(): CalendarClient {
       if (existing) {
         const body = resurrectBody(spec);
         const next: GoogleEvent = {
-          ...existing,
+          ...patched(existing, body),
           status: body.status,
-          summary: body.summary,
-          description: body.description || undefined,
-          location: body.location || undefined,
-          start: stored(body.start),
-          end: stored(body.end),
         };
         store().set(eventId, next);
         return { ok: true, data: read(next) };
@@ -131,15 +150,7 @@ export function memoryCalendar(): CalendarClient {
     async update(eventId, spec) {
       const e = live(eventId);
       if (!e) return NOT_FOUND;
-      const body = patchBody(spec);
-      const next: GoogleEvent = {
-        ...e,
-        summary: body.summary,
-        description: body.description || undefined,
-        location: body.location || undefined,
-        start: stored(body.start),
-        end: stored(body.end),
-      };
+      const next = patched(e, patchBody(spec));
       store().set(eventId, next);
       return { ok: true, data: read(next) };
     },
@@ -155,4 +166,38 @@ export function memoryCalendar(): CalendarClient {
       return { ok: true, data: null };
     },
   };
+}
+
+/**
+ * The cookie a spec sets to make the calendar look unconnected
+ * (`unconfigured`) or down (`down`) for its own browser (issue #134), as
+ * `baumy_e2e_brain` does for brain: specs share one server, so the outage
+ * is per browser, never per server.
+ */
+export const CALENDAR_E2E_COOKIE = "baumy_e2e_calendar";
+
+async function askedFor(): Promise<CalendarFailure | null> {
+  let value: string | undefined;
+  try {
+    value = (await cookies()).get(CALENDAR_E2E_COOKIE)?.value;
+  } catch {
+    // Outside a request (a unit test): the calendar is itself.
+    return null;
+  }
+  if (value === "unconfigured") return { ok: false, reason: "not_configured" };
+  if (value === "down") return { ok: false, reason: "unavailable" };
+  return null;
+}
+
+/** `inner`, but unconnected or down for a browser that asked for it. */
+export function calendarAsAsked(inner: CalendarClient): CalendarClient {
+  const out = {} as CalendarClient;
+  for (const key of Object.keys(inner) as (keyof CalendarClient)[]) {
+    out[key] = (async (...args: unknown[]) => {
+      const failure = await askedFor();
+      if (failure) return failure;
+      return (inner[key] as (...a: unknown[]) => unknown)(...args);
+    }) as never;
+  }
+  return out;
 }

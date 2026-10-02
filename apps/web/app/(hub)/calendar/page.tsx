@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { rosterColours } from "@/lib/members/characters";
 import { berlinDateKey } from "@baumy/core";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { PageHeading } from "@baumy/ui";
@@ -8,7 +7,8 @@ import { CalendarStatus } from "@/components/calendar/calendar-status";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
-import { householdMembers } from "@/lib/members/household";
+import { rosterColours } from "@/lib/members/characters";
+import { householdPeople } from "@/lib/members/household";
 import { parseViewParams, viewRange } from "@/lib/calendar/view";
 import {
   createEventAction,
@@ -36,7 +36,7 @@ export default async function CalendarPage({
   const range = viewRange(view, date);
   const [listed, people] = await Promise.all([
     runAction("list_events", { from: range.from, to: range.to }, ctx),
-    householdMembers(HOUSEHOLD_ID),
+    householdPeople(HOUSEHOLD_ID),
   ]);
   return (
     <>
@@ -49,10 +49,7 @@ export default async function CalendarPage({
           range={range}
           events={listed.data.events}
           today={today}
-          basePath="/calendar"
-          memberNames={Object.fromEntries(
-            people.map((p) => [p.id, p.displayName]),
-          )}
+          people={people}
           memberColors={rosterColours(people)}
           actions={{
             create: createEventAction,
