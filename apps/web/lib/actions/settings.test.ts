@@ -108,11 +108,14 @@ describe("set_kiosk_pin", () => {
 
   it("keeps the PIN out of the ledger and the audit row", async () => {
     const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
-    await runAction(
-      "set_kiosk_pin",
-      { pin: "987654" },
-      ctxFor(signedIn(me, 1)),
-    );
+    const actor = await sessionWithRow(me);
+    await grantStepUp(db(), {
+      sessionId: actor.sessionId!,
+      userId: actor.userId,
+      method: "password",
+      now: FIXED_NOW,
+    });
+    await runAction("set_kiosk_pin", { pin: "987654" }, ctxFor(actor));
     const ledger = await t.db().select().from(actionRequests);
     const audits = await t.db().select().from(auditEvents);
     expect(audits).toEqual([
@@ -159,18 +162,19 @@ describe("set_kiosk_pin", () => {
     ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
   });
 
-  it("a session under 10 minutes old may change the PIN without confirming", async () => {
+  it("a session's age alone never lets the PIN change", async () => {
+    // Signed in a minute ago, or "in the future": with no window, refused.
     const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
-    await expect(
-      runAction("set_kiosk_pin", { pin: "2222" }, ctxFor(signedIn(me, 9))),
-    ).resolves.toEqual({ ok: true, data: { changed: true } });
-  });
-
-  it("a session dated in the future does not count as fresh", async () => {
-    const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
-    await expect(
-      runAction("set_kiosk_pin", { pin: "2222" }, ctxFor(signedIn(me, -5))),
-    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    for (const minutesAgo of [1, 9, -5]) {
+      await expect(
+        runAction(
+          "set_kiosk_pin",
+          { pin: "2222" },
+          ctxFor(signedIn(me, minutesAgo)),
+        ),
+      ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    }
+    expect((await row(me)).kioskPinHash).toBe("scrypt$old");
   });
 
   it("refuses a PIN that is not 4 to 6 digits", async () => {

@@ -453,6 +453,7 @@ export function PasskeysCard({
   emailVerified: boolean;
 }) {
   const router = useRouter();
+  const stepUp = useStepUp();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
@@ -468,6 +469,12 @@ export function PasskeysCard({
     e.preventDefault();
     setError(null);
     setPending(true);
+    // A new passkey is a new way in: Better Auth refuses it without an open
+    // "Confirm it's you" window (issue #135).
+    if (!(await stepUp.ensure())) {
+      setPending(false);
+      return;
+    }
     const res = await authClient.passkey
       .addPasskey({ name: name.trim() || undefined })
       .catch(() => null);
@@ -572,6 +579,7 @@ export function PasskeysCard({
         A passkey is a faster way in, not your only one: the Security page never
         lets you remove your last way in.
       </p>
+      {stepUp.dialog}
     </Card>
   );
 }

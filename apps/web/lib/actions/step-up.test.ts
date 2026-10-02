@@ -28,11 +28,7 @@ import {
   sessionActor,
 } from "@/test-utils/actions";
 import type { Actor, MemberActor, ServiceActor } from "@/lib/auth";
-import {
-  FRESH_SESSION_MS,
-  recentAuthUntil,
-  requireRecentAuth,
-} from "@/lib/auth/recent-auth";
+import { recentAuthUntil, requireRecentAuth } from "@/lib/auth/recent-auth";
 import {
   setBrainClientForTests,
   type BrainClient,
@@ -54,9 +50,12 @@ const verify = vi.hoisted(() => ({
   totp: vi.fn(async (_: string) => false),
   passkey: vi.fn(async (_: Record<string, unknown>) => false),
 }));
+/** The TOTP time step a right code matched (Better Auth's answer). */
+const totp = vi.hoisted(() => ({ step: 1000 }));
 vi.mock("@/lib/auth/step-up-verify", () => ({
   verifyPasswordStepUp: (p: string) => verify.password(p),
-  verifyTotpStepUp: (c: string) => verify.totp(c),
+  verifyTotpStepUp: async (c: string) =>
+    (await verify.totp(c)) ? totp.step : null,
   verifyPasskeyStepUp: (r: Record<string, unknown>) => verify.passkey(r),
 }));
 
@@ -87,6 +86,7 @@ const fakeBrain: BrainClient = {
 
 beforeEach(() => {
   __resetMemoryRateLimits();
+  totp.step += 10;
   for (const fn of Object.values(verify)) {
     fn.mockReset();
     fn.mockResolvedValue(false);
@@ -221,22 +221,17 @@ const gateCtx = (actor: Actor, now = FIXED_NOW) => ({
 });
 
 describe("requireRecentAuth", () => {
-  it("counts a sign-in under 10 minutes old, then no longer", async () => {
-    const me = await member({ ageMs: 4 * MIN });
-    await expect(recentAuthUntil(gateCtx(me))).resolves.toEqual(
-      at(FRESH_SESSION_MS - 4 * MIN),
-    );
-    await expect(requireRecentAuth(gateCtx(me))).resolves.toEqual({
-      ok: true,
-    });
-    await expect(
-      requireRecentAuth(gateCtx(me, at(FRESH_SESSION_MS - 4 * MIN))),
-    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
-  });
-
-  it("does not count a sign-in dated in the future", async () => {
-    const me = await member({ ageMs: -5 * MIN });
-    await expect(recentAuthUntil(gateCtx(me))).resolves.toBeNull();
+  it("never counts a session's age (the bypass in PR #139)", async () => {
+    // Better Auth swaps in brand-new sessions on paths that prove nothing
+    // (turning two-factor on or off); only a window counts.
+    for (const ageMs of [0, 1 * MIN, 4 * MIN, -5 * MIN]) {
+      const me = await member({ ageMs });
+      await expect(recentAuthUntil(gateCtx(me))).resolves.toBeNull();
+      await expect(requireRecentAuth(gateCtx(me))).resolves.toMatchObject({
+        ok: false,
+        code: "REAUTH_REQUIRED",
+      });
+    }
   });
 
   it("counts this session's window until it closes, never another session's", async () => {
@@ -263,31 +258,27 @@ describe("requireRecentAuth", () => {
     ).resolves.toBeNull();
   });
 
-  it("takes the later of a fresh sign-in and a window", async () => {
-    const me = await member({ ageMs: 9 * MIN });
+  it("counts a window a real sign-in opened like any other", async () => {
+    const me = await member({ ageMs: 1 * MIN });
     await grantStepUp(db(), {
       sessionId: me.sessionId!,
       userId: me.userId,
-      method: "totp",
-      now: FIXED_NOW,
+      method: "google",
+      now: at(-1 * MIN),
     });
     await expect(recentAuthUntil(gateCtx(me))).resolves.toEqual(
-      at(STEP_UP_WINDOW_MS),
-    );
-    const fresher = await member({ ageMs: 1 * MIN });
-    await grantStepUp(db(), {
-      sessionId: fresher.sessionId!,
-      userId: fresher.userId,
-      method: "totp",
-      now: at(-5 * MIN),
-    });
-    await expect(recentAuthUntil(gateCtx(fresher))).resolves.toEqual(
-      at(FRESH_SESSION_MS - 1 * MIN),
+      at(STEP_UP_WINDOW_MS - 1 * MIN),
     );
   });
 
   it("never lets anyone but a member's own session through", async () => {
     const me = await member({ ageMs: 1 * MIN });
+    await grantStepUp(db(), {
+      sessionId: me.sessionId!,
+      userId: me.userId,
+      method: "password",
+      now: FIXED_NOW,
+    });
     const others: Actor[] = [
       kioskActor(me.memberId),
       { kind: "mcp", memberId: me.memberId!, scopes: ["baumy:write"] },
@@ -296,9 +287,11 @@ describe("requireRecentAuth", () => {
     for (const actor of others) {
       await expect(recentAuthUntil(gateCtx(actor))).resolves.toBeNull();
     }
-    // A member session without an id is judged by its sign-in time alone.
+    // Present before absent: the member's own session passes...
+    await expect(recentAuthUntil(gateCtx(me))).resolves.not.toBeNull();
+    // ...but not without its session id.
     const { sessionId: _, ...noId } = me;
-    await expect(recentAuthUntil(gateCtx(noId))).resolves.not.toBeNull();
+    await expect(recentAuthUntil(gateCtx(noId))).resolves.toBeNull();
   });
 });
 
@@ -460,6 +453,36 @@ describe("confirm_identity", () => {
     expect(verify.password).toHaveBeenCalledWith("correct horse battery");
     expect(verify.totp).toHaveBeenCalledWith("123456");
     expect(verify.passkey).toHaveBeenCalledWith(PROOFS.passkey.response);
+  });
+
+  it("takes each two-factor code once: the same or an older time step is refused", async () => {
+    const me = await member();
+    await withTotp(me.userId);
+    verify.totp.mockResolvedValue(true);
+    totp.step = 5000;
+    await expect(
+      run("confirm_identity", PROOFS.totp, me),
+    ).resolves.toMatchObject({ ok: true, data: { method: "totp" } });
+    // Replayed (seen over a shoulder, or a second tab): refused.
+    await expect(
+      run("confirm_identity", PROOFS.totp, me),
+    ).resolves.toMatchObject({ ok: false, code: "STEP_UP_FAILED" });
+    totp.step = 4999;
+    await expect(
+      run("confirm_identity", PROOFS.totp, me),
+    ).resolves.toMatchObject({ ok: false, code: "STEP_UP_FAILED" });
+    // The next 30 seconds' code works.
+    totp.step = 5001;
+    await expect(
+      run("confirm_identity", PROOFS.totp, me),
+    ).resolves.toMatchObject({ ok: true });
+    // Another member's steps are their own.
+    const other = await member();
+    await withTotp(other.userId);
+    totp.step = 5000;
+    await expect(
+      run("confirm_identity", PROOFS.totp, other),
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it("never asks Better Auth about a code without finished two-factor", async () => {

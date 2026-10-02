@@ -50,11 +50,30 @@ const BAUMY_POLL_MS = 2_000;
 type Outcome = (confirmed: boolean) => void;
 
 /**
+ * Google's sign-in URL, made to ask for the Google password again
+ * (`prompt=login`, `max_age=0`), so a browser already signed in to Google
+ * cannot confirm with one click. Better Auth 1.6.25 sets `prompt` only for
+ * the whole provider and does not check the id token's `auth_time`, so this
+ * is the browser's request, not something the server verifies (ADR 0007).
+ */
+export function reauthUrl(googleUrl: string): string {
+  const url = new URL(googleUrl);
+  url.searchParams.set("prompt", "login");
+  url.searchParams.set("max_age", "0");
+  return url.toString();
+}
+
+/**
  * The dialog and the wrapper that opens it. Render `dialog` once in the
  * component that uses `guard`.
  */
 export function useStepUp(): {
   guard: <T>(action: FormAction<T>) => FormAction<T>;
+  /**
+   * For Better Auth's own security endpoints (adding a passkey, two-factor):
+   * true when this session's window is open, else the dialog's answer.
+   */
+  ensure: () => Promise<boolean>;
   dialog: ReactNode;
 } {
   const [open, setOpen] = useState(false);
@@ -88,8 +107,15 @@ export function useStepUp(): {
     [confirm],
   );
 
+  const ensure = useCallback(async () => {
+    const view = await getStepUpAction().catch(() => null);
+    if (view?.ok && view.data.until) return true;
+    return confirm();
+  }, [confirm]);
+
   return {
     guard,
+    ensure,
     dialog: (
       <Dialog
         open={open}
@@ -224,12 +250,16 @@ function StepUpChoices({ onDone }: { onDone: Outcome }) {
       .social({
         provider: "google",
         callbackURL: window.location.pathname,
+        disableRedirect: true,
       })
       .catch(() => null);
-    if (!res || res.error) {
+    const url = res && !res.error ? res.data?.url : undefined;
+    if (!url) {
       setBusy(null);
       setError("Google didn't open. Try again, or use another way.");
+      return;
     }
+    window.location.assign(reauthUrl(url));
   }
 
   function submitCode(e: FormEvent<HTMLFormElement>) {
