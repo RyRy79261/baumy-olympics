@@ -10,3 +10,6 @@ export * from "./scoring/standings";
 export * from "./scoring/streaks";
 export * from "./scoring/frequency";
 export * from "./scoring/lifecycle";
+export * from "./feedback/text-redaction";
+export * from "./feedback/report-screen";
+export * from "./feedback/shake";
