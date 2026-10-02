@@ -12,7 +12,12 @@ import { stepUps, twoFactor, user } from "./schema";
 export const STEP_UP_WINDOW_MS = 10 * 60_000;
 
 /** The ways a member can confirm it is them. */
-export const STEP_UP_METHODS = ["passkey", "totp", "baumy", "password"] as const;
+export const STEP_UP_METHODS = [
+  "passkey",
+  "totp",
+  "baumy",
+  "password",
+] as const;
 export type StepUpMethod = (typeof STEP_UP_METHODS)[number];
 
 /**

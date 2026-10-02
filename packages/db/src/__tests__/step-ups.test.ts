@@ -151,23 +151,29 @@ describe("hasVerifiedTotp", () => {
 
     // Mid-enrolment: a secret, not verified, two-factor off.
     const half = await account();
-    await t.db().insert(twoFactor).values({
-      id: `tf-${half}`,
-      userId: half,
-      secret: "enc",
-      backupCodes: "enc",
-      verified: false,
-    });
+    await t
+      .db()
+      .insert(twoFactor)
+      .values({
+        id: `tf-${half}`,
+        userId: half,
+        secret: "enc",
+        backupCodes: "enc",
+        verified: false,
+      });
     expect(await hasVerifiedTotp(db(), half)).toBe(false);
 
     const on = await account({ twoFactorEnabled: true });
-    await t.db().insert(twoFactor).values({
-      id: `tf-${on}`,
-      userId: on,
-      secret: "enc",
-      backupCodes: "enc",
-      verified: true,
-    });
+    await t
+      .db()
+      .insert(twoFactor)
+      .values({
+        id: `tf-${on}`,
+        userId: on,
+        secret: "enc",
+        backupCodes: "enc",
+        verified: true,
+      });
     expect(await hasVerifiedTotp(db(), on)).toBe(true);
   });
 });

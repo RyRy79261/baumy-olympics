@@ -461,15 +461,18 @@ describe("step-up requests (issue #135)", () => {
     await t.db().delete(session).where(eq(session.id, mine));
     expect(await t.db().select().from(loginRequests)).toEqual([]);
     await expect(
-      t.db().insert(loginRequests).values({
-        memberId: m.id,
-        purpose: "step_up",
-        secretHash: "x",
-        code: 47,
-        choices: [47],
-        device: "d",
-        expiresAt: NOW,
-      }),
+      t
+        .db()
+        .insert(loginRequests)
+        .values({
+          memberId: m.id,
+          purpose: "step_up",
+          secretHash: "x",
+          code: 47,
+          choices: [47],
+          device: "d",
+          expiresAt: NOW,
+        }),
     ).rejects.toThrow();
   });
 });
