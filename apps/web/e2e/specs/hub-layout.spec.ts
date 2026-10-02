@@ -10,8 +10,9 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 //   right after Today too, so the order seen is the order read and tabbed;
 // - the PIN nudge is one slim strip across the top, not a card, and its ×
 //   hides it for that member;
-// - the page reads heading, header row (clock and tiles), cards, with even
-//   room between them;
+// - there is no visible heading block (owner ruling 2026-10-03): a
+//   screen-reader h1 names the page, and it reads PIN strip, header row
+//   (clock and tiles), cards, with even room between them;
 // - the page is centred, and the strip and the cards share its edges;
 // - there is one Ask Baumy button at every width: below 89rem (1424px) in
 //   the top bar, tabbed to after the menus; from there in the viewport's
@@ -64,11 +65,16 @@ async function measure(page: Page) {
       const r = rect(document.querySelector(`[data-testid="${id}"]`)!);
       return { id, ...r, width: r.right - r.left };
     });
-    const h1 = document.querySelector("h1")!;
     return {
       cards,
       gap: parseFloat(getComputedStyle(grid).rowGap),
-      heading: rect(h1.parentElement!.parentElement!),
+      // Visible headings in the page itself (the hub's h1 is sr-only).
+      visibleHeadings: [...document.querySelectorAll("main h1, main h2")]
+        .filter((h) => {
+          const r = h.getBoundingClientRect();
+          return r.width > 1 && r.height > 1;
+        })
+        .map((h) => h.textContent ?? ""),
       glance: rect(document.querySelector('[data-testid="hub-glance"]')!),
       grid: rect(grid),
       // The one shown: the bar's below 89rem, the corner's from there.
@@ -117,7 +123,7 @@ async function expectSheetFont(p: Page, label: string) {
   expect(fonts.dialog, `${label}: the sheet's font`).toBe(fonts.body);
 }
 
-test("the hub reads heading, header row, cards, with Baumy placed right", async ({
+test("the hub reads strip, header row, cards, with Baumy placed right", async ({
   page,
   browser,
 }, testInfo) => {
@@ -164,7 +170,19 @@ test("the hub reads heading, header row, cards, with Baumy placed right", async 
 
     const m = await measure(p);
 
-    // The strip: one line of text, as wide as the heading's row.
+    // No eyebrow, title or welcome line: only the cards' own titles show,
+    // and the page is still named by its h1.
+    expect(m.visibleHeadings, `${label}: visible headings`).not.toContain(
+      "Hub",
+    );
+    await expect(
+      p.getByRole("heading", { name: "Hub", level: 1 }),
+      `${label}: the page's h1`,
+    ).toHaveCount(1);
+    await expect(p.getByText("Baumy Olympics", { exact: true })).toHaveCount(0);
+    await expect(p.getByText(/^Welcome, /)).toHaveCount(0);
+
+    // The strip: one line of text, as wide as the cards.
     const s = (await strip.boundingBox())!;
     expect(s.height, `${label}: strip height`).toBeLessThan(STRIP_MAX_PX);
     const lines = await strip.locator("p").evaluate((el) => {
@@ -173,12 +191,9 @@ test("the hub reads heading, header row, cards, with Baumy placed right", async 
     });
     expect(lines, `${label}: the strip's lines`).toBeLessThan(1.5);
     expect(
-      Math.abs(s.width - (m.heading.right - m.heading.left)),
+      Math.abs(s.width - (m.grid.right - m.grid.left)),
       `${label}: strip width`,
     ).toBeLessThanOrEqual(1);
-    expect(s.y + s.height, `${label}: strip above the heading`).toBeLessThan(
-      m.heading.top + 1,
-    );
 
     // The page is centred, and the strip and the cards share its edges.
     const cardsRight = Math.max(...m.cards.map((c) => c.right));
@@ -195,11 +210,11 @@ test("the hub reads heading, header row, cards, with Baumy placed right", async 
       `${label}: the cards are centred`,
     ).toBeLessThanOrEqual(1);
 
-    // Heading, header row, cards: the same room before and after the row.
-    const above = m.glance.top - m.heading.bottom;
+    // Strip, header row, cards: the same room before and after the row.
+    const above = m.glance.top - (s.y + s.height);
     const below = m.grid.top - m.glance.bottom;
-    expect(above, `${label}: heading to header row`).toBeGreaterThan(0);
-    expect(above, `${label}: heading to header row`).toBeLessThanOrEqual(32);
+    expect(above, `${label}: strip to header row`).toBeGreaterThan(0);
+    expect(above, `${label}: strip to header row`).toBeLessThanOrEqual(32);
     expect(
       Math.abs(above - below),
       `${label}: even room around the header row`,

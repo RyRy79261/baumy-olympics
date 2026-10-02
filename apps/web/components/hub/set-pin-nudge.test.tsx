@@ -49,7 +49,7 @@ describe("SetPinNudge", () => {
 
   it("hides for that member on this device when its × is tapped", () => {
     const main = document.createElement("main");
-    main.innerHTML = "<h1>Hub</h1>";
+    main.innerHTML = '<h1 class="sr-only" tabindex="-1">Hub</h1>';
     document.body.append(main);
     act(() => root!.render(<SetPinNudge memberId="m1" />));
     expect(strip()).not.toBeNull();

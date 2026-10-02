@@ -99,7 +99,10 @@ describe("/", () => {
     });
     const out = renderToStaticMarkup(await HubPage());
     expect(out).toContain('data-testid="hub-home"');
-    expect(out).toContain("Welcome, Ada.");
+    // The page is named for a screen reader only, with no visible heading
+    // block (issue #152).
+    expect(out).toContain('<h1 class="sr-only" tabindex="-1">Hub</h1>');
+    expect(out).not.toContain("Welcome, Ada.");
     expect(out).not.toContain("private household app");
     expect(out).not.toContain("set-pin-nudge");
   });
