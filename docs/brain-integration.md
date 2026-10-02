@@ -214,6 +214,17 @@ request) and `INVALID_STATE` (expired, or already answered) carry a
 `message` to show. These two actions come only from those buttons: never
 from a conversation, and never offered to brain's LLM.
 
+**Confirm it's you** (issue #135, ADR 0007). The same call, with
+`"purpose": "step_up"` added, asks a member who is ALREADY signed in on that
+device to confirm a sensitive change there (creating a service token,
+changing their kiosk PIN). Say "Confirm it's you on Safari on iPad? Tap the
+number on the screen." instead of "Sign in on …"; the buttons, the actions
+and the 15-minute lock after a denial are the same. `approve_login` and
+`deny_login` answer `data.purpose` (`sign_in` or `step_up`) so the edited
+DM can say "Confirmed it's you" rather than "Signed in". Approving one signs
+nobody in: it opens a 10-minute window for that one session. A brain that
+ignores `purpose` still works, but its DM says "Sign in".
+
 ## Service tokens
 
 Only the sha256 of a token is stored (`service_tokens`); the plaintext lives
@@ -226,8 +237,10 @@ is shown once, with a Copy button and "put it in brain's Vercel project as
 `BRAIN_SERVICE_TOKEN`". These are the registry actions
 `create_service_token`, `rotate_service_token` and `revoke_service_token`
 (`apps/web/lib/actions/service-tokens.ts`): admin only, UI only, audited,
-each refused on a session signed out elsewhere. Creating and rotating also
-need the admin's password or a sign-in under 10 minutes old; the result
+each refused on a session signed out elsewhere. All three also need "Confirm
+it's you" (issue #135, ADR 0007): a sign-in under 10 minutes old, or a
+confirmation in that session in the last 10 minutes with a passkey, the
+two-factor code, a Sign in with Baumy tap or the password; the result
 keeps the token out of the request ledger (`storedData`) and the audit row
 names only the token. Tokens minted there always get the `brain` scope.
 `last_used_at` is written by the endpoint at most every 5 minutes.
