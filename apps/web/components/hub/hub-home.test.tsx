@@ -132,3 +132,27 @@ describe("HubHome's streamed widgets", () => {
     );
   });
 });
+
+// Issue #152: the page's own card (Post a reminder) stacks under Today in the
+// wide column, so the short column leaves no gap; on one column it goes last.
+describe("HubHome's extra card", () => {
+  it("sits in the wide column after Today, last on one column", () => {
+    const html = renderToStaticMarkup(
+      <HubHome
+        hub={hub({ urgent: 0, new: 0, messages: 0 })}
+        memberColors={{}}
+        shopping={{ add: vi.fn(), checkOff: vi.fn() }}
+      >
+        <p data-testid="extra">Post a reminder</p>
+      </HubHome>,
+    );
+    const extra = html.indexOf('data-testid="extra"');
+    expect(extra).toBeGreaterThan(html.indexOf('data-testid="widget-events"'));
+    expect(extra).toBeLessThan(
+      html.indexOf('data-testid="widget-leaderboard"'),
+    );
+    const wrapper = html.slice(html.lastIndexOf("<div", extra), extra);
+    expect(wrapper).toContain("order-last");
+    expect(wrapper).toContain("lg:order-none");
+  });
+});
