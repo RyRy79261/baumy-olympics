@@ -280,8 +280,11 @@ describe("onRelease", () => {
 
 describe("heardNothing", () => {
   it("drops a clip only when a running meter never rose above silence", () => {
-    expect(heardNothing(0, true)).toBe(true);
+    expect(heardNothing(0.001, true)).toBe(true);
     expect(heardNothing(SILENCE_LEVEL - 0.001, true)).toBe(true);
+    // Exactly 0 the whole time: a dead meter (some iOS versions report
+    // running audio that reads flat), not a silent room. Send it.
+    expect(heardNothing(0, true)).toBe(false);
     expect(heardNothing(SILENCE_LEVEL, true)).toBe(false);
     expect(heardNothing(0.4, true)).toBe(false);
     // A meter that never ran (suspended audio on iOS) proves nothing.
