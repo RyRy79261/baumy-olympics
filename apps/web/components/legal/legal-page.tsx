@@ -66,6 +66,19 @@ export function LegalPage({
   );
 }
 
+/**
+ * A section title as its anchor id: "How long we keep it" →
+ * `how-long-we-keep-it`, so a help answer can link to `/privacy#…` (issue
+ * #142). Lower case, letters and digits only, words joined by hyphens.
+ */
+export function legalAnchor(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 /** One framed section of a legal page, with readable body text. */
 export function LegalSection({
   title,
@@ -75,7 +88,7 @@ export function LegalSection({
   children: ReactNode;
 }) {
   return (
-    <Card title={title}>
+    <Card id={legalAnchor(title)} title={title} className="scroll-mt-6">
       <div className="flex flex-col gap-3 text-lg leading-relaxed [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-6">
         {children}
       </div>

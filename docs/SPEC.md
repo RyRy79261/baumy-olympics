@@ -148,6 +148,15 @@ Added 2026-10-02 (issue #133). Owner: "copy camp-404's feedback system" (camp-40
 - **System status** (`/settings/system`, admins only; anyone else gets a 404, and Settings links to it only for admins): Database, Email (Resend), Baumy's brain, Google Calendar, Claude, Groq, Blob and Bug reports, each as configured or not and answering or not, with what to change. "Configured" is decided by the same function the integration uses. The live checks are reads that cost nothing: `select 1`, brain's shopping list (through its cache), one hour of the calendar, Claude's and Groq's model lists, and the tracker repo; Resend (a send-only key cannot be checked without sending) and Blob (every call is billed) are not called. Each check has a 5-second timeout. The page names env vars, never their values, and keeps an HTTP status and a reason word from a failure, never a provider's text (`lib/system/status.ts`, `probe.ts`).
 - **E2E:** under `E2E_TEST_MODE=1` reports go to an in-memory tracker (`lib/integrations/github-memory.ts`) that `GET /api/test/github` reads back, and the status page calls no outside service (each shows "Test fake").
 
+### 3.8 Help corpus
+
+Added 2026-10-02 (issue #142). Baumy should be able to explain how the app works, from words that stay true to the code. Members only (§12 decision 25).
+
+- **The manual** is `docs/manual/NN-<slug>.md`: hand-written pages in plain English for housemates, each opening with frontmatter (`slug`, `title`, `audience` `member` or `admin`, `url` the in-app page it is about, `covers` the code it explains). Numbers are `{{NAME}}` placeholders filled from the constants the code uses (`apps/web/lib/help/constants.ts`, the way `/privacy` reads its own); an unknown placeholder, or a constant no page uses, fails the build. Security internals (rate limits, PIN lockout) stay out.
+- **The corpus** (`apps/web/lib/help/corpus.ts`) is the manual, then "What Baumy can do" (generated from `toolSpecs("ai")`: each action's title and description, whether Baumy answers or proposes a card, admin-only, own-word-only and whether the kitchen screen asks for a PIN, then the app-only actions by title), then every section of `/privacy` and `/terms`, read from the pages' own element trees so their constants flow through. Each `LegalSection` has an anchor id from its title (`/privacy#how-long-we-keep-it`). Nothing comes from the database.
+- `pnpm help:corpus` writes `docs/help-corpus.generated.md`; `corpus.test.ts` fails while it is out of date, and checks that every `ai` action is listed, every `covers` path exists, every link is a page the app has and every anchor resolves.
+- Reading it (`read_help`) and the members' "what do you keep about me" (`get_my_data`) are later issues.
+
 ---
 
 ## 4. Scoring rules (ruleset v1)
@@ -901,6 +910,10 @@ Decided 2026-10-01 (issue #127):
 Decided 2026-10-02 (issue #135, ADR 0007):
 
 23. **Confirm it's you with any way in, like GitHub's sudo mode.** Owner: creating a service token "asks for the password again. It should accept whatever authentication the member has". One dialog offers the member's own methods (passkey, two-factor code, Sign in with Baumy, password, Google), and a success lets that session make sensitive changes for 10 minutes without being asked again (§6.2).
+
+Decided 2026-10-02 (issue #142):
+
+25. **Help is for members only.** Asked whether Baumy should also answer strangers' questions about the app on a public endpoint (option A of the help-bot research), the owner chose option B: members only, with no public help endpoint. The help corpus (§3.8) is read by members' Baumy (the in-app command, brain, MCP), never by an anonymous route. (Numbered 25: two decisions of 2026-10-02 both took 23, and the auth fix of PR #148 takes 24.)
 
 Still open:
 
