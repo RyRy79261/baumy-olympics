@@ -209,10 +209,50 @@ describe("set_kiosk_pin", () => {
   });
 });
 
+/** A member's session with a row and an open "Confirm it's you" window. */
+async function confirmedSession(memberId: string, now = FIXED_NOW) {
+  const actor = await sessionWithRow(memberId);
+  await grantStepUp(db(), {
+    sessionId: actor.sessionId!,
+    userId: actor.userId,
+    method: "password",
+    now,
+  });
+  return actor;
+}
+
 describe("create_telegram_link_code", () => {
+  it("needs 'Confirm it's you': a stolen session cannot link its own Telegram", async () => {
+    // Linking adds a way in (Sign in with Baumy) and a way to confirm: a
+    // session without a window gets no code (the critic's review of #148).
+    const me = await seedMember(db());
+    const actor = await sessionWithRow(me);
+    await expect(
+      runAction("create_telegram_link_code", {}, ctxFor(actor)),
+    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    // Signed in a minute ago proves nothing either (and this one has no
+    // session row at all, so it reads as signed out).
+    await expect(
+      runAction("create_telegram_link_code", {}, ctxFor(signedIn(me, 1))),
+    ).resolves.toMatchObject({ ok: false });
+    expect(await t.db().select().from(telegramLinkCodes)).toEqual([]);
+    expect(await t.db().select().from(auditEvents)).toEqual([]);
+
+    await grantStepUp(db(), {
+      sessionId: actor.sessionId!,
+      userId: actor.userId,
+      method: "passkey",
+      now: FIXED_NOW,
+    });
+    await expect(
+      runAction("create_telegram_link_code", {}, ctxFor(actor)),
+    ).resolves.toMatchObject({ ok: true });
+    expect(await t.db().select().from(telegramLinkCodes)).toHaveLength(1);
+  });
+
   it("shows the code once and stores only its hash, for 10 minutes", async () => {
     const me = await seedMember(db());
-    const ctx = ctxFor(sessionActor(me));
+    const ctx = ctxFor(await confirmedSession(me));
     const res = await runAction("create_telegram_link_code", {}, ctx);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -286,7 +326,7 @@ describe("get_telegram_link_status", () => {
     const res = await runAction(
       "create_telegram_link_code",
       {},
-      ctxFor(sessionActor(memberId), { now }),
+      ctxFor(await confirmedSession(memberId, now), { now }),
     );
     if (!res.ok || !res.data.code) throw new Error("no code");
     return res.data.code;
