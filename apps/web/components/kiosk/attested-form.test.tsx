@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ActionResult } from "@/lib/actions/result";
@@ -107,6 +107,56 @@ describe("AttestedForm", () => {
     );
     expect(el.querySelector('[data-testid="no-pin-notice"]')).not.toBeNull();
     expect(pad(el)).toBeNull();
+  });
+
+  it("keeps a typed dispute reason when the no-PIN help replaces the pad", async () => {
+    const action = vi.fn(async () => NEEDS_PIN);
+    function Dispute() {
+      // Controlled, as the claim list's dispute form is.
+      const [reason, setReason] = useState("");
+      return (
+        <AttestedForm
+          action={action}
+          label="Send dispute"
+          pinLabel="Charl's PIN"
+          fields={
+            <textarea
+              name="reason"
+              aria-label="Why was it not done?"
+              value={reason}
+              onChange={(e) => setReason(e.currentTarget.value)}
+            />
+          }
+        />
+      );
+    }
+    const el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    await act(async () =>
+      root!.render(
+        <ActingPinProvider value={{ name: "Charl", hasPin: false }}>
+          <Dispute />
+        </ActingPinProvider>,
+      ),
+    );
+    const box = el.querySelector("textarea")!;
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )!.set!;
+      set.call(box, "Still dirty");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(el.querySelector('[data-testid="no-pin-notice"]')).not.toBeNull();
+    expect(el.querySelector("textarea")!.value).toBe("Still dirty");
+    const close = [...el.querySelectorAll("button")].find(
+      (b) => b.textContent === "Close",
+    )!;
+    await act(async () => close.click());
+    expect(el.querySelector("textarea")!.value).toBe("Still dirty");
   });
 
   it("asks nothing for an action that needs no PIN", async () => {
