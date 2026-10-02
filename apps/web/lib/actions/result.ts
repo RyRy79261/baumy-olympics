@@ -22,6 +22,11 @@ export type PlatformErrorCode =
   | "ATTESTATION_FAILED"
   /** The member's kiosk PIN is locked after 10 failures in 24h. */
   | "PIN_LOCKED"
+  /**
+   * The kiosk's acting member has never set a personal PIN, so nothing that
+   * needs one can be done as them until they set it (issue #145).
+   */
+  | "PIN_NOT_SET"
   | "RATE_LIMITED"
   /** The request id was already used for a different input. */
   | "IDEMPOTENCY_CONFLICT"

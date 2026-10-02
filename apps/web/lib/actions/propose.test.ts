@@ -82,10 +82,11 @@ describe("proposeAction", () => {
       kiosk,
       choices,
     );
-    expect(forSam).toMatchObject({ valid: true, needsPin: true });
+    // Vouching needs no PIN on the kiosk (issue #145).
+    expect(forSam).toMatchObject({ valid: true, needsPin: false });
     expect(forSam.preview).toMatch(/^Log Trash for Sam/);
 
-    // Sam's claim, which Ryan confirms: attested, so the kiosk needs a PIN.
+    // Sam's claim: Ryan confirms it with no PIN, and disputes it with one.
     const logged = await runAction(
       "log_completion",
       { choreId: trash },
@@ -98,14 +99,45 @@ describe("proposeAction", () => {
       kiosk,
       choices,
     );
-    expect(confirm).toMatchObject({ valid: true, needsPin: true });
+    expect(confirm).toMatchObject({ valid: true, needsPin: false });
+    const dispute = await proposeAction(
+      "dispute_completion",
+      { completionId: logged.data.completionId, reason: "Still full" },
+      kiosk,
+      choices,
+    );
+    expect(dispute).toMatchObject({ valid: true, needsPin: true });
     const phone = await proposeAction(
-      "confirm_completion",
-      { completionId: logged.data.completionId },
+      "dispute_completion",
+      { completionId: logged.data.completionId, reason: "Still full" },
       ai(ctxFor(sessionActor(ryan))),
       choices,
     );
     expect(phone.needsPin).toBe(false);
+  });
+
+  it("asks no PIN on the kiosk for a note or an event (issue #145)", async () => {
+    const kiosk = ai(ctxFor(kioskActor(ryan)));
+    const note = await proposeAction(
+      "create_note",
+      { title: "Bins out" },
+      kiosk,
+      choices,
+    );
+    expect(note).toMatchObject({ valid: true, needsPin: false });
+    const event = await proposeAction(
+      "create_event",
+      {
+        title: "Dinner",
+        kind: "timed",
+        date: "2027-01-15",
+        startTime: "19:00",
+        endTime: "20:30",
+      },
+      kiosk,
+      choices,
+    );
+    expect(event).toMatchObject({ valid: true, needsPin: false });
   });
 
   it("marks input that fails the schema as invalid, with the issues", async () => {

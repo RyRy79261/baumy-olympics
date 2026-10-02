@@ -129,15 +129,22 @@ async function runEvent(ctx: ActionCtx, id: string, event: VerificationEvent) {
   };
 }
 
-/** The kiosk needs the member's PIN for every one of these. */
-const ATTESTED: Gate = "attested";
+// The kiosk's PIN scope (owner ruling 2026-10-02, SPEC §12 decision 26,
+// issue #145): only a dispute asks the acting member's PIN. Confirming,
+// undoing, withdrawing and conceding run as the member picked on the kiosk,
+// with no PIN. Each is one constant, so the ruling flips in one line.
+
+/** Confirm, undo, withdraw and concede: no PIN on the kiosk. */
+const CLAIM_GATE: Gate = "member";
+/** Dispute: the kiosk needs the acting member's PIN. */
+const DISPUTE_GATE: Gate = "attested";
 
 /** What confirm, undo, withdraw and concede share: only the claim's id. */
 const byId = {
   kind: "write",
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: ATTESTED,
+  requires: CLAIM_GATE,
   // Never on someone's behalf: it is the member's own word (issue #70).
   ownWordOnly: true,
   input: z.strictObject({ completionId }),
@@ -217,7 +224,7 @@ export const disputeCompletion = defineAction({
   kind: "write",
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: ATTESTED,
+  requires: DISPUTE_GATE,
   ownWordOnly: true,
   input: z.strictObject({
     completionId,
