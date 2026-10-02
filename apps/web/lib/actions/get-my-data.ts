@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import type { CompletionStatus } from "@baumy/core";
 import {
@@ -23,10 +23,10 @@ import { fail } from "./result";
 // "What do you keep about me?" (issue #144): a self-only read. It needs the
 // member's OWN session (`session`: never the kiosk, where the room would see
 // it, nor MCP or brain), and has no member field, so it only ever answers
-// about the caller. It returns counts and dates, never text anyone wrote,
-// never an IP address or a user agent, and nothing about anyone else. The
-// retention rules come from lib/privacy/retention.ts, the privacy page's own
-// numbers.
+// about the caller. It returns counts, dates and names (their own display
+// name, their connected apps'), never text anyone wrote, never an IP address
+// or a user agent, and nothing about anyone else. The retention rules come
+// from lib/privacy/retention.ts, the privacy page's own numbers.
 
 export interface MyDataView {
   account: {
@@ -77,7 +77,7 @@ export const getMyData = defineAction({
   name: "get_my_data",
   title: "What Baumy keeps about me",
   description:
-    "What the app stores about the member asking, as counts and dates: how they sign in, their signed-in devices, their profile, their completions, notes (deleted ones are kept), proof photos and when each is deleted, audit-log entries naming them, their AI usage and connected apps, plus the retention rules. Only ever about the asker; it never shows IP addresses or anyone else's data. Use it for 'what do you keep about me?'.",
+    "What the app stores about the member asking, as counts, dates and names: how they sign in, their signed-in devices, their profile, their completions, notes (deleted ones are kept), proof photos and when each is deleted, audit-log entries naming them, their AI usage and connected apps, plus the retention rules. Only ever about the asker; it never shows IP addresses or anyone else's data. Use it for 'what do you keep about me?'.",
   consent: "See a summary of what Baumy keeps about you",
   kind: "read",
   risk: "safe",
@@ -112,7 +112,12 @@ export const getMyData = defineAction({
           telegramUserId: members.telegramUserId,
         })
         .from(members)
-        .where(eq(members.id, memberId)),
+        .where(
+          and(
+            eq(members.id, memberId),
+            eq(members.householdId, ctx.householdId),
+          ),
+        ),
       findAuthUser(ctx.db, userId),
       signInMethods(ctx.db, userId),
       listUserSessions(ctx.db, userId, ctx.now),
