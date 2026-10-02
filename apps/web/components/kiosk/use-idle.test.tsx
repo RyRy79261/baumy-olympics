@@ -71,6 +71,23 @@ describe("useIdle", () => {
     expect(onIdle).toHaveBeenCalledOnce();
   });
 
+  it("starts the wait again when a hold lets go (issue #132)", () => {
+    for (const release of ["pointerup", "touchend"]) {
+      const onIdle = vi.fn();
+      mount(true, onIdle);
+      // A finger down at 0s, held for 50s, then lifted.
+      window.dispatchEvent(new Event("pointerdown"));
+      wait(50_000);
+      window.dispatchEvent(new Event(release));
+      wait(59_000);
+      expect(onIdle).not.toHaveBeenCalled();
+      wait(1_000);
+      expect(onIdle).toHaveBeenCalledOnce();
+      act(() => root?.unmount());
+      root = null;
+    }
+  });
+
   it("counts down the last ten seconds, and a touch cancels it", () => {
     const onIdle = vi.fn();
     mount(true, onIdle);

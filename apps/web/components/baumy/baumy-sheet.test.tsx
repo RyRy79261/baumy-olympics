@@ -23,6 +23,8 @@ const { BaumySheet } = await import("./baumy-sheet");
 const { MIN_CLIP_MS } = await import("@/lib/ai/voice");
 const NOW = Date.parse("2026-09-28T10:00:00.000Z");
 const { closeOpenDialogs } = await import("@/components/kiosk/idle-reset");
+const { KIOSK_IDLE_MS } = await import("@/lib/kiosk/constants");
+const { isKioskBusy } = await import("@/lib/kiosk/busy");
 
 beforeAll(() => {
   (
@@ -39,13 +41,17 @@ beforeAll(() => {
 
 class FakeRecorder {
   static isTypeSupported = (t: string) => t.startsWith("audio/webm");
+  /** Every recorder made, the latest last. */
+  static made: FakeRecorder[] = [];
   state: "inactive" | "recording" = "inactive";
   ondataavailable: ((e: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
   constructor(
     public stream: unknown,
     public opts: { mimeType: string },
-  ) {}
+  ) {
+    FakeRecorder.made.push(this);
+  }
   start() {
     this.state = "recording";
   }
@@ -324,6 +330,31 @@ describe("BaumySheet on the kitchen dashboard", () => {
     [...document.querySelectorAll("button")].find(
       (b) => b.textContent?.trim() === name,
     )!;
+  const holdButtons = () =>
+    document.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="hold-to-talk"]',
+    );
+  const hold = () => holdButtons()[0]!;
+  // React's onPointerDown/Up read the event's type and button.
+  const press = (el: HTMLElement) =>
+    act(() => {
+      el.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true, button: 0 }),
+      );
+    });
+  const lift = (el: HTMLElement) =>
+    act(() => {
+      el.dispatchEvent(new MouseEvent("pointerup", { bubbles: true }));
+    });
+  /** Tap the cat, hold, speak, let go. */
+  async function talkToCat() {
+    await act(async () => cat().click());
+    await settle();
+    press(hold());
+    await settle(300);
+    lift(hold());
+    await settle();
+  }
   const heardAndAnswered = (reply: string, proposals: unknown[]) =>
     fetchMock.mockImplementation(async (url: string) =>
       url === "/api/ai/transcribe"
@@ -349,7 +380,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(bubble()).toBeNull();
   });
 
-  it("asks who is talking while nobody is, then is ready once someone is", () => {
+  it("asks who is talking while nobody is, then holds to talk once someone is", async () => {
     mountCat({ who: <button type="button">Kim</button> });
     act(() => cat().click());
     expect(bubble()!.dataset.mode).toBe("who");
@@ -359,26 +390,50 @@ describe("BaumySheet on the kitchen dashboard", () => {
     const list = bubble()!.querySelector('[data-testid="who-list"]')!;
     expect(list.className).toContain("overflow-y-auto");
     expect(list.className).toMatch(/max-h-/);
+    expect(getUserMedia).not.toHaveBeenCalled();
     act(() =>
       root!.render(
         <BaumySheet kiosk cat voice actingName="Kim" who={<i>Kim</i>} />,
       ),
     );
-    expect(bubble()!.dataset.mode).toBe("ready");
+    expect(bubble()!.dataset.mode).toBe("talk");
     expect(bubble()!.textContent).toContain("Hi Kim.");
-    expect(button("Start talking")).toBeDefined();
+    // Tapped in: the microphone opens, ready for the hold.
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    await settle();
+    expect(hold().textContent).toBe("Hold to talk");
   });
 
-  it("listens, shows what it understood, and does it on Confirm all", async () => {
+  it("asks for the microphone inside the tap, before the hold (issue #132)", async () => {
+    mountCat({ actingName: "Ryan" });
+    // iOS Safari only starts audio inside a user gesture: the tap itself
+    // asks, synchronously, so the hold never waits on a prompt.
+    act(() => cat().click());
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(bubble()!.dataset.mode).toBe("talk");
+    expect(hold().dataset.state).toBe("opening");
+    await settle();
+    expect(hold().dataset.state).toBe("idle");
+    expect(hold().textContent).toBe("Hold to talk");
+    expect(bubble()!.textContent).toContain("Hold the button and talk.");
+  });
+
+  it("listens while held, answers on release, does it on Confirm all, and stays", async () => {
+    const track = { stop: vi.fn() };
+    getUserMedia.mockResolvedValue({ getTracks: () => [track] });
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
     await act(async () => cat().click());
     await settle();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    press(hold());
     expect(bubble()!.dataset.mode).toBe("listening");
-    expect(bubble()!.textContent).toContain("Mrrp? I'm listening");
-    expect(getUserMedia).toHaveBeenCalled();
+    expect(bubble()!.textContent).toContain("Mrrp? I’m listening");
+    expect(hold().getAttribute("aria-pressed")).toBe("true");
+    expect(hold().textContent).toBe("Release to send");
     await settle(300);
-    await act(async () => button("Done talking").click());
+    lift(hold());
     await settle();
     await settle();
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
@@ -388,19 +443,81 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(bubble()!.dataset.mode).toBe("answer");
     expect(bubble()!.textContent).toContain("Got it! I'll do this:");
     expect(bubble()!.textContent).toContain("Log Bins for Ryan: +10");
+    // Cards wait on Confirm all or Cancel: no talking over them.
+    expect(holdButtons()).toHaveLength(0);
     await act(async () => button("Confirm all").click());
     await settle(10);
     expect(fetchMock.mock.calls.at(-1)![0]).toBe("/api/actions/run");
     expect(refresh).toHaveBeenCalled();
-    // Done and scored: the cat says so instead.
-    expect(bubble()!.dataset.mode).toBe("says");
-    expect(bubble()!.textContent).toBe("Purrfect. +10 for Ryan ✦");
+    // Done and scored: the cat says so, in the bubble, and listens again.
+    expect(bubble()!.dataset.mode).toBe("answer");
+    expect(bubble()!.textContent).toContain("Purrfect. +10 for Ryan ✦");
+    expect(hold().textContent).toBe("Hold to talk");
+    // The microphone stayed open between the clips: asked for once.
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(track.stop).not.toHaveBeenCalled();
+
+    // A second hold, straight from the answer.
+    press(hold());
+    expect(bubble()!.dataset.mode).toBe("listening");
+    expect(bubble()!.textContent).not.toContain("Purrfect");
+    await settle(300);
+    // The finger lifts off whatever is under it now.
+    await act(async () =>
+      window.dispatchEvent(new MouseEvent("pointerup", { bubbles: true })),
+    );
+    await settle();
+    await settle();
+    expect(
+      fetchMock.mock.calls.filter((c) => c[0] === "/api/ai/transcribe"),
+    ).toHaveLength(2);
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+
+    // A tap on the cat closes it and turns the microphone off.
+    await act(async () => cat().click());
+    expect(bubble()).toBeNull();
+    expect(track.stop).toHaveBeenCalled();
+  });
+
+  it("says to hold for a hold too short to hear, and stays", async () => {
+    heardAndAnswered("Bins it is.", [proposal]);
+    mountCat({ actingName: "Ryan" });
+    await act(async () => cat().click());
+    await settle();
+    press(hold());
+    lift(hold());
+    await settle();
+    expect(bubble()!.dataset.mode).toBe("talk");
+    expect(bubble()!.textContent).toContain("Hold the button while you speak.");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("records nothing for a hold let go before the microphone opened", async () => {
+    let grant: (s: unknown) => void = () => undefined;
+    getUserMedia.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          grant = resolve;
+        }),
+    );
+    heardAndAnswered("Bins it is.", [proposal]);
+    mountCat({ actingName: "Ryan" });
+    act(() => cat().click());
+    press(hold());
+    lift(hold());
+    await act(async () => grant({ getTracks: () => [{ stop() {} }] }));
+    await settle();
+    expect(bubble()!.dataset.mode).toBe("talk");
+    expect(hold().dataset.state).toBe("idle");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("stops listening and closes when a reminder or the screensaver covers the screen", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
     await act(async () => cat().click());
+    await settle();
+    press(hold());
     await settle(300);
     expect(bubble()!.dataset.mode).toBe("listening");
     // What the reminder and the screensaver do when they come up.
@@ -422,10 +539,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
           }),
     );
     mountCat({ actingName: "Ryan" });
-    await act(async () => cat().click());
-    await settle(300);
-    await act(async () => button("Done talking").click());
-    await settle();
+    await talkToCat();
     expect(bubble()!.dataset.mode).toBe("thinking");
     expect(fetchMock.mock.calls.map((c) => c[0])).toContain("/api/ai/command");
     await act(async () => closeOpenDialogs(document));
@@ -467,10 +581,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
           }),
     );
     mountCat({ actingName: "Ryan" });
-    await act(async () => cat().click());
-    await settle(300);
-    await act(async () => button("Done talking").click());
-    await settle();
+    await talkToCat();
     expect(bubble()!.dataset.mode).toBe("thinking");
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
       "/api/ai/transcribe",
@@ -490,22 +601,21 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(document.body.textContent).not.toContain("I did the bins");
   });
 
-  it("does nothing on Cancel, and Type instead opens the sheet", async () => {
+  it("does nothing on Cancel and listens again; Type instead opens the sheet", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });
-    await act(async () => cat().click());
-    await settle(300);
-    await act(async () => button("Done talking").click());
-    await settle();
+    await talkToCat();
     await settle();
     await act(async () => button("Cancel").click());
-    expect(bubble()).toBeNull();
     expect(fetchMock.mock.calls.map((c) => c[0])).not.toContain(
       "/api/actions/run",
     );
-    // Tapping again listens again; Type instead drops the clip.
-    await act(async () => cat().click());
-    await settle();
+    // Still on the bubble, ready for the next hold.
+    expect(bubble()!.dataset.mode).toBe("talk");
+    expect(bubble()!.textContent).not.toContain("Log Bins for Ryan");
+    expect(hold().textContent).toBe("Hold to talk");
+    // Type instead drops a clip being recorded.
+    press(hold());
     expect(bubble()!.dataset.mode).toBe("listening");
     await act(async () => button("Type instead").click());
     expect(bubble()).toBeNull();
@@ -516,17 +626,59 @@ describe("BaumySheet on the kitchen dashboard", () => {
     ).toHaveLength(1);
   });
 
-  it("answers without proposals in the bubble, closed by OK", async () => {
+  it("answers without proposals in the bubble, with Hold to talk again, closed by Done", async () => {
+    heardAndAnswered("Ryan is winning.", []);
+    mountCat({ actingName: "Ryan" });
+    await talkToCat();
+    await settle();
+    expect(bubble()!.dataset.mode).toBe("answer");
+    expect(bubble()!.textContent).toContain("Ryan is winning.");
+    expect(hold().textContent).toBe("Hold to talk");
+    await act(async () => button("Done").click());
+    expect(bubble()).toBeNull();
+  });
+
+  it("shows a failed transcription in the bubble, and lets them hold again", async () => {
+    fetchMock.mockImplementation(async () =>
+      json({
+        ok: false,
+        code: "UNAVAILABLE",
+        message: "Baumy can't listen right now.",
+      }),
+    );
+    mountCat({ actingName: "Ryan" });
+    await talkToCat();
+    await settle();
+    expect(bubble()!.dataset.mode).toBe("answer");
+    expect(bubble()!.textContent).toContain("Baumy can't listen right now.");
+    expect(hold().textContent).toBe("Hold to talk");
+  });
+
+  it("toggles with Enter or Space: a click with no pointer", async () => {
     heardAndAnswered("Ryan is winning.", []);
     mountCat({ actingName: "Ryan" });
     await act(async () => cat().click());
+    await settle();
+    // element.click() has detail 0, as a keyboard's activation does.
+    act(() => hold().click());
+    expect(bubble()!.dataset.mode).toBe("listening");
     await settle(300);
-    await act(async () => button("Done talking").click());
+    act(() => hold().click());
     await settle();
     await settle();
     expect(bubble()!.textContent).toContain("Ryan is winning.");
-    await act(async () => button("OK").click());
+  });
+
+  it("falls back to the sheet when the microphone is blocked", async () => {
+    getUserMedia.mockRejectedValue(
+      new DOMException("Permission denied", "NotAllowedError"),
+    );
+    mountCat({ actingName: "Ryan" });
+    await act(async () => cat().click());
+    await settle();
     expect(bubble()).toBeNull();
+    expect(document.querySelector("dialog")!.hasAttribute("open")).toBe(true);
+    expect(document.body.textContent).toContain("The microphone is blocked");
   });
 
   it("confirms every valid card in order, with the PIN only where needed, never the invalid one (issue #107)", async () => {
@@ -747,6 +899,197 @@ describe("BaumySheet on the kitchen dashboard", () => {
     // Opening it again clears it.
     act(() => cat().click());
     expect(bubble()).toBeNull();
+  });
+
+  // Issue #132 review: the microphone really goes off, the minute is not
+  // spent while held or answering, and a hold keeps its element.
+  describe("the microphone and the minute", () => {
+    let track: { stop: ReturnType<typeof vi.fn> };
+    beforeEach(() => {
+      track = { stop: vi.fn() };
+      getUserMedia.mockResolvedValue({ getTracks: () => [track] });
+      FakeRecorder.made = [];
+    });
+    const latestRecorder = () => FakeRecorder.made.at(-1)!;
+    /** Move fake timers on, letting promises settle in between. */
+    const advance = (ms: number) =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(ms);
+      });
+
+    it("turns it off when a reminder or the screensaver covers a hold", async () => {
+      mountCat({ actingName: "Ryan" });
+      await act(async () => cat().click());
+      await settle();
+      press(hold());
+      expect(latestRecorder().state).toBe("recording");
+      expect(track.stop).not.toHaveBeenCalled();
+      await act(async () => closeOpenDialogs(document));
+      expect(track.stop).toHaveBeenCalled();
+      expect(latestRecorder().state).toBe("inactive");
+      expect(isKioskBusy()).toBe(false);
+    });
+
+    it("turns it off when the page goes away mid-hold", async () => {
+      mountCat({ actingName: "Ryan" });
+      await act(async () => cat().click());
+      await settle();
+      press(hold());
+      expect(latestRecorder().state).toBe("recording");
+      expect(isKioskBusy()).toBe(true);
+      act(() => root!.unmount());
+      root = null;
+      expect(track.stop).toHaveBeenCalled();
+      expect(latestRecorder().state).toBe("inactive");
+      expect(isKioskBusy()).toBe(false);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("turns it off after the bubble's idle minute", async () => {
+      vi.useFakeTimers();
+      heardAndAnswered("Ryan is winning.", []);
+      mountCat({ actingName: "Ryan" });
+      await act(async () => cat().click());
+      await advance(0);
+      press(hold());
+      await advance(1_000);
+      lift(hold());
+      await advance(0);
+      await advance(0);
+      expect(bubble()!.textContent).toContain("Ryan is winning.");
+      expect(track.stop).not.toHaveBeenCalled();
+      await advance(KIOSK_IDLE_MS + 1_000);
+      expect(bubble()).toBeNull();
+      expect(track.stop).toHaveBeenCalled();
+      expect(latestRecorder().state).toBe("inactive");
+    });
+
+    it("keeps the answer after a long hold and a slow reply, and counts the minute from then", async () => {
+      vi.useFakeTimers();
+      fetchMock.mockImplementation(async (url: string) =>
+        url === "/api/ai/transcribe"
+          ? new Promise<Response>((resolve) =>
+              setTimeout(
+                () => resolve(json({ ok: true, data: { text: "who?" } })),
+                30_000,
+              ),
+            )
+          : json({
+              ok: true,
+              data: {
+                reply: "Ryan is winning.",
+                proposals: [],
+                choices: { members: [], chores: [] },
+              },
+            }),
+      );
+      mountCat({ actingName: "Ryan" });
+      await act(async () => cat().click());
+      await advance(0);
+      // Held for 44 seconds, under the 45-second cut, then 30 seconds of
+      // listening back: well past the minute since the tap.
+      press(hold());
+      await advance(44_000);
+      expect(bubble()!.dataset.mode).toBe("listening");
+      expect(isKioskBusy()).toBe(true);
+      lift(hold());
+      await advance(30_000);
+      await advance(0);
+      expect(bubble()!.dataset.mode).toBe("answer");
+      expect(bubble()!.textContent).toContain("Ryan is winning.");
+      expect(isKioskBusy()).toBe(false);
+      // The minute starts with the answer.
+      await advance(KIOSK_IDLE_MS - 2_000);
+      expect(bubble()!.textContent).toContain("Ryan is winning.");
+      await advance(3_000);
+      expect(bubble()).toBeNull();
+    });
+
+    it("keeps the same button under the finger when a hold starts on an answer", async () => {
+      heardAndAnswered("Ryan is winning.", []);
+      mountCat({ actingName: "Ryan" });
+      await talkToCat();
+      await settle();
+      expect(bubble()!.dataset.mode).toBe("answer");
+      const before = hold();
+      press(before);
+      expect(bubble()!.dataset.mode).toBe("listening");
+      expect(hold()).toBe(before);
+      expect(before.isConnected).toBe(true);
+    });
+
+    describe("with a level meter", () => {
+      let samples = 128;
+      const closed = vi.fn();
+      class FakeAudioContext {
+        state = "running";
+        resume = () => Promise.resolve();
+        close = () => {
+          closed();
+          this.state = "closed";
+          return Promise.resolve();
+        };
+        createMediaStreamSource = () => ({ connect: () => undefined });
+        createAnalyser = () => ({
+          fftSize: 64,
+          getByteTimeDomainData: (buf: Uint8Array) => {
+            for (let i = 0; i < buf.length; i++) {
+              buf[i] = i % 2 ? samples : 256 - samples;
+            }
+          },
+        });
+      }
+      beforeEach(() => {
+        closed.mockReset();
+        vi.stubGlobal("AudioContext", FakeAudioContext);
+        vi.stubGlobal(
+          "requestAnimationFrame",
+          (cb: () => void) => setTimeout(cb, 16) as unknown as number,
+        );
+        vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
+      });
+
+      it("drops a clip it heard only silence in", async () => {
+        samples = 128;
+        heardAndAnswered("Ryan is winning.", []);
+        mountCat({ actingName: "Ryan" });
+        await talkToCat();
+        expect(bubble()!.dataset.mode).toBe("talk");
+        expect(bubble()!.textContent).toContain(
+          "I didn't hear anything — hold and speak.",
+        );
+        expect(fetchMock).not.toHaveBeenCalled();
+      });
+
+      it("sends a clip with a voice in it, the bars rising", async () => {
+        samples = 200;
+        heardAndAnswered("Ryan is winning.", []);
+        mountCat({ actingName: "Ryan" });
+        await act(async () => cat().click());
+        await settle();
+        press(hold());
+        await settle(100);
+        const bars = hold().querySelector<HTMLElement>("[data-level]")!;
+        expect(Number(bars.dataset.level)).toBeGreaterThan(0);
+        await settle(200);
+        lift(hold());
+        await settle();
+        await settle();
+        expect(fetchMock.mock.calls.map((c) => c[0])).toContain(
+          "/api/ai/transcribe",
+        );
+      });
+
+      it("closes the meter's audio when the bubble closes before any microphone", () => {
+        mountCat({ who: <button type="button">Kim</button> });
+        act(() => cat().click());
+        expect(bubble()!.dataset.mode).toBe("who");
+        expect(getUserMedia).not.toHaveBeenCalled();
+        act(() => cat().click());
+        expect(bubble()).toBeNull();
+        expect(closed).toHaveBeenCalled();
+      });
+    });
   });
 });
 

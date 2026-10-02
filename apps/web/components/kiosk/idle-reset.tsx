@@ -8,6 +8,7 @@ import {
   KIOSK_IDLE_MS,
   KIOSK_IDLE_WARN_MS,
 } from "@/lib/kiosk/constants";
+import { useKioskBusy } from "@/lib/kiosk/busy";
 import { useIdle } from "./use-idle";
 
 /**
@@ -22,8 +23,11 @@ export function IdleReset({ memberPicked }: { memberPicked: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const away = pathname !== "/kiosk";
+  // Mid-hold or mid-reply with Baumy (issue #132): wait, and count the
+  // minute from when it ends.
+  const busy = useKioskBusy();
   const secondsLeft = useIdle(
-    memberPicked || away,
+    (memberPicked || away) && !busy,
     KIOSK_IDLE_MS,
     () => {
       closeOpenDialogs(document);

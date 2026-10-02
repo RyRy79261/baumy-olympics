@@ -12,10 +12,25 @@ export const PREFERRED_MIME_TYPES = [
   "audio/webm",
   "audio/mp4",
   "audio/mp4;codecs=mp4a.40.2",
+  "audio/ogg;codecs=opus",
 ] as const;
 
 /** A clip is cut off here, well under the route's 20 MB. */
-export const MAX_RECORDING_MS = 60_000;
+export const MAX_RECORDING_MS = 45_000;
+
+/**
+ * Below this peak level, a clip held nothing but silence. Only trusted when
+ * the meter was really listening (iOS can leave its audio suspended, which
+ * reads as silence).
+ */
+export const SILENCE_LEVEL = 0.03;
+
+/** A clip to drop unheard: the meter ran, and never rose above silence. */
+export function heardNothing(peak: number, meterRan: boolean): boolean {
+  return meterRan && peak < SILENCE_LEVEL;
+}
+
+export const SILENT_CLIP = "I didn't hear anything — hold and speak.";
 
 /** A press shorter than this is a tap: recording goes on until a second tap. */
 export const HOLD_MS = 350;
@@ -48,6 +63,110 @@ export function canRecord(
     return false;
   }
   return pickMimeType(win.MediaRecorder.isTypeSupported) !== null;
+}
+
+/**
+ * The type a finished clip is sent as: what the recorder says it wrote
+ * (Safari on iPad says `audio/mp4`), else the type we asked it for. After
+ * camp-404 `apps/web/components/voice/use-voice-recorder.ts`, which labels
+ * the clip `mimeType ?? rec.mimeType`.
+ */
+export function clipType(asked: string, written: string | undefined): string {
+  const w = written?.trim();
+  return w ? w : asked;
+}
+
+// ------------------------------------------------- the microphone's machine
+//
+// Hold to talk on the kitchen iPad (issue #132) splits opening the
+// microphone from recording. A tap on the cat (a click, which iOS Safari
+// counts as a user gesture) opens it, and the bubble shows "Hold to talk";
+// the hold then only starts a recorder on the stream already open, so no
+// permission prompt sits between the finger and the recording. The sheet's
+// button (voice-recorder.tsx) presses without opening first: the press
+// opens the microphone, and the clip closes it again.
+//
+// Pure, so every path is tested (voice.test.ts); use-recorder.ts runs the
+// effects each step returns.
+
+export type MicPhase =
+  /** The microphone is off. */
+  | "off"
+  /** Asking for the microphone, nobody holding (the cat's tap). */
+  | "opening"
+  /** Held before the microphone answered: record once it does. */
+  | "pressing"
+  /** Open, waiting for a hold. */
+  | "ready"
+  | "recording";
+
+export interface MicMachine {
+  phase: MicPhase;
+  /**
+   * Opened by a tap (the cat): the microphone stays open between clips,
+   * until the bubble closes. Otherwise a clip turns it off (the sheet).
+   */
+  keep: boolean;
+}
+
+export type MicEvent =
+  | { type: "open" }
+  | { type: "press" }
+  | { type: "granted" }
+  | { type: "refused" }
+  | { type: "release" }
+  | { type: "close" };
+
+export type MicEffect =
+  /** Ask for the microphone (getUserMedia). */
+  | "request"
+  /** Start a recorder on the open stream. */
+  | "record"
+  /** Stop the recorder: its clip is sent. */
+  | "stop"
+  /** Throw away any recording and turn the microphone off. */
+  | "shut";
+
+export const MIC_OFF: MicMachine = { phase: "off", keep: false };
+
+export function micStep(
+  m: MicMachine,
+  e: MicEvent,
+): { next: MicMachine; effects: MicEffect[] } {
+  const to = (phase: MicPhase, effects: MicEffect[] = [], keep = m.keep) => ({
+    next: { phase, keep },
+    effects,
+  });
+  const same = { next: m, effects: [] as MicEffect[] };
+  // Closing always shuts, even from off: the tap that asked "who's talking?"
+  // started the meter's audio before any microphone was asked for.
+  if (e.type === "close") return to("off", ["shut"], false);
+  switch (m.phase) {
+    case "off":
+      if (e.type === "open") return to("opening", ["request"], true);
+      if (e.type === "press") return to("pressing", ["request"], false);
+      return same;
+    case "opening":
+      if (e.type === "press") return to("pressing");
+      if (e.type === "granted") return to("ready");
+      if (e.type === "refused") return to("off", ["shut"], false);
+      return same;
+    case "pressing":
+      if (e.type === "granted") return to("recording", ["record"]);
+      if (e.type === "refused") return to("off", ["shut"], false);
+      // Let go before the microphone answered: the cat waits for the next
+      // hold; the sheet's button records on (it turns into tap-to-send).
+      if (e.type === "release" && m.keep) return to("opening");
+      return same;
+    case "ready":
+      if (e.type === "press") return to("recording", ["record"]);
+      return same;
+    case "recording":
+      if (e.type === "release") {
+        return m.keep ? to("ready", ["stop"]) : to("off", ["stop", "shut"]);
+      }
+      return same;
+  }
 }
 
 export type MicFailure =
