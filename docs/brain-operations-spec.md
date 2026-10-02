@@ -2225,3 +2225,4 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `dismiss_weight`: An admin action: UI only (SPEC §12 decision 10).
 - `add_shopping_items`: The shopping list is brain's own (`baumy_list_items`); brain changes it directly, and Olympics calls brain to do the same.
 - `check_off_shopping_items`: The shopping list is brain's own; brain ticks items off directly.
+- `report_bug`: Files an issue on the public bug tracker from the in-app reporter (a shake, or Settings); a report is the person's own words in the app. Tell them to shake their phone or use Settings → Bugs and feature requests.

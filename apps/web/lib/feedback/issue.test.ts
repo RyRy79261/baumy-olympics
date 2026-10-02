@@ -45,9 +45,9 @@ describe("buildFeedbackIssue", () => {
     expect(issue.title).toBe("Feature request");
     expect(issue.labels).toEqual(["type:feat", "source:in-app"]);
     expect(issue.body).toContain("on the kitchen screen");
-    expect(
-      buildFeedbackIssue({ ...base, description: "" }).title,
-    ).toBe("Bug report");
+    expect(buildFeedbackIssue({ ...base, description: "" }).title).toBe(
+      "Bug report",
+    );
   });
 
   it("defuses backtick fences so the text can't leave its code block", () => {
@@ -258,7 +258,10 @@ describe("buildFeedbackIssue", () => {
     const issue = buildFeedbackIssue({
       ...base,
       description: "Crash",
-      diagnostics: { environment: [{ label: "Online", value: "yes" }], errors: [] },
+      diagnostics: {
+        environment: [{ label: "Online", value: "yes" }],
+        errors: [],
+      },
     });
     expect(issue.body).toContain("Online: yes");
     expect(issue.body).not.toContain("Recent errors");

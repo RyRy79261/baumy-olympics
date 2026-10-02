@@ -51,7 +51,11 @@ describe("githubCreateIssue", () => {
 
   it("maps each status to a reason", async () => {
     const answer = (status: number) =>
-      githubCreateIssue(CONFIG, ISSUE, async () => new Response("{}", { status }));
+      githubCreateIssue(
+        CONFIG,
+        ISSUE,
+        async () => new Response("{}", { status }),
+      );
     await expect(answer(401)).resolves.toEqual({
       ok: false,
       reason: "invalid_token",
@@ -81,9 +85,9 @@ describe("githubCreateIssue", () => {
           reject(new Error("aborted")),
         );
       });
-    await expect(
-      githubCreateIssue(CONFIG, ISSUE, hanging, 5),
-    ).resolves.toEqual({ ok: false, reason: "timeout" });
+    await expect(githubCreateIssue(CONFIG, ISSUE, hanging, 5)).resolves.toEqual(
+      { ok: false, reason: "timeout" },
+    );
     await expect(
       githubCreateIssue(CONFIG, ISSUE, async () => {
         throw new Error("ECONNRESET");

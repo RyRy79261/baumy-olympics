@@ -13,7 +13,8 @@ import { DIAGNOSTICS_LIMITS as L, type ReportDiagnostics } from "@baumy/types";
 export type ClientError = ReportDiagnostics["errors"][number];
 
 /** Where an error came from. Only an uncaught one is offered for a report. */
-export type ErrorSource = "window.error" | "unhandledrejection" | "console.error";
+export type ErrorSource =
+  "window.error" | "unhandledrejection" | "console.error";
 
 const buffer: ClientError[] = [];
 const listeners = new Set<(error: ClientError) => void>();

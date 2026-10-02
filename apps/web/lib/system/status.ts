@@ -189,7 +189,8 @@ function check(spec: Spec, probes: Probes): IntegrationCheck {
     return {
       ...base,
       reachable: "not_checked",
-      tone: spec.core || bugs?.problem === "bad_repo" ? "attention" : "degraded",
+      tone:
+        spec.core || bugs?.problem === "bad_repo" ? "attention" : "degraded",
       detail: `Not set up. ${why}`,
     };
   }

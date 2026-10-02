@@ -265,9 +265,8 @@ describe("kioskActionAsFace", () => {
 
 describe("kioskActionInput", () => {
   it("runs structured input as the acting member, from the kiosk surface", async () => {
-    const { setGithubIssuesForTests } = await import(
-      "@/lib/integrations/github"
-    );
+    const { setGithubIssuesForTests } =
+      await import("@/lib/integrations/github");
     const { memoryGithub } = await import("@/lib/integrations/github-memory");
     setGithubIssuesForTests({
       ok: true,
@@ -290,9 +289,8 @@ describe("kioskActionInput", () => {
       expect(res).toMatchObject({ ok: true, data: { number: 1 } });
     } finally {
       setGithubIssuesForTests(null);
-      const { clearMemoryIssues } = await import(
-        "@/lib/integrations/github-memory"
-      );
+      const { clearMemoryIssues } =
+        await import("@/lib/integrations/github-memory");
       clearMemoryIssues();
     }
   });

@@ -128,7 +128,10 @@ describe("probeAll", () => {
   it("checks nothing that is not set up", async () => {
     const fetchImpl = vi.fn();
     const p = await probeAll(
-      deps({ env: { GITHUB_FEEDBACK_TOKEN: "t", GITHUB_FEEDBACK_REPO: "x" }, fetch: fetchImpl }),
+      deps({
+        env: { GITHUB_FEEDBACK_TOKEN: "t", GITHUB_FEEDBACK_REPO: "x" },
+        fetch: fetchImpl,
+      }),
     );
     expect(fetchImpl).not.toHaveBeenCalled();
     for (const id of [
@@ -205,7 +208,10 @@ describe("probeAll", () => {
       "blob",
       "bugReports",
     ] as const) {
-      expect(p[id]).toMatchObject({ configured: true, reach: { kind: "fake" } });
+      expect(p[id]).toMatchObject({
+        configured: true,
+        reach: { kind: "fake" },
+      });
     }
   });
 

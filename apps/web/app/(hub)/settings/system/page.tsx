@@ -22,12 +22,19 @@ const REACHABLE: Record<IntegrationCheck["reachable"], string> = {
   fake: "Test fake",
 };
 
-function Badge({ tone, children }: { tone: "good" | "bad" | "quiet"; children: string }) {
+function Badge({
+  tone,
+  children,
+}: {
+  tone: "good" | "bad" | "quiet";
+  children: string;
+}) {
   return (
     <span
       className={cx(
         "pixel-frame inline-block px-2 py-0.5 font-label text-xs font-bold tracking-wide uppercase",
-        tone === "good" && "bg-bm-green/10 text-bm-green [--pf:var(--color-bm-green)]",
+        tone === "good" &&
+          "bg-bm-green/10 text-bm-green [--pf:var(--color-bm-green)]",
         tone === "bad" && "bg-bm-red/10 text-bm-red [--pf:var(--color-bm-red)]",
         tone === "quiet" && "text-bm-muted",
       )}
@@ -54,7 +61,9 @@ export default async function SystemStatusPage() {
       />
       <div className="flex max-w-3xl flex-col gap-6">
         <div data-testid="system-headline">
-          <FormMessage tone={status.headline.tone === "attention" ? "error" : "success"}>
+          <FormMessage
+            tone={status.headline.tone === "attention" ? "error" : "success"}
+          >
             {status.headline.summary}
           </FormMessage>
         </div>
@@ -70,7 +79,15 @@ export default async function SystemStatusPage() {
                   <h2 className="mr-auto font-display text-sm leading-relaxed">
                     {c.label}
                   </h2>
-                  <Badge tone={c.configured ? "good" : c.tone === "attention" ? "bad" : "quiet"}>
+                  <Badge
+                    tone={
+                      c.configured
+                        ? "good"
+                        : c.tone === "attention"
+                          ? "bad"
+                          : "quiet"
+                    }
+                  >
                     {c.configured ? "Configured" : "Not configured"}
                   </Badge>
                   <Badge

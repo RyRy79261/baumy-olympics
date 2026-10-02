@@ -81,7 +81,9 @@ describe("deriveSystemStatus", () => {
   });
 
   it("names an optional service that is off, without alarm", () => {
-    const p = probes({ groq: { configured: false, reach: { kind: "not_checked" } } });
+    const p = probes({
+      groq: { configured: false, reach: { kind: "not_checked" } },
+    });
     expect(find(p, "groq")).toMatchObject({
       configured: false,
       reachable: "not_checked",
@@ -120,7 +122,9 @@ describe("deriveSystemStatus", () => {
     expect(find(p, "calendar").detail).toContain(
       "It did not answer (unavailable).",
     );
-    expect(find(p, "claude").detail).toContain("It answered 401 (key refused).");
+    expect(find(p, "claude").detail).toContain(
+      "It answered 401 (key refused).",
+    );
     expect(find(p, "bugReports").tone).toBe("attention");
     expect(find(p, "bugReports").detail).toContain("must be owner/name");
     expect(deriveSystemStatus(p).headline.summary).toBe(

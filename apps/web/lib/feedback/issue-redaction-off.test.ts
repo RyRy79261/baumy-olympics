@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type * as Core from "@baumy/core";
 
 // The redaction tests can fail (AGENTS.md: "A test that cannot fail proves
 // nothing"). Here the builder runs with redaction switched off, and the same
@@ -8,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 // exactly like this.
 
 vi.mock("@baumy/core", async (importOriginal) => {
-  const real = await importOriginal<typeof import("@baumy/core")>();
+  const real = await importOriginal<typeof Core>();
   return {
     ...real,
     sanitizeReportText: (text: string, max: number) => ({
