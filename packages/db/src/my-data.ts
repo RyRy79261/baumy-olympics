@@ -5,14 +5,7 @@ import {
 } from "@baumy/core";
 import { and, asc, count, eq, max, or, sql } from "drizzle-orm";
 import type { Queryable } from "./index";
-import {
-  aiUsage,
-  auditEvents,
-  chores,
-  completions,
-  disputes,
-  notes,
-} from "./schema";
+import { aiUsage, auditEvents, completions, disputes, notes } from "./schema";
 
 // "What do you keep about me?" (issue #144): counts and dates about ONE
 // member, for the self-only `get_my_data` action. Every query here is keyed

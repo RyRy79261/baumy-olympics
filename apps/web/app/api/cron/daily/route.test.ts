@@ -62,7 +62,6 @@ describe("GET /api/cron/daily", () => {
     const second = await (await get(`Bearer ${SECRET}`)).json();
     expect(second.steps[0].detail).toEqual({
       finalized: 0,
-      expired: 0,
       timedOut: 0,
     });
     expect(second.steps[1].detail).toEqual({ closing: 0, closed: 0 });
