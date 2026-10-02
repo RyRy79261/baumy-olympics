@@ -16,7 +16,6 @@ import {
   type PixelIconName,
   type TabAccent,
 } from "@baumy/ui";
-import { BaumySheet } from "@/components/baumy/baumy-sheet";
 import {
   ShoppingList,
   type ShoppingActions,
@@ -191,15 +190,15 @@ function ShoppingWidget(
 }
 
 /**
- * The hub page's right gutter. From md (a portrait tablet) up the whole page
- * (the PIN strip, the heading, the header row and the cards, so they share
- * one right edge) keeps clear of the corner Baumy's button sits in (fixed,
- * bottom right), so it never covers a card, a widget's link or the shopping
+ * The hub page's right gutter. From lg up, where Baumy's button floats in
+ * the bottom-right corner, the whole page (the PIN strip, the heading, the
+ * header row and the cards, so they share one right edge) keeps clear of
+ * that corner, so it never covers a card, a widget's link or the shopping
  * list's Add, wherever the page is scrolled; from 2xl the page's own margin
- * is wide enough. On a phone the shell's bottom padding clears it at the end
- * of the page.
+ * is wide enough. Below lg the button sits in the top bar
+ * (components/hub/hub-baumy.tsx) and the page uses the full width.
  */
-export const HUB_GUTTER = "md:pr-36 2xl:pr-0";
+export const HUB_GUTTER = "lg:pr-36 2xl:pr-0";
 
 /** How many urgent bounties the hub lists before "N more". */
 export const HUB_BOUNTIES = 6;
@@ -216,16 +215,13 @@ export function HubHome({
   hub,
   memberColors,
   shopping,
-  voice = false,
   children,
 }: {
   hub: HubView;
   /** Member id → colour, for the agenda's bars. */
   memberColors: Record<string, string>;
   shopping: ShoppingActions;
-  /** Offer hold-to-speak in the Baumy sheet (a transcriber is configured). */
-  voice?: boolean;
-  /** A card of the page's own, stacked last in the wide column. */
+  /** A card of the page's own, stacked under Today in the wide column. */
   children?: ReactNode;
 }) {
   const { chores, standings, pot, notes, counts } = hub;
@@ -392,7 +388,6 @@ export function HubHome({
           </Deferred>
         </div>
       </div>
-      <BaumySheet voice={voice} />
     </div>
   );
 }
