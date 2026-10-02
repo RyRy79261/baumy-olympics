@@ -100,5 +100,9 @@ describe("HoldToTalk", () => {
     expect(held).toContain("bg-[#b8243a]");
     expect(held).toContain("motion-safe:animate-pulse");
     expect(held).toContain('data-level="50"');
+    // The bars stand out white on the red, not pink on red.
+    expect(held).toContain("bg-white");
+    expect(held).not.toContain("bg-[#ff5a7a]");
+    expect(html(<LevelBars level={0.5} />)).toContain("bg-[#ff5a7a]");
   });
 });

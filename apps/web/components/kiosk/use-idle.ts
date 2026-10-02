@@ -19,7 +19,16 @@ import { useEffect, useRef, useState } from "react";
 // With `warnMs`, it also returns the whole seconds left during the last
 // `warnMs` of the wait (null otherwise), for a countdown.
 
-const EVENTS = ["pointerdown", "keydown", "touchstart", "wheel"] as const;
+// A release counts too: a hold (Baumy's "Hold to talk", issue #132) is
+// touched when the finger lifts, not only when it went down.
+const EVENTS = [
+  "pointerdown",
+  "pointerup",
+  "keydown",
+  "touchstart",
+  "touchend",
+  "wheel",
+] as const;
 
 /** How often the wait is checked. */
 export const IDLE_TICK_MS = 1_000;

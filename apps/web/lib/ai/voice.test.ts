@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { KIOSK_IDLE_MS } from "@/lib/kiosk/constants";
 import {
   HOLD_MS,
   MAX_RECORDING_MS,
   MIC_OFF,
   PREFERRED_MIME_TYPES,
+  SILENCE_LEVEL,
+  SILENT_CLIP,
   canRecord,
   clipType,
+  heardNothing,
   levelOf,
   micFailure,
   micStep,
@@ -204,10 +208,12 @@ describe("micStep", () => {
           : { m: { phase: "recording", keep: true }, effects: [] },
       );
     }
-    expect(run(["release", "granted", "refused", "close"])).toEqual({
+    expect(run(["release", "granted", "refused"])).toEqual({
       m: MIC_OFF,
       effects: [],
     });
+    // Closing shuts even from off: the meter's audio may be warm already.
+    expect(run(["close"])).toEqual({ m: MIC_OFF, effects: ["shut"] });
     expect(run(["open", "open"]).effects).toEqual(["request"]);
     expect(run(["open", "granted", "open", "granted"]).m.phase).toBe("ready");
   });
@@ -266,6 +272,20 @@ describe("onRelease", () => {
     expect(onRelease(HOLD_MS - 1)).toBe("keep");
     expect(onRelease(HOLD_MS)).toBe("send");
     expect(onRelease(5_000)).toBe("send");
-    expect(MAX_RECORDING_MS).toBe(60_000);
+    // Cut well inside the kiosk's idle minute.
+    expect(MAX_RECORDING_MS).toBe(45_000);
+    expect(MAX_RECORDING_MS).toBeLessThanOrEqual(KIOSK_IDLE_MS - 15_000);
+  });
+});
+
+describe("heardNothing", () => {
+  it("drops a clip only when a running meter never rose above silence", () => {
+    expect(heardNothing(0, true)).toBe(true);
+    expect(heardNothing(SILENCE_LEVEL - 0.001, true)).toBe(true);
+    expect(heardNothing(SILENCE_LEVEL, true)).toBe(false);
+    expect(heardNothing(0.4, true)).toBe(false);
+    // A meter that never ran (suspended audio on iOS) proves nothing.
+    expect(heardNothing(0, false)).toBe(false);
+    expect(SILENT_CLIP).toMatch(/hold and speak/);
   });
 });

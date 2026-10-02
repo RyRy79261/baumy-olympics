@@ -16,7 +16,21 @@ export const PREFERRED_MIME_TYPES = [
 ] as const;
 
 /** A clip is cut off here, well under the route's 20 MB. */
-export const MAX_RECORDING_MS = 60_000;
+export const MAX_RECORDING_MS = 45_000;
+
+/**
+ * Below this peak level, a clip held nothing but silence. Only trusted when
+ * the meter was really listening (iOS can leave its audio suspended, which
+ * reads as silence).
+ */
+export const SILENCE_LEVEL = 0.03;
+
+/** A clip to drop unheard: the meter ran, and never rose above silence. */
+export function heardNothing(peak: number, meterRan: boolean): boolean {
+  return meterRan && peak < SILENCE_LEVEL;
+}
+
+export const SILENT_CLIP = "I didn't hear anything — hold and speak.";
 
 /** A press shorter than this is a tap: recording goes on until a second tap. */
 export const HOLD_MS = 350;
@@ -124,9 +138,9 @@ export function micStep(
     effects,
   });
   const same = { next: m, effects: [] as MicEffect[] };
-  if (e.type === "close") {
-    return m.phase === "off" ? same : to("off", ["shut"], false);
-  }
+  // Closing always shuts, even from off: the tap that asked "who's talking?"
+  // started the meter's audio before any microphone was asked for.
+  if (e.type === "close") return to("off", ["shut"], false);
   switch (m.phase) {
     case "off":
       if (e.type === "open") return to("opening", ["request"], true);
