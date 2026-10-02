@@ -6,9 +6,10 @@ import { randomBytes } from "node:crypto";
 //   sha256 is stored (kiosk_devices.token_hash).
 // - `baumy_kiosk_member`: the member whose avatar was tapped, a member id and
 //   nothing more. The PIN is NEVER stored here or anywhere: an attested
-//   request carries it in that request. The screen clears the pick after 60
-//   seconds idle; this cookie's own 10-minute life is the backstop if the
-//   screen does not.
+//   request carries it in that request. The screen clears the pick after
+//   its idle minutes (2 by default, up to 15, chosen on the kiosk: issue
+//   #147); this cookie's own 20-minute life is the backstop if the screen
+//   does not.
 //
 // Both are `HttpOnly; Secure; SameSite=Strict; Path=/`. Browsers accept a
 // Secure cookie from http://localhost, so dev and e2e need no exception;
@@ -18,7 +19,7 @@ export const KIOSK_COOKIE = "baumy_kiosk";
 export const KIOSK_MEMBER_COOKIE = "baumy_kiosk_member";
 
 export const KIOSK_COOKIE_MAX_AGE_S = 365 * 24 * 60 * 60;
-export const KIOSK_MEMBER_MAX_AGE_S = 10 * 60;
+export const KIOSK_MEMBER_MAX_AGE_S = 20 * 60;
 
 // The walk-in cookie lives in walk-in.ts, which has no node imports, so the
 // client component that clears it does not pull node:crypto into the
