@@ -70,13 +70,15 @@ function post(body: unknown, headers: Record<string, string> = {}): Request {
 let phoneMember: string | undefined;
 let phoneRole: "admin" | "member" = "member";
 let kioskMember: string | undefined;
+let kioskRole: "admin" | "member" = "member";
 const requestCtx: RunRouteDeps["requestCtx"] = async (
   surface,
   requestId,
   pin,
 ) => {
   if (surface === "kiosk") {
-    return ctxFor(kioskActor(kioskMember), {
+    const actor = kioskActor(kioskMember);
+    return ctxFor(kioskMember ? { ...actor, role: kioskRole } : actor, {
       requestId,
       now: new Date(),
       ...(pin ? { pin } : {}),
@@ -93,6 +95,7 @@ beforeEach(() => {
   phoneMember = ryan;
   phoneRole = "member";
   kioskMember = ryan;
+  kioskRole = "member";
 });
 
 const loadHousehold = async () => ({
@@ -342,6 +345,21 @@ describe("POST /api/ai/command", () => {
     expect(system[1]!.text).toContain(`"id":"${sam}","name":"Sam"`);
     expect(system[1]!.text).toContain("kitchen iPad");
     expect(system[1]!.text).toContain("The acting member is not an admin.");
+  });
+
+  it("tells Claude when the kiosk's picked member is an admin (issue #147)", async () => {
+    const create = vi.fn(fakeClaude);
+    kioskMember = sam;
+    kioskRole = "admin";
+    await handleCommand(
+      post({ text: "hello", surface: "kiosk" }),
+      commandDeps({ claude: () => ({ ok: true, kind: "fake", create }) }),
+    );
+    const system = create.mock.calls[0]![0].system as { text: string }[];
+    expect(system[1]!.text).toContain("kitchen iPad");
+    expect(system[1]!.text).toContain(
+      "The acting member is a household admin.",
+    );
   });
 
   it("tells Claude when the phone's member is an admin (issue #107)", async () => {
