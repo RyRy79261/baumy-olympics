@@ -41,7 +41,7 @@ export function PageHeading({
 }
 
 /**
- * A section's heading inside a page (the activity log's "Today"): a
+ * A section's heading inside a page (the bounties' "Points history"): a
  * Silkscreen label, quieter than the page's h1 and a Card's title.
  */
 export function SectionHeading({
