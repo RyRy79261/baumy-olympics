@@ -207,11 +207,12 @@ export function BaumyButton({
         // corner clear (AppShell's bottom padding, HubGrid's on the kiosk).
         // Anchored to the viewport's bottom-right corner, clear of a phone's
         // home bar and rounded corners (the safe-area insets), like a chat
-        // button (issue #152).
+        // button (issue #152). Docked, it has no `lg:shadow-*`: a variant
+        // shadow would land after the frame's inset box-shadow and hide it.
         "inline-flex touch-manipulation justify-center",
         "pixel-frame bg-bm-raised [--pf:var(--color-bm-violet)] active:translate-y-px",
         docked
-          ? "min-h-11 min-w-11 items-center px-1.5 lg:fixed lg:right-[max(0.75rem,env(safe-area-inset-right))] lg:bottom-[max(0.75rem,env(safe-area-inset-bottom))] lg:z-10 lg:items-end lg:pixel-frame-4 lg:px-3 lg:pt-2 lg:pb-3 lg:shadow-[0_6px_0_rgb(0_0_0/0.45)]"
+          ? "min-h-11 min-w-11 items-center px-1.5 lg:fixed lg:right-[max(0.75rem,env(safe-area-inset-right))] lg:bottom-[max(0.75rem,env(safe-area-inset-bottom))] lg:z-10 lg:items-end lg:pixel-frame-4 lg:px-3 lg:pt-2 lg:pb-3"
           : "fixed right-[max(0.75rem,env(safe-area-inset-right))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 items-end pixel-frame-4 px-3 pt-2 pb-3 shadow-[0_6px_0_rgb(0_0_0/0.45)]",
         className,
       )}
