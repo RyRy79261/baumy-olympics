@@ -88,7 +88,11 @@ describe("/api/test/brain/login", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       ok: true,
-      data: { outcome: "approved", device: "Chrome on macOS" },
+      data: {
+        outcome: "approved",
+        device: "Chrome on macOS",
+        purpose: "sign_in",
+      },
     });
     const [row] = await t.db().select().from(loginRequests);
     expect(row?.status).toBe("approved");
