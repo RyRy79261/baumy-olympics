@@ -6,6 +6,7 @@ import {
   bountyNamed,
   choresNamed,
   fakeClaude,
+  myDataSummary,
   potAmountNamed,
   shoppingItemsNamed,
 } from "./claude-fake";
@@ -315,6 +316,55 @@ describe("fakeClaude", () => {
     expect(uses(noTool)).toEqual([]);
     const empty = await fakeClaude(params([]));
     expect(text(empty)).toContain("Meow");
+  });
+
+  it("reads get_my_data for 'what do you keep about me', then sums it up with the policy (issue #144)", async () => {
+    const offered = [
+      ...tools,
+      { name: "get_my_data", input_schema: { type: "object" as const } },
+    ];
+    const said = "What do you keep about me?";
+    const first = await fakeClaude(
+      params([{ role: "user", content: said }], offered),
+    );
+    expect(uses(first).map((u) => u.name)).toEqual(["get_my_data"]);
+
+    const data = {
+      sessions: { count: 1 },
+      completions: { total: 3 },
+      notes: { written: 2, deletedKept: 1 },
+      photos: { stored: 1 },
+      auditEntries: 7,
+      ai: { commands: 4 },
+      retention: { photoDays: 90, policyUrl: "/privacy" },
+    };
+    const second = await fakeClaude({
+      ...afterRead(said, "get_my_data", { ok: true, data }),
+      tools: offered,
+    });
+    expect(second.stop_reason).toBe("end_turn");
+    expect(uses(second)).toEqual([]);
+    expect(text(second)).toBe(myDataSummary(data));
+    expect(text(second)).toContain("3 completions");
+    expect(text(second)).toContain("2 notes (1 deleted but kept)");
+    expect(text(second)).toContain("1 proof photo,");
+    expect(text(second)).toContain("7 audit-log entries");
+    expect(text(second)).toContain("1 signed-in device.");
+    expect(text(second)).toContain("deleted 90 days after");
+    expect(text(second)).toContain("/privacy");
+
+    // Refused (the kitchen iPad): it says where to ask instead.
+    const refused = await fakeClaude({
+      ...afterRead(said, "get_my_data", { ok: false, code: "FORBIDDEN" }),
+      tools: offered,
+    });
+    expect(text(refused)).toContain("your own phone");
+
+    // Not offered: the help line, no tool.
+    const notOffered = await fakeClaude(
+      params([{ role: "user", content: said }]),
+    );
+    expect(uses(notOffered)).toEqual([]);
   });
 });
 

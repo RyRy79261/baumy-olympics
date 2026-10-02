@@ -92,9 +92,16 @@ describe("the registry", () => {
     }
   });
 
-  it("guards writes that need a real session to the ui", () => {
-    for (const [name, def] of entries) {
-      if (def.requires === "session" || def.requires === "account") {
+  it("guards actions that need a real session to the ui, except the get_my_data read Baumy answers with (issue #144)", () => {
+    const session = entries.filter(
+      ([, d]) => d.requires === "session" || d.requires === "account",
+    );
+    expect(session.map(([n]) => n)).toContain("get_my_data");
+    for (const [name, def] of session) {
+      if (name === "get_my_data") {
+        expect(def.surfaces, name).toEqual(["ui", "ai"]);
+        expect(def.kind, name).toBe("read");
+      } else {
         expect(def.surfaces, name).toEqual(["ui"]);
       }
     }
