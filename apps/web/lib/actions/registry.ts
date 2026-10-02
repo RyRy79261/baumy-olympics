@@ -34,6 +34,7 @@ import {
   withdrawDispute,
 } from "./confirmations";
 import { createTelegramLinkCode } from "./create-telegram-link-code";
+import { getMyData } from "./get-my-data";
 import { getPendingConfirmations } from "./get-pending-confirmations";
 import { getTelegramLinkStatus } from "./get-telegram-link-status";
 import { joinAsFounder } from "./join-as-founder";
@@ -125,6 +126,7 @@ export const REGISTRY = {
   list_mcp_connections: listMcpConnectionsAction,
   revoke_mcp_connection: revokeMcpConnection,
   get_account_security: getAccountSecurity,
+  get_my_data: getMyData,
   revoke_session: revokeSession,
   revoke_other_sessions: revokeOtherSessions,
   rename_passkey: renamePasskey,

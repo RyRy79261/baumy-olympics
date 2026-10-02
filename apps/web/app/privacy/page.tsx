@@ -7,13 +7,17 @@ import {
   SECURITY_COOKIES,
 } from "@baumy/auth/env";
 import { PHOTO_RETENTION_DAYS } from "@baumy/core";
-import { RATE_LIMIT_ROW_HORIZON_MS } from "@baumy/db/rate-limit";
 import { linkClass } from "@baumy/ui";
 import {
   LegalPage,
   LegalSection,
   PRIVACY_UPDATED,
 } from "@/components/legal/legal-page";
+import {
+  RATE_LIMIT_DAYS,
+  SESSION_DAYS,
+  TRUST_DAYS,
+} from "@/lib/privacy/retention";
 import { REFRESH_COOKIE, REFRESH_COOKIE_MAX_AGE_S } from "@/lib/hub/refresh";
 import {
   KIOSK_COOKIE,
@@ -38,17 +42,15 @@ import {
 // Public (issue #82): outside the (hub) gate, no session read. Every sentence
 // here describes what the code does; change the words in the same PR as the
 // behaviour, and move PRIVACY_UPDATED with them (issue #87 corrected it). The cookie names and the
-// numbers come from the constants the code uses, so they cannot drift.
+// numbers come from the constants the code uses, so they cannot drift; the
+// retention ones live in lib/privacy/retention.ts, which get_my_data reads too.
 
 const DAY_S = 24 * 60 * 60;
-const SESSION_DAYS = AUTH_SESSION.expiresInSeconds / DAY_S;
 const SESSION_CACHE_MIN = AUTH_SESSION.cookieCacheMaxAgeSeconds / 60;
 const KIOSK_YEARS = Math.round(KIOSK_COOKIE_MAX_AGE_S / (365 * DAY_S));
 const KIOSK_MEMBER_MIN = KIOSK_MEMBER_MAX_AGE_S / 60;
-const RATE_LIMIT_DAYS = RATE_LIMIT_ROW_HORIZON_MS / (DAY_S * 1000);
 const LAST_LOGIN_DAYS = SECURITY_COOKIES.lastLoginMethodMaxAgeSeconds / DAY_S;
 const TWO_FACTOR_MIN = SECURITY_COOKIES.twoFactorChallengeMaxAgeSeconds / 60;
-const TRUST_DAYS = SECURITY_COOKIES.trustDeviceMaxAgeSeconds / DAY_S;
 const PASSKEY_CHALLENGE_MIN =
   SECURITY_COOKIES.passkeyChallengeMaxAgeSeconds / 60;
 const LOGIN_REQUEST_MIN = LOGIN_REQUEST_TTL_MS / 60_000;
@@ -225,8 +227,9 @@ export default function PrivacyPage() {
             Anthropic receives what you typed (or the transcript of what you
             said), the date and time, your member name, the housemates&apos;
             names and the chores, and whatever the app looks up to answer (for
-            example chores, scores, notes, calendar events or the shopping
-            list).
+            example chores, scores, notes, calendar events, the shopping list
+            or, when you ask what is kept about you, the counts, dates and names
+            in that summary).
           </li>
           <li>
             <strong>Groq:</strong> when you hold the microphone, Groq receives
@@ -415,6 +418,13 @@ export default function PrivacyPage() {
           <li>
             You can change your display name, colour and character yourself in
             Settings.
+          </li>
+          <li>
+            Settings, Your data, shows a summary of what is kept about you, as
+            counts, dates and names (never an IP address), with the rules above;
+            Baumy tells you the same when you ask &quot;what do you keep about
+            me?&quot; on your own phone or computer. Only you see it, never the
+            kitchen screen.
           </li>
           <li>
             To leave, ask the admin. They can switch off your membership in the

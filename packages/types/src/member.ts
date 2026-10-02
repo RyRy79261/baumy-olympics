@@ -79,8 +79,17 @@ export function memberColorName(color: string): string {
   return MEMBER_COLOR_NAMES[key] ?? "Custom colour";
 }
 
+/** How many digits a kiosk PIN has (SPEC §6.2), at least and at most. */
+export const KIOSK_PIN_MIN_DIGITS = 4;
+export const KIOSK_PIN_MAX_DIGITS = 6;
+
 /** A kiosk PIN (SPEC §6.2): 4 to 6 digits. */
-export const KioskPin = z.string().regex(/^\d{4,6}$/, "Use 4 to 6 digits.");
+export const KioskPin = z
+  .string()
+  .regex(
+    new RegExp(`^\\d{${KIOSK_PIN_MIN_DIGITS},${KIOSK_PIN_MAX_DIGITS}}$`),
+    `Use ${KIOSK_PIN_MIN_DIGITS} to ${KIOSK_PIN_MAX_DIGITS} digits.`,
+  );
 
 /** What a wrong Telegram user id is told, by the server and the browser. */
 export const TELEGRAM_ID_MESSAGE =
