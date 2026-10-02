@@ -1020,6 +1020,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
 
     describe("with a level meter", () => {
       let samples = 128;
+      let hiss = false;
       const closed = vi.fn();
       class FakeAudioContext {
         state = "running";
@@ -1036,6 +1037,8 @@ describe("BaumySheet on the kitchen dashboard", () => {
             for (let i = 0; i < buf.length; i++) {
               buf[i] = i % 2 ? samples : 256 - samples;
             }
+            // A quiet room: one sample a step off the midline.
+            if (hiss) buf[0] = 129;
           },
         });
       }
@@ -1049,8 +1052,9 @@ describe("BaumySheet on the kitchen dashboard", () => {
         vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
       });
 
-      it("drops a clip it heard only silence in", async () => {
+      it("drops a clip it heard only a quiet room in", async () => {
         samples = 128;
+        hiss = true;
         heardAndAnswered("Ryan is winning.", []);
         mountCat({ actingName: "Ryan" });
         await talkToCat();
@@ -1061,8 +1065,25 @@ describe("BaumySheet on the kitchen dashboard", () => {
         expect(fetchMock).not.toHaveBeenCalled();
       });
 
+      it("sends a clip when the meter read flat zero: a dead meter, not silence", async () => {
+        // Some iOS versions report running audio while the source reads
+        // nothing at all; the recording itself may still hold words.
+        samples = 128;
+        hiss = false;
+        heardAndAnswered("Ryan is winning.", []);
+        mountCat({ actingName: "Ryan" });
+        await talkToCat();
+        await settle();
+        expect(bubble()!.textContent).not.toContain("I didn't hear anything");
+        expect(fetchMock.mock.calls.map((c) => c[0])).toContain(
+          "/api/ai/transcribe",
+        );
+        expect(bubble()!.textContent).toContain("Ryan is winning.");
+      });
+
       it("sends a clip with a voice in it, the bars rising", async () => {
         samples = 200;
+        hiss = false;
         heardAndAnswered("Ryan is winning.", []);
         mountCat({ actingName: "Ryan" });
         await act(async () => cat().click());
