@@ -27,7 +27,7 @@ const PLACEHOLDER = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 const Frontmatter = z.strictObject({
   slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
   title: z.string().min(1),
-  // Members only: there is no public help (SPEC §12 decision 24). An admin
+  // Members only: there is no public help (SPEC §12 decision 25). An admin
   // page is one only an admin can act on.
   audience: z.enum(["member", "admin"]),
   /** The in-app page the topic lives on, e.g. `/pot` or `/privacy#cookies`. */

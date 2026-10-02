@@ -39,7 +39,6 @@ export const HELP_CONSTANTS: Readonly<Record<string, string | number>> = {
   BREAK_MAX_PCT: RULESET_V1.breakPctPerLen * RULESET_V1.breakLenCap,
   UNDO_WINDOW_MIN: RULESET_V1.undoWindowMin,
   CHALLENGE_WINDOW_H: RULESET_V1.challengeWindowH,
-  PARTNER_CONFIRM_EXPIRY_H: RULESET_V1.partnerConfirmExpiryH,
   MAX_BACKDATE_H: RULESET_V1.maxBackdateH,
   // Points changes (SPEC §4.4).
   WEIGHT_VETO_LEAD_H: FREQUENCY_V1.vetoLeadHours,

@@ -28,6 +28,6 @@ Only an admin records money for the pot: on the Pot page, or by asking Baumy ("p
 
 The winner is whoever has the most season points: their scored chores plus any point adjustments two admins agreed on.
 
-- If two people are level, the one with more chores a housemate vouched for (confirmed, or logged for them) wins; if that is level too, the one who got to their total first.
-- If nobody has any points, or two people are level on all of that, there is no automatic winner and the owner decides.
+- If two people are level on points, the app breaks the tie from their chores this season and from who got to their total first.
+- If nobody has any points, or the tie cannot be broken, there is no automatic winner and the owner decides.
 - Claims can still be disputed for a short while after New Year, so the season closes, and the winner is written down, once every last claim has settled.

@@ -15,7 +15,7 @@ import { parseManualPage, type ManualFile } from "./manual";
 //
 // `pnpm help:corpus` writes it to docs/help-corpus.generated.md, and
 // corpus.test.ts fails while that file is out of date (like brain:spec). It
-// is for members only: there is no public help (SPEC §12 decision 24).
+// is for members only: there is no public help (SPEC §12 decision 25).
 
 /** Where the generated corpus lives, from the repo root. */
 export const CORPUS_PATH = "docs/help-corpus.generated.md";

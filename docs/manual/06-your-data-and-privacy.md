@@ -13,7 +13,7 @@ The full, exact answer is the [privacy page](/privacy). This is the short versio
 
 ## What the app keeps about you
 
-Your account (email, name, how you sign in), your member profile (display name, colour, character, your PIN only as a scrambled hash, and your Telegram id if you link it), and what you do in the game and on the board: chores, confirmations and disputes, notes and reminders. There is also an audit log of who changed what, and when. See [what we keep](/privacy#what-we-keep).
+Your account (email, name, how you sign in), your member profile (display name, colour, character, your PIN only as a scrambled hash, and your Telegram id if you link it), and what you do in the game and on the board: chores and disputes, notes and reminders. There is also an audit log of who changed what, and when. See [what we keep](/privacy#what-we-keep).
 
 ## Where it lives, and who else sees it
 

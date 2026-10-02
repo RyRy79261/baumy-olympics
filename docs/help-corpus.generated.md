@@ -55,7 +55,6 @@ On your phone or laptop, the menu has:
 - **Shopping**: the house shopping list, the same one the Telegram group uses.
 - **Scores**: who is winning this season, and the streaks.
 - **Pot**: the money the winner takes at the end of the year.
-- **Needs your OK**: housemates' chores waiting for you to confirm, with a count when there are some.
 - **Settings**: your name, colour and character, your personal PIN for the kitchen iPad, Telegram, and how you sign in.
 
 The kitchen iPad shows the same household on one big screen. See [the kitchen iPad](/kiosk).
@@ -68,7 +67,7 @@ Baumy is the pixel cat in the corner. Tap it to ask something in your own words,
 - **Anything that changes something** comes back as a card that says in plain words what it will do, for example "Add milk, eggs to the shopping list". Nothing happens until you tap **Confirm all**. **Cancel** throws them all away, and the small × drops one card.
 - A card that is marked red deletes something. A card Baumy is not allowed to do is greyed out, with the reason.
 
-Baumy can only do what you could do yourself, as you. It never runs a change without a member confirming it. Baumy's answers come from an AI and can be wrong, so read the cards before you confirm them.
+Baumy can only do what you could do yourself, as you. It never runs a change until a member taps Confirm all. Baumy's answers come from an AI and can be wrong, so read the cards first.
 
 ### Admins
 
@@ -93,20 +92,17 @@ A bounty is **urgent** when it is overdue on its own rhythm, or falls due before
 Open **Bounties**, pick the chore and tap **Log it**. You can also tell Baumy ("I did the dishes"), the kitchen iPad, or Baumy in Telegram.
 
 - You can log a chore up to 24 hours after you did it, but never in the future, and never before the chore's last completion.
-- You can log a chore for a housemate ("Jo did the dishes"). That counts as you vouching for them, so it is confirmed straight away.
+- You can log a chore for a housemate ("Jo did the dishes"). It is logged in their name, by you.
 - Some bounties need a **proof photo**; those can only be logged with one.
 - If you logged something by mistake, **Undo** it within 10 minutes.
 
-### Confirming and disputing
+### Disputing
 
-When you log your own chore, your housemates have 24 hours to look at it.
+When a chore is logged, its points count straight away, shown dimmed as provisional.
 
-- The points count straight away, shown dimmed as provisional. After 24 hours with no dispute they are final.
-- Anyone else can **Confirm** it sooner, under **Needs your OK**.
-- Anyone else can **Dispute** it, with a reason. A disputed claim scores nothing while it is disputed. If the person who did it attached a photo in time, it waits for the two of you (or an admin) to settle it; otherwise it is dropped when the 24 hours end.
-- The person who disputed can **Withdraw** the dispute, and the person who did the chore can **Concede** it.
-
-Some bounties are set to need a housemate's OK first. Those score nothing until someone confirms them, and are dropped if nobody does within 72 hours.
+- Another housemate can **dispute** a logged chore within the dispute window, 24 hours after it was logged, with a reason. If nobody does, the points are final when the window ends.
+- A disputed chore scores nothing while it is disputed. If the person who did it attached a photo in time, it waits for them and the person who disputed (or an admin) to settle it; otherwise it is dropped when the window ends.
+- The person who disputed can **withdraw** the dispute, and the person who did the chore can **concede** it.
 
 ### How points work
 
@@ -153,8 +149,8 @@ Only an admin records money for the pot: on the Pot page, or by asking Baumy ("p
 
 The winner is whoever has the most season points: their scored chores plus any point adjustments two admins agreed on.
 
-- If two people are level, the one with more chores a housemate vouched for (confirmed, or logged for them) wins; if that is level too, the one who got to their total first.
-- If nobody has any points, or two people are level on all of that, there is no automatic winner and the owner decides.
+- If two people are level on points, the app breaks the tie from their chores this season and from who got to their total first.
+- If nobody has any points, or the tie cannot be broken, there is no automatic winner and the owner decides.
 - Claims can still be disputed for a short while after New Year, so the season closes, and the winner is written down, once every last claim has settled.
 
 ## The kitchen iPad
@@ -171,13 +167,7 @@ After 60 seconds untouched, the screen forgets who was acting and goes back home
 
 ### Your personal PIN
 
-The kitchen screen is shared, so for some things it asks for **your personal PIN** before it does them as you:
-
-- confirming, disputing or undoing a chore, or logging one for someone else;
-- adding or changing notes;
-- adding, changing or deleting calendar events.
-
-Logging your own chore, the shopping list and reminders need no PIN. Admin things and your own settings are never done on the kitchen screen; use your phone.
+The kitchen screen is shared, so the kitchen iPad asks for **your personal PIN** for some actions, before it does them as you. Your own settings are only changed on your phone.
 
 Set your PIN on your phone, in **Settings → Your personal PIN**: 4 to 6 digits, yours alone. Changing a PIN you already have asks you to confirm it's you first. On the iPad, **Check my PIN** on the Bounties page checks it without changing anything. Keep it to yourself, and never use someone else's.
 
@@ -232,8 +222,8 @@ If the button does not work, send `/link` and the code the card shows to @baumy_
 
 Anything you could ask Baumy in the app: "who's winning?", "what's on this weekend?", "I cleaned the bathroom", "add a note that the plumber comes Tuesday". It can also post reminders, and veto a points change that is waiting.
 
-- It asks you to tap a **confirm button** before most changes: logging, confirming or disputing a chore, changing or deleting something. Small things, like adding a note or a reminder, happen straight away.
-- It can do something **for a housemate** too ("Jo took the trash out"), but only after you tap the confirm button, and the app records both of you. Confirming, disputing or undoing a chore is never done for someone else: that is their own word.
+- It asks you to tap a **confirm button** before most changes, such as logging or disputing a chore, or changing or deleting something. Small things, like adding a note or a reminder, happen straight away.
+- It can do something **for a housemate** too ("Jo took the trash out"), but only after you tap the confirm button, and the app records both of you. Disputing or undoing a chore is never done for someone else: that is their own word.
 - An admin can add bounties, change them and record pot money from Telegram, only in their own name. Other admin things are only in the app.
 
 ### Signing in with Baumy
@@ -252,7 +242,7 @@ The full, exact answer is the [privacy page](/privacy). This is the short versio
 
 ### What the app keeps about you
 
-Your account (email, name, how you sign in), your member profile (display name, colour, character, your PIN only as a scrambled hash, and your Telegram id if you link it), and what you do in the game and on the board: chores, confirmations and disputes, notes and reminders. There is also an audit log of who changed what, and when. See [what we keep](/privacy#what-we-keep).
+Your account (email, name, how you sign in), your member profile (display name, colour, character, your PIN only as a scrambled hash, and your Telegram id if you link it), and what you do in the game and on the board: chores and disputes, notes and reminders. There is also an audit log of who changed what, and when. See [what we keep](/privacy#what-we-keep).
 
 ### Where it lives, and who else sees it
 

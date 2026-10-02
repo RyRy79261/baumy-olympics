@@ -23,13 +23,7 @@ After {{KIOSK_IDLE_SECONDS}} seconds untouched, the screen forgets who was actin
 
 ## Your personal PIN
 
-The kitchen screen is shared, so for some things it asks for **your personal PIN** before it does them as you:
-
-- confirming, disputing or undoing a chore, or logging one for someone else;
-- adding or changing notes;
-- adding, changing or deleting calendar events.
-
-Logging your own chore, the shopping list and reminders need no PIN. Admin things and your own settings are never done on the kitchen screen; use your phone.
+The kitchen screen is shared, so the kitchen iPad asks for **your personal PIN** for some actions, before it does them as you. Your own settings are only changed on your phone.
 
 Set your PIN on your phone, in **Settings → Your personal PIN**: {{KIOSK_PIN_MIN_DIGITS}} to {{KIOSK_PIN_MAX_DIGITS}} digits, yours alone. Changing a PIN you already have asks you to confirm it's you first. On the iPad, **Check my PIN** on the Bounties page checks it without changing anything. Keep it to yourself, and never use someone else's.
 
