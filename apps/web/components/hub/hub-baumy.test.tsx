@@ -13,7 +13,7 @@ import {
 import type { SpriteState } from "@baumy/ui";
 import { usePublishToBar } from "@/components/baumy/bar-relay";
 
-// Issue #152: below lg the hub home's Baumy is a button in the top bar. It
+// Issue #152: below 89rem the hub home's Baumy is a button in the top bar. It
 // shows the sheet's mood and opens that one sheet (at the end of the home)
 // through the relay, and only the home has it.
 
@@ -57,7 +57,7 @@ const button = () =>
   div.querySelector<HTMLButtonElement>('button[aria-label="Ask Baumy"]');
 
 describe("HubBaumy", () => {
-  it("is the bar's button below lg, and wakes the sheet when tapped", () => {
+  it("is the bar's button below 89rem, and wakes the sheet when tapped", () => {
     woken = 0;
     act(() =>
       root!.render(
@@ -68,7 +68,7 @@ describe("HubBaumy", () => {
       ),
     );
     expect(button()).not.toBeNull();
-    expect(button()!.className).toContain("lg:hidden");
+    expect(button()!.className).toContain("min-[89rem]:hidden");
     expect(button()!.className).toContain("min-h-11");
     act(() => button()!.click());
     expect(woken).toBe(1);

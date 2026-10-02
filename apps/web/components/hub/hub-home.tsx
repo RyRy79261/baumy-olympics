@@ -381,9 +381,11 @@ export function HubHome({
           </Deferred>
         </div>
       </div>
-      {/* Last on the page, so from lg up the corner button is tabbed to
-          last, as it is drawn; the shell's bottom padding keeps the page's
-          end clear of it. Below lg the top bar's button opens this sheet. */}
+      {/* Last on the page, so on a wide screen (89rem, 1424px, up) the
+          corner button is tabbed to last, as it is drawn; it sits in the
+          page's side margin there, and the shell's bottom padding keeps the
+          page's end clear of it. Below that the top bar's button opens this
+          sheet. */}
       <BaumySheet voice={voice} docked />
     </div>
   );

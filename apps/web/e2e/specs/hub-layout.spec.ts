@@ -13,11 +13,11 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 // - the page reads heading, header row (clock and tiles), cards, with even
 //   room between them;
 // - the page is centred, and the strip and the cards share its edges;
-// - there is one Ask Baumy button at every width: below lg (a phone, a
-//   portrait tablet) in the top bar, tabbed to after the menus; from lg up
-//   in the viewport's bottom-right corner, tabbed to last, and the page's
-//   end scrolls clear of it. The sheet opens from either, by tap or key,
-//   in the body font.
+// - there is one Ask Baumy button at every width: below 89rem (1424px) in
+//   the top bar, tabbed to after the menus; from there in the viewport's
+//   bottom-right corner, in the page's side margin, tabbed to last. It
+//   covers no card at the top of the page, halfway down or at its end. The
+//   sheet opens from either, by tap or key, in the body font.
 //
 // Set E2E_SHOTS_DIR to also save the hub at each width (the PR's before and
 // after shots): `hub-<w>.png` is what the screen shows at the top, with the
@@ -27,9 +27,10 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 const WIDTHS = [
   { width: 360, height: 780, columns: 1, floats: false }, // a phone
   { width: 768, height: 1024, columns: 1, floats: false }, // a tablet
-  // lg: the two columns begin, and Baumy moves to the corner.
-  { width: 1024, height: 768, columns: 2, floats: true },
-  { width: 1280, height: 800, columns: 2, floats: true },
+  // lg: the two columns begin; Baumy stays in the top bar.
+  { width: 1024, height: 768, columns: 2, floats: false },
+  { width: 1280, height: 800, columns: 2, floats: false },
+  // From 89rem the side margin clears the corner, and Baumy moves there.
   { width: 1440, height: 900, columns: 2, floats: true },
 ];
 
@@ -70,7 +71,7 @@ async function measure(page: Page) {
       heading: rect(h1.parentElement!.parentElement!),
       glance: rect(document.querySelector('[data-testid="hub-glance"]')!),
       grid: rect(grid),
-      // The one shown: the bar's below lg, the corner's from lg.
+      // The one shown: the bar's below 89rem, the corner's from there.
       baumy: rect(
         [...document.querySelectorAll('button[aria-label="Ask Baumy"]')].find(
           (b) => b.getClientRects().length > 0,
@@ -243,7 +244,7 @@ test("the hub reads heading, header row, cards, with Baumy placed right", async 
       viewport.width,
     );
     if (!size.floats) {
-      // Below lg: in the top bar, tabbed to right after the account menu.
+      // Below 89rem: in the top bar, tabbed to right after the account menu.
       expect(
         baumy.top,
         `${label}: Baumy in the top bar`,
@@ -257,37 +258,50 @@ test("the hub reads heading, header row, cards, with Baumy placed right", async 
         p.getByTestId("account-menu").getByRole("button"),
         label,
       );
-      continue;
+    } else {
+      // From 89rem: in the viewport's bottom-right corner, and tabbed to
+      // last, right after the last thing in the cards.
+      expect(baumy.bottom, `${label}: Baumy on screen`).toBeLessThanOrEqual(
+        viewport.height,
+      );
+      expect(baumy.right, `${label}: Baumy at the right`).toBeGreaterThan(
+        viewport.width - CORNER_PX,
+      );
+      expect(baumy.bottom, `${label}: Baumy at the bottom`).toBeGreaterThan(
+        viewport.height - CORNER_PX,
+      );
+      await expectBaumyNextAfter(
+        p,
+        p
+          .getByTestId("hub")
+          .locator("a[href], button:not([disabled]), input, textarea, select")
+          .last(),
+        label,
+      );
     }
-    // From lg: in the viewport's bottom-right corner, and tabbed to last,
-    // right after the last thing in the cards.
-    expect(baumy.bottom, `${label}: Baumy on screen`).toBeLessThanOrEqual(
-      viewport.height,
-    );
-    expect(baumy.right, `${label}: Baumy at the right`).toBeGreaterThan(
-      viewport.width - CORNER_PX,
-    );
-    expect(baumy.bottom, `${label}: Baumy at the bottom`).toBeGreaterThan(
-      viewport.height - CORNER_PX,
-    );
-    await expectBaumyNextAfter(
-      p,
-      p
-        .getByTestId("hub")
-        .locator("a[href], button:not([disabled]), input, textarea, select")
-        .last(),
-      label,
-    );
-    // Scrolled to the end, the page's foot is clear of it.
-    await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    const end = await measure(p);
-    for (const card of end.cards) {
-      expect
-        .soft(
-          overlaps(end.baumy, card),
-          `${label}, scrolled: Baumy over ${card.id}`,
-        )
-        .toBe(false);
+    // Over no card: at the top of the page, halfway down and at its end.
+    for (const [where, to] of [
+      ["top", 0],
+      ["halfway", 0.5],
+      ["end", 1],
+    ] as const) {
+      await p.evaluate(
+        (f) =>
+          window.scrollTo(
+            0,
+            (document.documentElement.scrollHeight - window.innerHeight) * f,
+          ),
+        to,
+      );
+      const at = await measure(p);
+      for (const card of at.cards) {
+        expect
+          .soft(
+            overlaps(at.baumy, card),
+            `${label}, ${where}: Baumy over ${card.id}`,
+          )
+          .toBe(false);
+      }
     }
   }
 
@@ -342,13 +356,13 @@ test("the Ask Baumy sheet opens from the top bar on a phone, and from the corner
   // Closing gives the focus back to the button that opened it.
   await expect(button).toBeFocused();
 
-  // A laptop: the corner button.
-  await page.setViewportSize({ width: 1280, height: 800 });
+  // A wide screen: the corner button.
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await expect(page.getByTestId("widget-events")).toBeVisible();
   await expect(button).toHaveCount(1);
   await button.click();
   await expect(sheet).toBeVisible();
-  await expectSheetFont(page, "1280");
-  await page.screenshot({ path: join(shots, "hub-1280-sheet.png") });
+  await expectSheetFont(page, "1440");
+  await page.screenshot({ path: join(shots, "hub-1440-sheet.png") });
 });
