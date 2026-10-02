@@ -23,10 +23,12 @@ import {
   seedMember,
   sessionActor,
 } from "@/test-utils/actions";
+import { STEP_UP_WINDOW_MS, grantStepUp } from "@baumy/db/step-ups";
+import type * as StepUps from "@baumy/db/step-ups";
 import type { Actor, MemberActor } from "@/lib/auth";
+import { FRESH_SESSION_MS } from "@/lib/auth/recent-auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { ActionName } from "./define";
-import { FRESH_SESSION_MS } from "./set-kiosk-pin";
 import {
   DEFAULT_SERVICE_TOKEN_NAME,
   SERVICE_TOKEN_SCOPES,
@@ -34,23 +36,26 @@ import {
 
 // /admin/connections (issue #104), through the real runAction on PGlite:
 // create, rotate and revoke brain's service token. Admin only, UI only, a
-// live session, and a fresh sign-in or the password to hand out a token.
-
-const RIGHT_PASSWORD = "correct horse battery staple";
+// live session, and a recent "Confirm it's you" (issue #135): a session
+// signed in, or confirmed, in the last 10 minutes.
 
 /**
- * What the re-auth path did, in order: the password check and the session
+ * What the re-auth path did, in order: the sudo window read and the session
  * lock (`isLiveSession`, `FOR SHARE`). PGlite has one connection, so the
- * hang itself (Better Auth updating the session row on another connection
- * while we hold the lock) cannot happen here; the order is pinned instead.
+ * hang the order prevents (PR #105) cannot happen here; the order is pinned
+ * instead.
  */
 const calls = vi.hoisted(() => [] as string[]);
-vi.mock("@/lib/auth/password-check", () => ({
-  verifyCurrentPassword: async (pw: string) => {
-    calls.push("verifyCurrentPassword");
-    return pw === RIGHT_PASSWORD;
-  },
-}));
+vi.mock("@baumy/db/step-ups", async (importOriginal) => {
+  const real = await importOriginal<typeof StepUps>();
+  return {
+    ...real,
+    findStepUp: (...args: Parameters<typeof real.findStepUp>) => {
+      calls.push("findStepUp");
+      return real.findStepUp(...args);
+    },
+  };
+});
 vi.mock("@baumy/db/account-security", async (importOriginal) => {
   const real = await importOriginal<typeof AccountSecurity>();
   return {
@@ -117,6 +122,16 @@ async function admin(ageMs = HOUR): Promise<MemberActor> {
 
 const freshAdmin = () => admin(5 * 60_000);
 
+/** Open the sudo window of `actor`'s session at `now`. */
+function confirm(actor: MemberActor, now = FIXED_NOW) {
+  return grantStepUp(db(), {
+    sessionId: actor.sessionId!,
+    userId: actor.userId,
+    method: "passkey",
+    now,
+  });
+}
+
 async function tokenData(res: Awaited<ReturnType<typeof runAction>>) {
   expect(res.ok).toBe(true);
   return (res as { ok: true; data: { token: string } }).data.token;
@@ -180,76 +195,110 @@ describe("create_service_token", () => {
     expect(await listServiceTokens(db())).toHaveLength(1);
   });
 
-  it("needs the password when the sign-in is over 10 minutes old", async () => {
+  it("needs 'Confirm it's you' when the sign-in is over 10 minutes old", async () => {
     const actor = await admin(FRESH_SESSION_MS);
-    const run = (input: Record<string, unknown>) =>
-      runAction("create_service_token", input, ctxFor(actor));
-    await expect(run({})).resolves.toMatchObject({
+    const run = (now = FIXED_NOW) =>
+      runAction("create_service_token", {}, ctxFor(actor, { now }));
+    await expect(run()).resolves.toMatchObject({
       ok: false,
       code: "REAUTH_REQUIRED",
-      message: expect.stringContaining("password"),
+      message: expect.stringContaining("Confirm it's you"),
     });
-    await expect(run({ currentPassword: "wrong" })).resolves.toMatchObject({
-      ok: false,
-      code: "REAUTH_REQUIRED",
-      message: "That password is not right.",
-    });
+    // The old password field is gone: the input refuses it.
+    await expect(
+      runAction(
+        "create_service_token",
+        { currentPassword: "x" },
+        ctxFor(actor),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
     expect(await listServiceTokens(db())).toHaveLength(0);
 
-    const res = await run({ currentPassword: RIGHT_PASSWORD });
-    await tokenData(res);
+    await confirm(actor);
+    await tokenData(await run());
     expect(await listServiceTokens(db())).toHaveLength(1);
-    // The password reaches neither the ledger nor the audit row.
-    const rows = [
-      ...(await t.db().select().from(actionRequests)),
-      ...(await t.db().select().from(auditEvents)),
-    ];
-    expect(rows.length).toBeGreaterThan(0);
-    expect(JSON.stringify(rows)).not.toContain(RIGHT_PASSWORD);
   });
 
-  it("checks the password before it locks the session row", async () => {
-    // Better Auth's verifyPassword may UPDATE the session row on its own
+  it("takes only this session's window, and only while it is open", async () => {
+    const actor = await admin();
+    // Another session of the same admin confirmed: not this one.
+    const otherSession = "sess_other_device";
+    await t
+      .db()
+      .insert(session)
+      .values({
+        id: otherSession,
+        token: `tok-${otherSession}`,
+        userId: actor.userId,
+        expiresAt: new Date(FIXED_NOW.getTime() + 24 * HOUR),
+      });
+    await confirm({ ...actor, sessionId: otherSession });
+    const create = (name: string, now = FIXED_NOW) =>
+      runAction("create_service_token", { name }, ctxFor(actor, { now }));
+    await expect(create("robot-a")).resolves.toMatchObject({
+      ok: false,
+      code: "REAUTH_REQUIRED",
+    });
+
+    await confirm(actor);
+    // The window skips the second prompt too.
+    await tokenData(await create("robot-a"));
+    await tokenData(
+      await create(
+        "robot-b",
+        new Date(FIXED_NOW.getTime() + STEP_UP_WINDOW_MS - 1000),
+      ),
+    );
+    // Then it closes.
+    await expect(
+      create("robot-c", new Date(FIXED_NOW.getTime() + STEP_UP_WINDOW_MS)),
+    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    expect((await listServiceTokens(db())).map((r) => r.name).sort()).toEqual([
+      "robot-a",
+      "robot-b",
+    ]);
+  });
+
+  it("reads the window before it locks the session row", async () => {
+    // A proof checked by Better Auth may UPDATE the session row on its own
     // connection; holding FOR SHARE on it first would hang the request.
     for (const name of [
       "create_service_token",
       "rotate_service_token",
+      "revoke_service_token",
     ] as const) {
-      if (name === "rotate_service_token") {
+      if (name !== "create_service_token") {
         await runAction("create_service_token", {}, ctxFor(await freshAdmin()));
       }
       const actor = await admin();
+      await confirm(actor);
       calls.length = 0;
-      const res = await runAction(
-        name,
-        { name: "baumy-brain", currentPassword: RIGHT_PASSWORD },
-        ctxFor(actor),
-      );
+      const res = await runAction(name, { name: "baumy-brain" }, ctxFor(actor));
       expect(res.ok).toBe(true);
-      expect(calls).toEqual(["verifyCurrentPassword", "isLiveSession"]);
+      expect(calls).toEqual(["findStepUp", "isLiveSession"]);
+      if (name === "rotate_service_token") {
+        await runAction(
+          "revoke_service_token",
+          { name: "baumy-brain" },
+          ctxFor(actor),
+        );
+      }
     }
   });
 
-  it("slows password guessing: the 6th try in 15 minutes is refused", async () => {
+  it("refuses the 11th try in 15 minutes", async () => {
     const actor = await admin();
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 10; i += 1) {
       await expect(
-        runAction(
-          "create_service_token",
-          { currentPassword: `wrong-${i}` },
-          ctxFor(actor),
-        ),
+        runAction("create_service_token", {}, ctxFor(actor)),
       ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
     }
+    await confirm(actor);
     calls.length = 0;
     await expect(
-      runAction(
-        "create_service_token",
-        { currentPassword: RIGHT_PASSWORD },
-        ctxFor(actor),
-      ),
+      runAction("create_service_token", {}, ctxFor(actor)),
     ).resolves.toMatchObject({ ok: false, code: "RATE_LIMITED" });
-    // Refused before any password check, and nothing minted.
+    // Refused before anything is read, and nothing minted.
     expect(calls).toEqual([]);
     expect(await listServiceTokens(db())).toHaveLength(0);
   });
@@ -301,7 +350,7 @@ describe("rotate_service_token", () => {
     expect(await listServiceTokens(db())).toHaveLength(0);
   });
 
-  it("needs a fresh sign-in or the password, and a live session", async () => {
+  it("needs a recent 'Confirm it's you', and a live session", async () => {
     const fresh = await freshAdmin();
     await runAction("create_service_token", {}, ctxFor(fresh));
     const stale = await admin();
@@ -320,12 +369,17 @@ describe("rotate_service_token", () => {
 });
 
 describe("revoke_service_token", () => {
-  it("revokes the live token once, with no password needed", async () => {
+  it("revokes the live token once, after 'Confirm it's you'", async () => {
     const fresh = await freshAdmin();
     const token = await tokenData(
       await runAction("create_service_token", {}, ctxFor(fresh)),
     );
     const stale = await admin();
+    await expect(
+      runAction("revoke_service_token", { name: "baumy-brain" }, ctxFor(stale)),
+    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    await expect(findLiveServiceToken(db(), token)).resolves.not.toBeNull();
+    await confirm(stale);
     await expect(
       runAction("revoke_service_token", { name: "baumy-brain" }, ctxFor(stale)),
     ).resolves.toEqual({ ok: true, data: { name: "baumy-brain" } });

@@ -18,6 +18,7 @@ import {
   signInMethods,
 } from "@baumy/db/account-security";
 import type { MemberActor } from "@/lib/auth";
+import { requireRecentAuth } from "@/lib/auth/recent-auth";
 import { sessionLabel } from "@/lib/auth/session-label";
 import type { ActionCtx } from "./define";
 import { defineAction } from "./define";
@@ -75,6 +76,21 @@ export async function liveActor(
 
 export const isFailure = (x: MemberActor | ActionFailure): x is ActionFailure =>
   "ok" in x;
+
+/**
+ * `liveActor`, for a sensitive change: the session must also have confirmed
+ * it is its member lately ("Confirm it's you", `requireRecentAuth`, issue
+ * #135). The window is read BEFORE the session row is share-locked, the
+ * order service-tokens.ts explains.
+ */
+export async function confirmedActor(
+  ctx: ActionCtx,
+  signedOut: string = SIGNED_OUT,
+): Promise<MemberActor | ActionFailure> {
+  const recent = await requireRecentAuth(ctx);
+  if (!recent.ok) return recent;
+  return liveActor(ctx, signedOut);
+}
 
 const NO_WAY_IN =
   "That's your only way in. Add a password, a passkey or Google first.";
@@ -269,7 +285,7 @@ export const removePasskey = defineAction({
   name: "remove_passkey",
   title: "Remove a passkey",
   description:
-    "Removes one of the signed-in member's passkeys. Refused when it is their only way in.",
+    "Removes one of the signed-in member's passkeys. Refused when it is their only way in. Needs a recent 'Confirm it's you'.",
   consent: "Remove your passkeys",
   kind: "write",
   risk: "destructive",
@@ -277,7 +293,7 @@ export const removePasskey = defineAction({
   requires: "session",
   input: z.strictObject({ passkeyId: PasskeyId }),
   async execute(ctx, { passkeyId }) {
-    const actor = await liveActor(ctx);
+    const actor = await confirmedActor(ctx);
     if (isFailure(actor)) return actor;
     const { userId } = actor;
     await lockAuthUser(ctx.db, userId);
@@ -302,7 +318,7 @@ export const unlinkGoogle = defineAction({
   name: "unlink_google",
   title: "Unlink Google",
   description:
-    "Unlinks Google from the signed-in member's account, so Continue with Google no longer signs in to it until they press Link Google again. Refused when Google is their only way in.",
+    "Unlinks Google from the signed-in member's account, so Continue with Google no longer signs in to it until they press Link Google again. Refused when Google is their only way in. Needs a recent 'Confirm it's you'.",
   consent: "Unlink Google from your account",
   kind: "write",
   risk: "destructive",
@@ -310,7 +326,7 @@ export const unlinkGoogle = defineAction({
   requires: "session",
   input: z.strictObject({}),
   async execute(ctx) {
-    const actor = await liveActor(ctx);
+    const actor = await confirmedActor(ctx);
     if (isFailure(actor)) return actor;
     const { userId } = actor;
     await lockAuthUser(ctx.db, userId);

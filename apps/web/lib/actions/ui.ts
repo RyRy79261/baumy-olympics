@@ -76,13 +76,28 @@ export async function actionForm<N extends ActionName>(
   name: N,
   form: FormData,
 ): Promise<ActionResult<ActionOutput<N>>> {
+  const requestId = form.get("requestId");
+  return actionInput(
+    name,
+    formDataToInput(form),
+    typeof requestId === "string" && requestId !== "" ? requestId : undefined,
+  );
+}
+
+/**
+ * `actionForm` for an input that is not a form: a JSON value the client built
+ * (a WebAuthn assertion, say). The action's Zod schema parses it as for any
+ * other surface.
+ */
+export async function actionInput<N extends ActionName>(
+  name: N,
+  input: unknown,
+  requestId: string | undefined,
+): Promise<ActionResult<ActionOutput<N>>> {
   try {
-    const requestId = form.get("requestId");
-    const ctx = await uiRequestCtx(
-      typeof requestId === "string" && requestId !== "" ? requestId : undefined,
-    );
+    const ctx = await uiRequestCtx(requestId);
     if (!ctx) return fail("UNAUTHENTICATED", "Sign in to do this.");
-    return await runAction(name, formDataToInput(form), ctx);
+    return await runAction(name, input, ctx);
   } catch (err) {
     unstable_rethrow(err);
     console.error(`[actionForm:${name}]`, err);

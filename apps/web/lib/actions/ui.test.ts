@@ -20,7 +20,8 @@ const headersMock = vi.fn(
 vi.mock("@/lib/auth", () => ({ getActor: () => getActor() }));
 vi.mock("next/headers", () => ({ headers: () => headersMock() }));
 
-const { actionForm, formDataToInput, uiRequestCtx } = await import("./ui");
+const { actionForm, actionInput, formDataToInput, uiRequestCtx } =
+  await import("./ui");
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -77,6 +78,26 @@ describe("uiRequestCtx", () => {
   it("is null for a paired kiosk: it has its own adapter and surface", async () => {
     getActor.mockResolvedValue(kioskActor("m1"));
     await expect(uiRequestCtx("req-12345678")).resolves.toBeNull();
+  });
+});
+
+describe("actionInput", () => {
+  it("runs the action with a JSON input, as the signed-in member", async () => {
+    const me = await seedMember(db(), { displayName: "Old" });
+    getActor.mockResolvedValue(sessionActor(me));
+    const res = await actionInput(
+      "update_my_profile",
+      { displayName: "Json" },
+      "input-request-0001",
+    );
+    expect(res).toMatchObject({ ok: true, data: { displayName: "Json" } });
+    const audits = await t.db().select().from(auditEvents);
+    expect(audits).toHaveLength(1);
+    getActor.mockResolvedValue(null);
+    await expect(actionInput("whoami", {}, undefined)).resolves.toMatchObject({
+      ok: false,
+      code: "UNAUTHENTICATED",
+    });
   });
 });
 
