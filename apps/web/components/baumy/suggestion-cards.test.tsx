@@ -192,6 +192,47 @@ describe.each([false, true])("SuggestionCards (bubble: %s)", (bubble) => {
     expect(document.querySelector('form[aria-label="Ryan\'s PIN"]')).toBeNull();
   });
 
+  it("never opens the PinPad for a member with no PIN: the rest run, the PIN cards wait with why (issue #145)", () => {
+    const note = proposal({ name: "create_note" });
+    const confirm = proposal({ name: "dispute_completion", needsPin: true });
+    const props = mount(rowsFor([note, confirm]), {
+      bubble,
+      kiosk: true,
+      hasPin: false,
+      actingName: "Charl",
+    });
+    // Before Confirm all, no help yet.
+    expect(document.querySelector('[data-testid="no-pin-notice"]')).toBeNull();
+    act(() => button("Confirm all").click());
+    expect(props.onConfirmAll).toHaveBeenCalledWith();
+    expect(document.querySelector('form[aria-label="Ryan\'s PIN"]')).toBeNull();
+
+    // The sheet ran the note and left the PIN card waiting with why.
+    act(() => root!.unmount());
+    document.body.innerHTML = "";
+    const after: ReviewRow[] = [
+      { proposal: note, state: "saved", needsPin: false, message: "Saved." },
+      {
+        proposal: confirm,
+        state: "pending",
+        needsPin: true,
+        message: "Charl hasn't set a personal PIN yet.",
+      },
+    ];
+    mount(after, { bubble, kiosk: true, hasPin: false, actingName: "Charl" });
+    const notice = document.querySelector('[data-testid="no-pin-notice"]');
+    expect(notice).not.toBeNull();
+    expect(notice!.textContent).toContain(
+      "Charl hasn't set a personal PIN yet",
+    );
+    expect(
+      notice!.querySelector('[aria-label^="QR code: set your personal PIN"]'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('[role="group"][aria-label="Ryan\'s PIN"]'),
+    ).toBeNull();
+  });
+
   it("confirms without a PIN off the kiosk, and while busy says Saving", () => {
     const props = mount(rowsFor([proposal({ needsPin: true })]), { bubble });
     act(() => button("Confirm all").click());
