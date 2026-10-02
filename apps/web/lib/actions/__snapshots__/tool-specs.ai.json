@@ -13,6 +13,19 @@
     "risk": "safe"
   },
   {
+    "name": "get_my_data",
+    "title": "What Baumy keeps about me",
+    "description": "What the app stores about the member asking, as counts, dates and names: how they sign in, their signed-in devices, their profile, their completions, notes (deleted ones are kept), proof photos and when each is deleted, audit-log entries naming them, their AI usage and connected apps, plus the retention rules. Only ever about the asker; it never shows IP addresses or anyone else's data. Use it for 'what do you keep about me?'.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "kind": "read",
+    "risk": "safe"
+  },
+  {
     "name": "list_chores",
     "title": "List chores",
     "description": "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (overdue on its own rhythm: its last completion plus the larger of its interval and its cooldown has passed, or falls before midnight in Berlin; a chore never done is never urgent), `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",

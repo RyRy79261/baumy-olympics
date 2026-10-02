@@ -34,6 +34,7 @@ export const ACTION_NAMES = [
   "list_mcp_connections",
   "revoke_mcp_connection",
   "get_account_security",
+  "get_my_data",
   "revoke_session",
   "revoke_other_sessions",
   "rename_passkey",

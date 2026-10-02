@@ -87,4 +87,10 @@ describe("commandSystemPrompt", () => {
     expect(BAUMY_PERSONA).toContain("only when the context below says");
     expect(BAUMY_PERSONA).not.toContain("Admin work (chores");
   });
+
+  it("answers 'what do you keep about me' with get_my_data and the privacy page (issue #144)", () => {
+    expect(BAUMY_PERSONA).toContain("call get_my_data");
+    expect(BAUMY_PERSONA).toContain("/privacy");
+    expect(BAUMY_PERSONA).toContain("never describe another member's data");
+  });
 });
