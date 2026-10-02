@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { rosterColours } from "@/lib/members/characters";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { householdMembers } from "@/lib/members/household";
-import { PageHeading } from "@baumy/ui";
 import { HubHome } from "@/components/hub/hub-home";
 import { PostReminderForm } from "@/components/hub/post-reminder-form";
 import { SetPinNudge } from "@/components/hub/set-pin-nudge";
@@ -48,13 +47,15 @@ export default async function HubPage() {
   ]);
   return (
     <>
+      {/* No visible heading block (owner ruling 2026-10-03, issue #152):
+          the header row is the page's head, as on the kiosk dashboard, and
+          this h1 names the page for a screen reader. tabIndex -1 lets the
+          PIN strip's × hand the focus to it. */}
+      <h1 className="sr-only" tabIndex={-1}>
+        Hub
+      </h1>
       {/* A slim strip above everything, never a card (issue #152). */}
       {hasPin ? null : <SetPinNudge memberId={me.memberId} />}
-      <PageHeading
-        eyebrow="Baumy Olympics"
-        title="Hub"
-        description={`Welcome, ${me.displayName}.`}
-      />
       <HubHome
         hub={{ ...hub, events, shopping }}
         voice={voiceConfigured()}

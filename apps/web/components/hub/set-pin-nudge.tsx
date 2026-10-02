@@ -55,18 +55,15 @@ export function SetPinNudge({ memberId }: { memberId: string }) {
     }
     hiddenThisVisit.add(memberId);
     for (const l of listeners) l();
-    // The × goes with the strip: focus moves on to the page's heading, the
-    // next thing, rather than falling back to the top of the document.
-    const heading = document.querySelector<HTMLElement>("main h1");
-    if (heading) {
-      heading.tabIndex = -1;
-      heading.focus();
-    }
+    // The × goes with the strip: focus moves on to the page's heading (the
+    // hub's screen-reader h1, focusable with tabIndex -1), rather than
+    // falling back to the top of the document.
+    document.querySelector<HTMLElement>("main h1")?.focus();
   };
   return (
     <div
       data-testid="set-pin-nudge"
-      className="pixel-frame mb-4 flex items-center gap-3 bg-bm-surface py-1 pr-1 pl-4 text-base text-bm-text"
+      className="pixel-frame mb-6 flex items-center gap-3 bg-bm-surface py-1 pr-1 pl-4 text-base text-bm-text"
     >
       <p className="min-w-0 flex-1">
         {/* One line on a phone too. */}
