@@ -5,7 +5,7 @@ import { SET_PIN_URL } from "@/lib/kiosk/constants";
 
 // What the kiosk shows instead of the PinPad when the acting member has no
 // personal PIN (issue #145): who it is, what the PIN is for (today only a
-// dispute, SPEC §12 decision 26), and a QR code
+// dispute, SPEC §12 decision 27), and a QR code
 // to Settings on their phone, where they set it. Never a PinPad they cannot
 // use.
 

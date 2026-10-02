@@ -129,7 +129,7 @@ async function runEvent(ctx: ActionCtx, id: string, event: VerificationEvent) {
   };
 }
 
-// The kiosk's PIN scope (owner ruling 2026-10-02, SPEC §12 decision 26,
+// The kiosk's PIN scope (owner ruling 2026-10-02, SPEC §12 decision 27,
 // issue #145): only a dispute asks the acting member's PIN. Confirming,
 // undoing, withdrawing and conceding run as the member picked on the kiosk,
 // with no PIN. Each is one constant, so the ruling flips in one line.

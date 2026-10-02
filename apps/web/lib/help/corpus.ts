@@ -42,11 +42,11 @@ const GATE_NOTES: Record<Gate, string | null> = {
   service: "Only Baumy in Telegram can.",
 };
 
-/** The gate notes of actions whose gate depends on what is asked. */
-const INPUT_GATE_NOTES: Readonly<Record<string, string>> = {
-  log_completion:
-    "On the kitchen screen, logging it for someone else asks for your PIN.",
-};
+/**
+ * The gate notes of actions whose gate depends on what is asked. None today:
+ * logging for someone else needs no PIN on the kiosk since issue #145.
+ */
+const INPUT_GATE_NOTES: Readonly<Record<string, string>> = {};
 
 function gateNote(def: AnyActionDef): string | null {
   if (typeof def.requires !== "function") return GATE_NOTES[def.requires];

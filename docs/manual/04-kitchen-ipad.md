@@ -23,7 +23,9 @@ After {{KIOSK_IDLE_SECONDS}} seconds untouched, the screen forgets who was actin
 
 ## Your personal PIN
 
-The kitchen screen is shared, so the kitchen iPad asks for **your personal PIN** for some actions, before it does them as you. Your own settings are only changed on your phone.
+The kitchen screen is shared, but almost everything there runs as whoever tapped their avatar, with no PIN: logging a chore (for yourself or someone else), confirming, undoing, notes, the calendar, the shopping list and Baumy. The iPad asks for **your personal PIN** only before it **disputes** a chore as you. Your own settings are only changed on your phone.
+
+If you have not set a PIN, the iPad never shows a PIN pad you cannot use: it says "<your name> hasn't set a personal PIN yet" with a QR code that opens Settings on your phone. When you ask Baumy for several things, **Confirm all** does the rest and leaves only the dispute waiting. After you join, the hub reminds you to set one.
 
 Set your PIN on your phone, in **Settings → Your personal PIN**: {{KIOSK_PIN_MIN_DIGITS}} to {{KIOSK_PIN_MAX_DIGITS}} digits, yours alone. Changing a PIN you already have asks you to confirm it's you first. On the iPad, **Check my PIN** on the Bounties page checks it without changing anything. Keep it to yourself, and never use someone else's.
 

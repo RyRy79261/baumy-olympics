@@ -25,7 +25,7 @@ import { fail } from "./result";
 // kitchen screen. Any member may add, change, pin or delete any note; it is
 // the household's board. Every write is `member`: on the kiosk the acting
 // member (the avatar tapped) writes it with no PIN, since a note touches
-// nobody's points (owner ruling 2026-10-02, SPEC §12 decision 26, issue
+// nobody's points (owner ruling 2026-10-02, SPEC §12 decision 27, issue
 // #145; before, every change asked the PIN).
 //
 // Note bodies are data. They are shown only through the sanitising markdown

@@ -124,11 +124,14 @@ describe("what Baumy can do", () => {
       text.split("\n").find((l) => l.includes(`(\`${name}\`)`)) ?? "";
     expect(lineOf("get_standings")).toContain("Baumy looks it up and answers.");
     expect(lineOf("create_note")).toContain("tap Confirm all");
-    expect(lineOf("create_note")).toContain("acting member's PIN");
+    // Issue #145: only a dispute asks the PIN on the kitchen screen.
+    expect(lineOf("dispute_completion")).toContain("acting member's PIN");
+    expect(lineOf("create_note")).not.toContain("PIN");
     expect(lineOf("delete_note")).toContain("marked red");
     expect(lineOf("create_bounty")).toContain("Only a household admin");
     expect(lineOf("confirm_completion")).toContain("never for someone else");
-    expect(lineOf("log_completion")).toContain("logging it for someone else");
+    expect(lineOf("log_completion")).toContain("`log_completion`");
+    expect(lineOf("log_completion")).not.toContain("PIN");
     expect(lineOf("create_reminder")).not.toContain("PIN");
   });
 
@@ -144,6 +147,7 @@ describe("what Baumy can do", () => {
     const def = {
       ...REGISTRY.log_completion,
       name: "log_mystery",
+      requires: () => "member",
     } as unknown as AnyActionDef;
     expect(() => capabilitiesSection({ log_mystery: def })).toThrow(
       /log_mystery: its gate depends on the input/,

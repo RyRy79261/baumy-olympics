@@ -37,7 +37,7 @@ Open **Bounties**, pick the chore and tap **Log it**. You can also tell Baumy ("
 
 When a chore is logged, its points count straight away, shown dimmed as provisional.
 
-- Another housemate can **dispute** a logged chore within the dispute window, {{CHALLENGE_WINDOW_H}} hours after it was logged, with a reason. If nobody does, the points are final when the window ends.
+- Another housemate can **dispute** a logged chore within the dispute window, {{CHALLENGE_WINDOW_H}} hours after it was logged, with a reason. If nobody does, the points are final when the window ends. On the kitchen iPad a dispute asks for your personal PIN; nothing else about chores does.
 - A disputed chore scores nothing while it is disputed. If the person who did it attached a photo in time, it waits for them and the person who disputed (or an admin) to settle it; otherwise it is dropped when the window ends.
 - The person who disputed can **withdraw** the dispute, and the person who did the chore can **concede** it.
 

@@ -45,7 +45,7 @@ import { fail, type ActionFailure } from "./result";
 //
 // The writes are `member`: on the kiosk the acting member changes the
 // calendar with no PIN, since an event touches nobody's points (owner ruling
-// 2026-10-02, SPEC §12 decision 26, issue #145; issue #134 had made them
+// 2026-10-02, SPEC §12 decision 27, issue #145; issue #134 had made them
 // `attested`).
 
 /** The calendar's failures as sentences people can act on. */
