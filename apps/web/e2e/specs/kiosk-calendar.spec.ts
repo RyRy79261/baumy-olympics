@@ -8,27 +8,20 @@ import {
   type Page,
 } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import {
-  expectKioskTargets,
-  kioskNav,
-  pairedKiosk,
-  typePin,
-} from "../lib/kiosk";
+import { expectKioskTargets, kioskNav, pairedKiosk } from "../lib/kiosk";
 import { pickTile } from "../lib/pickers";
 
 // Issue #134: the kitchen screen's Calendar tab is a manager, not another
 // month (the dashboard shows that). On the iPad in portrait (820×1180),
 // against the in-memory calendar that stands in for Google under
 // E2E_TEST_MODE=1: the list of what is coming up, a big "Add event", and
-// add → see it in the list → edit → delete, each change asking the acting
-// member for their PIN in that request (SPEC §6.2), and who each event is
-// for. Then the calendar unconnected and down, for this browser only (the
+// add → see it in the list → edit → delete, each change made as the acting
+// member with no PIN, by a member who never set one (owner ruling
+// 2026-10-02, issue #145), and who each event is for. Then the calendar unconnected and down, for this browser only (the
 // `baumy_e2e_calendar` cookie).
 //
 // Screenshots go to E2E_SHOTS_DIR when it is set (the PR's shots),
 // otherwise to the test's own output folder.
-
-const PIN = "2580";
 
 function shotsDir(name: string, outputPath: (p: string) => string): string {
   const dir = process.env.E2E_SHOTS_DIR ?? outputPath(name);
@@ -43,8 +36,8 @@ function berlinDay(days: number): string {
   });
 }
 
-/** A housemate with a kiosk PIN, set from their own phone. */
-async function memberWithPin(browser: Browser, admin: Page, name: string) {
+/** A housemate who never set a personal PIN. */
+async function newMember(browser: Browser, admin: Page, name: string) {
   const invite = await mintCode(admin, 1);
   const member = await newAccount(
     browser,
@@ -52,13 +45,6 @@ async function memberWithPin(browser: Browser, admin: Page, name: string) {
   );
   await redeem(member.page, invite, name);
   await expect(member.page).toHaveURL(/\/$/);
-  await member.page.goto("/settings");
-  await member.page.getByLabel("PIN", { exact: true }).fill(PIN);
-  await member.page.getByLabel("Type it again").fill(PIN);
-  await member.page.getByRole("button", { name: "Set PIN" }).click();
-  await expect(
-    member.page.getByRole("status").filter({ hasText: "PIN saved." }),
-  ).toBeVisible();
   await member.context.close();
 }
 
@@ -66,7 +52,7 @@ function eventRow(scope: Page | Locator, title: string): Locator {
   return scope.getByRole("button", { name: new RegExp(`^${title}, `) });
 }
 
-test("add, see, edit and delete an event on the kiosk, with the PIN", async ({
+test("add, see, edit and delete an event on the kiosk, with no PIN", async ({
   page,
   browser,
 }, testInfo) => {
@@ -81,7 +67,7 @@ test("add, see, edit and delete an event on the kiosk, with the PIN", async ({
   const shots = shotsDir("kiosk-calendar", (p) => testInfo.outputPath(p));
 
   await founderAdmin(page, project);
-  await memberWithPin(browser, page, name);
+  await newMember(browser, page, name);
   const ipad = await pairedKiosk(browser, page, `iPad cal ${tag}`);
   const kiosk = ipad.page;
 
@@ -124,12 +110,7 @@ test("add, see, edit and delete an event on the kiosk, with the PIN", async ({
   await kiosk.screenshot({ path: join(shots, "2-add.png") });
   await sheet.getByRole("button", { name: "Add event" }).click();
 
-  // The PIN is asked for in that request; the form keeps what was typed.
-  const pin = kiosk.getByRole("dialog", { name: `${name}'s PIN` });
-  await expect(pin).toBeVisible();
-  await expect(sheet.getByLabel("Title")).toHaveValue(title);
-  await kiosk.screenshot({ path: join(shots, "3-pin.png") });
-  await typePin(pin, PIN);
+  // No PIN is asked (issue #145): it saves at once.
   await expect(sheet).toBeHidden();
   await expect(
     kiosk
@@ -158,7 +139,7 @@ test("add, see, edit and delete an event on the kiosk, with the PIN", async ({
   await expect(details.getByTestId("event-for-name")).toHaveText(founder);
   await details.getByRole("button", { name: "Cancel" }).click();
 
-  // Edit: a new title, for everyone. The PIN again, for this request.
+  // Edit: a new title, for everyone. Still no PIN.
   await row.click();
   const edit = kiosk.getByRole("dialog", { name: `Edit ${title}` });
   await expect(edit.getByTestId("event-for-name")).toHaveText(founder);
@@ -166,7 +147,6 @@ test("add, see, edit and delete an event on the kiosk, with the PIN", async ({
   await edit.getByLabel("Title").fill(renamed);
   await pickTile(edit, "Who is it for?", "Everyone");
   await edit.getByRole("button", { name: "Save" }).click();
-  await typePin(kiosk.getByRole("dialog", { name: `${name}'s PIN` }), PIN);
   await expect(edit).toBeHidden();
   const renamedRow = eventRow(later, renamed);
   await expect(renamedRow).toBeVisible();
@@ -187,7 +167,7 @@ test("add, see, edit and delete an event on the kiosk, with the PIN", async ({
   await expect(confirm).toBeHidden();
   await expect(renamedRow).toBeVisible();
 
-  // Then for real, with the PIN.
+  // Then for real, with no PIN.
   await renamedRow.click();
   await kiosk
     .getByRole("dialog", { name: `Edit ${renamed}` })
@@ -195,7 +175,6 @@ test("add, see, edit and delete an event on the kiosk, with the PIN", async ({
     .click();
   await expectKioskTargets(confirm);
   await confirm.getByRole("button", { name: "Delete event" }).click();
-  await typePin(kiosk.getByRole("dialog", { name: `${name}'s PIN` }), PIN);
   await expect(
     kiosk.getByRole("status").filter({ hasText: `Deleted ${renamed}.` }),
   ).toBeVisible();

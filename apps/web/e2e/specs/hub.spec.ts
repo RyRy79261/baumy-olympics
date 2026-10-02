@@ -1,17 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import {
-  expectKioskTargets,
-  kioskNav,
-  pairedKiosk,
-  typePin,
-} from "../lib/kiosk";
+import { expectKioskTargets, kioskNav, pairedKiosk } from "../lib/kiosk";
 
 // Issue #20: the hub and notes. A note written on a phone shows in the
 // kitchen dashboard's Messages (ADR 0005 §3) after it re-reads itself (the
 // focus refresh), its markdown cannot inject HTML or script, and the home
 // stays one screen with no scrollbars at 820×1180 whatever the notes hold.
-// On the kiosk every change to a note needs the acting member's PIN.
+// On the kiosk a note is written as the acting member with no PIN, even by
+// one who never set a PIN (owner ruling 2026-10-02, issue #145); a new
+// member is nudged on the hub to set their personal PIN.
 //
 // The household is shared by the specs running in parallel, so each note
 // has a title of its own.
@@ -137,7 +134,7 @@ test("pin a note on the phone and see it on the kiosk home after a refresh", asy
   await ipad.context.close();
 });
 
-test("on the kiosk, adding a note asks for the member's PIN", async ({
+test("on the kiosk, a member with no PIN adds and unpins a note", async ({
   page,
   browser,
 }, testInfo) => {
@@ -146,20 +143,19 @@ test("on the kiosk, adding a note asks for the member's PIN", async ({
   const suffix = Math.random().toString(36).slice(2, 8);
   const partner = `Partner ${suffix}`;
   const title = `Bins ${suffix}`;
-  const PIN = "8642";
 
   await founderAdmin(page, project);
   const invite = await mintCode(page, 1);
   const member = await newAccount(browser, `notes-${project}`);
   await redeem(member.page, invite, partner);
   await expect(member.page).toHaveURL(/\/$/);
-  await member.page.goto("/settings");
-  await member.page.getByLabel("PIN", { exact: true }).fill(PIN);
-  await member.page.getByLabel("Type it again").fill(PIN);
-  await member.page.getByRole("button", { name: "Set PIN" }).click();
-  await expect(
-    member.page.getByRole("status").filter({ hasText: "PIN saved." }),
-  ).toBeVisible();
+  // After joining, the hub nudges them to set their personal PIN.
+  const nudge = member.page.getByTestId("set-pin-nudge");
+  await expect(nudge).toContainText("Set your personal PIN");
+  await expect(nudge.getByRole("link", { name: "Set it now" })).toHaveAttribute(
+    "href",
+    "/settings#pin",
+  );
 
   const ipad = await pairedKiosk(browser, page, `iPad ${suffix}`);
   const kiosk = ipad.page;
@@ -182,16 +178,7 @@ test("on the kiosk, adding a note asks for the member's PIN", async ({
   await expectKioskTargets(sheet);
   await sheet.getByRole("button", { name: "Add note" }).click();
 
-  // The first send had no PIN, so the pad opens; a wrong one is refused.
-  const pad = kiosk.getByRole("dialog", { name: `${partner}'s PIN` });
-  await expect(pad).toBeVisible();
-  await expectKioskTargets(pad);
-  await typePin(pad, "1111");
-  await expect(
-    pad.getByRole("alert").filter({ hasText: "That PIN is not right." }),
-  ).toBeVisible();
-  await expect(kiosk.getByTestId(`note-${title}`)).toHaveCount(0);
-  await typePin(pad, PIN);
+  // No PIN is asked: it saves at once, as the member who tapped in.
   await expect(sheet).toBeHidden();
   await expect(
     kiosk.getByRole("status").filter({ hasText: `Added ${title}.` }),
@@ -199,14 +186,16 @@ test("on the kiosk, adding a note asks for the member's PIN", async ({
   const note = kiosk.getByTestId(`note-${title}`);
   await expect(note).toContainText(`By ${partner}`);
   await expect(note.locator("em")).toHaveText("Tuesday");
+  await expect(kiosk.getByTestId("no-pin-notice")).toHaveCount(0);
 
-  // Unpinning is a change too: it asks again.
+  // Unpinning needs none either.
   await note.getByRole("button", { name: "Unpin" }).click();
-  await expect(pad).toBeVisible();
-  await typePin(pad, PIN);
   await expect(
     kiosk.getByRole("status").filter({ hasText: `Unpinned ${title}.` }),
   ).toBeVisible();
+  await expect(
+    kiosk.getByRole("dialog", { name: `${partner}'s PIN` }),
+  ).toBeHidden();
 
   await ipad.context.close();
   await member.context.close();

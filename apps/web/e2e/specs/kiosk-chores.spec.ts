@@ -1,17 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { addChore, openChore, tile } from "../lib/chores";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
-import {
-  expectKioskTargets,
-  openKioskChores,
-  pairedKiosk,
-  typePin,
-} from "../lib/kiosk";
+import { expectKioskTargets, openKioskChores, pairedKiosk } from "../lib/kiosk";
 
 // Issue #14 on the kitchen iPad: the chore grid acts as the member whose
 // avatar was tapped. The founder builds a streak of 2; the partner breaks it
 // and sees STREAK BROKEN with the broken length; then the partner logs one
-// FOR the founder, which needs the partner's PIN in that request.
+// FOR the founder, which vouches for them and, since the owner's ruling of
+// 2026-10-02 (issue #145), needs no PIN.
 //
 // The chore has no cooldown, so the three logs can follow each other.
 
@@ -85,18 +81,17 @@ test("on the kiosk, break the partner's streak and log for someone else", async 
   await expect(kiosk.getByTestId("score-pop")).toHaveText("+28");
   await expect(tile(kiosk, chore)).toContainText(`${partner} · streak 1`);
 
-  // The partner logs one for the founder: the partner's PIN, in the request.
+  // The partner logs one for the founder: a vouch, with no PIN.
   sheet = await openChore(kiosk, chore);
   await sheet.getByText(founder, { exact: true }).click();
   await expect(sheet.getByTestId("log-preview")).toContainText("+24, streak 1");
-  await expect(sheet).toContainText("your PIN is needed");
+  await expect(sheet).toContainText(`You are vouching that ${founder} did it.`);
+  await expect(sheet).not.toContainText("your PIN is needed");
   await sheet.getByRole("button", { name: "Log it" }).click();
-  const pad = kiosk.getByRole("dialog", { name: `${partner}'s PIN` });
-  await expect(pad).toBeVisible();
-  await expectKioskTargets(pad);
-  await typePin(pad, PIN);
-  await expect(pad).toBeHidden();
   await expect(kiosk.getByTestId("score-pop")).toHaveText("+24");
+  await expect(
+    kiosk.getByRole("dialog", { name: `${partner}'s PIN` }),
+  ).toBeHidden();
   await expect(
     kiosk
       .getByRole("status")

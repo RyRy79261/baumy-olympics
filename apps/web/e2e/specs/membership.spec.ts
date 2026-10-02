@@ -108,6 +108,8 @@ test("a member sets a kiosk PIN and creates a Telegram link code", async ({
   await expect(member.page).toHaveURL(/\/$/);
 
   const p = member.page;
+  // After joining, the hub nudges them to set their personal PIN (#145).
+  await expect(p.getByTestId("set-pin-nudge")).toBeVisible();
   await openAccountMenu(p);
   await p.getByRole("link", { name: "Settings" }).click();
   await expect(
@@ -126,6 +128,11 @@ test("a member sets a kiosk PIN and creates a Telegram link code", async ({
   await expect(
     p.getByRole("status").filter({ hasText: "PIN saved." }),
   ).toBeVisible();
+  // With a PIN set, the hub's nudge is gone.
+  await p.goto("/");
+  await expect(p.getByRole("heading", { name: "Hub", level: 1 })).toBeVisible();
+  await expect(p.getByTestId("set-pin-nudge")).toHaveCount(0);
+  await p.goto("/settings");
 
   // Changing it needs "Confirm it's you" (issue #135), but a session this
   // fresh (under 10 minutes) counts, so no dialog opens and no password

@@ -10,12 +10,14 @@ import {
 
 // Issue #15 on the kitchen iPad: the founder self-claims a chore on the
 // kiosk; when the partner taps their avatar, the "Needs your OK" banner shows
-// it, and confirming it asks for the partner's PIN in that request. The
-// founder's own claims show there with Undo, which asks for their PIN.
+// it. Since the owner's ruling of 2026-10-02 (issue #145, SPEC §12 decision
+// 26) only a dispute asks for the PIN: the founder (who never set a PIN)
+// undoes one of their own claims and the partner confirms one with no PIN,
+// then disputes the last with theirs.
 
 const PIN = "2580";
 
-test("on the kiosk, confirm a housemate's claim with a PIN; undo asks for one too", async ({
+test("on the kiosk, undo and confirm need no PIN; a dispute asks for one", async ({
   page,
   browser,
 }, testInfo) => {
@@ -43,24 +45,28 @@ test("on the kiosk, confirm a housemate's claim with a PIN; undo asks for one to
   const ipad = await pairedKiosk(browser, page, `iPad ${suffix}`);
   const kiosk = ipad.page;
 
-  // The founder logs it twice; the banner offers to undo them.
+  // The founder logs it three times; the banner offers to undo them.
   await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     const sheet = await openChore(kiosk, chore);
     await sheet.getByRole("button", { name: "Log it" }).click();
     await expect(sheet).toBeHidden();
   }
   const banner = kiosk.getByTestId("needs-ok-banner");
   const mine = banner.getByTestId(`claim-${chore}`);
-  await expect(mine).toHaveCount(2);
+  await expect(mine).toHaveCount(3);
   await expectKioskTargets(mine.first());
+  // Undo needs no PIN on the kiosk, so the founder's missing PIN is fine.
   await mine.first().getByRole("button", { name: "Undo" }).click();
-  // On the kiosk, undo asks for the logger's PIN too; the founder backs out.
-  const founderPad = kiosk.getByRole("dialog", { name: `${founder}'s PIN` });
-  await expect(founderPad).toBeVisible();
-  await founderPad.getByRole("button", { name: "Cancel" }).click();
+  await expect(
+    kiosk.getByRole("status").filter({ hasText: `Undid ${chore}.` }),
+  ).toBeVisible();
+  await expect(mine).toHaveCount(2);
+  await expect(
+    kiosk.getByRole("dialog", { name: `${founder}'s PIN` }),
+  ).toBeHidden();
 
   // The partner taps in: the banner counts what waits on them.
   await kiosk.getByRole("button", { name: partner, exact: true }).click();
@@ -68,20 +74,32 @@ test("on the kiosk, confirm a housemate's claim with a PIN; undo asks for one to
   await expect(
     banner.getByRole("heading", { name: /^\d+ claims? needs? your OK$/ }),
   ).toBeVisible();
-  const theirs = banner.getByTestId(`claim-${chore}`).first();
-  await expect(theirs).toContainText(`${founder} did ${chore}`);
-  await theirs.getByRole("button", { name: "Confirm" }).click();
+  const theirs = banner.getByTestId(`claim-${chore}`);
+  await expect(theirs.first()).toContainText(`${founder} did ${chore}`);
+  // Confirming asks no PIN.
+  await theirs.first().getByRole("button", { name: "Confirm" }).click();
+  await expect(
+    kiosk
+      .getByRole("status")
+      .filter({ hasText: `Confirmed: ${founder} did ${chore}.` }),
+  ).toBeVisible();
+  await expect(
+    kiosk.getByRole("dialog", { name: `${partner}'s PIN` }),
+  ).toBeHidden();
+  await expect(theirs).toHaveCount(1);
+
+  // Disputing does: the pad opens in that request.
+  await theirs.getByRole("button", { name: "Dispute" }).click();
+  await theirs.getByLabel("Why was it not done?").fill("Still dirty");
+  await theirs.getByRole("button", { name: "Send dispute" }).click();
   const pad = kiosk.getByRole("dialog", { name: `${partner}'s PIN` });
   await expect(pad).toBeVisible();
   await expectKioskTargets(pad);
   await typePin(pad, PIN);
   await expect(pad).toBeHidden();
   await expect(
-    kiosk
-      .getByRole("status")
-      .filter({ hasText: `Confirmed: ${founder} did ${chore}.` }),
+    kiosk.getByRole("status").filter({ hasText: `Disputed ${chore}.` }),
   ).toBeVisible();
-  await expect(banner.getByTestId(`claim-${chore}`)).toHaveCount(1);
 
   await ipad.context.close();
   await member.context.close();

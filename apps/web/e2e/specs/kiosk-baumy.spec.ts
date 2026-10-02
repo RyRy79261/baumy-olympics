@@ -11,8 +11,9 @@ import {
 
 // Issue #21 on the kitchen iPad, with the scripted fake Claude: the founder
 // logs a chore through Baumy (their own claim, no PIN); the partner then
-// asks Baumy to confirm it, and approving that proposal opens the PIN pad
-// in the row: a wrong PIN saves nothing, the right one confirms it.
+// asks Baumy to dispute it, and approving that proposal opens the PIN pad
+// (since issue #145 only a dispute asks for the PIN on the kiosk): a wrong
+// PIN saves nothing, the right one disputes it.
 
 const PIN = "2580";
 
@@ -24,7 +25,7 @@ async function say(sheet: Locator, text: string) {
   await sheet.getByRole("button", { name: "Send" }).click();
 }
 
-test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
+test("on the kiosk, approving Baumy's dispute asks for the PIN", async ({
   page,
   browser,
 }, testInfo) => {
@@ -79,14 +80,14 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
   await expect(log.getByTestId("proposal-state")).toHaveText("Done");
   await sheet.getByRole("button", { name: "Done" }).click();
 
-  // The partner asks Baumy to confirm it (tapping in on another page, where
+  // The partner asks Baumy to dispute it (tapping in on another page, where
   // the avatar bar is): the card needs their PIN, asked once by Confirm all.
   await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: partner, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(partner);
   sheet = await openBaumy(kiosk);
-  await say(sheet, `confirm the ${chore}`);
-  const confirm = sheet.getByTestId("suggestion-confirm_completion");
+  await say(sheet, `dispute the ${chore}`);
+  const confirm = sheet.getByTestId("suggestion-dispute_completion");
   await expect(confirm).toContainText(chore);
   await expect(confirm).toContainText("Needs your PIN");
   await sheet.getByRole("button", { name: "Confirm all" }).click();
@@ -101,7 +102,7 @@ test("on the kiosk, approving Baumy's confirmation asks for the PIN", async ({
     "Waiting for you",
   );
 
-  // The right one confirms it.
+  // The right one disputes it.
   await sheet.getByRole("button", { name: "Confirm all" }).click();
   pad = sheet.getByRole("group", { name: `${partner}'s PIN` });
   await typePin(pad, PIN, "Confirm all");
