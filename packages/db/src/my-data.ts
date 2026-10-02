@@ -63,11 +63,9 @@ export async function myCompletions(
   const rows = await db
     .select({
       completion: completions,
-      confirmMode: chores.confirmMode,
       lastResolvedAt: lastRuling.resolvedAt,
     })
     .from(completions)
-    .innerJoin(chores, eq(chores.id, completions.choreId))
     .leftJoin(lastRuling, eq(lastRuling.completionId, completions.id))
     .where(
       and(
@@ -84,8 +82,8 @@ export async function myCompletions(
     voided: 0,
   };
   const photos: MyPhoto[] = [];
-  for (const { completion: c, confirmMode, lastResolvedAt } of rows) {
-    const row = { ...c, confirmMode, disputedBy: null };
+  for (const { completion: c, lastResolvedAt } of rows) {
+    const row = { ...c, disputedBy: null };
     byStatus[effectiveStatus(row, now)] += 1;
     if (c.photoPathname && c.photoAttachedAt) {
       photos.push({

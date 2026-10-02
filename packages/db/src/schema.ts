@@ -58,8 +58,6 @@ export const proofMode = pgEnum("proof_mode", ["none", "optional", "required"]);
  */
 export const choreKind = pgEnum("chore_kind", ["consumable", "maintenance"]);
 
-export const confirmMode = pgEnum("confirm_mode", ["optimistic", "partner"]);
-
 export const ruleSource = pgEnum("rule_source", [
   "seed",
   "manual",
@@ -107,6 +105,8 @@ export const completionStatus = pgEnum("completion_status", [
   "voided",
 ]);
 
+// `unconfirmed` is history only: a claim of the partner confirm mode that
+// nobody confirmed in 72h. The mode is gone (SPEC §12 decision 29).
 export const voidReason = pgEnum("void_reason", [
   "unconfirmed",
   "conceded",
@@ -766,7 +766,6 @@ export const chores = pgTable(
     sprite: text("sprite").notNull(),
     kind: choreKind("kind").notNull().default("maintenance"),
     proofMode: proofMode("proof_mode").notNull().default("none"),
-    confirmMode: confirmMode("confirm_mode").notNull().default("optimistic"),
     effortFactorPct: integer("effort_factor_pct").notNull().default(100),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

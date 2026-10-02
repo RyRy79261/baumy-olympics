@@ -1,6 +1,5 @@
 import {
   initialVerification,
-  isCounted,
   isLive,
   replayChore,
   seasonBounds,
@@ -57,8 +56,8 @@ type ChoreRow = typeof chores.$inferSelect;
 /**
  * How many stored-not-voided completions before the season start are looked
  * at to find the previous *live* one (for `COOLDOWN` across 1 Jan, E12).
- * Only a disputed row that timed out or an expired partner-mode claim can be
- * non-live without being stored as voided, so the first few rows decide it.
+ * Only a disputed row that timed out can be non-live without being stored as
+ * voided, so the first few rows decide it.
  */
 const PREVIOUS_LIVE_SCAN = 20;
 
@@ -98,7 +97,7 @@ export type LogCompletionResult =
       /** True when `clientRequestId` was seen before: nothing was written. */
       duplicate: boolean;
       completion: CompletionRow;
-      /** Null while the completion is not counted (partner-mode pending). */
+      /** Null once the completion no longer counts (a repeated request for a claim since undone or disputed). */
       score: CompletionScoreRow | null;
     }
   | LogCompletionFailure;
@@ -153,10 +152,6 @@ async function loadLiveCompletions(
   seasonStart: Date,
   now: Date,
 ): Promise<ValidatorCompletion[]> {
-  const withMode = (r: Omit<ValidatorCompletion, "confirmMode">) => ({
-    ...r,
-    confirmMode: chore.confirmMode,
-  });
   const inSeason = await db
     .select(validatorColumns)
     .from(completions)
@@ -179,8 +174,8 @@ async function loadLiveCompletions(
     )
     .orderBy(desc(completions.occurredAt), desc(completions.loggedAt))
     .limit(PREVIOUS_LIVE_SCAN);
-  const previous = before.map(withMode).find((c) => isLive(c, now));
-  const live = inSeason.map(withMode).filter((c) => isLive(c, now));
+  const previous = before.find((c) => isLive(c, now));
+  const live = inSeason.filter((c) => isLive(c, now));
   return previous ? [previous, ...live] : live;
 }
 
@@ -296,7 +291,6 @@ export async function logCompletion(
   const v = initialVerification({
     doneBy: input.doneBy,
     loggedBy: input.loggedBy,
-    confirmMode: chore.confirmMode,
     loggedAt: input.now,
     photoAttachedAt,
   });
@@ -354,11 +348,6 @@ export type PreviewCompletionResult =
       choreName: string;
       /** What the completion would score, as `logCompletion` would store it. */
       score: CompletionScore;
-      /**
-       * False for a partner-mode self-claim: it scores nothing until another
-       * member confirms it, and then scores `score` if nothing changed.
-       */
-      counted: boolean;
     }
   | Exclude<LogCompletionFailure, { code: "REQUEST_ID_REUSED" }>;
 
@@ -430,34 +419,22 @@ export async function previewCompletion(
           ),
         )
     : [];
-  const v = initialVerification({
-    doneBy: input.doneBy,
-    loggedBy: input.loggedBy,
-    confirmMode: chore.confirmMode,
-    loggedAt: input.now,
-    photoAttachedAt: input.photoPathname ? input.now : null,
-  });
-  const counted = isCounted({
-    status: v.status,
-    confirmMode: chore.confirmMode,
-  });
   const scores = replayChore(
     [
-      ...rows.map((r) => ({ ...r, confirmMode: chore.confirmMode })),
+      ...rows,
       {
         id: PREVIEW_ID,
         doneBy: input.doneBy,
         occurredAt: input.occurredAt,
         loggedAt: input.now,
-        // Scored as if counted; `counted` says whether it will be yet.
+        // Every new completion counts (SPEC §4.1).
         status: "confirmed",
-        confirmMode: chore.confirmMode,
       },
     ],
     ruleVersions,
   );
   const score = scores.find((s) => s.completionId === PREVIEW_ID)!;
-  return { ok: true, choreName: chore.name, score, counted };
+  return { ok: true, choreName: chore.name, score };
 }
 
 function toRow(score: CompletionScore, now: Date): CompletionScoreRow {
@@ -491,10 +468,7 @@ export async function rescoreLocked(
       ),
     );
   const ruleVersions = await loadRuleVersions(db, chore.id);
-  const scores = replayChore(
-    rows.map((r) => ({ ...r, confirmMode: chore.confirmMode })),
-    ruleVersions,
-  ).map((s) => toRow(s, now));
+  const scores = replayChore(rows, ruleVersions).map((s) => toRow(s, now));
 
   const ofThisChoreSeason = db
     .select({ id: completions.id })
