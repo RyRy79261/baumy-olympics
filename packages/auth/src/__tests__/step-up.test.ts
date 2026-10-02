@@ -184,7 +184,7 @@ async function challengeFor(cookie: string) {
 
 function verify(cookie: string, response: Record<string, unknown>) {
   return auth.api.verifyStepUpPasskey({
-    body: { response },
+    body: { response: response as { id: string } },
     headers: new Headers({ cookie, origin: ORIGIN }),
   });
 }
@@ -325,6 +325,89 @@ describe("verifyStepUpPasskey", () => {
     const { options, cookie: withChallenge } = await challengeFor(cookie);
     await expect(
       verify(withChallenge, key.assert(options.challenge)),
+    ).resolves.toMatchObject({ passkeyId: expect.any(String) });
+  });
+});
+
+describe("verifyStepUpPasskey's other challenges and deployments", () => {
+  it("refuses a registration challenge", async () => {
+    const { userId, cookie } = await signUp();
+    const key = authenticator();
+    await registerPasskey(userId, key);
+    // Enrolling needs a confirmed address (the email-proof guard).
+    await db
+      .update(schema.user)
+      .set({ emailVerified: true })
+      .where(eq(schema.user.id, userId));
+    const res = await auth.handler(
+      new Request(`${ORIGIN}/api/auth/passkey/generate-register-options`, {
+        headers: { cookie, origin: ORIGIN },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const { challenge } = (await res.json()) as { challenge: string };
+    await expect(
+      verify(`${cookie}; ${cookiesOf(res)}`, key.assert(challenge)),
+    ).rejects.toMatchObject({ statusCode: 401 });
+  });
+
+  it("accepts a passkey stored with no transports", async () => {
+    const { userId, cookie } = await signUp();
+    const key = authenticator();
+    const pk = await registerPasskey(userId, key);
+    await db
+      .update(schema.passkey)
+      .set({ transports: null })
+      .where(eq(schema.passkey.id, pk.id));
+    const { options, cookie: withChallenge } = await challengeFor(cookie);
+    await expect(
+      verify(withChallenge, key.assert(options.challenge)),
+    ).resolves.toEqual({ passkeyId: pk.id });
+  });
+
+  it("with no base URL, checks the request's origin on localhost", async () => {
+    // No BETTER_AUTH_URL and not on Vercel: passkeys bind to localhost and
+    // the origin is the request's own (resolvePasskeyScope gives {}).
+    const bare = createAuth({ E2E_TEST_MODE: "1" });
+    const { userId } = await signUp();
+    const key = authenticator();
+    await registerPasskey(userId, key);
+    const signIn = await bare.handler(
+      new Request(`${ORIGIN}/api/auth/sign-in/email`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: ORIGIN },
+        body: JSON.stringify({
+          email: `stepper${seq}@example.com`,
+          password: "stepper-passphrase".padEnd(PASSWORD_MIN_LENGTH, "x"),
+        }),
+      }),
+    );
+    expect(signIn.status).toBe(200);
+    const session = cookiesOf(signIn);
+    const ask = async () => {
+      const res = await bare.handler(
+        new Request(
+          `${ORIGIN}/api/auth/passkey/generate-authenticate-options`,
+          { headers: { cookie: session, origin: ORIGIN } },
+        ),
+      );
+      const { challenge } = (await res.json()) as { challenge: string };
+      return { challenge, cookie: `${session}; ${cookiesOf(res)}` };
+    };
+    const call = (cookie: string, response: unknown, origin?: string) =>
+      bare.api.verifyStepUpPasskey({
+        body: { response: response as { id: string } },
+        headers: new Headers({ cookie, ...(origin ? { origin } : {}) }),
+      });
+
+    // Without an Origin header there is nothing to check it against.
+    const first = await ask();
+    await expect(
+      call(first.cookie, key.assert(first.challenge)),
+    ).rejects.toMatchObject({ statusCode: 401 });
+    const second = await ask();
+    await expect(
+      call(second.cookie, key.assert(second.challenge), ORIGIN),
     ).resolves.toMatchObject({ passkeyId: expect.any(String) });
   });
 });
