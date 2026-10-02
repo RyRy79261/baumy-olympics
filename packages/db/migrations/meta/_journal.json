@@ -148,6 +148,13 @@
       "when": 1790886613495,
       "tag": "0020_kiosk_pairing_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790954312701,
+      "tag": "0021_step_ups",
+      "breakpoints": true
     }
   ]
 }
