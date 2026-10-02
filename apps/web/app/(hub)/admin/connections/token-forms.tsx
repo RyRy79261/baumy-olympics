@@ -9,6 +9,7 @@ import {
   type SetStateAction,
 } from "react";
 import { Button, Card, Field, FormMessage, Input } from "@baumy/ui";
+import { useStepUp } from "@/components/account/confirm-its-you";
 import { useActionForm } from "@/components/use-action-form";
 import type { ServiceTokenData } from "@/lib/actions/service-tokens";
 import type { ActionOutput as Out } from "@/lib/actions/registry";
@@ -21,30 +22,10 @@ import {
 
 // /admin/connections' forms (issue #104). Creating and rotating show the new
 // token once, in the page's one OneTimeTokenArea, with a copy button and
-// where it goes; both ask for the
-// password unless the admin signed in under 10 minutes ago. Rotating and
-// revoking cut brain off, so each asks first (the Security page's confirm
-// step).
-
-const PASSWORD_HINT =
-  "Not needed if you signed in within the last 10 minutes. If you sign in with Google, sign out and in again instead.";
-
-function PasswordField({ id, disabled }: { id: string; disabled: boolean }) {
-  return (
-    <Field id={id} label="Your password" hint={PASSWORD_HINT}>
-      {(control) => (
-        <Input
-          {...control}
-          name="currentPassword"
-          type="password"
-          autoComplete="current-password"
-          maxLength={256}
-          disabled={disabled}
-        />
-      )}
-    </Field>
-  );
-}
+// where it goes. Rotating and revoking cut brain off, so each asks first (the
+// Security page's confirm step). All three need "Confirm it's you" (issue
+// #135): unless this session signed in or confirmed in the last 10 minutes,
+// the dialog opens with the admin's own methods, then the request goes again.
 
 /** The plaintext, once: copy it, and where to put it. */
 function OneTimeToken({ data }: { data: ServiceTokenData }) {
@@ -132,10 +113,11 @@ export function OneTimeTokenArea({ children }: { children: ReactNode }) {
 /** create_service_token: the new token shows in OneTimeTokenArea. */
 export function CreateTokenForm({ defaultName }: { defaultName: string }) {
   const { setShown } = useContext(ShownToken);
+  const stepUp = useStepUp();
   const { state, formAction, pending, requestId, errors } = useActionForm<
     Out<"create_service_token">
   >(async (prev, form) => {
-    const result = await createServiceTokenAction(prev, form);
+    const result = await stepUp.guard(createServiceTokenAction)(prev, form);
     if (result.ok) setShown(result.data);
     return result;
   });
@@ -157,7 +139,6 @@ export function CreateTokenForm({ defaultName }: { defaultName: string }) {
             />
           )}
         </Field>
-        <PasswordField id="service-token-password" disabled={pending} />
         {state && !state.ok && state.code !== "INVALID_INPUT" ? (
           <FormMessage tone="error">{state.message}</FormMessage>
         ) : null}
@@ -165,6 +146,7 @@ export function CreateTokenForm({ defaultName }: { defaultName: string }) {
           {pending ? "Creating..." : "Create token"}
         </Button>
       </form>
+      {stepUp.dialog}
     </Card>
   );
 }
@@ -173,9 +155,10 @@ export function CreateTokenForm({ defaultName }: { defaultName: string }) {
 export function LiveTokenControls({ name }: { name: string }) {
   const [asking, setAsking] = useState<"rotate" | "revoke" | null>(null);
   const { setShown } = useContext(ShownToken);
+  const stepUp = useStepUp();
   const rotate = useActionForm<Out<"rotate_service_token">>(
     async (prev, form) => {
-      const result = await rotateServiceTokenAction(prev, form);
+      const result = await stepUp.guard(rotateServiceTokenAction)(prev, form);
       if (result.ok) {
         setShown(result.data);
         setAsking(null);
@@ -185,7 +168,7 @@ export function LiveTokenControls({ name }: { name: string }) {
   );
   const revoke = useActionForm<Out<"revoke_service_token">>(
     async (prev, form) => {
-      const result = await revokeServiceTokenAction(prev, form);
+      const result = await stepUp.guard(revokeServiceTokenAction)(prev, form);
       if (result.ok) {
         // The token on show stops working: take it off the page.
         setShown((s) => (s?.name === name ? null : s));
@@ -206,10 +189,6 @@ export function LiveTokenControls({ name }: { name: string }) {
             Rotate {name}? Its token stops working now, so brain is cut off
             until it has the new one.
           </p>
-          <PasswordField
-            id={`rotate-password-${name}`}
-            disabled={rotate.pending}
-          />
           {rotate.state && !rotate.state.ok ? (
             <FormMessage tone="error">{rotate.state.message}</FormMessage>
           ) : null}
@@ -265,6 +244,7 @@ export function LiveTokenControls({ name }: { name: string }) {
           </Button>
         </div>
       )}
+      {stepUp.dialog}
     </div>
   );
 }
