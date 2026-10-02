@@ -62,7 +62,7 @@ The kitchen iPad shows the same household on one big screen. See [the kitchen iP
 
 ### Baumy, the cat
 
-Baumy is the pixel cat. On the hub home it sits in the bottom-right corner on a big screen, and in the top bar next to your menu on a phone or tablet. Tap it to ask something in your own words, typed or spoken: "who's winning?", "what's on Saturday?", "I took the trash out", "add milk and eggs".
+Baumy is the pixel cat. On the hub home it sits in the bottom-right corner on a wide screen, and in the top bar next to your menu on a laptop, tablet or phone. Tap it to ask something in your own words, typed or spoken: "who's winning?", "what's on Saturday?", "I took the trash out", "add milk and eggs".
 
 - **Questions** are answered straight away in Baumy's speech bubble.
 - **Anything that changes something** comes back as a card that says in plain words what it will do, for example "Add milk, eggs to the shopping list". Nothing happens until you tap **Confirm all**. **Cancel** throws them all away, and the small × drops one card.

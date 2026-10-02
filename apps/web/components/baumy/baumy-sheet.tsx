@@ -125,8 +125,9 @@ export function BaumySheet({
    */
   cat?: boolean;
   /**
-   * The hub home's (issue #152): the corner button shows from lg up only;
-   * below lg the top bar's button (components/hub/hub-baumy.tsx) opens this
+   * The hub home's (issue #152): the corner button shows from 89rem
+   * (1424px, where the page's side margin clears it) up only; below that
+   * the top bar's button (components/hub/hub-baumy.tsx) opens this
    * sheet through the relay (./bar-relay.ts).
    */
   docked?: boolean;
@@ -811,7 +812,7 @@ export function BaumySheet({
         <BaumyButton
           state={mood}
           onClick={wake}
-          className={docked ? "max-lg:hidden" : undefined}
+          className={docked ? "max-[89rem]:hidden" : undefined}
         />
       )}
       <Dialog open={open} onClose={close} title="Ask Baumy">

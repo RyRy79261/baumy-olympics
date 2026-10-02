@@ -96,7 +96,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
               Sign out
             </Link>
           </HubMenu>
-          {/* The hub home's Baumy below lg; from lg up it is the corner
+          {/* The hub home's Baumy below 89rem; from there it is the corner
               button at the end of the page (HubHome), tabbed to last. */}
           <HubBaumy />
         </>
