@@ -6,7 +6,11 @@ import { applyCompletionEvent } from "../confirmations";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import { auditEvents, households } from "../schema";
-import { insertAdminChange, vetoSuggestion } from "../weights";
+import {
+  dismissSuggestion,
+  insertAdminChange,
+  vetoSuggestion,
+} from "../weights";
 import { SEED_CHORES, seedChore, seedPlayer } from "./_game-fixtures";
 import { useTestDb } from "./_harness";
 
@@ -237,15 +241,21 @@ describe("listActivity", () => {
       reason: "smelly",
       appliesAt: at(48),
       vetoable: true,
+      outcome: "pending",
     });
     expect(byLabel("points Bathroom vetoed")).toMatchObject({
       by: { memberId: sam, displayName: "Sam" },
       vetoable: false,
+      outcome: "vetoed",
+    });
+    expect(byLabel("points Bathroom scheduled")).toMatchObject({
+      outcome: "vetoed",
     });
     expect(byLabel("points Dishes applied")).toMatchObject({
       at: at(7.5),
       by: null,
       vetoable: false,
+      outcome: "applied",
     });
   });
 
@@ -288,6 +298,41 @@ describe("listActivity", () => {
     await apply(fine.id, { type: "withdraw", actor: sam }, at(3));
     const later = await read(at(4));
     expect(later.map(label)).toContain("dispute Trash withdrawn");
+  });
+
+  it("says a cancelled change was cancelled, never that it can be vetoed", async () => {
+    const ryan = await seedPlayer(db(), "Ryan");
+    const trash = await seedChore(db(), TRASH);
+    const change = await insertAdminChange(db(), {
+      householdId: HOUSEHOLD_ID,
+      choreId: trash.choreId,
+      currentPoints: TRASH.basePoints,
+      currentCooldownMinutes: TRASH.cooldownMinutes,
+      basePoints: 30,
+      cooldownMinutes: TRASH.cooldownMinutes,
+      reason: null,
+      appliesAt: at(48),
+      scheduledBy: ryan,
+      now: at(0),
+    });
+    const before = await read(at(1));
+    expect(before).toEqual([
+      expect.objectContaining({ event: "scheduled", outcome: "pending" }),
+    ]);
+    await dismissSuggestion(db(), {
+      suggestionId: change.id,
+      dismissedBy: ryan,
+      now: at(2),
+    });
+    // Past the day it would have landed: still no applied entry.
+    const after = await read(at(50));
+    expect(after).toEqual([
+      expect.objectContaining({
+        event: "scheduled",
+        outcome: "cancelled",
+        vetoable: false,
+      }),
+    ]);
   });
 
   it("keeps to its window, its limit and its household", async () => {

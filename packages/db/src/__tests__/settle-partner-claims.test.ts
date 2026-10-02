@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
-import { asc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { rescoreUnscoredClaims } from "../completions";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import * as schema from "../schema";
@@ -13,7 +13,10 @@ import { seedPlayer } from "./_game-fixtures";
 // The data migration that retires the partner confirm mode (issue #150, SPEC
 // §12 decision 29), on PGlite: the database is migrated up to the one before
 // it, given partner-mode history, and then migrated by hand, twice, to show
-// it is idempotent; the next migration then drops the column.
+// it is idempotent. Then the deploy's `db:seed` hook (`rescoreUnscoredClaims`)
+// scores the claims the migration made count, once. The column itself stays
+// for now (deprecated), so the deploy still live while this one builds keeps
+// working.
 
 const MIGRATIONS = fileURLToPath(new URL("../../migrations", import.meta.url));
 const journal = JSON.parse(
@@ -22,7 +25,6 @@ const journal = JSON.parse(
 
 const tagOf = (idx: number) => journal.entries.find((e) => e.idx === idx)!.tag;
 const SETTLE = tagOf(24);
-const DROP = tagOf(25);
 const sqlOf = (tag: string) => readFileSync(`${MIGRATIONS}/${tag}.sql`, "utf8");
 
 const HOUR = 60 * 60_000;
@@ -32,7 +34,6 @@ let db: Queryable;
 
 beforeAll(async () => {
   expect(SETTLE).toBe("0024_settle_partner_claims");
-  expect(DROP).toBe("0025_drop_confirm_mode");
   client = new PGlite();
   for (const e of journal.entries.filter((e) => e.idx < 24)) {
     await client.exec(sqlOf(e.tag));
@@ -78,7 +79,14 @@ describe("0024_settle_partner_claims", () => {
          values ($1, $2, $3, $4) returning id`,
         [HOUSEHOLD_ID, name, name.toLowerCase(), mode],
       );
-      return r.rows[0]!.id;
+      const id = r.rows[0]!.id;
+      await client.query(
+        `insert into chore_rule_versions
+           (chore_id, effective_from, base_points, cooldown_minutes, source)
+         values ($1, '2020-01-01T00:00:00Z', 10, 0, 'seed')`,
+        [id],
+      );
+      return id;
     };
     const partner = await chore("Mop", "partner");
     const optimistic = await chore("Trash", "optimistic");
@@ -204,22 +212,32 @@ describe("0024_settle_partner_claims", () => {
     await client.exec(sqlOf(SETTLE));
     expect(await rows()).toEqual(expected);
 
-    // Then the column and its type go, and the claims stay as they are.
-    await client.exec(sqlOf(DROP));
-    const columns = await client.query<{ column_name: string }>(
-      `select column_name from information_schema.columns
-        where table_name = 'chores' and column_name = 'confirm_mode'`,
-    );
-    expect(columns.rows).toEqual([]);
-    const types = await client.query(
-      "select 1 from pg_type where typname = 'confirm_mode'",
-    );
-    expect(types.rows).toEqual([]);
+    // The claims that now count have no score yet: SQL cannot replay them.
+    const scored = async () =>
+      (
+        await client.query<{ label: string; total_pts: number }>(
+          `select c.note as label, s.total_pts from completions c
+             join completion_scores s on s.completion_id = c.id
+            order by c.note`,
+        )
+      ).rows.map((r) => r.label);
+    expect(await scored()).toEqual([]);
+
+    // The deploy's seed hook scores every counted claim, once.
+    const hook = () =>
+      rescoreUnscoredClaims(db, {
+        householdId: HOUSEHOLD_ID,
+        now: new Date(now),
+      });
+    await expect(hook()).resolves.toBe(2);
+    expect(await scored()).toEqual([
+      "b-waiting",
+      "d-for-ryan",
+      "f-optimistic",
+      "g-left-behind",
+    ]);
+    // A second deploy finds nothing to do.
+    await expect(hook()).resolves.toBe(0);
     expect(await rows()).toEqual(expected);
-    const left = await db
-      .select({ name: schema.chores.name })
-      .from(schema.chores)
-      .orderBy(asc(schema.chores.name));
-    expect(left).toEqual([{ name: "Mop" }, { name: "Trash" }]);
   });
 });

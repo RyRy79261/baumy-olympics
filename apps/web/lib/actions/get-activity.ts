@@ -101,6 +101,8 @@ export interface ActivityPointsView {
   toCooldownMinutes: number;
   appliesAt: string;
   reason: string | null;
+  /** What became of it at `now`. */
+  outcome: "pending" | "applied" | "vetoed" | "cancelled";
   /** The member asking may veto it now (on a `scheduled` entry only). */
   canVeto: boolean;
 }
@@ -231,6 +233,7 @@ function view(
         toCooldownMinutes: e.toCooldownMinutes,
         appliesAt: e.appliesAt.toISOString(),
         reason: e.reason,
+        outcome: e.outcome,
         canVeto:
           e.event === "scheduled" &&
           e.vetoable &&

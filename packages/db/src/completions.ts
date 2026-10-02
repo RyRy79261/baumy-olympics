@@ -20,6 +20,7 @@ import {
   eq,
   gte,
   inArray,
+  isNull,
   lt,
   ne,
   notInArray,
@@ -545,6 +546,43 @@ export async function rebuildAllScores(
     })
     .from(completions)
     .where(eq(completions.householdId, input.householdId))
+    .orderBy(asc(completions.choreId), asc(completions.seasonId));
+  for (const p of pairs) {
+    await rescoreChore(db, { ...input, ...p });
+  }
+  return pairs.length;
+}
+
+/**
+ * Re-score every (chore, season) of the household that has a counted
+ * completion (pending, confirmed or finalized) with no score. Run by
+ * `db:seed` on every deploy, after the migrations: migration 0024 (issue
+ * #150) made the partner-mode claims still waiting count, and SQL cannot
+ * replay them. Idempotent: once each is scored, nothing matches and it does
+ * nothing. In chore order, like `rebuildAllScores`. Returns how many pairs it
+ * re-scored.
+ */
+export async function rescoreUnscoredClaims(
+  db: Queryable,
+  input: { householdId: string; now: Date },
+): Promise<number> {
+  const pairs = await db
+    .selectDistinct({
+      choreId: completions.choreId,
+      seasonId: completions.seasonId,
+    })
+    .from(completions)
+    .leftJoin(
+      completionScores,
+      eq(completionScores.completionId, completions.id),
+    )
+    .where(
+      and(
+        eq(completions.householdId, input.householdId),
+        inArray(completions.status, ["pending", "confirmed", "finalized"]),
+        isNull(completionScores.completionId),
+      ),
+    )
     .orderBy(asc(completions.choreId), asc(completions.seasonId));
   for (const p of pairs) {
     await rescoreChore(db, { ...input, ...p });

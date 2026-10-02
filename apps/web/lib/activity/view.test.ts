@@ -145,6 +145,7 @@ describe("the other entries", () => {
       toCooldownMinutes: 1440,
       appliesAt: T,
       reason: "smelly",
+      outcome: "pending",
       canVeto: true,
     };
     const change = "20 → 30 pts, cooldown 1 day → 1 day";
@@ -154,6 +155,15 @@ describe("the other entries", () => {
     expect(entryLine({ ...points, by: null, reason: null })).toBe(
       `Someone scheduled new points for Trash: ${change}, from ${berlin} unless someone vetoes it.`,
     );
+    // Only a waiting change says it can still be vetoed.
+    expect(entryLine({ ...points, outcome: "cancelled", reason: null })).toBe(
+      `Ryan scheduled new points for Trash: ${change}, for ${berlin}, then cancelled.`,
+    );
+    for (const outcome of ["applied", "vetoed"] as const) {
+      expect(entryLine({ ...points, outcome, reason: null })).toBe(
+        `Ryan scheduled new points for Trash: ${change}, for ${berlin}.`,
+      );
+    }
     expect(entryLine({ ...points, event: "applied", by: null })).toBe(
       `New points for Trash applied: ${change}.`,
     );

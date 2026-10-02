@@ -96,8 +96,17 @@ export function entryLine(e: Exclude<ActivityView, ActivityChoreView>): string {
       const change = changeLabel(e);
       const reason = e.reason ? ` Reason: ${e.reason}` : "";
       switch (e.event) {
-        case "scheduled":
-          return `${e.by?.displayName ?? "Someone"} scheduled new points for ${e.choreName}: ${change}, from ${at(e.appliesAt)} unless someone vetoes it.${reason}`;
+        case "scheduled": {
+          // Said by what became of it: only a waiting change can be vetoed.
+          const when = at(e.appliesAt);
+          const next =
+            e.outcome === "pending"
+              ? `from ${when} unless someone vetoes it.`
+              : e.outcome === "cancelled"
+                ? `for ${when}, then cancelled.`
+                : `for ${when}.`;
+          return `${e.by?.displayName ?? "Someone"} scheduled new points for ${e.choreName}: ${change}, ${next}${reason}`;
+        }
         case "applied":
           return `New points for ${e.choreName} applied: ${change}.`;
         case "vetoed":
