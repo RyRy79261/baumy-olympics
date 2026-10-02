@@ -31,7 +31,13 @@ const CARDS = [
   "widget-shopping",
 ];
 
-type Box = { id: string; left: number; width: number; top: number; bottom: number };
+type Box = {
+  id: string;
+  left: number;
+  width: number;
+  top: number;
+  bottom: number;
+};
 
 async function cardBoxes(page: Page) {
   return page.evaluate((ids) => {
