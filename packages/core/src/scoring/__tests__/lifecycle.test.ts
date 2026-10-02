@@ -18,7 +18,6 @@ import { DAY, HOUR, PARTNER, RYAN, berlin } from "./fixtures";
 
 const ADMIN = "member-admin";
 const WINDOW = RULESET_V1.challengeWindowH * HOUR;
-const EXPIRY = RULESET_V1.partnerConfirmExpiryH * HOUR;
 const BACKDATE = RULESET_V1.maxBackdateH * HOUR;
 const RETAIN = PHOTO_RETENTION_DAYS * DAY;
 
@@ -81,11 +80,10 @@ describe("verificationEndedAt and photoPruneAt", () => {
   const loggedAt = berlin(2026, 3, 2, 8);
   const at = (ms: number) => new Date(loggedAt.getTime() + ms);
 
-  function claim(confirmMode: "optimistic" | "partner"): VerificationRow {
+  function claim(loggedBy = RYAN): VerificationRow {
     return initialVerification({
       doneBy: RYAN,
-      loggedBy: RYAN,
-      confirmMode,
+      loggedBy,
       loggedAt,
       photoAttachedAt: loggedAt,
     });
@@ -105,7 +103,7 @@ describe("verificationEndedAt and photoPruneAt", () => {
   }
 
   it("is open while the claim is pending or disputed", () => {
-    const row = claim("optimistic");
+    const row = claim();
     expect(verificationEndedAt(row, at(WINDOW - 1), null)).toBeNull();
     expect(photoPruneAt(row, at(WINDOW - 1), null)).toBeNull();
     const disputed = after(row, {
@@ -117,27 +115,20 @@ describe("verificationEndedAt and photoPruneAt", () => {
     expect(verificationEndedAt(disputed, at(30 * DAY), null)).toBeNull();
   });
 
-  it("ends an optimistic claim when its window does", () => {
-    const row = claim("optimistic");
+  it("ends a self-claim when its window does", () => {
+    const row = claim();
     expect(verificationEndedAt(row, at(WINDOW), null)).toEqual(at(WINDOW));
     expect(photoPruneAt(row, at(WINDOW), null)).toEqual(at(WINDOW + RETAIN));
   });
 
-  it("ends an early confirmation no sooner than its window", () => {
-    const row = after(claim("optimistic"), { type: "confirm", actor: PARTNER });
+  it("ends a claim logged for someone else no sooner than its window", () => {
+    const row = claim(PARTNER);
+    expect(row.status).toBe("confirmed");
     expect(verificationEndedAt(row, at(HOUR), null)).toEqual(at(WINDOW));
   });
 
-  it("ends a partner-mode claim at its expiry at the earliest", () => {
-    const row = claim("partner");
-    expect(verificationEndedAt(row, at(EXPIRY - 1), null)).toBeNull();
-    expect(verificationEndedAt(row, at(EXPIRY), null)).toEqual(at(EXPIRY));
-    const confirmed = after(row, { type: "confirm", actor: PARTNER });
-    expect(verificationEndedAt(confirmed, at(HOUR), null)).toEqual(at(EXPIRY));
-  });
-
-  it("ends a ruled dispute at the ruling, and a late confirmation then", () => {
-    const disputed = after(claim("optimistic"), {
+  it("ends a ruled dispute at the ruling, and a late upholding then", () => {
+    const disputed = after(claim(), {
       type: "dispute",
       actor: PARTNER,
       reason: "not done",

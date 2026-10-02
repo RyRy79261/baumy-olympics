@@ -154,9 +154,7 @@ describe("isOpen", () => {
 describe("savedMessage", () => {
   it("names the points when the action scored", () => {
     expect(savedMessage({ totalPts: 25 })).toBe("Saved: +25 points.");
-    expect(savedMessage({ totalPts: null, counted: false })).toBe(
-      "Saved. It counts once someone confirms it.",
-    );
+    expect(savedMessage({ totalPts: null })).toBe("Saved.");
     expect(savedMessage(null)).toBe("Saved.");
   });
 });

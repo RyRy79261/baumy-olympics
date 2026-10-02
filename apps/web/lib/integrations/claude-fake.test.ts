@@ -125,100 +125,71 @@ describe("fakeClaude", () => {
     expect(text(tie)).toContain("Nobody is ahead");
   });
 
-  it("proposes confirming the first claim the asker may confirm", async () => {
+  it("proposes disputing the newest chore the asker may dispute, or the one named", async () => {
     const first = await fakeClaude(
-      params([{ role: "user", content: "confirm it" }]),
+      params([{ role: "user", content: "dispute it" }]),
     );
-    expect(uses(first)[0]!.name).toBe("get_pending_confirmations");
-    const m = await fakeClaude(
-      afterRead("confirm it", "get_pending_confirmations", {
-        ok: true,
-        data: {
-          claims: [
-            {
-              completionId: "x0",
-              choreName: "Mop",
-              doneByName: "Me",
-              can: { confirm: false },
-            },
-            {
-              completionId: "x1",
-              choreName: "Trash",
-              doneByName: "Sam",
-              can: { confirm: true },
-            },
-          ],
-        },
-      }),
-    );
-    expect(uses(m)[0]).toMatchObject({
-      name: "confirm_completion",
-      input: { completionId: "x1" },
+    expect(uses(first)[0]!.name).toBe("get_activity");
+    const chore = (
+      id: string,
+      name: string,
+      who: string,
+      dispute: boolean,
+    ) => ({
+      kind: "chore",
+      completionId: id,
+      choreName: name,
+      doneBy: { memberId: who, displayName: who },
+      can: { dispute },
     });
-    const named = await fakeClaude(
-      afterRead("confirm the mop", "get_pending_confirmations", {
-        ok: true,
-        data: {
-          claims: [
-            {
-              completionId: "y1",
-              choreName: "Trash",
-              doneByName: "Sam",
-              can: { confirm: true },
-            },
-            {
-              completionId: "y2",
-              choreName: "Mop",
-              doneByName: "Sam",
-              can: { confirm: true },
-            },
-          ],
-        },
-      }),
-    );
-    expect(uses(named)[0]!.input).toEqual({ completionId: "y2" });
-    const none = await fakeClaude(
-      afterRead("confirm it", "get_pending_confirmations", {
-        ok: true,
-        data: { claims: [] },
-      }),
-    );
-    expect(text(none)).toContain("nothing waiting");
-  });
-
-  it("proposes disputing the claim named, with a reason", async () => {
     const m = await fakeClaude(
-      afterRead("dispute the mop", "get_pending_confirmations", {
+      afterRead("dispute it", "get_activity", {
         ok: true,
         data: {
-          claims: [
-            {
-              completionId: "z1",
-              choreName: "Trash",
-              doneByName: "Sam",
-              can: { confirm: true, dispute: true },
-            },
-            {
-              completionId: "z2",
-              choreName: "Mop",
-              doneByName: "Sam",
-              can: { confirm: true, dispute: true },
-            },
-            {
-              completionId: "z3",
-              choreName: "Mop",
-              doneByName: "Me",
-              can: { dispute: false },
-            },
+          entries: [
+            chore("x0", "Mop", "Me", false),
+            { kind: "bounty", choreName: "Trash" },
+            chore("x1", "Trash", "Sam", true),
           ],
         },
       }),
     );
     expect(uses(m)[0]).toMatchObject({
       name: "dispute_completion",
+      input: { completionId: "x1", reason: "Baumy heard it was not done" },
+    });
+    const named = await fakeClaude(
+      afterRead("dispute the mop", "get_activity", {
+        ok: true,
+        data: {
+          entries: [
+            chore("z1", "Trash", "Sam", true),
+            chore("z2", "Mop", "Sam", true),
+            chore("z3", "Mop", "Me", false),
+          ],
+        },
+      }),
+    );
+    expect(uses(named)[0]).toMatchObject({
+      name: "dispute_completion",
       input: { completionId: "z2", reason: "Baumy heard it was not done" },
     });
-    expect(text(m)).toContain("disputing Sam's Mop");
+    expect(text(named)).toContain("disputing Sam's Mop");
+    const none = await fakeClaude(
+      afterRead("dispute it", "get_activity", {
+        ok: true,
+        data: { entries: [] },
+      }),
+    );
+    expect(text(none)).toContain("nothing you can dispute");
+  });
+
+  it("never proposes confirming: there is no confirming (issue #150)", async () => {
+    const m = await fakeClaude(
+      params([{ role: "user", content: "confirm Sam's trash" }]),
+    );
+    expect(text(m).length).toBeGreaterThan(0);
+    expect(uses(m)).toEqual([]);
   });
 
   it("proposes a note when create_note is offered (issue #145)", async () => {

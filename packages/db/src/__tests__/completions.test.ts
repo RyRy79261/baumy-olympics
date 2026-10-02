@@ -4,7 +4,6 @@ import {
   seasonBounds,
   transition,
   type CompletionStatus,
-  type ConfirmMode,
   type DisputeResolution,
   type PrizeMode,
   type ProofMode,
@@ -24,7 +23,6 @@ import {
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import type {
-  confirmMode,
   disputeResolution,
   prizeMode,
   proofMode,
@@ -123,9 +121,6 @@ describe("schema enums mirror packages/core", () => {
     expectTypeOf<
       (typeof completionStatus.enumValues)[number]
     >().toEqualTypeOf<CompletionStatus>();
-    expectTypeOf<
-      (typeof confirmMode.enumValues)[number]
-    >().toEqualTypeOf<ConfirmMode>();
     expectTypeOf<
       (typeof proofMode.enumValues)[number]
     >().toEqualTypeOf<ProofMode>();
@@ -242,19 +237,6 @@ describe("logCompletion", () => {
     expect(r.score?.totalPts).toBe(TRASH.basePoints);
   });
 
-  it("does not score a partner-mode self-claim until it is confirmed", async () => {
-    const ryan = await seedPlayer(db());
-    const { choreId } = await seedChore(db(), {
-      ...TRASH,
-      confirmMode: "partner",
-    });
-    const r = ok(await selfClaim(choreId, ryan, NOW));
-    expect(r.completion.status).toBe("pending");
-    expect(r.completion.finalizesAt).toBeNull();
-    expect(r.score).toBeNull();
-    await expect(scoresInOrder(choreId)).resolves.toEqual([]);
-  });
-
   it("builds a streak and pays the break bonus (SPEC E1, E2)", async () => {
     const ryan = await seedPlayer(db(), "Ryan");
     const partner = await seedPlayer(db(), "Partner");
@@ -304,7 +286,7 @@ describe("logCompletion", () => {
     const { choreId } = await seedChore(db(), TRASH);
     const first = ok(await selfClaim(choreId, ryan, NOW));
     const disputed = transition(
-      { ...first.completion, confirmMode: "optimistic", disputedBy: null },
+      { ...first.completion, disputedBy: null },
       { type: "dispute", actor: partner, reason: "bins still full" },
       at(1),
     );
@@ -584,20 +566,26 @@ describe("setCompletionStatus", () => {
     ]);
   });
 
-  it("confirming a partner-mode claim scores it", async () => {
+  it("upholding a disputed claim scores it again", async () => {
     const ryan = await seedPlayer(db());
     const partner = await seedPlayer(db());
-    const { choreId } = await seedChore(db(), {
-      ...TRASH,
-      confirmMode: "partner",
-    });
+    const { choreId } = await seedChore(db(), TRASH);
     const c = ok(await selfClaim(choreId, ryan, NOW)).completion;
-    await expect(scoresInOrder(choreId)).resolves.toEqual([]);
     ok(
       await setCompletionStatus(db(), {
         householdId: HOUSEHOLD_ID,
         completionId: c.id,
         expectedStatus: "pending",
+        next: { ...c, status: "disputed" },
+        now: at(1),
+      }),
+    );
+    await expect(scoresInOrder(choreId)).resolves.toEqual([]);
+    ok(
+      await setCompletionStatus(db(), {
+        householdId: HOUSEHOLD_ID,
+        completionId: c.id,
+        expectedStatus: "disputed",
         next: {
           ...c,
           status: "confirmed",
@@ -658,10 +646,7 @@ describe("completion_scores is always rebuildable", () => {
     const partner = await seedPlayer(db(), "Partner");
     const trash = await seedChore(db(), TRASH);
     const dishes = await seedChore(db(), SEED_CHORES.dishes);
-    const bathroom = await seedChore(db(), {
-      ...SEED_CHORES.bathroom,
-      confirmMode: "partner",
-    });
+    const bathroom = await seedChore(db(), SEED_CHORES.bathroom);
     const who = [ryan, ryan, partner, ryan, partner, partner];
     for (const [i, m] of who.entries()) {
       ok(await selfClaim(trash.choreId, m, at(i * 48)));

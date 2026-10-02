@@ -116,11 +116,13 @@ test("the hub shell: the Baumy badge by the brand, the page you are on framed", 
   }));
   expect(width.scroll).toBeLessThanOrEqual(width.client);
 
-  // "Needs your OK" (the nav link, or the pinned badge while claims wait)
-  // is wholly on screen at every width: nothing hides it in an overflow.
-  const inbox = page.getByRole("link", { name: /^Needs your OK/ });
-  await expect(inbox).toBeVisible();
-  const onScreen = await inbox.evaluate((el) => {
+  // Activity, the nav's last page (issue #150), is wholly on screen at
+  // every width: nothing hides it in an overflow.
+  const activity = page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Activity", exact: true });
+  await expect(activity).toBeVisible();
+  const onScreen = await activity.evaluate((el) => {
     const r = el.getBoundingClientRect();
     const y = r.top + r.height / 2;
     const hits = [r.left + 2, r.left + r.width / 2, r.right - 2].map((x) =>
@@ -155,12 +157,12 @@ test("on a laptop the whole header is one row", async ({ page }, testInfo) => {
   const rows = await header.evaluate((h) => {
     const tops = [
       ...h.querySelectorAll(
-        'nav[aria-label="Main"] a, [data-testid$="-menu"] > button, [data-testid="inbox-badge"]',
+        'nav[aria-label="Main"] a, [data-testid$="-menu"] > button',
       ),
     ].map((el) => Math.round(el.getBoundingClientRect().top));
     return { tops: [...new Set(tops)], count: tops.length };
   });
-  // Eight pages (the inbox as a link or a badge), Admin and the account.
+  // Eight pages (Activity the last), Admin and the account.
   expect(rows.count).toBe(10);
   expect(rows.tops).toHaveLength(1);
   // And nothing in the nav is cut off: it does not need to scroll.
@@ -181,7 +183,7 @@ const PAGES: { path: string; title: string }[] = [
   { path: "/shopping", title: "Shopping list" },
   { path: "/scores", title: "Scores" },
   { path: "/pot", title: "Pot" },
-  { path: "/inbox", title: "Needs your OK" },
+  { path: "/activity", title: "Activity" },
   { path: "/settings", title: "Settings" },
   { path: "/admin/chores", title: "Edit chores" },
   { path: "/admin/members", title: "Members" },

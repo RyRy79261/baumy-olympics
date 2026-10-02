@@ -27,7 +27,7 @@ export const DISALLOWED_PATHS = [
   "/oauth/",
   "/calendar",
   "/chores",
-  "/inbox",
+  "/activity",
   "/notes",
   "/pot",
   "/scores",

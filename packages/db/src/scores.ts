@@ -1,4 +1,4 @@
-import type { CompletionStatus, ConfirmMode, PrizeMode } from "@baumy/core";
+import type { CompletionStatus, PrizeMode } from "@baumy/core";
 import {
   aliasedTable,
   and,
@@ -44,7 +44,6 @@ export interface ScoredCompletion {
   occurredAt: Date;
   loggedAt: Date;
   status: CompletionStatus;
-  confirmMode: ConfirmMode;
   finalizesAt: Date | null;
   photoAttachedAt: Date | null;
   verifiedBy: string | null;
@@ -73,7 +72,6 @@ export async function listSeasonScores(
       occurredAt: completions.occurredAt,
       loggedAt: completions.loggedAt,
       status: completions.status,
-      confirmMode: chores.confirmMode,
       finalizesAt: completions.finalizesAt,
       photoAttachedAt: completions.photoAttachedAt,
       verifiedBy: completions.verifiedBy,

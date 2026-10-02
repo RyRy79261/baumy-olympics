@@ -12,10 +12,9 @@ import type { MessageParams } from "./claude";
 //
 //   - "who's winning?" (win, lead, standings, score): reads get_standings,
 //     then answers with the leader;
-//   - "confirm …" or "dispute …": reads get_pending_confirmations, then
-//     proposes confirm_completion (or dispute_completion, with the reason
-//     "Baumy heard it was not done") for the claim the asker may confirm
-//     (or dispute) whose chore the text names (else the first one);
+//   - "dispute …": reads get_activity, then proposes dispute_completion,
+//     with the reason "Baumy heard it was not done", for the chore the asker
+//     may dispute whose name the text says (else the newest one);
 //   - "add a note: <title>": proposes create_note (issue #145);
 //   - "I did/took/cleaned … the <chore>": reads list_chores, then proposes
 //     log_completion for every chore named in the text (the longest names
@@ -269,37 +268,33 @@ export async function fakeClaude(
     );
   }
 
-  const disputing = /\bdispute\b/.test(said);
-  if (disputing || /\bconfirm\b/.test(said)) {
-    const pending = reads.get("get_pending_confirmations") as
+  if (/\bdispute\b/.test(said)) {
+    const activity = reads.get("get_activity") as
       | {
           data?: {
-            claims: {
-              completionId: string;
+            entries: {
+              kind: string;
+              completionId?: string;
               choreName: string;
-              doneByName: string;
-              can: { confirm?: boolean; dispute?: boolean };
+              doneBy?: { displayName: string };
+              can?: { dispute?: boolean };
             }[];
           };
         }
       | undefined;
-    if (!pending) {
-      return message(
-        model,
-        [toolUse("get_pending_confirmations", {})],
-        "tool_use",
-      );
+    if (!activity) {
+      return message(model, [toolUse("get_activity", {})], "tool_use");
     }
-    const mine = (pending.data?.claims ?? []).filter((c) =>
-      disputing ? c.can.dispute : c.can.confirm,
+    const open = (activity.data?.entries ?? []).filter(
+      (e) => e.kind === "chore" && e.can?.dispute,
     );
-    // The claim whose chore the text names, else the first one.
+    // The chore the text names, else the newest one.
     const claim =
-      mine.find((c) => said.includes(c.choreName.toLowerCase())) ?? mine[0];
+      open.find((c) => said.includes(c.choreName.toLowerCase())) ?? open[0];
     if (!claim) {
       return message(
         model,
-        [text("There is nothing waiting for your OK.")],
+        [text("There is nothing you can dispute right now.")],
         "end_turn",
       );
     }
@@ -307,14 +302,12 @@ export async function fakeClaude(
       model,
       [
         text(
-          `I've lined up ${disputing ? "disputing" : "confirming"} ${claim.doneByName}'s ${claim.choreName}.`,
+          `I've lined up disputing ${claim.doneBy!.displayName}'s ${claim.choreName}.`,
         ),
-        disputing
-          ? toolUse("dispute_completion", {
-              completionId: claim.completionId,
-              reason: "Baumy heard it was not done",
-            })
-          : toolUse("confirm_completion", { completionId: claim.completionId }),
+        toolUse("dispute_completion", {
+          completionId: claim.completionId,
+          reason: "Baumy heard it was not done",
+        }),
       ],
       "tool_use",
     );

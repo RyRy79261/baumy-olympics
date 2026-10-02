@@ -364,7 +364,6 @@ describe("schedule_weight", () => {
           basePoints: 30,
           cooldownHours: BATHROOM.cooldownMinutes / 60,
           proofMode: "none",
-          confirmMode: "optimistic",
           effortFactorPct: 100,
         },
         asAdmin(adminA, { now: new Date(FIXED_NOW.getTime() - MIN) }),

@@ -20,6 +20,7 @@
     "./seasons": "./src/seasons.ts",
     "./completions": "./src/completions.ts",
     "./confirmations": "./src/confirmations.ts",
+    "./activity": "./src/activity.ts",
     "./chores": "./src/chores.ts",
     "./scores": "./src/scores.ts",
     "./weights": "./src/weights.ts",

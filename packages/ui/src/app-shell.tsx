@@ -27,8 +27,8 @@ export function navItemClass(current: boolean): string {
 }
 
 /**
- * The classes of a link pinned in the header's top row as a badge (the
- * "Needs your OK" count): yellow-framed, so it is seen at every width.
+ * The classes of a link pinned in the header's top row as a badge (a count
+ * that must be seen): yellow-framed, so it is seen at every width.
  */
 export function navBadgeClass(current: boolean): string {
   return cx(
@@ -48,8 +48,8 @@ export function AppShell({
   /** The nav links, each styled with navItemClass. */
   nav: ReactNode;
   /**
-   * What stays pinned at the end of the top row: the "Needs your OK" badge
-   * and the folded menus (Admin, the account: who is signed in, the way out).
+   * What stays pinned at the end of the top row: the folded menus (Admin,
+   * the account: who is signed in, the way out), and any badge.
    */
   user?: ReactNode;
   children: ReactNode;

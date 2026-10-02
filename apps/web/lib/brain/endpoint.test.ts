@@ -502,7 +502,6 @@ describe("X-Baumy-On-Behalf-Of", () => {
   it("refuses the claim events on someone's behalf with 403, before asking for a tap", async () => {
     const { deps, runAction } = setup();
     for (const name of [
-      "confirm_completion",
       "dispute_completion",
       "undo_completion",
       "withdraw_dispute",
@@ -523,8 +522,8 @@ describe("X-Baumy-On-Behalf-Of", () => {
     expect(runAction).not.toHaveBeenCalled();
     // For the asker themself they run as before, behind the tap.
     const own = await handleBrainAction(
-      post("confirm_completion", { confirmed: "1" }),
-      "confirm_completion",
+      post("undo_completion", { confirmed: "1" }),
+      "undo_completion",
       deps,
     );
     expect(own.status).toBe(200);
@@ -604,8 +603,8 @@ describe("X-Baumy-On-Behalf-Of", () => {
   it("runs a read on someone's behalf without confirmation", async () => {
     const { deps, runAction } = setup();
     const res = await handleBrainAction(
-      post("get_pending_confirmations", { onBehalfOf: HOUSEMATE, key: null }),
-      "get_pending_confirmations",
+      post("get_activity", { onBehalfOf: HOUSEMATE, key: null }),
+      "get_activity",
       deps,
     );
     expect(res.status).toBe(200);
@@ -682,8 +681,8 @@ describe("X-Baumy-On-Behalf-Of", () => {
     const { deps, runAction } = setup();
     // The same header with a housemate's id is refused (403 and 400)...
     const claim = await handleBrainAction(
-      post("confirm_completion", { onBehalfOf: HOUSEMATE, confirmed: "1" }),
-      "confirm_completion",
+      post("undo_completion", { onBehalfOf: HOUSEMATE, confirmed: "1" }),
+      "undo_completion",
       deps,
     );
     expect(claim.status).toBe(403);
@@ -696,7 +695,6 @@ describe("X-Baumy-On-Behalf-Of", () => {
     expect(runAction).not.toHaveBeenCalled();
     // ...but the asker's own id, in any case, runs as the asker.
     const names = [
-      "confirm_completion",
       "dispute_completion",
       "undo_completion",
       "withdraw_dispute",

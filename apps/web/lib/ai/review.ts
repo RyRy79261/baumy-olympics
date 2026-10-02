@@ -104,9 +104,8 @@ export function cancelAll(rows: readonly ReviewRow[]): ReviewRow[] {
 
 /** A short line for a saved row, from the action's result. */
 export function savedMessage(data: unknown): string {
-  const d = (data ?? {}) as { totalPts?: unknown; counted?: unknown };
+  const d = (data ?? {}) as { totalPts?: unknown };
   if (typeof d.totalPts === "number") return `Saved: +${d.totalPts} points.`;
-  if (d.counted === false) return "Saved. It counts once someone confirms it.";
   return "Saved.";
 }
 

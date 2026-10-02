@@ -15,7 +15,7 @@ covers:
 
 ## What it shows
 
-The iPad on the kitchen wall is the house's shared screen. Its home shows the date and the clock, the **Urgent**, **New** and **Messages** icons (tap one to see those bounties or notes), the month's calendar, and Baumy at the bottom. The bar along the bottom goes to Bounties, Calendar, Board, Shop and Scores.
+The iPad on the kitchen wall is the house's shared screen. Its home shows the date and the clock, the **Urgent**, **New** and **Messages** icons (tap one to see those bounties or notes), the month's calendar, and Baumy at the bottom. The bar along the bottom goes to Bounties, Calendar, Board, Activity, Shop and Scores. **Activity** is what happened in the house, newest first; a chore is disputed from there.
 
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
 
@@ -23,7 +23,7 @@ After {{KIOSK_IDLE_DEFAULT_MIN}} minutes untouched, the screen forgets who was a
 
 ## Your personal PIN
 
-The kitchen screen is shared, but almost everything there runs as whoever tapped their avatar, with no PIN: logging a chore (for yourself or someone else), confirming, undoing, notes, the calendar, the shopping list and Baumy. The iPad asks for **your personal PIN** only before it **disputes** a chore as you, and, for an admin, before it adds or edits a bounty or changes a bounty's points. Your own settings are only changed on your phone.
+The kitchen screen is shared, but almost everything there runs as whoever tapped their avatar, with no PIN: logging a chore (for yourself or someone else), undoing, notes, the calendar, the shopping list and Baumy. The iPad asks for **your personal PIN** only before it **disputes** a chore as you, and, for an admin, before it adds or edits a bounty or changes a bounty's points. Your own settings are only changed on your phone.
 
 If you have not set a PIN, the iPad never shows a PIN pad you cannot use: it says "<your name> hasn't set a personal PIN yet" with a QR code that opens Settings on your phone. When you ask Baumy for several things, **Confirm all** does the rest and leaves only the dispute waiting. After you join, the hub reminds you to set one.
 

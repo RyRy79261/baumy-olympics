@@ -20,12 +20,6 @@ export const ProofMode = z.enum(["none", "optional", "required"], {
 });
 export type ProofMode = z.infer<typeof ProofMode>;
 
-/** The same values as the `confirm_mode` pg enum. */
-export const ConfirmMode = z.enum(["optimistic", "partner"], {
-  error: "Pick optimistic or partner.",
-});
-export type ConfirmMode = z.infer<typeof ConfirmMode>;
-
 /**
  * What kind of bounty a chore is (ADR 0005): something to buy or refill, or
  * something to clean or fix. The same values as the `chore_kind` pg enum.

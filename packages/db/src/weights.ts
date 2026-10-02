@@ -69,7 +69,7 @@ export type WeightSuggestionRow = typeof weightSuggestions.$inferSelect;
 export async function loadIntervalSamples(
   db: Queryable,
   input: {
-    chore: Pick<ChoreRow, "id" | "confirmMode">;
+    chore: Pick<ChoreRow, "id">;
     since: Date;
     now: Date;
   },
@@ -100,10 +100,7 @@ export async function loadIntervalSamples(
     .orderBy(asc(completions.occurredAt));
   return rows
     .filter((r) => {
-      const s = effectiveStatus(
-        { ...r, confirmMode: input.chore.confirmMode },
-        input.now,
-      );
+      const s = effectiveStatus(r, input.now);
       return s === "finalized" || s === "confirmed";
     })
     .map((r) => r.occurredAt);
@@ -167,7 +164,7 @@ export interface ChoreMeasurement {
  */
 export async function measureChore(
   db: Queryable,
-  chore: Pick<ChoreRow, "id" | "confirmMode" | "effortFactorPct">,
+  chore: Pick<ChoreRow, "id" | "effortFactorPct">,
   now: Date,
 ): Promise<ChoreMeasurement | null> {
   const rule = ruleNow(await loadRuleVersions(db, chore.id), now);
