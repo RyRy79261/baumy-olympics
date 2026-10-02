@@ -46,7 +46,10 @@ function berlinDay(days: number): string {
 /** A housemate with a kiosk PIN, set from their own phone. */
 async function memberWithPin(browser: Browser, admin: Page, name: string) {
   const invite = await mintCode(admin, 1);
-  const member = await newAccount(browser, `kiosk-cal-${name}`);
+  const member = await newAccount(
+    browser,
+    `kiosk-cal-${name.replace(/\s+/g, "-")}`,
+  );
   await redeem(member.page, invite, name);
   await expect(member.page).toHaveURL(/\/$/);
   await member.page.goto("/settings");
