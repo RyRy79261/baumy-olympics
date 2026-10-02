@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Screensaver } from "@baumy/ui";
 import { clockLines } from "@/lib/hub/view";
+import { isKioskBusy } from "@/lib/kiosk/busy";
 import { KIOSK_IDLE_MS, SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import {
   NIGHT_EVENT,
@@ -74,6 +75,8 @@ export function KioskScreensaver({
     const tick = () => {
       const at = new Date(Date.now() + offset);
       const night = isNightAt(at, win);
+      // Mid-hold or mid-reply with Baumy is not idle (issue #132).
+      if (isKioskBusy()) lastTouch.current = Date.now();
       const idle = Date.now() - lastTouch.current;
       setNow(at);
       if (night) {

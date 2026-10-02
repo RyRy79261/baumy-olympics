@@ -17,7 +17,7 @@ import {
   CatLink,
   CatSays,
   CatText,
-  LevelBars,
+  HoldToTalk,
   Dialog,
   Input,
   ScorePop,
@@ -44,6 +44,7 @@ import {
   PIN_PROMPT_CODES,
 } from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
+import { setKioskBusy } from "@/lib/kiosk/busy";
 import { announceScore } from "@/lib/ui/scored";
 import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
 import { SuggestionCards } from "./suggestion-cards";
@@ -72,17 +73,25 @@ import { VoiceRecorder } from "./voice-recorder";
 //
 // On the kitchen dashboard (`cat`, ADR 0005 §1, the approved prototype's
 // baumy-cat.tsx) the cat itself is the button and the talking happens in
-// its speech bubble: a tap starts listening ("Mrrp? I'm listening…", level
-// bars, "Done talking"), then what Baumy understood shows as "Got it! I'll
-// do this:" with the same suggestion cards, "Confirm all" and "Cancel",
-// through the same transcribe, command and run calls as the sheet. "Type instead" opens the sheet
-// with the same conversation. With nobody tapped in, the bubble first asks
-// who is talking; without a microphone, a tap opens the sheet.
+// its speech bubble (issue #132): a tap opens the microphone and shows a big
+// "Hold to talk"; while it is held, "Mrrp? I'm listening…" with the level
+// bars and a red pulse; letting go transcribes, and what Baumy understood
+// shows as "Got it! I'll do this:" with the same suggestion cards, "Confirm
+// all" and "Cancel", through the same transcribe, command and run calls as
+// the sheet. The bubble stays: once the cards are settled (or after a plain
+// answer, or Cancel) "Hold to talk" is there again, until "Done", a tap on
+// the cat, a minute untouched, or a reminder or the screensaver. "Type
+// instead" opens the sheet with the same conversation. With nobody tapped
+// in, the bubble first asks who is talking; without a microphone, a tap
+// opens the sheet.
 
-type CatMode = "who" | "ready" | "listening" | "thinking" | "answer";
+type CatMode = "who" | "talk" | "thinking" | "answer";
 
 const VOICE_NOTE_HINT =
   "Say it like a voice note: \u201cI bought cat food and the bins are out.\u201d";
+
+/** This bubble's flag in lib/kiosk/busy.ts. */
+const BUSY_ID = "baumy-cat";
 
 /** How long the "+N" stays after a save that scored. */
 const POP_MS = 1_600;
@@ -335,19 +344,29 @@ export function BaumySheet({
   // (a tap, a reminder, the screensaver, idle) moves on, so a late answer
   // never reopens it with the last person's proposals.
   const generation = useRef(0);
+  // What a too-short hold or a passing microphone failure says, under the
+  // button, without leaving it.
+  const [holdHint, setHoldHint] = useState<string | null>(null);
+  // "Purrfect. +N for Ryan ✦" in the bubble once Confirm all scored.
+  const [praise, setPraise] = useState<string | null>(null);
   const recorder = useRecorder({
-    onStart: () => feel({ type: "record_start" }),
+    onStart: () => {
+      // A new hold: the last answer (all of it settled) makes way.
+      feel({ type: "record_start" });
+      setReply(null);
+      setRows([]);
+      setHeard(null);
+      setPraise(null);
+      setHoldHint(null);
+      setBubble("talk");
+    },
     onClip: (clip, mime) => {
       if (!dropClip.current) void catHeard(clip, mime);
     },
     onCancel: (message) => {
       if (dropClip.current) return;
       feel({ type: "record_cancel" });
-      setReply({
-        text: message ?? "I didn't catch that. Tap me and try again?",
-        error: true,
-      });
-      setBubble("answer");
+      setHoldHint(message ?? "I didn't catch that. Hold the button and talk.");
     },
     onUnavailable: (message) => {
       // No microphone here: type instead, in the sheet.
@@ -358,19 +377,30 @@ export function BaumySheet({
     },
   });
 
-  // Tapped in from the bubble: ready to talk.
-  useEffect(() => {
-    if (bubble === "who" && actingName) setBubble("ready");
-  }, [bubble, actingName]);
-
-  function listen() {
+  /** "Hold to talk", with the microphone opened by the tap that got here. */
+  function talk() {
     dropClip.current = false;
     setReply(null);
     setRows([]);
     setHeard(null);
-    setBubble("listening");
-    void recorder.begin();
+    setPraise(null);
+    setHoldHint(null);
+    setBubble("talk");
+    recorder.open();
   }
+
+  // Tapped in from the bubble: ready to talk (or to type, without a mic).
+  const talkLatest = useRef(talk);
+  talkLatest.current = talk;
+  useEffect(() => {
+    if (bubble !== "who" || !actingName) return;
+    if (showMic) {
+      talkLatest.current();
+    } else {
+      setBubble(null);
+      setOpen(true);
+    }
+  }, [bubble, actingName, showMic]);
 
   /** Still thinking in the bubble: show the answer there (not after Type instead). */
   const showAnswer = (b: CatMode | null): CatMode | null =>
@@ -388,7 +418,10 @@ export function BaumySheet({
     if (!result.ok) {
       setReply({ text: result.message, error: true });
       feel({ type: "error" });
-      if (result.code === "NOT_CONFIGURED") setMicOff(result.message);
+      if (result.code === "NOT_CONFIGURED") {
+        setMicOff(result.message);
+        recorder.close();
+      }
       setBubble(showAnswer);
       return;
     }
@@ -398,23 +431,24 @@ export function BaumySheet({
     setBubble(showAnswer);
   }
 
+  /** Turn the microphone off; a recording in progress is dropped. */
+  function stopListening() {
+    dropClip.current = true;
+    if (recorder.state === "recording") feel({ type: "record_cancel" });
+    recorder.close();
+  }
+
   function hideBubble() {
     generation.current += 1;
-    dropClip.current = true;
-    if (recorder.state !== "idle") {
-      recorder.finish();
-      feel({ type: "record_cancel" });
-    }
+    stopListening();
     setBubble(null);
+    setPraise(null);
+    setHoldHint(null);
     sayEarned();
   }
 
   function typeInstead() {
-    dropClip.current = true;
-    if (recorder.state !== "idle") {
-      recorder.finish();
-      feel({ type: "record_cancel" });
-    }
+    stopListening();
     setBubble(null);
     setOpen(true);
   }
@@ -426,25 +460,76 @@ export function BaumySheet({
     }
     feel({ type: "wake" });
     setSays(null);
-    if (kiosk && !actingName) setBubble("who");
-    else if (showMic) listen();
+    if (kiosk && !actingName) {
+      // This tap is the gesture iOS needs to start audio: warm the level
+      // meter now, as the next step (tapping an avatar) reloads the page.
+      if (showMic) recorder.warm();
+      setBubble("who");
+    } else if (showMic) talk();
     else setOpen(true);
+  }
+
+  // The hold itself: a pointer held on the button, or Enter/Space to toggle.
+  function holdDown(e: React.PointerEvent<HTMLButtonElement>) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    dropClip.current = false;
+    setHoldHint(null);
+    // Closed after an error, or by a transcriber that went away: reopen.
+    if (recorder.state === "idle") recorder.open();
+    recorder.begin();
+  }
+
+  function holdUp() {
+    recorder.finish();
+  }
+
+  // The button keeps its element across the bubble's modes (its keyed
+  // slot below), but whichever element the finger lifts from, letting go
+  // sends: a release outside the button must never leave it recording.
+  const held = recorder.state === "recording" || recorder.state === "starting";
+  const finishLatest = useRef(recorder.finish);
+  finishLatest.current = recorder.finish;
+  useEffect(() => {
+    if (!held) return;
+    const up = () => finishLatest.current();
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [held]);
+
+  function holdKey(e: React.MouseEvent<HTMLButtonElement>) {
+    if (e.detail !== 0) return;
+    if (recorder.state === "recording") {
+      recorder.finish();
+    } else {
+      dropClip.current = false;
+      if (recorder.state === "idle") recorder.open();
+      recorder.begin();
+    }
   }
 
   async function catConfirmAll(pin?: string) {
     await confirmAll(pin);
     // Let the cards' last states render before reading them.
     await new Promise((r) => setTimeout(r, 0));
-    // Everything is done and scored: the cat says so instead.
-    const unsettled = rowsRef.current.some(
-      (r) => r.state === "pending" || r.state === "failed",
-    );
-    if (!unsettled && earned.current > 0) hideBubble();
+    // Everything is done and scored: the cat says so, and stays to listen.
+    const unsettled = rowsRef.current.some(isOpen);
+    if (!unsettled && earned.current > 0) {
+      setPraise(
+        `Purrfect. +${earned.current}${actingName ? ` for ${actingName}` : ""} ✦`,
+      );
+      earned.current = 0;
+    }
   }
 
   function catCancel() {
-    setRows(cancelAll);
-    hideBubble();
+    // Nothing is done; Baumy listens again.
+    talk();
   }
 
   function sheetCancel() {
@@ -452,8 +537,16 @@ export function BaumySheet({
     close();
   }
 
-  // A bubble left open closes after a minute untouched.
-  useIdle(cat && bubble !== null, KIOSK_IDLE_MS, hideBubble);
+  // A bubble left open closes after a minute untouched; not while a finger
+  // holds the button or Baumy is still listening back, thinking or saving
+  // (the minute starts again when that ends). The kiosk's idle reset and
+  // screensaver wait for the same (lib/kiosk/busy.ts).
+  const catBusy = cat && bubble !== null && (held || busy || bulk);
+  useIdle(cat && bubble !== null && !catBusy, KIOSK_IDLE_MS, hideBubble);
+  useEffect(() => {
+    setKioskBusy(BUSY_ID, catBusy);
+  }, [catBusy]);
+  useEffect(() => () => setKioskBusy(BUSY_ID, false), []);
   // A reminder or the screensaver taking the screen closes it at once, and
   // drops any recording: nothing listens under them.
   const hideLatest = useRef(hideBubble);
@@ -468,16 +561,58 @@ export function BaumySheet({
 
   const pinLabel = actingName ? `${actingName}'s PIN` : "Your PIN";
 
+  const recording = recorder.state === "recording";
+  // Talking again is offered once nothing is waiting on Confirm all or
+  // Cancel: a new answer would replace cards nobody had decided on.
+  const cardsSettled =
+    rows.length === 0 ||
+    (confirmAllTargets(rows).length === 0 &&
+      rows.some((r) => r.state === "saved"));
+
+  const showHold =
+    showMic && (bubble === "talk" || (bubble === "answer" && cardsSettled));
+  const showDone =
+    bubble === "answer" && (Boolean(reply?.error) || rows.length === 0);
+
+  // One button, always in the same place in the bubble (its own keyed
+  // slot), so a hold that starts on an answer keeps the element under the
+  // finger: iOS sends the rest of a touch to the element it started on.
+  const holdButton = (
+    <div key="hold" className="mt-4 flex flex-col gap-2">
+      <HoldToTalk
+        state={
+          recording
+            ? "recording"
+            : recorder.state === "opening" || recorder.state === "starting"
+              ? "opening"
+              : "idle"
+        }
+        level={recorder.level}
+        onPointerDown={holdDown}
+        onPointerUp={holdUp}
+        onPointerCancel={holdUp}
+        onClick={holdKey}
+        onContextMenu={(e) => e.preventDefault()}
+      />
+      {holdHint ? (
+        <p role="status" className="font-body text-[20px] text-[#b8243a]">
+          {holdHint}
+        </p>
+      ) : null}
+    </div>
+  );
+
   const answer = reply?.error ? (
-    <>
-      <CatText tone="error">{reply.text}</CatText>
-      <div className="mt-4 flex gap-3">
-        <CatButton onClick={hideBubble}>OK</CatButton>
-      </div>
-    </>
+    <CatText tone="error">{reply.text}</CatText>
   ) : rows.length > 0 ? (
     <>
-      <CatSays size="sm">Got it! I&apos;ll do this:</CatSays>
+      {praise ? (
+        <p role="status" className="font-display text-[16px]">
+          {praise}
+        </p>
+      ) : (
+        <CatSays size="sm">Got it! I&apos;ll do this:</CatSays>
+      )}
       <SuggestionCards
         rows={rows}
         kiosk={kiosk}
@@ -491,12 +626,7 @@ export function BaumySheet({
       />
     </>
   ) : (
-    <>
-      <CatText>{reply?.text ?? ""}</CatText>
-      <div className="mt-4 flex gap-3">
-        <CatButton onClick={hideBubble}>OK</CatButton>
-      </div>
-    </>
+    <CatText>{reply?.text ?? ""}</CatText>
   );
 
   const catBubble =
@@ -509,56 +639,57 @@ export function BaumySheet({
         </CatBubble>
       ) : null
     ) : (
-      <CatBubble mode={bubble}>
-        {bubble === "who" ? (
-          <>
-            <CatSays>Mrrp? Who&apos;s talking?</CatSays>
-            <CatText tone="muted">Tap yourself first.</CatText>
-            {/* The bubble grows up from the cat, so a long list scrolls
+      <CatBubble mode={bubble === "talk" && recording ? "listening" : bubble}>
+        <div key="body">
+          {bubble === "who" ? (
+            <>
+              <CatSays>Mrrp? Who&apos;s talking?</CatSays>
+              <CatText tone="muted">Tap yourself first.</CatText>
+              {/* The bubble grows up from the cat, so a long list scrolls
                 inside it rather than running off the top of the screen. */}
-            <div
-              className="mt-3 flex max-h-[45vh] flex-wrap gap-2 overflow-y-auto"
-              data-testid="who-list"
-            >
-              {who}
-            </div>
-          </>
-        ) : bubble === "ready" ? (
-          <>
-            <CatSays>Mrrp? Hi {actingName}.</CatSays>
-            {showMic ? (
-              <>
-                <CatText tone="muted">{VOICE_NOTE_HINT}</CatText>
-                <div className="mt-4 flex">
-                  <CatButton onClick={listen}>Start talking</CatButton>
-                </div>
-              </>
-            ) : null}
-          </>
-        ) : bubble === "listening" ? (
-          <>
-            <div className="flex items-center gap-4">
-              <LevelBars level={recorder.level} />
-              <CatSays>Mrrp? I&apos;m listening&hellip;</CatSays>
-            </div>
-            <CatText tone="muted">{VOICE_NOTE_HINT}</CatText>
-            <div className="mt-4 flex">
-              <CatButton
-                onClick={recorder.finish}
-                disabled={recorder.state !== "recording"}
+              <div
+                className="mt-3 flex max-h-[45vh] flex-wrap gap-2 overflow-y-auto"
+                data-testid="who-list"
               >
-                Done talking
-              </CatButton>
-            </div>
-          </>
-        ) : bubble === "thinking" ? (
-          <CatSays>
-            {transcribing ? "Listening back\u2026" : "Hmm, let me think\u2026"}
-          </CatSays>
-        ) : (
-          answer
-        )}
-        <CatLink onClick={typeInstead}>Type instead</CatLink>
+                {who}
+              </div>
+            </>
+          ) : bubble === "talk" ? (
+            <>
+              <CatSays>
+                {recording
+                  ? "Mrrp? I’m listening…"
+                  : actingName
+                    ? `Mrrp? Hi ${actingName}.`
+                    : "Mrrp?"}
+              </CatSays>
+              <CatText tone="muted">
+                {recording
+                  ? "Let go when you’re done."
+                  : `Hold the button and talk. ${VOICE_NOTE_HINT}`}
+              </CatText>
+            </>
+          ) : bubble === "thinking" ? (
+            <CatSays>
+              {transcribing
+                ? "Listening back\u2026"
+                : "Hmm, let me think\u2026"}
+            </CatSays>
+          ) : (
+            answer
+          )}
+        </div>
+        {showHold ? holdButton : null}
+        {showDone ? (
+          <div key="done" className="mt-3 flex gap-3">
+            <CatButton variant="soft" onClick={hideBubble}>
+              Done
+            </CatButton>
+          </div>
+        ) : null}
+        <CatLink key="type" onClick={typeInstead}>
+          Type instead
+        </CatLink>
       </CatBubble>
     );
 

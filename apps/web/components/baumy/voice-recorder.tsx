@@ -55,7 +55,7 @@ export function VoiceRecorder({
 
   function start() {
     releasedEarly.current = false;
-    void begin();
+    begin();
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLButtonElement>) {
@@ -97,7 +97,15 @@ export function VoiceRecorder({
     }
   }
 
-  const micState: MicState = sending ? "sending" : state;
+  // This button never opens the microphone ahead of a press, so it is
+  // never "opening" or "ready"; those read as waiting and as idle.
+  const micState: MicState = sending
+    ? "sending"
+    : state === "opening"
+      ? "starting"
+      : state === "ready"
+        ? "idle"
+        : state;
   return (
     <div className="flex flex-col gap-2" data-testid="voice-recorder">
       <MicButton

@@ -789,14 +789,15 @@ No migration: `ai_usage.audio_seconds` came with `0008_ai_usage.sql`.
   GROQ_API_KEY=
   ```
 
-- [ ] **After the deploy, check it on the kitchen iPad (Safari):** tap your
-      avatar, open Baumy, hold "Hold to speak", say "who's winning?" and let
-      go. Safari asks for the microphone the first time (the hold then turns
-      into "Tap to send"); allow it. The sheet shows "You said: …" and
-      Baumy's answer, and one `groq` row lands in `ai_usage` with its
-      `audio_seconds`. If you deny the microphone, the sheet says so and
-      the text box takes over; allow it again in Settings → Safari →
-      Microphone.
+- [ ] **After the deploy, check it on the kitchen iPad (Safari):** tap the
+      cat and your avatar; Safari asks for the microphone the first time,
+      allow it. Hold "Hold to talk", say "who's winning?" and let go
+      [CORRECTION 2026-10-02, issue #132: was "open Baumy, hold Hold to
+      speak" in the sheet]. Baumy's answer shows in the cat's bubble, and
+      one `groq` row lands in `ai_usage` with its `audio_seconds`. If you
+      deny the microphone, the typing sheet opens and says so; allow it
+      again in Settings → Apps → Safari → Microphone
+      ([kiosk-setup.md §4](kiosk-setup.md#4-talking-to-baumy)).
 - The Whisper prompt is the members' names, the chores' names and a few
   German place words (`packages/ai-prompts/src/transcribe.ts`); add words
   there if Whisper keeps mishearing one.
