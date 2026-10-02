@@ -161,8 +161,12 @@ async function otherSessionOf(me: MemberActor): Promise<MemberActor> {
   return { ...me, sessionId };
 }
 
-const run = (name: ActionName, input: unknown, actor: Actor, now = FIXED_NOW) =>
-  runAction(name, input as never, ctxFor(actor, { now }));
+const run = <N extends ActionName>(
+  name: N,
+  input: unknown,
+  actor: Actor,
+  now = FIXED_NOW,
+) => runAction(name, input as never, ctxFor(actor, { now }));
 
 async function withPassword(userId: string) {
   await t
