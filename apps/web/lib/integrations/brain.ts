@@ -14,12 +14,15 @@ import { downWhenAsked, memoryBrain } from "./brain-memory";
 //   POST {BRAIN_BASE_URL}/api/kitchen/shopping/add       { items } → { ok, added, already, items }
 //   POST {BRAIN_BASE_URL}/api/kitchen/shopping/checkoff  { items } → { ok, checkedOff, notFound, items }
 //
-//   POST {BRAIN_BASE_URL}/api/kitchen/login-approval  { requestId, telegramUserId, device, choices, expiresAt } → { ok, sent }
+//   POST {BRAIN_BASE_URL}/api/kitchen/login-approval  { requestId, telegramUserId, device, choices, expiresAt, purpose? } → { ok, sent }
 //
 // all with `Authorization: Bearer $KITCHEN_API_TOKEN`. The last one (issue
 // #80) asks brain to DM a member "Sign in on <device>? Tap the number on the
 // screen" with the five numbers (the right one and four decoys) and Deny as buttons; the tap comes back
-// through `/api/v1/actions` (`approve_login`, `deny_login`). Brain scopes the house
+// through `/api/v1/actions` (`approve_login`, `deny_login`). With
+// `purpose: "step_up"` (issue #135) the member is already signed in there and
+// is confirming it is them, so the DM says "Confirm it's you on <device>?"
+// instead; the buttons are the same. Brain scopes the house
 // itself; nothing here names it. Its 503 `not_configured` means the bot is
 // not in the house group yet.
 //
@@ -87,6 +90,13 @@ export interface LoginApprovalMessage {
   choices: number[];
   /** When the request stops being answerable, ISO 8601. */
   expiresAt: string;
+  /**
+   * `sign_in` (the default when absent): "Sign in on <device>?".
+   * `step_up` (issue #135): the member is already signed in there and is
+   * confirming it is them: "Confirm it's you on <device>?". Either way the
+   * buttons are the same and send `approve_login` / `deny_login`.
+   */
+  purpose?: "sign_in" | "step_up";
 }
 
 /** The shopping list and the sign-in DM, whichever brain this environment talks to. */

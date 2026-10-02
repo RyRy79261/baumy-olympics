@@ -13,6 +13,7 @@ import {
   user,
   verification,
 } from "@baumy/db/schema";
+import { grantStepUp } from "@baumy/db/step-ups";
 import { useTestDb } from "@baumy/db/test-harness";
 import {
   FIXED_NOW,
@@ -95,15 +96,24 @@ async function seedAccount(userId: string, providerId: string) {
     });
 }
 
-/** A member with account `u1`, signed in on session `here`. */
-async function arrange(): Promise<MemberActor> {
+/**
+ * A member with account `u1`, signed in on session `here` 5 minutes ago, so
+ * "Confirm it's you" (issue #135) is satisfied by the fresh sign-in.
+ * `stale: true` signs it in an hour ago instead.
+ */
+async function arrange({
+  stale = false,
+}: { stale?: boolean } = {}): Promise<MemberActor> {
   const memberId = await seedMember(db(), { authUserId: "u1" });
   await seedUser("u1");
   await seedUser("u2");
-  await seedSession("here", "u1", 1);
+  await seedSession("here", "u1", stale ? 1 : 5 / 60);
   return sessionActor(memberId, "member", {
     userId: "u1",
     sessionId: "here",
+    sessionCreatedAt: new Date(
+      FIXED_NOW.getTime() - (stale ? HOUR : 5 * 60_000),
+    ).toISOString(),
   });
 }
 
@@ -332,9 +342,50 @@ describe("unlink_google", () => {
       await run(
         "unlink_google",
         {},
-        sessionActor(other, "member", { userId: "u3", sessionId: "x" }),
+        sessionActor(other, "member", {
+          userId: "u3",
+          sessionId: "x",
+          sessionCreatedAt: FIXED_NOW.toISOString(),
+        }),
       ),
     ).toMatchObject({ ok: false, code: "NOT_FOUND" });
+  });
+});
+
+describe("removing a way in needs 'Confirm it's you' (issue #135)", () => {
+  const CASES: [ActionName, unknown][] = [
+    ["remove_passkey", { passkeyId: "mine" }],
+    ["unlink_google", {}],
+  ];
+
+  it("is refused to a session signed in over 10 minutes ago, until it confirms", async () => {
+    for (const [name, input] of CASES) {
+      const me = await arrange({ stale: true });
+      await seedAccount("u1", "credential");
+      await seedAccount("u1", "google");
+      await seedPasskey("mine", "u1");
+      expect(await run(name, input, me), name).toMatchObject({
+        ok: false,
+        code: "REAUTH_REQUIRED",
+      });
+      // Present before absent: nothing was removed.
+      expect(await t.db().select().from(passkey)).toHaveLength(1);
+      expect(await t.db().select().from(account)).toHaveLength(2);
+      expect(await audits()).toEqual([]);
+
+      await grantStepUp(db(), {
+        sessionId: "here",
+        userId: "u1",
+        method: "password",
+        now: FIXED_NOW,
+      });
+      expect(await run(name, input, me), name).toMatchObject({ ok: true });
+      await t
+        .client()
+        .exec(
+          'truncate "session", "passkey", "account", "user", members, action_requests, audit_events cascade',
+        );
+    }
   });
 });
 
