@@ -198,7 +198,10 @@ export function BaumyButton({
         // Baumy sits on a small raised plinth in the corner (the prototype's
         // footer end), so it reads against any page; the shells keep that
         // corner clear (AppShell's bottom padding, HubGrid's on the kiosk).
-        "fixed right-3 bottom-3 z-10 inline-flex touch-manipulation items-end justify-center",
+        // Anchored to the viewport's bottom-right corner, clear of a phone's
+        // home bar and rounded corners (the safe-area insets), like a chat
+        // button (issue #152).
+        "fixed right-[max(0.75rem,env(safe-area-inset-right))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 inline-flex touch-manipulation items-end justify-center",
         "pixel-frame pixel-frame-4 bg-bm-raised px-3 pt-2 pb-3 [--pf:var(--color-bm-violet)]",
         "shadow-[0_6px_0_rgb(0_0_0/0.45)] active:translate-y-px",
         className,

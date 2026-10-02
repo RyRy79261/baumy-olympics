@@ -30,6 +30,13 @@ vi.mock("@/components/hub/hub-home", () => ({
 vi.mock("@/components/hub/post-reminder-form", () => ({
   PostReminderForm: () => null,
 }));
+// The strip reads this device's storage, so it shows only in a browser;
+// here it is enough that the page mounts it for the right member.
+vi.mock("@/components/hub/set-pin-nudge", () => ({
+  SetPinNudge: ({ memberId }: { memberId: string }) => (
+    <div data-testid="set-pin-nudge" data-member={memberId} />
+  ),
+}));
 vi.mock("./reminder-actions", () => ({ createReminderAction: vi.fn() }));
 vi.mock("./shopping/actions", () => ({
   addShoppingAction: vi.fn(),
@@ -106,8 +113,7 @@ describe("/", () => {
       shopping: new Promise(() => {}),
     });
     const out = renderToStaticMarkup(await HubPage());
-    expect(out).toContain('data-testid="set-pin-nudge"');
-    expect(out).toContain('href="/settings#pin"');
+    expect(out).toContain('data-testid="set-pin-nudge" data-member="m1"');
     expect(hasPin).toHaveBeenCalledWith(expect.anything(), "m1");
   });
 

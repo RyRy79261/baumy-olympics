@@ -47,16 +47,13 @@ export default async function HubPage() {
   ]);
   return (
     <>
+      {/* A slim strip above everything, never a card (issue #152). */}
+      {hasPin ? null : <SetPinNudge memberId={me.memberId} />}
       <PageHeading
         eyebrow="Baumy Olympics"
         title="Hub"
         description={`Welcome, ${me.displayName}.`}
       />
-      {hasPin ? null : (
-        <div className="mb-6 max-w-xl">
-          <SetPinNudge />
-        </div>
-      )}
       <HubHome
         hub={{ ...hub, events, shopping }}
         voice={voiceConfigured()}

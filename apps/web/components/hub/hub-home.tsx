@@ -30,7 +30,7 @@ import { LiveClock } from "./live-clock";
 // the kitchen screen's calm look in a normal scrolling page. On top, the
 // clock and the three status tiles (Urgent, New, Messages), each dim at
 // zero and a link to its slice. Then the urgent bounties and today's agenda
-// in the wide column, the standings with the pot, the pinned notes (the
+// in the wide column, the scores with the pot, the pinned notes (the
 // Board) and the shopping list in the narrow one. Each widget keeps its own
 // empty and unavailable state (lib/hub/load.ts). The page's own card (Post a
 // reminder) stacks under the wide column's, so the short column leaves no
@@ -219,14 +219,16 @@ export function HubHome({
 }) {
   const { chores, standings, pot, notes, counts } = hub;
   return (
-    // From lg up the page keeps clear of the corner Baumy's button sits in
-    // (fixed, bottom right), so it never covers a widget's link or the
-    // shopping list's Add; from 2xl the page's own margin is wide enough.
-    <div className="lg:pr-32 2xl:pr-0">
+    // From md (a portrait tablet) up the page keeps clear of the corner
+    // Baumy's button sits in (fixed, bottom right), so it never covers a
+    // card, a widget's link or the shopping list's Add, wherever the page
+    // is scrolled; from 2xl the page's own margin is wide enough. On a phone
+    // the shell's bottom padding clears it at the end of the page.
+    <div className="md:pr-36 2xl:pr-0">
       <section
         aria-label="At a glance"
         data-testid="hub-glance"
-        className="mb-6 flex flex-wrap items-end justify-between gap-4"
+        className="mb-6 flex flex-wrap items-center justify-between gap-4"
       >
         <LiveClock serverNow={hub.now} />
         <nav aria-label="Needs attention" className="flex gap-3">
@@ -310,12 +312,12 @@ export function HubHome({
           <Widget
             id="widget-leaderboard"
             data-testid="widget-leaderboard"
-            title="Standings"
+            title="Scores"
             status={standings.status}
             message={
               standings.status === "ready" ? undefined : standings.message
             }
-            action={<More href="/scores" label="Scores" />}
+            action={<More href="/scores" label="All scores" />}
             footer={
               <p
                 data-testid="hub-pot"
