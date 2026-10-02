@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
 import type { ReactNode } from "react";
-import { NavMenu, navBadgeClass, navItemClass } from "@baumy/ui";
+import { NavMenu, navItemClass } from "@baumy/ui";
 
 export interface NavItem {
   href: Route;
@@ -55,28 +55,5 @@ export function HubMenu({
       <NavLinks items={items} />
       {children}
     </NavMenu>
-  );
-}
-
-/**
- * "Needs your OK (N)", pinned in the header's top row while claims wait on
- * this member. On a phone it shows "OK (N)"; the whole phrase is still its
- * name for screen readers.
- */
-export function InboxBadge({ waiting }: { waiting: number }) {
-  const pathname = usePathname();
-  const current = isCurrent(pathname, "/inbox");
-  return (
-    <Link
-      href="/inbox"
-      data-testid="inbox-badge"
-      className={navBadgeClass(current)}
-      aria-current={current ? "page" : undefined}
-    >
-      {/* One inline run, so the space before "OK" survives the flex box. */}
-      <span>
-        <span className="max-sm:sr-only">Needs your </span>OK ({waiting})
-      </span>
-    </Link>
   );
 }

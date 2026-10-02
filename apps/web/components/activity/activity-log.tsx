@@ -9,33 +9,46 @@ import { photoUploadAction } from "@/components/photos/upload-action";
 import type { FormAction } from "@/components/use-action-form";
 import type { AttachPhotoData } from "@/lib/actions/attach-completion-photo";
 import type { ClaimEventData } from "@/lib/actions/confirmations";
-import type { ClaimView } from "@/lib/actions/get-pending-confirmations";
+import type {
+  ActivityChoreView,
+  ActivityView,
+} from "@/lib/actions/get-activity";
+import type { WeightDecisionData } from "@/lib/actions/weights";
+import {
+  choreStatusLine,
+  choreTitle,
+  entryLine,
+  entryTime,
+} from "@/lib/activity/view";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
-import { claimStatusLine, claimTitle } from "@/lib/claims/view";
 import { toast } from "@/lib/ui/toast";
 
-// "Needs your OK" (SPEC §4.3): open claims, each with exactly the buttons
-// `get_pending_confirmations` says would work for the member acting. The
-// same list is the phone's /inbox and the kiosk's banner. Every button is an
+// The activity log (issue #150, SPEC §4.3): what happened in the house,
+// newest first, from `get_activity`. A logged chore carries exactly the
+// buttons the read says would work for the member acting (Dispute while its
+// window is open, Withdraw, Concede, Undo, a photo; an admin's ruling on the
+// phone), and a scheduled points change its Veto where the surface offers
+// it. There is no confirming (§12 decision 29). Every button is an
 // `AttestedForm`: on the kiosk only Dispute asks for the acting member's PIN
-// (owner ruling 2026-10-02, issue #145), and a member with no PIN is told
-// so with a QR code to Settings; on a phone the session vouches.
+// (decision 27), and a member with no PIN is told so with a QR code to
+// Settings; on a phone the session vouches.
 //
 // Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
-export interface ClaimActions {
-  confirm: FormAction<ClaimEventData>;
+export interface ActivityActions {
   dispute: FormAction<ClaimEventData>;
   undo: FormAction<ClaimEventData>;
   withdraw: FormAction<ClaimEventData>;
   concede: FormAction<ClaimEventData>;
   /** Admins in the UI only. */
   resolve?: FormAction<ClaimEventData>;
+  /** Where `veto_weight` is offered (the phone). */
+  veto?: FormAction<WeightDecisionData>;
 }
 
 /**
  * The action, reporting its outcome through a toast as soon as it answers.
- * Not through `AttestedForm`'s `onResult`: a claim that changes loses the
+ * Not through `AttestedForm`'s `onResult`: an entry that changes loses the
  * very button that changed it when the page re-renders, before an effect in
  * that button's form could run. A PIN prompt is the form's own business.
  */
@@ -69,7 +82,7 @@ function DisputeForm({
   kiosk,
   pinLabel,
 }: {
-  claim: ClaimView;
+  claim: ActivityChoreView;
   action: FormAction<ClaimEventData>;
   kiosk: boolean;
   pinLabel: string;
@@ -131,7 +144,7 @@ function PhotoForm({
   kiosk,
   pinLabel,
 }: {
-  claim: ClaimView;
+  claim: ActivityChoreView;
   kiosk: boolean;
   pinLabel: string;
 }) {
@@ -167,21 +180,21 @@ function PhotoForm({
   );
 }
 
-function ClaimCard({
+function ChoreEntry({
   claim,
   actions,
   kiosk,
   pinLabel,
 }: {
-  claim: ClaimView;
-  actions: ClaimActions;
+  claim: ActivityChoreView;
+  actions: ActivityActions;
   kiosk: boolean;
   pinLabel: string;
 }) {
-  const title = claimTitle(claim);
+  const title = choreTitle(claim);
   const can = claim.can;
   const simple = (
-    key: "confirm" | "undo" | "withdraw" | "concede",
+    key: "undo" | "withdraw" | "concede",
     label: string,
     done: string,
   ) => (
@@ -196,11 +209,15 @@ function ClaimCard({
   return (
     <Card
       title={title}
-      data-testid={`claim-${claim.choreName}`}
+      data-testid={`activity-chore-${claim.choreName}`}
       data-status={claim.status}
     >
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-bm-muted">{claimStatusLine(claim)}</p>
+        <p className="text-sm text-bm-muted">
+          <time dateTime={claim.at}>{entryTime(claim)}</time>
+          {" · "}
+          {choreStatusLine(claim)}
+        </p>
         {claim.photoUrl ? (
           <ProofPhoto
             src={claim.photoUrl}
@@ -208,9 +225,6 @@ function ClaimCard({
           />
         ) : null}
         <div className="flex flex-wrap items-start gap-3">
-          {can.confirm
-            ? simple("confirm", "Confirm", `Confirmed: ${title}.`)
-            : null}
           {can.dispute ? (
             <DisputeForm
               claim={claim}
@@ -269,35 +283,88 @@ function ClaimCard({
   );
 }
 
-export function ClaimList({
-  claims,
+function OtherEntry({
+  entry,
+  actions,
+  pinLabel,
+}: {
+  entry: Exclude<ActivityView, ActivityChoreView>;
+  actions: ActivityActions;
+  pinLabel: string;
+}) {
+  const veto =
+    entry.kind === "points" && entry.canVeto && actions.veto
+      ? actions.veto
+      : null;
+  return (
+    <div
+      data-testid={`activity-${entry.kind}-${entry.choreName}`}
+      className="flex flex-wrap items-center justify-between gap-3 px-1"
+    >
+      <p className="text-sm">
+        <time dateTime={entry.at} className="text-bm-muted">
+          {entryTime(entry)}
+        </time>
+        {" · "}
+        {entryLine(entry)}
+      </p>
+      {veto && entry.kind === "points" ? (
+        <AttestedForm
+          action={reporting(
+            veto,
+            () => `Vetoed. ${entry.choreName}'s points stay as they are.`,
+          )}
+          label="Veto"
+          pinLabel={pinLabel}
+          fields={
+            <input
+              type="hidden"
+              name="suggestionId"
+              value={entry.suggestionId}
+            />
+          }
+          onResult={QUIET}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function ActivityLog({
+  entries,
   actions,
   kiosk = false,
   pinLabel,
-  empty,
 }: {
-  claims: ClaimView[];
-  actions: ClaimActions;
+  entries: ActivityView[];
+  actions: ActivityActions;
   kiosk?: boolean;
   /** What the PIN pad is for, e.g. "Ryan's PIN". */
   pinLabel: string;
-  empty: string;
 }) {
-  if (claims.length === 0) {
-    return <p className="text-sm text-bm-muted">{empty}</p>;
+  if (entries.length === 0) {
+    return (
+      <p className="text-sm text-bm-muted">
+        Nothing has happened in the last 30 days.
+      </p>
+    );
   }
   return (
-    <ul className="flex flex-col gap-4">
-      {claims.map((c) => (
-        <li key={c.completionId}>
-          <ClaimCard
-            claim={c}
-            actions={actions}
-            kiosk={kiosk}
-            pinLabel={pinLabel}
-          />
+    <ol className="flex flex-col gap-4" data-testid="activity-log">
+      {entries.map((e) => (
+        <li key={e.id}>
+          {e.kind === "chore" ? (
+            <ChoreEntry
+              claim={e}
+              actions={actions}
+              kiosk={kiosk}
+              pinLabel={pinLabel}
+            />
+          ) : (
+            <OtherEntry entry={e} actions={actions} pinLabel={pinLabel} />
+          )}
         </li>
       ))}
-    </ul>
+    </ol>
   );
 }

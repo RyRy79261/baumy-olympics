@@ -20,7 +20,7 @@ import { DismissWeightButton, ScheduleWeightForm } from "./weight-forms";
 // the frequency formula says (raw and suggested), how many gaps it measured
 // and a sparkline of them, and the week's suggestion to schedule (as it is
 // or edited) or dismiss. A scheduled change shows when it applies; another
-// member can veto it until then (here or on /inbox). Suggestions are
+// member can veto it until then (here or on /activity). Suggestions are
 // computed on Mondays by the daily job (issue #18). Each chore folds out its
 // points history (issue #115): every change, and who vetoed or cancelled one.
 

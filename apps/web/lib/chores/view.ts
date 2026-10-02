@@ -35,8 +35,6 @@ export interface PreviewView {
   totalPts: number;
   /** "Breaks Ryan's streak of 3: +12 bonus", or null. */
   breaks: string | null;
-  /** Set when the points only count once someone else confirms. */
-  pending: string | null;
 }
 
 /**
@@ -45,9 +43,8 @@ export interface PreviewView {
  * stores unless someone logs the chore in between.
  */
 export function previewFor(
-  c: Pick<ChoreView, "basePoints" | "streak" | "confirmMode">,
+  c: Pick<ChoreView, "basePoints" | "streak">,
   doneBy: string,
-  actorId: string,
 ): PreviewView | null {
   if (c.basePoints === null) return null;
   const s = nextScore(c.basePoints, c.streak, doneBy);
@@ -57,10 +54,6 @@ export function previewFor(
     breaks:
       s.brokenLen !== null && c.streak
         ? `Breaks ${c.streak.holderName}'s streak of ${s.brokenLen}: +${s.breakPts} bonus`
-        : null,
-    pending:
-      c.confirmMode === "partner" && doneBy === actorId
-        ? "Counts once someone else confirms it."
         : null,
   };
 }
