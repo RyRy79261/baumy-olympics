@@ -47,7 +47,7 @@ describe("commandContext", () => {
       "The acting member is not an admin.",
     );
     expect(commandContext({ ...input, device: "kiosk" })).toContain(
-      "Admin work (bounties, the pot) cannot be approved here.",
+      "an admin's bounty writes, ask for the acting member's PIN when approved; the pot cannot be approved here.",
     );
   });
 
