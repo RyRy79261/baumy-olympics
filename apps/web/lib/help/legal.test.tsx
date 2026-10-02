@@ -24,8 +24,7 @@ describe("legalSections", () => {
         <LegalSection key="a" title="Be decent, please">
           <p>
             Keep <strong>your PIN</strong> to yourself, see{" "}
-            <Link href="/privacy">privacy</Link> and{" "}
-            <a href="/terms">terms</a>.
+            <Link href="/privacy">privacy</Link> and <a href="/terms">terms</a>.
           </p>
           <ul>
             <li>
