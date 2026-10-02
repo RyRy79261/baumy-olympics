@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { challengeWindowEndsAt, PHOTO_RETENTION_DAYS } from "@baumy/core";
 import type { Queryable } from "@baumy/db";
@@ -15,6 +16,7 @@ import {
   account,
   aiUsage,
   auditEvents,
+  mcpAccessTokens,
   passkey,
   session,
   user,
@@ -384,7 +386,10 @@ describe("get_my_data", () => {
     );
     expect(theirs.data.auditEntries).toBe(THEIRS.audit);
     expect(theirs.data.ai.commands).toBe(THEIRS.commands.length);
-    expect(theirs.data.connectedApps.map((a) => a.name)).toEqual(THEIRS.apps);
+    // Same grant time, so the order between them is the grant id's.
+    expect(theirs.data.connectedApps.map((a) => a.name).sort()).toEqual(
+      [...THEIRS.apps].sort(),
+    );
     expect(theirs.data.completions.total).toBe(1);
 
     const json = JSON.stringify(mine.data);
@@ -452,5 +457,61 @@ describe("get_my_data", () => {
     const before = await t.db().select().from(auditEvents);
     await get(me);
     expect(await t.db().select().from(auditEvents)).toHaveLength(before.length);
+  });
+
+  it("answers zeros for a member with nothing yet, and dates an app's last use", async () => {
+    const memberId = await seedMember(db(), { displayName: "Newcomer" });
+    await insertMcpClient(db(), {
+      clientId: "client_used",
+      clientSecretHash: null,
+      clientName: "Used app",
+      redirectUris: ["https://example.com/cb"],
+      tokenEndpointAuthMethod: "none",
+      now: FIXED_NOW,
+    });
+    await insertMcpTokens(db(), {
+      grantId: crypto.randomUUID(),
+      tokenHash: hashMcpSecret("at-used"),
+      refreshTokenHash: hashMcpSecret("rt-used"),
+      clientId: "client_used",
+      memberId,
+      scopes: ["baumy:read"],
+      grantedAt: FIXED_NOW,
+      now: FIXED_NOW,
+    });
+    await t
+      .db()
+      .update(mcpAccessTokens)
+      .set({ lastUsedAt: FIXED_NOW })
+      .where(eq(mcpAccessTokens.memberId, memberId));
+    // No auth `user` row behind the session: every flag reads false.
+    const res = await get(sessionActor(memberId));
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.account).toEqual({
+      emailVerified: false,
+      hasPassword: false,
+      googleLinked: false,
+      passkeys: 0,
+      twoFactorEnabled: false,
+    });
+    expect(res.data.sessions).toEqual({ count: 0, lastUsedAt: [] });
+    expect(res.data.completions.total).toBe(0);
+    expect(res.data.notes).toEqual({ written: 0, deletedKept: 0 });
+    expect(res.data.photos).toEqual({ stored: 0, items: [] });
+    expect(res.data.auditEntries).toBe(0);
+    expect(res.data.ai).toMatchObject({ commands: 0, lastUsedAt: null });
+    expect(res.data.connectedApps).toEqual([
+      {
+        name: "Used app",
+        connectedAt: FIXED_NOW.toISOString(),
+        lastUsedAt: FIXED_NOW.toISOString(),
+      },
+    ]);
+  });
+
+  it("says so when the member row is gone", async () => {
+    const res = await get(sessionActor(crypto.randomUUID()));
+    expect(res).toMatchObject({ ok: false, code: "NOT_FOUND" });
   });
 });
