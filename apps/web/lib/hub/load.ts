@@ -115,8 +115,8 @@ async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
     read(() => runAction("list_chores", {}, ctx)),
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
     read(() => runAction("get_pot", {}, ctx)),
-    // The pinned notes for the widget, and the Messages count, which
-    // list_notes counts over every note.
+    // The pinned notes for the widget, and the Messages count: the notes
+    // this member has not seen, which list_notes counts over every note.
     read(() =>
       runAction("list_notes", { pinnedOnly: true, limit: HUB_NOTES }, ctx),
     ),
@@ -153,7 +153,7 @@ async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
         ? chores.data.chores.filter((c) => c.urgent).length
         : null,
       new: chores.ok ? chores.data.chores.filter((c) => c.isNew).length : null,
-      messages: notes.ok ? notes.data.recentCount : null,
+      messages: notes.ok ? notes.data.unseenCount : null,
     },
   };
 }

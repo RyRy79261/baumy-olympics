@@ -337,7 +337,11 @@ describe("seen notes (issue #153)", () => {
     const a = await add("A");
     expect(await unseen(sam)).toBe(1);
     expect(await unseenByAnyone()).toBe(1);
-    await softDeleteNote(db(), { householdId: HOUSEHOLD_ID, id: a, now: at(1) });
+    await softDeleteNote(db(), {
+      householdId: HOUSEHOLD_ID,
+      id: a,
+      now: at(1),
+    });
     expect(await unseen(sam)).toBe(0);
     expect(await unseenByAnyone()).toBe(0);
   });
@@ -391,4 +395,3 @@ describe("seen notes (issue #153)", () => {
     expect(row!.seenBy).toEqual([sam, author]);
   });
 });
-

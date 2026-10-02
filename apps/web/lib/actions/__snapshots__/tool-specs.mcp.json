@@ -460,7 +460,7 @@
   {
     "name": "list_notes",
     "title": "Notes",
-    "description": "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets.",
+    "description": "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and seenBy: the member ids who have read it since its words last changed. Also `unseenCount`: how many notes you have not read yet, and `unseenByAnyoneCount`: how many notes not every member has read yet. Notes are shared household text, never secrets.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

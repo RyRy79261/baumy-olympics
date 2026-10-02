@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { MEMBER_COLORS } from "@baumy/types";
 import type { ChoreView } from "@/lib/actions/list-chores";
-import { NOTE_RECENT_MS, type NoteView } from "@/lib/actions/notes";
+import type { NoteView } from "@/lib/actions/notes";
 import { eventView } from "@/lib/calendar/view";
 import {
   CELL_HEAD,
@@ -11,7 +11,6 @@ import {
   CHIP_GAP,
   CHIP_H,
   HOUSE_COLOUR,
-  MESSAGES_WINDOW_MS,
   addMonths,
   agoLabel,
   bountyRows,
@@ -30,8 +29,8 @@ import {
   monthGridDays,
   monthTitle,
   parseMonthParams,
+  unseenMessages,
   plannedLabel,
-  recentMessages,
   sheetTime,
   whoOf,
   type DashboardMember,
@@ -277,7 +276,9 @@ describe("bountyRows", () => {
   });
 });
 
-describe("recentMessages", () => {
+describe("unseenMessages", () => {
+  const everyone = [{ id: "m-jo" }, { id: "m-sam" }];
+
   function note(over: Partial<NoteView>): NoteView {
     return {
       id: over.title ?? "n",
@@ -290,37 +291,40 @@ describe("recentMessages", () => {
       createdAt: at(-1),
       updatedAt: at(-1),
       editedAt: over.createdAt ?? at(-1),
+      seenBy: ["m-jo"],
       ...over,
     };
   }
 
-  it("keeps the notes added or edited in the last day, newest first", () => {
-    const window = MESSAGES_WINDOW_MS / HOUR;
-    const rows = recentMessages(
+  it("keeps the notes not every member has seen, newest change first", () => {
+    const rows = unseenMessages(
       [
-        note({ title: "Old", createdAt: at(-30), editedAt: at(-window) }),
+        // Everyone has read it, however new: not a message any more.
+        note({ title: "Read", createdAt: at(0), seenBy: ["m-jo", "m-sam"] }),
         note({ title: "Pasta", createdAt: at(-0.2) }),
         note({ title: "Wifi", createdAt: at(-40), editedAt: at(-3) }),
-        note({ title: "Now", createdAt: at(0) }),
-        // Pinned an hour ago: a change, but not an edit, so not a message.
-        note({
-          title: "Pinned",
-          createdAt: at(-40),
-          updatedAt: at(-1),
-          pinned: true,
-        }),
+        note({ title: "Now", createdAt: at(0), seenBy: [] }),
+        // Old, but Sam has still not read it.
+        note({ title: "Old", createdAt: at(-80) }),
       ],
+      everyone,
       NOW,
     );
-    expect(rows.map((r) => [r.title, r.when])).toEqual([
-      ["Now", "just now"],
-      ["Pasta", "12m ago"],
-      ["Wifi", "changed 3h ago"],
+    expect(rows.map((r) => [r.title, r.when, r.seenBy])).toEqual([
+      ["Now", "just now", []],
+      ["Pasta", "12m ago", ["m-jo"]],
+      ["Wifi", "changed 3h ago", ["m-jo"]],
+      ["Old", "3d ago", ["m-jo"]],
     ]);
   });
 
-  it("looks back as far as list_notes' recentCount does", () => {
-    expect(MESSAGES_WINDOW_MS).toBe(NOTE_RECENT_MS);
+  it("waits only for the members it is given", () => {
+    const rows = unseenMessages(
+      [note({ title: "Pasta" })],
+      [{ id: "m-jo" }],
+      NOW,
+    );
+    expect(rows).toEqual([]);
   });
 
   it("says how long ago", () => {
@@ -328,6 +332,8 @@ describe("recentMessages", () => {
     expect(agoLabel(at(1), NOW)).toBe("now");
     expect(agoLabel(at(-0.5), NOW)).toBe("30m");
     expect(agoLabel(at(-23), NOW)).toBe("23h");
+    expect(agoLabel(at(-24), NOW)).toBe("1d");
+    expect(agoLabel(at(-49), NOW)).toBe("2d");
   });
 });
 

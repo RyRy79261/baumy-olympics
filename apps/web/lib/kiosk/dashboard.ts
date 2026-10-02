@@ -220,15 +220,13 @@ export function kindLabel(kind: ChoreKind): string {
 
 // ---------------------------------------------------------------- messages
 
-/** How far back the Messages icon looks (ADR 0005 §3): list_notes' NOTE_RECENT_MS. */
-export const MESSAGES_WINDOW_MS = 24 * HOUR;
-
-/** "now", "12m", "3h": how long ago, for a message's byline. */
+/** "now", "12m", "3h", "2d": how long ago, for a message's byline. */
 export function agoLabel(at: string, now: Date): string {
   const ms = Math.max(0, now.getTime() - Date.parse(at));
   if (ms < MINUTE) return "now";
   if (ms < HOUR) return `${Math.floor(ms / MINUTE)}m`;
-  return `${Math.floor(ms / HOUR)}h`;
+  if (ms < 24 * HOUR) return `${Math.floor(ms / HOUR)}h`;
+  return `${Math.floor(ms / (24 * HOUR))}d`;
 }
 
 /** One note in the Messages module. */
@@ -240,20 +238,24 @@ export interface MessageView {
   authorName: string;
   /** "12m ago", or "changed 2h ago" once edited. */
   when: string;
+  /** The active members who have seen it as it is now (issue #153). */
+  seenBy: string[];
 }
 
 /**
- * The notes added, or whose words were edited, in the last 24 hours (ADR
- * 0005 §3), the newest first: the notes list_notes' `recentCount` counts,
- * so the icon's number and the module's list agree. Pinning is not an edit.
+ * The notes that not every active member has seen as they are now (issue
+ * #153: the kitchen screen "should show a number, until all members have
+ * indicated they've read the message"), the newest change first: the notes
+ * list_notes' `unseenByAnyoneCount` counts, so the icon's number and the
+ * module's list agree.
  */
-export function recentMessages(
+export function unseenMessages(
   notes: readonly NoteView[],
+  members: readonly { id: string }[],
   now: Date,
 ): MessageView[] {
-  const since = now.getTime() - MESSAGES_WINDOW_MS;
   return notes
-    .filter((n) => Date.parse(n.editedAt) > since)
+    .filter((n) => members.some((m) => !n.seenBy.includes(m.id)))
     .sort((a, b) => Date.parse(b.editedAt) - Date.parse(a.editedAt))
     .map((n) => {
       const edited = n.editedAt !== n.createdAt;
@@ -266,6 +268,7 @@ export function recentMessages(
         authorId: n.authorId,
         authorName: n.authorName,
         when: edited ? `changed ${when}` : when,
+        seenBy: n.seenBy,
       };
     });
 }

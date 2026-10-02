@@ -40,6 +40,8 @@ export const BRAIN_EXCLUDED: Partial<Record<ActionName, string>> = {
     "Checks a PIN typed on the kitchen screen; only the kiosk has one.",
   set_kiosk_idle_minutes:
     "A setting of the kitchen screen itself (how long it waits before it forgets who is acting); only the kiosk has one. Tell the person to change it on the kitchen screen.",
+  acknowledge_note:
+    "Marks notes read when a member opens them on the phone or the kitchen screen. Brain's own read button comes later (issue #163); until then, reading the board through list_notes marks nothing.",
   report_bug:
     "Files an issue on the public bug tracker from the in-app reporter (a shake, or Settings); a report is the person's own words in the app. Tell them to shake their phone or use Settings → Bugs and feature requests.",
 };
@@ -439,7 +441,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns:
-      "`notes`: id, title, markdown body, colour, pinned, author, created and changed times.",
+      "`notes`: id, title, markdown body, colour, pinned, author, created and changed times, and `seenBy` (the member ids who have read its current words); `unseenCount` (the notes the sender has not read) and `unseenByAnyoneCount` (the notes not every member has read).",
     errors: [],
     reply: "Titles first, pinned ones marked; the body only when asked.",
   },
