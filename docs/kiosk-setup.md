@@ -73,7 +73,24 @@ Guided Access keeps the iPad in Baumy: no swiping home, no notifications.
    and tap **Start**. Under Options, turn **Motion** off to hold portrait.
 5. To leave it: triple-click, type the passcode, End.
 
-## 4. What the screen does on its own
+## 4. Talking to Baumy
+
+Tap the cat (and your avatar, if nobody is tapped in): the bubble shows a
+big **Hold to talk**. Hold it while you speak, the button turns red with
+moving bars, and let go: Baumy's answer and its cards (Confirm all,
+Cancel) show in the same bubble, and Hold to talk is there again for the
+next thing. Done, or a tap on the cat, closes it.
+
+The first tap asks for the microphone. iPadOS shows "Allow … to use your
+microphone?": tap **Allow**. To stop it asking, Settings → Apps → Safari
+→ **Microphone → Allow** (on older iPadOS, Settings → Safari →
+Microphone). A home-screen app may still ask again after it is restarted.
+While the bubble is open the microphone is on and iPadOS shows its orange
+dot; it turns off when the bubble closes. If the microphone was refused,
+the cat opens the typing sheet instead and says so; allow it in the same
+setting and reload.
+
+## 5. What the screen does on its own
 
 - **Idle reset.** After 60 seconds untouched it forgets who tapped their
   avatar and goes back to the kitchen home, from any kiosk page, and closes
@@ -94,7 +111,7 @@ Guided Access keeps the iPad in Baumy: no swiping home, no notifications.
 - **Freshness.** The kitchen home and the Shop page re-read themselves
   every 60 seconds and when they come back into view (issues #20, #65).
 
-## 5. Checks before calling it done
+## 6. Checks before calling it done
 
 - [ ] Launched from the home screen, it is full screen in portrait.
 - [ ] **2-hour soak test:** leave it on the kitchen home, untouched, for two
@@ -107,6 +124,10 @@ Guided Access keeps the iPad in Baumy: no swiping home, no notifications.
 - [ ] After 23:00 (or with `KIOSK_NIGHT_HOURS` set to the next few minutes
       on a preview): the night screen shows, a tap wakes it, a minute
       later it sleeps again, and in the morning it is awake.
+- [ ] Tap the cat and your avatar, allow the microphone, hold **Hold to
+      talk** and say "who's winning?": the button turns red with moving
+      bars while held, and on letting go Baumy answers in the bubble, with
+      Hold to talk under the answer.
 - [ ] Turn Wi-Fi off and reload: "No connection". Turn it on: the kiosk is
       back by itself.
 - [ ] Lighthouse (Chrome DevTools → Lighthouse, device Desktop, on
