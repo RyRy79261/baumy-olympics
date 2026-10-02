@@ -412,6 +412,34 @@ describe("verifyStepUpPasskey's other challenges and deployments", () => {
   });
 });
 
+describe("a passkey sign-in", () => {
+  it("opens a window for the session it makes (issue #135)", async () => {
+    const { userId } = await signUp();
+    const key = authenticator();
+    await registerPasskey(userId, key);
+    // Signed out: the options name no passkeys, the browser picks one.
+    const { options, cookie } = await challengeFor("");
+    const res = await auth.handler(
+      new Request(`${ORIGIN}/api/auth/passkey/verify-authentication`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: ORIGIN,
+          cookie,
+        },
+        body: JSON.stringify({ response: key.assert(options.challenge) }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    const { session } = (await res.json()) as { session: { id: string } };
+    const [row] = await db
+      .select()
+      .from(schema.stepUps)
+      .where(eq(schema.stepUps.sessionId, session.id));
+    expect(row).toMatchObject({ userId, method: "passkey" });
+  });
+});
+
 describe("verifyStepUpPasskey with passkeys off", () => {
   it("refuses every call", async () => {
     const off = createAuth({

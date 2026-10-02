@@ -578,10 +578,12 @@ export const loginRequests = pgTable(
  * "Confirm it's you" (issue #135, ADR 0007): the sudo window of ONE session.
  * A member who has just proven it is them (a passkey, a two-factor code, a
  * Telegram tap or the password) may do sensitive things from this session,
- * without being asked again, until `expires_at` (10 minutes). Keyed by the
- * Better Auth session, so another device, or a new sign-in, has no window,
- * and signing the session out deletes the row. Nothing secret is stored:
- * only which method was used and when.
+ * without being asked again, until `expires_at` (10 minutes). A real sign-in
+ * opens one too (`google`, `backup_code` and the rest name how), written by
+ * @baumy/auth's step-up hooks; a session's age alone never counts. Keyed by
+ * the Better Auth session, so another device has no window, and signing the
+ * session out deletes the row. Nothing secret is stored: only which method
+ * was used and when.
  */
 export const stepUps = pgTable(
   "step_ups",
@@ -599,10 +601,25 @@ export const stepUps = pgTable(
   (t) => [
     check(
       "step_ups_method",
-      sql`${t.method} IN ('passkey', 'totp', 'baumy', 'password')`,
+      sql`${t.method} IN ('passkey', 'totp', 'baumy', 'password', 'google', 'backup_code')`,
     ),
   ],
 );
+
+/**
+ * "Confirm it's you" with a two-factor code (issue #135): the newest TOTP
+ * time step (30 s) a step-up accepted for each account. A step-up refuses a
+ * code from that step or an older one, so a code seen over the member's
+ * shoulder cannot be typed again in its 90-second window. Better Auth's own
+ * sign-in code step does not consult it.
+ */
+export const stepUpTotpSteps = pgTable("step_up_totp_steps", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  lastStep: bigint("last_step", { mode: "number" }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }).notNull(),
+});
 
 /**
  * A kitchen kiosk (SPEC §5, §6.2, §8): an iPad that stays signed in as a

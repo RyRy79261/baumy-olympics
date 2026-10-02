@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button, Card, Field, FormMessage, Input } from "@baumy/ui";
 import { PixelQr } from "@/components/account/pixel-qr";
+import { useStepUp } from "@/components/account/confirm-its-you";
 import { authClient } from "@/lib/auth-client";
 import {
   SOMETHING_WENT_WRONG,
@@ -53,6 +54,9 @@ export function TwoFactorCard({
   emailVerified: boolean;
 }) {
   const router = useRouter();
+  // Turning two-factor on or off and new backup codes need "Confirm it's
+  // you" (issue #135): Better Auth refuses them without an open window.
+  const stepUp = useStepUp();
   const [stage, setStage] = useState<Stage>({ step: "idle" });
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -75,6 +79,10 @@ export function TwoFactorCard({
     e.preventDefault();
     setError(null);
     setPending(true);
+    if (!(await stepUp.ensure())) {
+      setPending(false);
+      return;
+    }
     const { data, error: err } = await authClient.twoFactor
       .enable(pw())
       .catch(() => ({ data: null, error: { message: SOMETHING_WENT_WRONG } }));
@@ -120,6 +128,10 @@ export function TwoFactorCard({
     e.preventDefault();
     setError(null);
     setPending(true);
+    if (!(await stepUp.ensure())) {
+      setPending(false);
+      return;
+    }
     if (what === "disable") {
       const { error: err } = await authClient.twoFactor
         .disable(pw())
@@ -403,6 +415,7 @@ export function TwoFactorCard({
           </div>
         </form>
       ) : null}
+      {stepUp.dialog}
     </Card>
   );
 }

@@ -15,6 +15,7 @@ import {
   SwatchPicker,
   memberColourOptions,
 } from "@baumy/ui";
+import { useStepUp } from "@/components/account/confirm-its-you";
 import { useActionForm } from "@/components/use-action-form";
 import { toast } from "@/lib/ui/toast";
 import {
@@ -171,7 +172,12 @@ export function MemberControls(props: MemberRowProps) {
   const role = useActionForm(manageMembersAction);
   const status = useActionForm(manageMembersAction);
   const edit = useActionForm(manageMembersAction);
-  const telegram = useActionForm(manageMembersAction);
+  // Setting a Telegram id adds a way in: "Confirm it's you" first (#135).
+  const stepUp = useStepUp();
+  const telegram = useActionForm(
+    (prev: Parameters<typeof manageMembersAction>[0], form: FormData) =>
+      stepUp.guard(manageMembersAction)(prev, form),
+  );
   const [confirming, setConfirming] = useState(false);
   const [telegramValid, setTelegramValid] = useState(true);
 
@@ -379,6 +385,7 @@ export function MemberControls(props: MemberRowProps) {
             <FormMessage tone="error">{telegram.state.message}</FormMessage>
           ) : null}
         </form>
+        {stepUp.dialog}
       </details>
     </li>
   );

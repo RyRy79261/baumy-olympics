@@ -17,7 +17,10 @@ import {
   auditEvents,
   kioskDevices,
   kioskPairingRequests,
+  session,
+  user,
 } from "@baumy/db/schema";
+import { grantStepUp } from "@baumy/db/step-ups";
 import { useTestDb } from "@baumy/db/test-harness";
 import {
   FIXED_NOW,
@@ -529,13 +532,35 @@ describe("check_kiosk_pin: attestation on the kiosk", () => {
       .where(eq(auditEvents.action, "kiosk_pin_locked"));
     expect(locks).toHaveLength(1);
 
-    // Their own session sets a new PIN: the lock and the counters go.
+    // Their own session, after "Confirm it's you" (issue #135), sets a new
+    // PIN: the lock and the counters go.
+    await t.db().insert(user).values({
+      id: "pin-owner",
+      name: "pin-owner",
+      email: "pin-owner@example.com",
+    });
+    await t
+      .db()
+      .insert(session)
+      .values({
+        id: "pin-owner-session",
+        token: "tok-pin-owner",
+        userId: "pin-owner",
+        expiresAt: new Date(FIXED_NOW.getTime() + 3_600_000),
+      });
+    await grantStepUp(db(), {
+      sessionId: "pin-owner-session",
+      userId: "pin-owner",
+      method: "password",
+      now: FIXED_NOW,
+    });
     const reset = await runAction(
       "set_kiosk_pin",
       { pin: "2468" },
       ctxFor(
         sessionActor(me, "member", {
-          sessionCreatedAt: FIXED_NOW.toISOString(),
+          userId: "pin-owner",
+          sessionId: "pin-owner-session",
         }),
       ),
     );

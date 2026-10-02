@@ -113,7 +113,10 @@ export function passkeyErrorSentence(error: AuthError & { message?: string }) {
     return DEVICE_SIGNED_OUT;
   }
   if (error.code === "SESSION_NOT_FRESH") {
-    return "For your safety, sign out and in again, then add the passkey within a day.";
+    return "For your safety, sign out and in again, then add the passkey.";
+  }
+  if (error.code === "STEP_UP_REQUIRED") {
+    return "Confirm it's you first, then add the passkey within 10 minutes.";
   }
   if (error.status !== undefined && error.status >= 500) {
     return SOMETHING_WENT_WRONG;
