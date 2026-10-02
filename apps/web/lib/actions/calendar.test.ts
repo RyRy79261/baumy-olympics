@@ -597,6 +597,43 @@ describe("update_event", () => {
       ),
     ).toBe('Change "Dinner" to Fri 15 Jan, 19:00–20:30');
   });
+
+  it("previews who it is for when that is said, and refuses a stranger before the card (issue #134)", async () => {
+    const anna = await seedMember(db(), { displayName: "Anna" });
+    const gone = await seedMember(db(), { deactivatedAt: FIXED_NOW });
+    const ctx = { ...ctxFor(sessionActor("m")), db: db() };
+    const change = { ...dinner("2027-01-15"), eventId: "abcde123" } as const;
+    const updatePreview = (forMemberId: string | null) =>
+      REGISTRY.update_event.preview!(ctx, {
+        ...change,
+        kind: "timed",
+        forMemberId,
+      });
+    expect(await updatePreview(anna)).toBe(
+      'Change "Dinner" to Fri 15 Jan, 19:00–20:30 and make it for Anna',
+    );
+    expect(await updatePreview(null)).toBe(
+      'Change "Dinner" to Fri 15 Jan, 19:00–20:30 and make it for everyone',
+    );
+    expect(await updatePreview(gone)).toEqual({
+      invalid: "Pick someone in the house.",
+    });
+    const addPreview = (forMemberId: string | null) =>
+      REGISTRY.create_event.preview!(ctx, {
+        ...dinner("2027-01-15"),
+        kind: "timed",
+        forMemberId,
+      });
+    expect(await addPreview(anna)).toBe(
+      'Add "Dinner" on Fri 15 Jan, 19:00–20:30 for Anna',
+    );
+    expect(await addPreview(null)).toBe(
+      'Add "Dinner" on Fri 15 Jan, 19:00–20:30',
+    );
+    expect(await addPreview("6f1c2b9e-3a4d-4e5f-8a9b-0c1d2e3f4a5b")).toEqual({
+      invalid: "Pick someone in the house.",
+    });
+  });
 });
 
 describe("delete_event", () => {
@@ -748,7 +785,7 @@ describe("changing and deleting on the kiosk, and who it is for (issue #134)", (
     ).toMatchObject({ event: { title: "Moved" } });
   });
 
-  it("changes who it is for, back to the house when left out, and an undo puts it back", async () => {
+  it("keeps who it is for when left out, makes it the house's with null, and an undo puts it back", async () => {
     const me = await seedMember(db());
     const anna = await seedMember(db(), { displayName: "Anna" });
     const bo = await seedMember(db(), { displayName: "Bo" });
@@ -759,20 +796,27 @@ describe("changing and deleting on the kiosk, and who it is for (issue #134)", (
         ctxFor(sessionActor(me)),
       ),
     ) as { event: { id: string } };
-    const update = (forMemberId: string | undefined, requestId: string) =>
+    const update = (
+      forMemberId: string | null | undefined,
+      requestId: string,
+    ) =>
       run(
         "update_event",
         {
           ...dinner("2027-01-15"),
           eventId: event.id,
-          ...(forMemberId ? { forMemberId } : {}),
+          ...(forMemberId === undefined ? {} : { forMemberId }),
         },
         ctxFor(sessionActor(me), { requestId }),
       );
     expect(ok(await update(bo, "to-bo-0001"))).toMatchObject({
       event: { forMember: bo, addedBy: me },
     });
-    expect(ok(await update(undefined, "to-house-01"))).toMatchObject({
+    // Left out (an AI, MCP or brain change of the time only): still Bo's.
+    expect(ok(await update(undefined, "keep-bo-001"))).toMatchObject({
+      event: { forMember: bo, addedBy: me },
+    });
+    expect(ok(await update(null, "to-house-01"))).toMatchObject({
       event: { forMember: null, addedBy: me },
     });
     // For Anna, then Bo, but that audit fails: the undo puts Anna back.
@@ -825,7 +869,7 @@ describe("helpers", () => {
       allDay: true,
       date: "2027-07-01",
       endDate: "2027-07-01",
-      forMember: null,
+      forMember: undefined,
     });
   });
 });

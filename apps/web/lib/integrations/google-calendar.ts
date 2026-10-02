@@ -101,8 +101,11 @@ export interface EventSpec {
   startTime?: string;
   /** Timed only: "HH:MM" on `endDate`. */
   endTime?: string;
-  /** The member it is for, or null for the whole house. */
-  forMember: string | null;
+  /**
+   * The member it is for, or null for the whole house. Undefined on an
+   * update keeps who it is for (the PATCH leaves `baumyFor` alone).
+   */
+  forMember?: string | null;
 }
 
 /** A half-open range of instants. */
@@ -248,23 +251,38 @@ export function insertBody(eventId: string, spec: EventSpec, memberId: string) {
  * after its undo deleted it) into the event asked for, confirmed again.
  */
 export function resurrectBody(spec: EventSpec) {
-  return { ...patchBody(spec), status: "confirmed" as const };
+  return {
+    ...patchBody({ ...spec, forMember: spec.forMember ?? null }),
+    status: "confirmed" as const,
+  };
 }
 
 /**
  * The events.patch body: every field the sheet edits, cleared when empty.
  * Google merges `extendedProperties.private` key by key, so this sets who it
- * is for ("" for the house) and leaves who made it alone.
+ * is for ("" for the house) and leaves who made it alone; with `forMember`
+ * undefined it sends no key, and who it is for stays as it was.
  */
-export function patchBody(spec: EventSpec) {
+export function patchBody(spec: EventSpec): {
+  summary: string;
+  description: string;
+  location: string;
+  start: GoogleTime;
+  end: GoogleTime;
+  extendedProperties?: { private: Record<string, string> };
+} {
   return {
     summary: spec.title,
     description: spec.description ?? "",
     location: spec.location ?? "",
     ...eventTimes(spec, true),
-    extendedProperties: {
-      private: { [FOR_PROPERTY]: spec.forMember ?? "" },
-    },
+    ...(spec.forMember === undefined
+      ? {}
+      : {
+          extendedProperties: {
+            private: { [FOR_PROPERTY]: spec.forMember ?? "" },
+          },
+        }),
   };
 }
 

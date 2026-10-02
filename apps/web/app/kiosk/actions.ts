@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { kioskActionForm } from "@/lib/actions/kiosk";
 import type { ActionResult } from "@/lib/actions/result";
+import { eventFormInput } from "@/lib/calendar/view";
 import type {
   CalendarWriteData,
   DeleteEventData,
@@ -141,7 +142,12 @@ export async function kioskCreateEventAction(
   _prev: CalendarWriteResult | null,
   form: FormData,
 ): Promise<CalendarWriteResult> {
-  const result = await kioskActionForm("create_event", form);
+  const result = await kioskActionForm(
+    "create_event",
+    form,
+    undefined,
+    eventFormInput,
+  );
   if (result.ok) revalidatePath("/kiosk/calendar");
   return result;
 }
@@ -150,7 +156,12 @@ export async function kioskUpdateEventAction(
   _prev: CalendarWriteResult | null,
   form: FormData,
 ): Promise<CalendarWriteResult> {
-  const result = await kioskActionForm("update_event", form);
+  const result = await kioskActionForm(
+    "update_event",
+    form,
+    undefined,
+    eventFormInput,
+  );
   if (result.ok) revalidatePath("/kiosk/calendar");
   return result;
 }

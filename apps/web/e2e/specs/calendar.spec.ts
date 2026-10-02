@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { founderAdmin } from "../lib/household";
+import { pickTile } from "../lib/pickers";
 
 // Issue #19, against the in-memory calendar that stands in for Google under
 // E2E_TEST_MODE=1 (lib/integrations/calendar-memory.ts). The fake takes the
@@ -93,11 +94,19 @@ test("add, edit and delete an event on /calendar", async ({
     edit.getByRole("radio", { name: "Everyone", exact: true }),
   ).toBeChecked();
   await edit.getByLabel("Title").fill(renamed);
+  // Make it the founder's: the phone's form says who it is for too.
+  await pickTile(edit, "Who is it for?", `Founder ${project}`);
   await edit.getByLabel("Starts").fill("19:30");
   await edit.getByRole("button", { name: "Save" }).click();
   await expect(edit).toBeHidden();
   await expect(eventButton(page, renamed)).toBeVisible();
   await expect(eventButton(page, title)).toHaveCount(0);
+  await eventButton(page, renamed).click();
+  const saved = page.getByRole("dialog", { name: `Edit ${renamed}` });
+  await expect(saved.getByTestId("event-for-name")).toHaveText(
+    `Founder ${project}`,
+  );
+  await saved.getByRole("button", { name: "Cancel" }).click();
 
   // Delete asks first; "Keep it" keeps it.
   await eventButton(page, renamed).click();

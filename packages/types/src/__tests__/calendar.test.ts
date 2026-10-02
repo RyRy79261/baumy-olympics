@@ -58,6 +58,14 @@ describe("forMemberId (issue #134)", () => {
       { forMemberId: id },
     );
     expect(NewCalendarEvent.parse(timed).forMemberId).toBeUndefined();
+    // null says "the whole house" out loud (on an update, left out keeps it).
+    expect(
+      CalendarEventUpdate.parse({
+        ...timed,
+        eventId: "abc12",
+        forMemberId: null,
+      }).forMemberId,
+    ).toBeNull();
     expect(
       CalendarEventUpdate.parse({ ...timed, eventId: "abc12", forMemberId: id })
         .forMemberId,

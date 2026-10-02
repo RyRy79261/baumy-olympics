@@ -84,7 +84,7 @@ function patched(
       ...e.extendedProperties,
       private: {
         ...e.extendedProperties?.private,
-        ...body.extendedProperties.private,
+        ...body.extendedProperties?.private,
       },
     },
   };

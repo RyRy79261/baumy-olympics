@@ -126,6 +126,35 @@ describe("upcomingGroups", () => {
   });
 });
 
+describe("across the clocks going forward (Sun 28 Mar 2027)", () => {
+  it("groups and times by Berlin wall time, before and after the change", () => {
+    // Sat 27 Mar, 12:00 in Berlin (UTC+1); Sunday the clocks go to UTC+2.
+    const saturday = new Date("2027-03-27T11:00:00.000Z");
+    const brunch = eventView(
+      // Sunday 11:00 Berlin, in summer time: 09:00 UTC.
+      timed("brunch", "2027-03-28T09:00:00.000Z", "2027-03-28T10:30:00.000Z"),
+    );
+    const late = eventView(
+      // Saturday 23:30 Berlin (22:30 UTC) to Sunday 03:30 (01:30 UTC).
+      timed("late", "2027-03-27T22:30:00.000Z", "2027-03-28T01:30:00.000Z"),
+    );
+    const [today, week] = upcomingGroups([brunch, late], saturday);
+    expect(ids(today!)).toEqual(["late"]);
+    expect(ids(week!)).toEqual(["brunch"]);
+    expect(upcomingTime(late, "today", "2027-03-27")).toEqual({
+      start: "23:30",
+      end: "till late",
+    });
+    expect(upcomingTime(brunch, "week", "2027-03-27")).toEqual({
+      start: "Sun 28 Mar",
+      end: "11:00–12:30",
+    });
+    // Sunday 10:00 Berlin (08:00 UTC): the night is over, brunch is today.
+    const sunday = new Date("2027-03-28T08:00:00.000Z");
+    expect(ids(upcomingGroups([brunch, late], sunday)[0]!)).toEqual(["brunch"]);
+  });
+});
+
 describe("upcomingTime", () => {
   const byId = Object.fromEntries(events.map((e) => [e.id, e]));
   const today = "2027-01-13";

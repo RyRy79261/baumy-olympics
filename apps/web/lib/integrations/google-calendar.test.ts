@@ -17,6 +17,7 @@ import {
   googleCalendar,
   insertBody,
   patchBody,
+  resurrectBody,
   resetCalendarCaches,
   signAssertion,
   specInstants,
@@ -302,6 +303,14 @@ describe("request bodies", () => {
     expect(
       patchBody({ ...dinnerJan, forMember: "m-2" }).extendedProperties,
     ).toEqual({ private: { baumyFor: "m-2" } });
+    // Not said: no key, so who it is for stays as it was.
+    expect(
+      patchBody({ ...dinnerJan, forMember: undefined }),
+    ).not.toHaveProperty("extendedProperties");
+    // A create done again says it, always: the house when not given.
+    expect(
+      resurrectBody({ ...dinnerJan, forMember: undefined }).extendedProperties,
+    ).toEqual({ private: { baumyFor: "" } });
   });
 });
 
