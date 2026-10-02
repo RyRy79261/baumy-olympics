@@ -13,7 +13,9 @@ import type {
 import type { CheckKioskPinData } from "@/lib/actions/check-kiosk-pin";
 import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
+import type { KioskIdleData } from "@/lib/actions/kiosk-idle";
 import type { DeleteNoteData, NoteWriteData } from "@/lib/actions/notes";
+import type { WeightDecisionData } from "@/lib/actions/weights";
 import type {
   AddShoppingData,
   CheckOffShoppingData,
@@ -54,7 +56,7 @@ export async function pickMemberAction(form: FormData): Promise<void> {
   jar.set(KIOSK_WALK_IN_COOKIE, picked.data.memberId, walkInCookieOptions());
 }
 
-/** "Done", or 60 seconds idle: nobody is acting. */
+/** "Done", or the screen's idle minutes untouched: nobody is acting. */
 export async function clearPickAction(): Promise<void> {
   (await cookies()).delete(KIOSK_MEMBER_COOKIE);
 }
@@ -249,5 +251,31 @@ export async function kioskCheckOffShoppingAction(
 ): Promise<CheckOffShoppingResult> {
   const result = await kioskActionForm("check_off_shopping_items", form);
   if (result.ok) revalidateKioskShopping();
+  return result;
+}
+
+/**
+ * The kitchen screen's idle minutes (issue #147), as the member acting.
+ * [UNRESOLVED 2026-10-02] who may: anyone picked, for now.
+ */
+export async function kioskSetIdleMinutesAction(
+  _prev: ActionResult<KioskIdleData> | null,
+  form: FormData,
+): Promise<ActionResult<KioskIdleData>> {
+  const result = await kioskActionForm("set_kiosk_idle_minutes", form);
+  if (result.ok) revalidatePath("/kiosk", "layout");
+  return result;
+}
+
+/**
+ * A kiosk admin changes a bounty's points (issue #147): the admin gate asks
+ * their PIN in this request, through the form's PinPad.
+ */
+export async function kioskSchedulePointsAction(
+  _prev: ActionResult<WeightDecisionData> | null,
+  form: FormData,
+): Promise<ActionResult<WeightDecisionData>> {
+  const result = await kioskActionForm("schedule_points_change", form);
+  if (result.ok) revalidatePath("/kiosk/settings");
   return result;
 }

@@ -3,6 +3,7 @@ import { count, eq } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import Anthropic from "@anthropic-ai/sdk";
 import { hashKioskPin } from "@baumy/auth/kiosk-pin";
+import type { Actor } from "@/lib/auth";
 import type { Queryable } from "@baumy/db";
 import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
 import { actionRequests, completions } from "@baumy/db/schema";
@@ -78,11 +79,14 @@ const requestCtx: RunRouteDeps["requestCtx"] = async (
 ) => {
   if (surface === "kiosk") {
     const actor = kioskActor(kioskMember);
-    return ctxFor(kioskMember ? { ...actor, role: kioskRole } : actor, {
-      requestId,
-      now: new Date(),
-      ...(pin ? { pin } : {}),
-    });
+    return ctxFor(
+      kioskMember ? ({ ...actor, role: kioskRole } as Actor) : actor,
+      {
+        requestId,
+        now: new Date(),
+        ...(pin ? { pin } : {}),
+      },
+    );
   }
   if (phoneMember === undefined) return null;
   return ctxFor(sessionActor(phoneMember, phoneRole), {

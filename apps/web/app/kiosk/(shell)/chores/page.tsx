@@ -124,6 +124,18 @@ export default async function KioskChoresPage({
           >
             <CheckPinForm displayName={kiosk.displayName ?? "Your"} />
           </Card>
+          <Card
+            title="This screen"
+            description="How long it waits before it forgets who is acting, and, for an admin, a bounty's points."
+            className="max-w-xl"
+          >
+            <Link
+              href="/kiosk/settings"
+              className={buttonClass("secondary", "kiosk", "self-start")}
+            >
+              Kitchen screen settings
+            </Link>
+          </Card>
         </div>
       ) : null}
     </>

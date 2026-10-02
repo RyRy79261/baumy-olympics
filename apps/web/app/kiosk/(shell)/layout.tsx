@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
+import { DEFAULT_KIOSK_IDLE_MINUTES } from "@baumy/types";
 import { AvatarButton, Button, KioskShell, KioskTopBar } from "@baumy/ui";
 import { BaumySheet } from "@/components/baumy/baumy-sheet";
 import { ActingPinProvider } from "@/components/kiosk/acting-pin";
@@ -133,7 +134,10 @@ export default async function KioskLayout({
           {children}
         </KioskFrame>
         <KeepScreenOn />
-        <IdleReset memberPicked={Boolean(kiosk.memberId)} />
+        <IdleReset
+          memberPicked={Boolean(kiosk.memberId)}
+          idleMs={(kiosk.idleMinutes ?? DEFAULT_KIOSK_IDLE_MINUTES) * 60_000}
+        />
         {/* Issue #66: the full-screen reminder and the raccoon screensaver
           (at night, and after 5 minutes untouched), over every page. */}
         <KioskOverlays serverNow={at.toISOString()} window={night} />

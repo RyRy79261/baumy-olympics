@@ -64,4 +64,14 @@ describe("IdleReset", () => {
     wait(1_000);
     expect(clearPickAction).toHaveBeenCalledOnce();
   });
+
+  it("forgets the one acting after the screen's own idle minutes (issue #147)", () => {
+    root = createRoot(document.createElement("div"));
+    act(() => root!.render(<IdleReset memberPicked idleMs={5 * 60_000} />));
+    // Past the old minute, and nearly the five.
+    wait(5 * 60_000 - 1_000);
+    expect(clearPickAction).not.toHaveBeenCalled();
+    wait(1_000);
+    expect(clearPickAction).toHaveBeenCalledOnce();
+  });
 });
