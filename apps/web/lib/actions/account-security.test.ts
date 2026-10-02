@@ -97,9 +97,9 @@ async function seedAccount(userId: string, providerId: string) {
 }
 
 /**
- * A member with account `u1`, signed in on session `here` 5 minutes ago, so
- * "Confirm it's you" (issue #135) is satisfied by the fresh sign-in.
- * `stale: true` signs it in an hour ago instead.
+ * A member with account `u1`, signed in on session `here` 5 minutes ago, a
+ * sign-in that opened its "Confirm it's you" window (issue #135).
+ * `stale: true` signs it in an hour ago, with no window.
  */
 async function arrange({
   stale = false,
@@ -108,6 +108,16 @@ async function arrange({
   await seedUser("u1");
   await seedUser("u2");
   await seedSession("here", "u1", stale ? 1 : 5 / 60);
+  // A sign-in opens the session's window; `stale` has none (its sign-in was
+  // over 10 minutes ago, or made by a path that proves nothing).
+  if (!stale) {
+    await grantStepUp(db(), {
+      sessionId: "here",
+      userId: "u1",
+      method: "password",
+      now: new Date(FIXED_NOW.getTime() - 5 * 60_000),
+    });
+  }
   return sessionActor(memberId, "member", {
     userId: "u1",
     sessionId: "here",
@@ -337,6 +347,12 @@ describe("unlink_google", () => {
     const other = await seedMember(db(), { authUserId: "u3" });
     await seedUser("u3");
     await seedSession("x", "u3", 1);
+    await grantStepUp(db(), {
+      sessionId: "x",
+      userId: "u3",
+      method: "password",
+      now: FIXED_NOW,
+    });
     await seedAccount("u3", "credential");
     expect(
       await run(

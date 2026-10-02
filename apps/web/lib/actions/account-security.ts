@@ -78,18 +78,21 @@ export const isFailure = (x: MemberActor | ActionFailure): x is ActionFailure =>
   "ok" in x;
 
 /**
- * `liveActor`, for a sensitive change: the session must also have confirmed
- * it is its member lately ("Confirm it's you", `requireRecentAuth`, issue
- * #135). The window is read BEFORE the session row is share-locked, the
- * order service-tokens.ts explains.
+ * `liveActor`, for a sensitive change: the session must also have an open
+ * "Confirm it's you" window (`requireRecentAuth`, issue #135). Live first,
+ * so a device signed out elsewhere (whose window went with its session)
+ * hears that it was signed out. Neither step calls Better Auth, so taking
+ * the session lock first cannot wait on Better Auth's own connection (the
+ * hang of PR #105 came from checking a password here).
  */
 export async function confirmedActor(
   ctx: ActionCtx,
   signedOut: string = SIGNED_OUT,
 ): Promise<MemberActor | ActionFailure> {
+  const live = await liveActor(ctx, signedOut);
+  if (isFailure(live)) return live;
   const recent = await requireRecentAuth(ctx);
-  if (!recent.ok) return recent;
-  return liveActor(ctx, signedOut);
+  return recent.ok ? live : recent;
 }
 
 const NO_WAY_IN =

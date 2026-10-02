@@ -26,7 +26,6 @@ import {
 import { STEP_UP_WINDOW_MS, grantStepUp } from "@baumy/db/step-ups";
 import type * as StepUps from "@baumy/db/step-ups";
 import type { Actor, MemberActor } from "@/lib/auth";
-import { FRESH_SESSION_MS } from "@/lib/auth/recent-auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { ActionName } from "./define";
 import {
@@ -120,8 +119,6 @@ async function admin(ageMs = HOUR): Promise<MemberActor> {
   });
 }
 
-const freshAdmin = () => admin(5 * 60_000);
-
 /** Open the sudo window of `actor`'s session at `now`. */
 function confirm(actor: MemberActor, now = FIXED_NOW) {
   return grantStepUp(db(), {
@@ -130,6 +127,13 @@ function confirm(actor: MemberActor, now = FIXED_NOW) {
     method: "passkey",
     now,
   });
+}
+
+/** An admin who confirmed it is them just now (or signed in just now). */
+async function freshAdmin() {
+  const actor = await admin(5 * 60_000);
+  await confirm(actor);
+  return actor;
 }
 
 async function tokenData(res: Awaited<ReturnType<typeof runAction>>) {
@@ -195,8 +199,11 @@ describe("create_service_token", () => {
     expect(await listServiceTokens(db())).toHaveLength(1);
   });
 
-  it("needs 'Confirm it's you' when the sign-in is over 10 minutes old", async () => {
-    const actor = await admin(FRESH_SESSION_MS);
+  it("needs 'Confirm it's you', however new the session", async () => {
+    // Signed in a minute ago by a path that opened no window (Better Auth
+    // swaps in such sessions when two-factor is turned on or off): its age
+    // proves nothing (the critic's review of PR #139).
+    const actor = await admin(60_000);
     const run = (now = FIXED_NOW) =>
       runAction("create_service_token", {}, ctxFor(actor, { now }));
     await expect(run()).resolves.toMatchObject({
@@ -259,9 +266,10 @@ describe("create_service_token", () => {
     ]);
   });
 
-  it("reads the window before it locks the session row", async () => {
-    // A proof checked by Better Auth may UPDATE the session row on its own
-    // connection; holding FOR SHARE on it first would hang the request.
+  it("checks the session is live, then its window", async () => {
+    // Live first, so a device signed out elsewhere hears so. No proof is
+    // checked here (confirm_identity does that before it locks), so the
+    // lock cannot wait on Better Auth's own connection (PR #105).
     for (const name of [
       "create_service_token",
       "rotate_service_token",
@@ -275,7 +283,7 @@ describe("create_service_token", () => {
       calls.length = 0;
       const res = await runAction(name, { name: "baumy-brain" }, ctxFor(actor));
       expect(res.ok).toBe(true);
-      expect(calls).toEqual(["findStepUp", "isLiveSession"]);
+      expect(calls).toEqual(["isLiveSession", "findStepUp"]);
       if (name === "rotate_service_token") {
         await runAction(
           "revoke_service_token",
