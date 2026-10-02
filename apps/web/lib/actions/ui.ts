@@ -89,3 +89,26 @@ export async function actionForm<N extends ActionName>(
     return fail("INTERNAL", "Something went wrong. Please try again.");
   }
 }
+
+/**
+ * `actionForm` for a client that sends structured input (nested objects a
+ * form cannot carry, such as the bug reporter's diagnostics). The input is
+ * still parsed by the action's own Zod schema.
+ */
+export async function actionInput<N extends ActionName>(
+  name: N,
+  input: unknown,
+  requestId: unknown,
+): Promise<ActionResult<ActionOutput<N>>> {
+  try {
+    const ctx = await uiRequestCtx(
+      typeof requestId === "string" && requestId !== "" ? requestId : undefined,
+    );
+    if (!ctx) return fail("UNAUTHENTICATED", "Sign in to do this.");
+    return await runAction(name, input, ctx);
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error(`[actionInput:${name}]`, err);
+    return fail("INTERNAL", "Something went wrong. Please try again.");
+  }
+}
