@@ -3,7 +3,7 @@ import { rosterColours } from "@/lib/members/characters";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { householdMembers } from "@/lib/members/household";
 import { PageHeading } from "@baumy/ui";
-import { HUB_GUTTER, HubHome } from "@/components/hub/hub-home";
+import { HubHome } from "@/components/hub/hub-home";
 import { PostReminderForm } from "@/components/hub/post-reminder-form";
 import { SetPinNudge } from "@/components/hub/set-pin-nudge";
 import { actingMemberHasPin } from "@/lib/kiosk/acting-pin";
@@ -14,6 +14,7 @@ import {
   LandingPage,
 } from "@/components/landing/landing-page";
 import { startHub } from "@/lib/hub/load";
+import { voiceConfigured } from "@/lib/integrations/groq";
 import { landingMetadata } from "@/lib/seo";
 import { createReminderAction } from "./reminder-actions";
 import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
@@ -46,7 +47,7 @@ export default async function HubPage() {
     actingMemberHasPin(HOUSEHOLD_ID, me.memberId),
   ]);
   return (
-    <div className={HUB_GUTTER}>
+    <>
       {/* A slim strip above everything, never a card (issue #152). */}
       {hasPin ? null : <SetPinNudge memberId={me.memberId} />}
       <PageHeading
@@ -56,12 +57,13 @@ export default async function HubPage() {
       />
       <HubHome
         hub={{ ...hub, events, shopping }}
+        voice={voiceConfigured()}
         memberColors={rosterColours(people)}
         shopping={{ add: addShoppingAction, checkOff: checkOffShoppingAction }}
       >
         {/* Issue #66: a reminder for the kitchen screen. */}
         <PostReminderForm action={createReminderAction} />
       </HubHome>
-    </div>
+    </>
   );
 }

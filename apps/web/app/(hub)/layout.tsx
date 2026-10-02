@@ -10,7 +10,6 @@ import { householdRoster } from "@/lib/members/household";
 import { FeedbackGate } from "@/components/feedback/feedback-gate";
 import { ScoreEmote } from "@/components/members/score-emote";
 import { HubBaumy } from "@/components/hub/hub-baumy";
-import { voiceConfigured } from "@/lib/integrations/groq";
 import { reportAiAvailable } from "@/lib/feedback/ai";
 import { HubMenu, NavLinks, type NavItem } from "./nav-links";
 
@@ -97,8 +96,9 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
               Sign out
             </Link>
           </HubMenu>
-          {/* The hub home's Baumy: here below lg, the corner from lg up. */}
-          <HubBaumy voice={voiceConfigured()} />
+          {/* The hub home's Baumy below lg; from lg up it is the corner
+              button at the end of the page (HubHome), tabbed to last. */}
+          <HubBaumy />
         </>
       }
     >

@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 
 // Issue #152, the hub's layout at every width:
@@ -12,10 +12,12 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 //   hides it for that member;
 // - the page reads heading, header row (clock and tiles), cards, with even
 //   room between them;
-// - below lg (a phone, a portrait tablet) Baumy's button sits in the top bar
-//   and the page uses the full width; from lg up it floats in the viewport's
-//   bottom-right corner and never covers a card, wherever the page is
-//   scrolled.
+// - the page is centred, and the strip and the cards share its edges;
+// - there is one Ask Baumy button at every width: below lg (a phone, a
+//   portrait tablet) in the top bar, tabbed to after the menus; from lg up
+//   in the viewport's bottom-right corner, tabbed to last, and the page's
+//   end scrolls clear of it. The sheet opens from either, by tap or key,
+//   in the body font.
 //
 // Set E2E_SHOTS_DIR to also save the hub at each width (the PR's before and
 // after shots): `hub-<w>.png` is what the screen shows at the top, with the
@@ -68,7 +70,12 @@ async function measure(page: Page) {
       heading: rect(h1.parentElement!.parentElement!),
       glance: rect(document.querySelector('[data-testid="hub-glance"]')!),
       grid: rect(grid),
-      baumy: rect(document.querySelector('button[aria-label="Ask Baumy"]')!),
+      // The one shown: the bar's below lg, the corner's from lg.
+      baumy: rect(
+        [...document.querySelectorAll('button[aria-label="Ask Baumy"]')].find(
+          (b) => b.getClientRects().length > 0,
+        )!,
+      ),
       header: rect(document.querySelector("header")!),
       main: (() => {
         const el = document.querySelector("main")!;
@@ -87,7 +94,29 @@ async function measure(page: Page) {
 const overlaps = (a: Rect, b: Rect) =>
   a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
-test("the hub reads heading, header row, cards, with Baumy in the corner", async ({
+/** Tab from `from` and expect Ask Baumy to have the focus next. */
+async function expectBaumyNextAfter(p: Page, from: Locator, label: string) {
+  await from.focus();
+  await p.keyboard.press("Tab");
+  await expect(
+    p.getByRole("button", { name: "Ask Baumy" }),
+    `${label}: Ask Baumy tabbed to next`,
+  ).toBeFocused();
+}
+
+/** The sheet's own text is in the body font, not the nav's label font. */
+async function expectSheetFont(p: Page, label: string) {
+  const fonts = await p.evaluate(() => {
+    const dialog = document.querySelector('dialog[aria-label="Ask Baumy"]')!;
+    return {
+      dialog: getComputedStyle(dialog).fontFamily,
+      body: getComputedStyle(document.body).fontFamily,
+    };
+  });
+  expect(fonts.dialog, `${label}: the sheet's font`).toBe(fonts.body);
+}
+
+test("the hub reads heading, header row, cards, with Baumy placed right", async ({
   page,
   browser,
 }, testInfo) => {
@@ -114,10 +143,18 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
     for (const id of CARDS) await expect(p.getByTestId(id)).toBeVisible();
     await expect(p.getByTestId("hub")).not.toContainText("Loading…");
     const strip = p.getByTestId("set-pin-nudge");
-    await expect(strip).toContainText(
-      "Set your personal PIN for the kitchen iPad",
-    );
+    // The phone's line is shorter, so it stays one line.
+    await expect(
+      strip.getByText(
+        size.width < 640
+          ? "Set your kitchen PIN"
+          : "Set your personal PIN for the kitchen iPad",
+        { exact: true },
+      ),
+    ).toBeVisible();
     await expect(p.getByTestId("widget-leaderboard")).toContainText("Scores");
+    // Exactly one Baumy button at every width.
+    await expect(p.getByRole("button", { name: "Ask Baumy" })).toHaveCount(1);
     await p.screenshot({ path: join(shots, `hub-${label}.png`) });
     await p.screenshot({
       path: join(shots, `hub-${label}-full.png`),
@@ -126,22 +163,36 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
 
     const m = await measure(p);
 
-    // The strip: one line, as wide as the heading's row.
+    // The strip: one line of text, as wide as the heading's row.
     const s = (await strip.boundingBox())!;
     expect(s.height, `${label}: strip height`).toBeLessThan(STRIP_MAX_PX);
+    const lines = await strip.locator("p").evaluate((el) => {
+      const lh = parseFloat(getComputedStyle(el).lineHeight);
+      return el.getBoundingClientRect().height / lh;
+    });
+    expect(lines, `${label}: the strip's lines`).toBeLessThan(1.5);
     expect(
       Math.abs(s.width - (m.heading.right - m.heading.left)),
       `${label}: strip width`,
     ).toBeLessThanOrEqual(1);
-    // One right edge for the strip and the cards.
+    expect(s.y + s.height, `${label}: strip above the heading`).toBeLessThan(
+      m.heading.top + 1,
+    );
+
+    // The page is centred, and the strip and the cards share its edges.
     const cardsRight = Math.max(...m.cards.map((c) => c.right));
     expect(
       Math.abs(s.x + s.width - cardsRight),
       `${label}: strip and cards end together`,
     ).toBeLessThanOrEqual(1);
-    expect(s.y + s.height, `${label}: strip above the heading`).toBeLessThan(
-      m.heading.top + 1,
-    );
+    expect(
+      Math.abs(cardsRight - m.main),
+      `${label}: cards use the full width`,
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(m.grid.left - (m.viewport.width - m.grid.right)),
+      `${label}: the cards are centred`,
+    ).toBeLessThanOrEqual(1);
 
     // Heading, header row, cards: the same room before and after the row.
     const above = m.glance.top - m.heading.bottom;
@@ -192,7 +243,7 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
       viewport.width,
     );
     if (!size.floats) {
-      // Below lg: in the top bar, and the page has the full width.
+      // Below lg: in the top bar, tabbed to right after the account menu.
       expect(
         baumy.top,
         `${label}: Baumy in the top bar`,
@@ -201,15 +252,15 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
         baumy.bottom,
         `${label}: Baumy in the top bar`,
       ).toBeLessThanOrEqual(m.header.bottom);
-      const cardsRight = Math.max(...m.cards.map((c) => c.right));
-      expect(
-        Math.abs(cardsRight - m.main),
-        `${label}: cards use the full width`,
-      ).toBeLessThanOrEqual(1);
+      await expectBaumyNextAfter(
+        p,
+        p.getByTestId("account-menu").getByRole("button"),
+        label,
+      );
       continue;
     }
-    // From lg: in the viewport's bottom-right corner, over no card, at the
-    // top of the page and scrolled to its end.
+    // From lg: in the viewport's bottom-right corner, and tabbed to last,
+    // right after the last thing in the cards.
     expect(baumy.bottom, `${label}: Baumy on screen`).toBeLessThanOrEqual(
       viewport.height,
     );
@@ -219,11 +270,15 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
     expect(baumy.bottom, `${label}: Baumy at the bottom`).toBeGreaterThan(
       viewport.height - CORNER_PX,
     );
-    for (const card of m.cards) {
-      expect
-        .soft(overlaps(baumy, card), `${label}: Baumy over ${card.id}`)
-        .toBe(false);
-    }
+    await expectBaumyNextAfter(
+      p,
+      p
+        .getByTestId("hub")
+        .locator("a[href], button:not([disabled]), input, textarea, select")
+        .last(),
+      label,
+    );
+    // Scrolled to the end, the page's foot is clear of it.
     await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     const end = await measure(p);
     for (const card of end.cards) {
@@ -241,8 +296,59 @@ test("the hub reads heading, header row, cards, with Baumy in the corner", async
   await expect(strip).toBeVisible();
   await p.getByRole("button", { name: "Hide the PIN reminder" }).click();
   await expect(strip).toHaveCount(0);
+  await expect(p.getByRole("heading", { name: "Hub", level: 1 })).toBeFocused();
   await p.reload();
   await expect(p.getByTestId("widget-events")).toBeVisible();
   await expect(strip).toHaveCount(0);
   await member.context.close();
+});
+
+test("the Ask Baumy sheet opens from the top bar on a phone, and from the corner", async ({
+  page,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(project !== "desktop-chromium", "Sets its own widths.");
+  const shots = process.env.E2E_SHOTS_DIR ?? testInfo.outputPath("hub");
+  mkdirSync(shots, { recursive: true });
+  await founderAdmin(page, project);
+  const sheet = page.getByRole("dialog", { name: "Ask Baumy" });
+  const button = page.getByRole("button", { name: "Ask Baumy" });
+
+  // A phone: the top bar's button, by tap.
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.goto("/");
+  await expect(page.getByTestId("widget-events")).toBeVisible();
+  await expect(button).toHaveCount(1);
+  await button.click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByTestId("baumy-says")).toContainText(
+    "Tell me what you did",
+  );
+  await expectSheetFont(page, "360");
+  await page.screenshot({ path: join(shots, "hub-360-sheet.png") });
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+
+  // And by keyboard: Tab from the account menu, then Enter.
+  await expectBaumyNextAfter(
+    page,
+    page.getByTestId("account-menu").getByRole("button"),
+    "360",
+  );
+  await page.keyboard.press("Enter");
+  await expect(sheet).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  // Closing gives the focus back to the button that opened it.
+  await expect(button).toBeFocused();
+
+  // A laptop: the corner button.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await expect(page.getByTestId("widget-events")).toBeVisible();
+  await expect(button).toHaveCount(1);
+  await button.click();
+  await expect(sheet).toBeVisible();
+  await expectSheetFont(page, "1280");
+  await page.screenshot({ path: join(shots, "hub-1280-sheet.png") });
 });
