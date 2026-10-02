@@ -476,6 +476,18 @@ export function BaumySheet({
     sayEarned();
   }
 
+  /**
+   * Closed from inside the bubble (its "×", Done, Escape): the focus, which
+   * was in the bubble now gone, goes back to the cat.
+   */
+  const catButton = useRef<HTMLButtonElement>(null);
+  function dismissBubble() {
+    hideBubble();
+    catButton.current?.focus();
+  }
+  const dismissLatest = useRef(dismissBubble);
+  dismissLatest.current = dismissBubble;
+
   function typeInstead() {
     stopListening();
     setBubble(null);
@@ -498,11 +510,19 @@ export function BaumySheet({
     else setOpen(true);
   }
 
+  // The finger holding the button (null for a hold started by the
+  // keyboard): only its lift sends, so a second finger tapping elsewhere
+  // and lifting never ends the hold. A cancel, of any pointer, still does.
+  const holdPointer = useRef<number | null>(null);
+  const isHoldPointer = (id: number) =>
+    holdPointer.current === null || id === holdPointer.current;
+
   // The hold itself: a pointer held on the button, or Enter/Space to toggle.
   function holdDown(e: React.PointerEvent<HTMLButtonElement>) {
     if (e.button !== 0) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
+    holdPointer.current = e.pointerId;
     dropClip.current = false;
     setHoldHint(null);
     // Closed after an error, or by a transcriber that went away: reopen.
@@ -510,7 +530,8 @@ export function BaumySheet({
     recorder.begin();
   }
 
-  function holdUp() {
+  function holdUp(e: React.PointerEvent<HTMLButtonElement>) {
+    if (e.type === "pointerup" && !isHoldPointer(e.pointerId)) return;
     recorder.finish();
   }
 
@@ -520,9 +541,15 @@ export function BaumySheet({
   const held = recorder.state === "recording" || recorder.state === "starting";
   const finishLatest = useRef(recorder.finish);
   finishLatest.current = recorder.finish;
+  const isHoldPointerLatest = useRef(isHoldPointer);
+  isHoldPointerLatest.current = isHoldPointer;
   useEffect(() => {
     if (!held) return;
-    const up = () => finishLatest.current();
+    const up = (e: PointerEvent) => {
+      if (e.type === "pointerup" && !isHoldPointerLatest.current(e.pointerId))
+        return;
+      finishLatest.current();
+    };
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
     return () => {
@@ -536,6 +563,7 @@ export function BaumySheet({
     if (recorder.state === "recording") {
       recorder.finish();
     } else {
+      holdPointer.current = null;
       dropClip.current = false;
       if (recorder.state === "idle") recorder.open();
       recorder.begin();
@@ -602,8 +630,17 @@ export function BaumySheet({
       if (target instanceof Node && catRef.current?.contains(target)) return;
       hideLatest.current();
     };
+    // Escape closes it too, and gives the focus back to the cat.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || heldRef.current) return;
+      dismissLatest.current();
+    };
     document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [bubbleOpen]);
 
   const pinLabel = actingName ? `${actingName}'s PIN` : "Your PIN";
@@ -670,7 +707,7 @@ export function BaumySheet({
         busy={bulk}
         onConfirmAll={(pin) => void catConfirmAll(pin)}
         onCancel={catCancel}
-        onDone={hideBubble}
+        onDone={dismissBubble}
         onDrop={drop}
       />
     </>
@@ -690,7 +727,7 @@ export function BaumySheet({
     ) : (
       <CatBubble
         mode={bubble === "talk" && recording ? "listening" : bubble}
-        onClose={hideBubble}
+        onClose={dismissBubble}
       >
         <div key="body">
           {bubble === "who" ? (
@@ -734,7 +771,7 @@ export function BaumySheet({
         {showHold ? holdButton : null}
         {showDone ? (
           <div key="done" className="mt-3 flex gap-3">
-            <CatButton variant="soft" onClick={hideBubble}>
+            <CatButton variant="soft" onClick={dismissBubble}>
               Done
             </CatButton>
           </div>
@@ -751,6 +788,7 @@ export function BaumySheet({
         <div ref={catRef} className="relative" data-voice-cat>
           {catBubble}
           <button
+            ref={catButton}
             type="button"
             aria-label="Ask Baumy"
             aria-expanded={bubble !== null}

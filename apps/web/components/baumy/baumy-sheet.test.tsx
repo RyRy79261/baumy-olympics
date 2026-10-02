@@ -526,26 +526,100 @@ describe("BaumySheet on the kitchen dashboard", () => {
 
     it("closes on a tap outside, the microphone off and nothing sent", async () => {
       heardAndAnswered("Bins it is.", [proposal]);
+      const added = vi.spyOn(document, "addEventListener");
+      const removed = vi.spyOn(document, "removeEventListener");
       const track = await openTalking();
+      const listener = added.mock.calls.find(
+        (c) => c[0] === "pointerdown" && c[2] === true,
+      )?.[1];
+      expect(listener).toBeTypeOf("function");
       const elsewhere = outside();
       expect(track.stop).not.toHaveBeenCalled();
       touch(elsewhere);
       expect(bubble()).toBeNull();
-      expect(track.stop).toHaveBeenCalled();
+      expect(track.stop).toHaveBeenCalledTimes(1);
       await settle(300);
       expect(fetchMock).not.toHaveBeenCalled();
-      // Closed, it listens no more: the next tap anywhere does nothing.
+      // Closed, it listens no more: that very listener is taken off, and
+      // the next tap anywhere does nothing.
+      expect(removed).toHaveBeenCalledWith("pointerdown", listener, true);
       touch(elsewhere);
       expect(bubble()).toBeNull();
+      expect(track.stop).toHaveBeenCalledTimes(1);
+      added.mockRestore();
+      removed.mockRestore();
     });
 
-    it("closes on its ×, the microphone off", async () => {
+    it("closes on its ×, the microphone off, the focus back on the cat", async () => {
       const track = await openTalking();
       const x = closeButton();
       expect(x.textContent).toBe("×");
+      x.focus();
+      expect(document.activeElement).toBe(x);
       await act(async () => x.click());
       expect(bubble()).toBeNull();
       expect(track.stop).toHaveBeenCalled();
+      expect(document.activeElement).toBe(cat());
+    });
+
+    it("closes on Escape, but not during a hold", async () => {
+      heardAndAnswered("Bins it is.", [proposal]);
+      const track = await openTalking();
+      const escape = () =>
+        act(() => {
+          document.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+          );
+        });
+      press(hold());
+      escape();
+      expect(bubble()!.dataset.mode).toBe("listening");
+      await settle(300);
+      lift(hold());
+      await settle();
+      await settle();
+      expect(bubble()!.dataset.mode).toBe("answer");
+      // Another key does nothing; Escape closes and the cat has the focus.
+      act(() => {
+        document.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+        );
+      });
+      expect(bubble()).not.toBeNull();
+      escape();
+      expect(bubble()).toBeNull();
+      expect(track.stop).toHaveBeenCalled();
+      expect(document.activeElement).toBe(cat());
+    });
+
+    it("sends only when the holding finger lifts, not a second one", async () => {
+      heardAndAnswered("Bins it is.", [proposal]);
+      await openTalking();
+      const pointer = (type: string, id: number, el: EventTarget) =>
+        act(() => {
+          const ev = new MouseEvent(type, { bubbles: true, button: 0 });
+          Object.defineProperty(ev, "pointerId", { value: id });
+          el.dispatchEvent(ev);
+        });
+      pointer("pointerdown", 1, hold());
+      expect(bubble()!.dataset.mode).toBe("listening");
+      await settle(300);
+      // A second finger lands elsewhere and lifts: still listening.
+      const elsewhere = outside();
+      pointer("pointerdown", 2, elsewhere);
+      pointer("pointerup", 2, elsewhere);
+      await settle();
+      expect(bubble()!.dataset.mode).toBe("listening");
+      expect(fetchMock).not.toHaveBeenCalled();
+      // The holding finger lifts: sent and answered.
+      pointer("pointerup", 1, window);
+      await settle();
+      await settle();
+      expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+        "/api/ai/transcribe",
+        "/api/ai/command",
+      ]);
+      expect(bubble()!.dataset.mode).toBe("answer");
     });
 
     it("stays open for a tap inside it, or on the cat's own toggle", async () => {

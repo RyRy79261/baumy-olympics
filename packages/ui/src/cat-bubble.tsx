@@ -38,7 +38,7 @@ export function CatBubble({
     >
       <div
         data-bubble
-        className="pixel-frame pixel-frame-4 bg-bm-surface p-5 font-body text-xl text-bm-text [--pf:var(--color-bm-violet)]"
+        className="pixel-frame pixel-frame-4 relative bg-bm-surface p-5 font-body text-xl text-bm-text [--pf:var(--color-bm-violet)]"
       >
         {onClose ? (
           <button
@@ -46,12 +46,22 @@ export function CatBubble({
             aria-label="Close"
             data-testid="cat-bubble-close"
             onClick={onClose}
-            className="pixel-frame float-right -mt-1 -mr-1 mb-2 ml-3 grid size-14 place-items-center bg-bm-raised font-display text-[22px] text-bm-text [--pf:var(--color-bm-muted)]"
+            className="pixel-frame absolute top-3 right-3 z-10 grid size-14 place-items-center bg-bm-raised font-display text-[22px] text-bm-text [--pf:var(--color-bm-muted)]"
           >
             {"\u00d7"}
           </button>
         ) : null}
-        {children}
+        {/* Only the first line (the first block of the first block: Baumy's
+            "Mrrp?" or answer) makes room for the "\u00d7", as tall as it, so the
+            cards and buttons below keep the bubble's whole width. */}
+        <div
+          className={cx(
+            onClose &&
+              "[&>:first-child>:first-child]:min-h-12 [&>:first-child>:first-child]:pr-16",
+          )}
+        >
+          {children}
+        </div>
       </div>
       <span
         aria-hidden
