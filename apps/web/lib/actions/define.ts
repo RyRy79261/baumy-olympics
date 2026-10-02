@@ -52,6 +52,7 @@ export const ACTION_NAMES = [
   "rotate_service_token",
   "revoke_service_token",
   "check_kiosk_pin",
+  "set_kiosk_idle_minutes",
   "list_chores",
   "log_completion",
   "manage_chore",

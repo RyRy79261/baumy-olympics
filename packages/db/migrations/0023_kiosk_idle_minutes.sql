@@ -1,0 +1,2 @@
+ALTER TABLE "kiosk_devices" ADD COLUMN "idle_minutes" integer;--> statement-breakpoint
+ALTER TABLE "kiosk_devices" ADD CONSTRAINT "kiosk_devices_idle_minutes_range" CHECK ("kiosk_devices"."idle_minutes" IS NULL OR "kiosk_devices"."idle_minutes" BETWEEN 1 AND 60);

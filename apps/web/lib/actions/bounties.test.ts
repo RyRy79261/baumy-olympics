@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { count, eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { hashKioskPin } from "@baumy/auth/kiosk-pin";
 import type { Queryable } from "@baumy/db";
 import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
 import {
@@ -24,9 +25,9 @@ import { createProposer } from "./propose";
 import { REGISTRY, runAction } from "./registry";
 
 // create_bounty and update_bounty (issue #107) through the real runAction
-// and proposer on PGlite: success, each error code, the surfaces (ui, ai,
-// brain; never kiosk or MCP) and the admin gate, brain in the admin's own
-// name only.
+// and proposer on PGlite: success, each error code, the surfaces (ui,
+// kiosk, ai, brain; never MCP) and the admin gate, brain in the admin's own
+// name only, the kiosk for a picked admin with their PIN (issue #147).
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -39,10 +40,23 @@ let admin: string;
 let member: string;
 let trash: string;
 
+const PIN = "2580";
+let pinHash: string;
+beforeAll(async () => {
+  pinHash = await hashKioskPin(PIN);
+});
+
 beforeEach(async () => {
   __resetMemoryRateLimits();
-  admin = await seedMember(db(), { role: "admin", displayName: "Admin" });
-  member = await seedMember(db(), { displayName: "Member" });
+  admin = await seedMember(db(), {
+    role: "admin",
+    displayName: "Admin",
+    kioskPinHash: pinHash,
+  });
+  member = await seedMember(db(), {
+    displayName: "Member",
+    kioskPinHash: pinHash,
+  });
   ({ choreId: trash } = await seedChore(db(), TRASH));
 });
 
@@ -186,11 +200,6 @@ describe("create_bounty", () => {
         "FORBIDDEN",
       ],
       [
-        { kind: "kiosk", deviceId: "d", memberId: admin },
-        "kiosk",
-        "SURFACE_FORBIDDEN",
-      ],
-      [
         {
           kind: "mcp",
           memberId: admin,
@@ -212,6 +221,75 @@ describe("create_bounty", () => {
     }
     const [n] = await t.db().select({ n: count() }).from(chores);
     expect(n!.n).toBe(3);
+  });
+
+  it("on the kiosk, needs an admin picked and their PIN (issue #147)", async () => {
+    const atKiosk = (
+      memberId: string,
+      role: "admin" | "member",
+      pin?: string,
+    ) =>
+      ctxFor(
+        { kind: "kiosk", deviceId: "d", memberId, role },
+        { source: "kiosk", ...(pin ? { pin } : {}) },
+      );
+    // A member with their right PIN is still not an admin.
+    await expect(
+      runAction(
+        "create_bounty",
+        { name: "K1", points: 5 },
+        atKiosk(member, "member", PIN),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    // An admin without a PIN, or with a wrong one.
+    await expect(
+      runAction(
+        "create_bounty",
+        { name: "K2", points: 5 },
+        atKiosk(admin, "admin"),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
+    await expect(
+      runAction(
+        "create_bounty",
+        { name: "K3", points: 5 },
+        atKiosk(admin, "admin", "1111"),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_FAILED" });
+    let [n] = await t.db().select({ n: count() }).from(chores);
+    expect(n!.n).toBe(1);
+    // An admin with their PIN adds it, audited as a kiosk write by them.
+    const made = ok(
+      await runAction(
+        "create_bounty",
+        { name: "Kiosk bounty", points: 5 },
+        atKiosk(admin, "admin", PIN),
+      ),
+    );
+    [n] = await t.db().select({ n: count() }).from(chores);
+    expect(n!.n).toBe(2);
+    const [audit] = await t
+      .db()
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "create_bounty"));
+    expect(audit).toMatchObject({ source: "kiosk", actorMemberId: admin });
+    expect(JSON.stringify(audit!.payload)).not.toContain(PIN);
+    // And edits it, the same way.
+    await expect(
+      runAction(
+        "update_bounty",
+        { choreId: made.choreId, points: 9 },
+        atKiosk(member, "member", PIN),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    ok(
+      await runAction(
+        "update_bounty",
+        { choreId: made.choreId, points: 9 },
+        atKiosk(admin, "admin", PIN),
+      ),
+    );
   });
 
   it("is proposed with a plain preview for an admin, and marked not valid for anyone else", async () => {
@@ -245,12 +323,40 @@ describe("create_bounty", () => {
       preview: "New bounty: Recycling (paper) · maintenance · 15 pts",
       error: "Only a household admin can do this.",
     });
+    // On the kiosk: a member may not; an admin may, with their PIN, which
+    // Confirm all asks for (issue #147).
     await expect(
       propose(
         "create_bounty",
         recycling,
         ctxFor(
-          { kind: "kiosk", deviceId: "d", memberId: admin },
+          { kind: "kiosk", deviceId: "d", memberId: member, role: "member" },
+          { source: "ai" },
+        ),
+        choices,
+      ),
+    ).resolves.toMatchObject({
+      valid: false,
+      error: "Only a household admin can do this.",
+    });
+    await expect(
+      propose(
+        "create_bounty",
+        recycling,
+        ctxFor(
+          { kind: "kiosk", deviceId: "d", memberId: admin, role: "admin" },
+          { source: "ai" },
+        ),
+        choices,
+      ),
+    ).resolves.toMatchObject({ valid: true, needsPin: true });
+    // Not the pot: it stays an admin's own session (and brain).
+    await expect(
+      propose(
+        "add_pot_contribution",
+        { amount: 20 },
+        ctxFor(
+          { kind: "kiosk", deviceId: "d", memberId: admin, role: "admin" },
           { source: "ai" },
         ),
         choices,
@@ -415,7 +521,7 @@ describe("update_bounty", () => {
     ]);
   });
 
-  it("is for an admin only, never the kiosk or MCP", async () => {
+  it("is for an admin only, never MCP", async () => {
     await expect(
       runAction(
         "update_bounty",

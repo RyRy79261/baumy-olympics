@@ -132,8 +132,9 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toBeHidden();
 
-  // 60 seconds untouched: home, and nobody is acting any more.
-  await ipad.clock.fastForward(61_000);
+  // 2 minutes untouched (the default, issue #147): home, and nobody is
+  // acting any more.
+  await ipad.clock.fastForward(2 * 60_000 + 1_000);
   await expect(kiosk).toHaveURL(/\/kiosk$/);
   await expect(kiosk.getByTestId("kiosk-home")).toBeVisible();
   await openKioskChores(kiosk);

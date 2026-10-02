@@ -89,6 +89,22 @@ describe("kioskRequestCtx", () => {
     );
   });
 
+  it("gives a tapped face its own role, never the picked member's (issue #147)", async () => {
+    getKioskActor.mockResolvedValue({
+      kind: "kiosk",
+      deviceId: "d1",
+      memberId: "m-admin",
+      displayName: "Admin",
+      role: "admin",
+    });
+    const ctx = await kioskRequestCtx(undefined, undefined, {
+      memberId: "m-jo",
+      displayName: "Jo",
+      role: "member",
+    });
+    expect(ctx!.actor).toMatchObject({ memberId: "m-jo", role: "member" });
+  });
+
   it("is null on a kiosk that is not paired", async () => {
     getKioskActor.mockResolvedValue(null);
     await expect(kioskRequestCtx(undefined, "1234")).resolves.toBeNull();
@@ -212,6 +228,50 @@ describe("kioskActionAsFace", () => {
       ok: true,
       data: { reminderId, memberId: ryan, seenByEveryone: true },
     });
+  });
+
+  it("never lends the picked admin's role to a tapped face (issue #147)", async () => {
+    // The cookie picked an admin; a member's face is tapped, with the
+    // member's own right PIN: an admin action must still be refused.
+    const admin = await seedMember(db(), {
+      role: "admin",
+      kioskPinHash: pinHash,
+    });
+    const jo = await seedMember(db(), {
+      displayName: "Jo",
+      kioskPinHash: pinHash,
+    });
+    getKioskActor.mockResolvedValue({
+      kind: "kiosk",
+      deviceId: "d1",
+      memberId: admin,
+      displayName: "Admin",
+      role: "admin",
+    });
+    await expect(
+      kioskActionAsFace(
+        "create_bounty",
+        form({
+          [FACE_FIELD]: jo,
+          name: "Stale role",
+          points: "5",
+          pin: PIN,
+          requestId: "req-face-stale",
+        }),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    // The admin themself, with their PIN, may.
+    await expect(
+      kioskActionForm(
+        "create_bounty",
+        form({
+          name: "Admin's own",
+          points: "5",
+          pin: PIN,
+          requestId: "req-admin-own",
+        }),
+      ),
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it("refuses a face that is not an active member, picking nobody", async () => {

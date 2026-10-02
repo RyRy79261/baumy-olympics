@@ -175,6 +175,7 @@ const DEVICE = {
   householdId: "h_1",
   name: "Kitchen iPad",
   lastSeenAt: null,
+  idleMinutes: null,
 };
 const MEMBER_ID = "0b6f1c1e-6a6e-4c4b-9d55-6a8f0f3a2b10";
 
@@ -199,7 +200,11 @@ describe("getKioskActor", () => {
       kind: "kiosk",
       deviceId: "d_1",
       deviceName: "Kitchen iPad",
+      // Never chosen: the default (issue #147).
+      idleMinutes: 2,
     });
+    findDevice.mockResolvedValue({ ...DEVICE, idleMinutes: 10 });
+    await expect(getKioskActor()).resolves.toMatchObject({ idleMinutes: 10 });
     expect(touchDevice).toHaveBeenCalledWith(DEVICE, expect.any(Date));
   });
 
@@ -215,13 +220,17 @@ describe("getKioskActor", () => {
       displayName: "Ryan",
       avatarSprite: "cat",
       color: "#112233",
+      role: "admin",
     });
     await expect(getKioskActor()).resolves.toEqual({
       kind: "kiosk",
       deviceId: "d_1",
       deviceName: "Kitchen iPad",
+      idleMinutes: 2,
       memberId: MEMBER_ID,
       displayName: "Ryan",
+      // The kiosk's admin gate reads it (issue #147).
+      role: "admin",
     });
   });
 

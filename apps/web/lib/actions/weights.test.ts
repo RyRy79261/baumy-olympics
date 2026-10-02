@@ -1,6 +1,7 @@
 // @vitest-environment node
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
+import { hashKioskPin } from "@baumy/auth/kiosk-pin";
 import {
   berlinWallTimeToUtc,
   nextBerlinMonday,
@@ -10,6 +11,7 @@ import type { Queryable } from "@baumy/db";
 import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
 import {
   auditEvents,
+  members,
   choreRuleVersions,
   chores,
   completionScores,
@@ -881,12 +883,11 @@ describe("schedule_points_change (issue #115)", () => {
     ]);
   });
 
-  it("is an admin's, in the UI only", async () => {
+  it("is an admin's, in the UI or on the kiosk with their PIN (issue #147)", async () => {
     await expect(
       runAction("schedule_points_change", change(), as(partner)),
     ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
     for (const [actor, source] of [
-      [kiosk(adminB), "kiosk"],
       [sessionActor(adminB, "admin"), "ai"],
       [mcp(adminB), "mcp"],
       [brain(adminB), "brain"],
@@ -906,6 +907,47 @@ describe("schedule_points_change (issue #115)", () => {
         .from(weightSuggestions)
         .where(eq(weightSuggestions.choreId, bathroom)),
     ).toEqual([]);
+
+    // The kiosk: a partner with their right PIN is not an admin, an admin
+    // needs their PIN, and with it the change is scheduled.
+    const pinHash = await hashKioskPin("2580");
+    await t
+      .db()
+      .update(members)
+      .set({ kioskPinHash: pinHash })
+      .where(inArray(members.id, [adminB, partner]));
+    const atKiosk = (
+      memberId: string,
+      role: "admin" | "member",
+      pin?: string,
+    ) =>
+      ctxFor({ ...kiosk(memberId), role } as Actor, {
+        source: "kiosk",
+        ...(pin ? { pin } : {}),
+      });
+    await expect(
+      runAction(
+        "schedule_points_change",
+        change(),
+        atKiosk(partner, "member", "2580"),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    await expect(
+      runAction("schedule_points_change", change(), atKiosk(adminB, "admin")),
+    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
+    ok(
+      await runAction(
+        "schedule_points_change",
+        change(),
+        atKiosk(adminB, "admin", "2580"),
+      ),
+    );
+    const [audit] = await t
+      .db()
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "schedule_points_change"));
+    expect(audit).toMatchObject({ source: "kiosk", actorMemberId: adminB });
   });
 
   it("is vetoed by another member, never by its admin, and a veto and a cancel race by compare-and-set", async () => {

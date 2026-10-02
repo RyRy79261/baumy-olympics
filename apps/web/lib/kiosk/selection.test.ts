@@ -15,7 +15,7 @@ describe("pickKioskMember", () => {
     const me = await seedMember(db(), { displayName: "Ryan" });
     await expect(pickKioskMember(kiosk, me)).resolves.toEqual({
       ok: true,
-      data: { memberId: me, displayName: "Ryan" },
+      data: { memberId: me, displayName: "Ryan", role: "member" },
     });
   });
 

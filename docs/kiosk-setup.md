@@ -28,9 +28,10 @@ How to turn the iPad into the always-on kitchen screen (SPEC §8, issue #29).
    This is not the **personal PIN** in Settings: that is each housemate's
    own 4 to 6 digits, which the kitchen screen asks for only before it
    disputes a chore as them (owner ruling 2026-10-02, SPEC §12 decision
-   27). Everything else there (logging, confirming, notes, the calendar,
-   shopping, Baumy) runs as whoever tapped their avatar, with no PIN.
-   Pairing needs no PIN.
+   27), and, for an admin, before it adds or edits a bounty or changes a
+   bounty's points (SPEC §12 decision 28, issue #147). Everything else
+   there (logging, confirming, notes, the calendar, shopping, Baumy) runs
+   as whoever tapped their avatar, with no PIN. Pairing needs no PIN.
 
    Someone who never set a PIN is never shown the PIN pad: the screen says
    "<Name> hasn't set a personal PIN yet" with a QR code to Settings on
@@ -98,13 +99,16 @@ setting and reload.
 
 ## 5. What the screen does on its own
 
-- **Idle reset.** After 60 seconds untouched it forgets who tapped their
-  avatar and goes back to the kitchen home, from any kiosk page, and closes
-  any open sheet or PIN pad. The last 10 seconds show a countdown; any
+- **Idle reset.** After 2 minutes untouched (the default; 1, 2, 5, 10 or
+  15 can be chosen on the iPad under Bounties → Kitchen screen settings,
+  issue #147) it forgets who tapped their avatar and goes back to the
+  kitchen home, from any kiosk page, and closes any open sheet or PIN pad.
+  With nobody picked, a page left open goes home after a minute. The last 10 seconds show a countdown; any
   touch cancels it. On the home, a day sheet or module left open closes,
   and another month left showing goes back to this one. Holding "Hold to
   talk", and Baumy working on the answer, do not count as untouched: the
-  minute starts again when the answer is there.
+  wait starts again when the answer is there. Who may change the wait is
+  [UNRESOLVED 2026-10-02]: for now anyone who has tapped their avatar.
 - **Night mode.** From 23:00 to 06:30 Berlin time it dims to a sleeping
   Baumy and a big clock. A touch wakes it; after a minute untouched it goes
   back to sleep; 06:30 wakes it for good. The hours are

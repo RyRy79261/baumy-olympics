@@ -36,6 +36,8 @@ export interface PairedKioskDevice {
   householdId: string;
   name: string;
   lastSeenAt: Date | null;
+  /** Minutes untouched before it forgets who is acting; null: the default. */
+  idleMinutes: number | null;
 }
 
 /**
@@ -53,6 +55,7 @@ export async function findPairedKioskDevice(
       householdId: kioskDevices.householdId,
       name: kioskDevices.name,
       lastSeenAt: kioskDevices.lastSeenAt,
+      idleMinutes: kioskDevices.idleMinutes,
       tokenHash: kioskDevices.tokenHash,
     })
     .from(kioskDevices)
@@ -86,6 +89,36 @@ export async function touchKioskDevice(
     .update(kioskDevices)
     .set({ lastSeenAt: now })
     .where(eq(kioskDevices.id, device.id));
+}
+
+/**
+ * Set how long the device waits, untouched, before it forgets who is acting
+ * (issue #147). Only a paired, unrevoked device of this household; returns
+ * its name and the minutes it had before, or null.
+ */
+export async function setKioskIdleMinutes(
+  db: Queryable,
+  input: { householdId: string; id: string; minutes: number },
+): Promise<{ name: string; before: number | null } | null> {
+  const [found] = await db
+    .select({ name: kioskDevices.name, before: kioskDevices.idleMinutes })
+    .from(kioskDevices)
+    .where(
+      and(
+        eq(kioskDevices.id, input.id),
+        eq(kioskDevices.householdId, input.householdId),
+        isNotNull(kioskDevices.pairedAt),
+        isNull(kioskDevices.revokedAt),
+      ),
+    )
+    .for("update")
+    .limit(1);
+  if (!found) return null;
+  await db
+    .update(kioskDevices)
+    .set({ idleMinutes: input.minutes })
+    .where(eq(kioskDevices.id, input.id));
+  return found;
 }
 
 /**

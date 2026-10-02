@@ -10,6 +10,7 @@ import {
   listKioskDevices,
   renameKioskDevice,
   revokeKioskDevice,
+  setKioskIdleMinutes,
   touchKioskDevice,
 } from "../kiosk-devices";
 import {
@@ -99,6 +100,7 @@ describe("findPairedKioskDevice", () => {
       householdId: HOUSEHOLD_ID,
       name: "Kitchen iPad",
       lastSeenAt: NOW,
+      idleMinutes: null,
     });
     await expect(
       findPairedKioskDevice(hashKioskToken("token-2")),
@@ -177,6 +179,50 @@ describe("renameKioskDevice", () => {
       renameKioskDevice(db(), { householdId: HOUSEHOLD_ID, id, name: "Late" }),
     ).resolves.toBeNull();
     expect((await stored(id)).name).toBe("Fridge");
+  });
+});
+
+describe("setKioskIdleMinutes", () => {
+  it("sets a paired device's minutes, in its household, until it is revoked (issue #147)", async () => {
+    const tokenHash = hashKioskToken("t");
+    const { id } = await paired("ABC234", tokenHash);
+    await expect(
+      setKioskIdleMinutes(db(), {
+        householdId: OTHER_HOUSEHOLD,
+        id,
+        minutes: 5,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      setKioskIdleMinutes(db(), { householdId: HOUSEHOLD_ID, id, minutes: 5 }),
+    ).resolves.toEqual({ name: "Kitchen iPad", before: null });
+    await expect(
+      setKioskIdleMinutes(db(), { householdId: HOUSEHOLD_ID, id, minutes: 10 }),
+    ).resolves.toEqual({ name: "Kitchen iPad", before: 5 });
+    await expect(findPairedKioskDevice(tokenHash)).resolves.toMatchObject({
+      idleMinutes: 10,
+    });
+    await revokeKioskDevice(db(), { householdId: HOUSEHOLD_ID, id, now: NOW });
+    await expect(
+      setKioskIdleMinutes(db(), { householdId: HOUSEHOLD_ID, id, minutes: 1 }),
+    ).resolves.toBeNull();
+    expect((await stored(id)).idleMinutes).toBe(10);
+  });
+
+  it("never sets an unpaired device, and the column refuses 0 or over an hour", async () => {
+    const { id } = await approved("ABC234");
+    await expect(
+      setKioskIdleMinutes(db(), { householdId: HOUSEHOLD_ID, id, minutes: 2 }),
+    ).resolves.toBeNull();
+    for (const bad of [0, 61]) {
+      await expect(
+        t
+          .db()
+          .update(kioskDevices)
+          .set({ idleMinutes: bad })
+          .where(eq(kioskDevices.id, id)),
+      ).rejects.toThrow();
+    }
   });
 });
 
