@@ -31,10 +31,11 @@ describe("buildAuthOptions", () => {
     expect(options.user.changeEmail.enabled).toBe(false);
   });
 
-  it("keeps sessions for 30 days, refreshed daily, with a 300s cookie cache", () => {
+  it("keeps sessions for 30 days, refreshed daily, with a 300s cookie cache and no fresh-age check of its own", () => {
     expect(options.session).toEqual({
       expiresIn: AUTH_SESSION.expiresInSeconds,
       updateAge: AUTH_SESSION.updateAgeSeconds,
+      freshAge: 0,
       cookieCache: { enabled: true, maxAge: 300 },
     });
   });

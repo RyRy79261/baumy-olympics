@@ -4,6 +4,7 @@ import {
   insertTelegramLinkCode,
 } from "@baumy/db/telegram-link-codes";
 import { generateTelegramLinkCode } from "@/lib/codes";
+import { confirmedActor, isFailure } from "./account-security";
 import { defineAction } from "./define";
 
 // /settings: a one-time code the member sends to baumy-brain as
@@ -27,7 +28,7 @@ export const createTelegramLinkCode = defineAction({
   name: "create_telegram_link_code",
   title: "Create a Telegram link code",
   description:
-    "Creates a one-time code, valid for 10 minutes, that links the signed-in member's Telegram account to Baumy when sent to the Baumy bot.",
+    "Creates a one-time code, valid for 10 minutes, that links the signed-in member's Telegram account to Baumy when sent to the Baumy bot. Needs a recent 'Confirm it's you'.",
   consent: "Create a code to link your Telegram account",
   kind: "write",
   risk: "safe",
@@ -36,7 +37,13 @@ export const createTelegramLinkCode = defineAction({
   rateLimit: { perMember: 5, perIp: 20, windowMs: 10 * 60_000 },
   input: z.strictObject({}),
   async execute(ctx) {
-    const memberId = ctx.actor.memberId!;
+    // Linking adds a way in ("Sign in with Baumy") and a way to confirm it's
+    // you, and `link_telegram` replaces the member's link: a stolen session
+    // could link its thief's Telegram for good. So it needs "Confirm it's
+    // you", always (issue #135, the critic's review of PR #148).
+    const actor = await confirmedActor(ctx);
+    if (isFailure(actor)) return actor;
+    const memberId = actor.memberId!;
     const code = generateTelegramLinkCode();
     const { expiresAt } = await insertTelegramLinkCode(ctx.db, {
       code,

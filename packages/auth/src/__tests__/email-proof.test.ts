@@ -13,6 +13,7 @@ import {
   PASSKEYS_OFF,
   newWayInNotices,
 } from "../security";
+import type { StepUpStore } from "../step-up";
 import { totpFromUri } from "./_totp";
 
 // The account-security plugins (issue #79), driven through a real Better Auth
@@ -30,12 +31,31 @@ type Row = Record<string, unknown>;
 let db: Record<string, Row[]>;
 let mail: { kind: "verify" | "reset"; url: string; token: string }[];
 
+/**
+ * The step-up windows (issue #135) beside the in-memory Better Auth tables:
+ * a sign-in opens one for its session, as the database store does. The
+ * step-up guards themselves are tested against Postgres in step-up.test.ts.
+ */
+let windows: Map<string, number>;
+const memoryStepUps: StepUpStore = {
+  isOpen: async ({ sessionId, now }) =>
+    (windows.get(sessionId) ?? 0) > now.getTime(),
+  grantIfLive: async ({ sessionId, now }) => {
+    if (!db.session!.some((s) => s.id === sessionId)) return false;
+    windows.set(sessionId, now.getTime() + 10 * 60_000);
+    return true;
+  },
+};
+
 function makeAuth(extra: AuthEnv = {}) {
-  const options = buildAuthOptions({
-    BETTER_AUTH_SECRET: "test-secret-that-is-at-least-32-characters-long",
-    BETTER_AUTH_URL: BASE,
-    ...extra,
-  });
+  const options = buildAuthOptions(
+    {
+      BETTER_AUTH_SECRET: "test-secret-that-is-at-least-32-characters-long",
+      BETTER_AUTH_URL: BASE,
+      ...extra,
+    },
+    memoryStepUps,
+  );
   return betterAuth({
     ...options,
     baseURL: BASE,
@@ -127,6 +147,7 @@ beforeEach(() => {
     passkey: [],
   };
   mail = [];
+  windows = new Map();
   auth = makeAuth();
 });
 

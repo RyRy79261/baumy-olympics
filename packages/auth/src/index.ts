@@ -53,7 +53,13 @@ export {
 export {
   PASSKEY_NOT_CONFIRMED,
   STEP_UP_PASSKEY_PATH,
-  stepUpPasskey,
+  CODE_NOT_CONFIRMED,
+  STEP_UP_GUARDED_PATHS,
+  STEP_UP_REQUIRED,
+  STEP_UP_TOTP_PATH,
+  databaseStepUpStore,
+  stepUp,
+  type StepUpStore,
 } from "./step-up";
 export {
   AUTH_RP_NAME,

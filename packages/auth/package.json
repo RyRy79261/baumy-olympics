@@ -22,6 +22,7 @@
   "dependencies": {
     "@baumy/db": "workspace:*",
     "@better-auth/passkey": "1.6.25",
+    "@better-auth/utils": "0.4.2",
     "@simplewebauthn/server": "13.3.3",
     "better-auth": "1.6.25",
     "zod": "^4.6.5"

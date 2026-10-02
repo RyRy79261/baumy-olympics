@@ -108,11 +108,14 @@ describe("set_kiosk_pin", () => {
 
   it("keeps the PIN out of the ledger and the audit row", async () => {
     const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
-    await runAction(
-      "set_kiosk_pin",
-      { pin: "987654" },
-      ctxFor(signedIn(me, 1)),
-    );
+    const actor = await sessionWithRow(me);
+    await grantStepUp(db(), {
+      sessionId: actor.sessionId!,
+      userId: actor.userId,
+      method: "password",
+      now: FIXED_NOW,
+    });
+    await runAction("set_kiosk_pin", { pin: "987654" }, ctxFor(actor));
     const ledger = await t.db().select().from(actionRequests);
     const audits = await t.db().select().from(auditEvents);
     expect(audits).toEqual([
@@ -159,18 +162,19 @@ describe("set_kiosk_pin", () => {
     ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
   });
 
-  it("a session under 10 minutes old may change the PIN without confirming", async () => {
+  it("a session's age alone never lets the PIN change", async () => {
+    // Signed in a minute ago, or "in the future": with no window, refused.
     const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
-    await expect(
-      runAction("set_kiosk_pin", { pin: "2222" }, ctxFor(signedIn(me, 9))),
-    ).resolves.toEqual({ ok: true, data: { changed: true } });
-  });
-
-  it("a session dated in the future does not count as fresh", async () => {
-    const me = await seedMember(db(), { kioskPinHash: "scrypt$old" });
-    await expect(
-      runAction("set_kiosk_pin", { pin: "2222" }, ctxFor(signedIn(me, -5))),
-    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    for (const minutesAgo of [1, 9, -5]) {
+      await expect(
+        runAction(
+          "set_kiosk_pin",
+          { pin: "2222" },
+          ctxFor(signedIn(me, minutesAgo)),
+        ),
+      ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    }
+    expect((await row(me)).kioskPinHash).toBe("scrypt$old");
   });
 
   it("refuses a PIN that is not 4 to 6 digits", async () => {
@@ -205,10 +209,50 @@ describe("set_kiosk_pin", () => {
   });
 });
 
+/** A member's session with a row and an open "Confirm it's you" window. */
+async function confirmedSession(memberId: string, now = FIXED_NOW) {
+  const actor = await sessionWithRow(memberId);
+  await grantStepUp(db(), {
+    sessionId: actor.sessionId!,
+    userId: actor.userId,
+    method: "password",
+    now,
+  });
+  return actor;
+}
+
 describe("create_telegram_link_code", () => {
+  it("needs 'Confirm it's you': a stolen session cannot link its own Telegram", async () => {
+    // Linking adds a way in (Sign in with Baumy) and a way to confirm: a
+    // session without a window gets no code (the critic's review of #148).
+    const me = await seedMember(db());
+    const actor = await sessionWithRow(me);
+    await expect(
+      runAction("create_telegram_link_code", {}, ctxFor(actor)),
+    ).resolves.toMatchObject({ ok: false, code: "REAUTH_REQUIRED" });
+    // Signed in a minute ago proves nothing either (and this one has no
+    // session row at all, so it reads as signed out).
+    await expect(
+      runAction("create_telegram_link_code", {}, ctxFor(signedIn(me, 1))),
+    ).resolves.toMatchObject({ ok: false });
+    expect(await t.db().select().from(telegramLinkCodes)).toEqual([]);
+    expect(await t.db().select().from(auditEvents)).toEqual([]);
+
+    await grantStepUp(db(), {
+      sessionId: actor.sessionId!,
+      userId: actor.userId,
+      method: "passkey",
+      now: FIXED_NOW,
+    });
+    await expect(
+      runAction("create_telegram_link_code", {}, ctxFor(actor)),
+    ).resolves.toMatchObject({ ok: true });
+    expect(await t.db().select().from(telegramLinkCodes)).toHaveLength(1);
+  });
+
   it("shows the code once and stores only its hash, for 10 minutes", async () => {
     const me = await seedMember(db());
-    const ctx = ctxFor(sessionActor(me));
+    const ctx = ctxFor(await confirmedSession(me));
     const res = await runAction("create_telegram_link_code", {}, ctx);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -282,7 +326,7 @@ describe("get_telegram_link_status", () => {
     const res = await runAction(
       "create_telegram_link_code",
       {},
-      ctxFor(sessionActor(memberId), { now }),
+      ctxFor(await confirmedSession(memberId, now), { now }),
     );
     if (!res.ok || !res.data.code) throw new Error("no code");
     return res.data.code;
