@@ -3,21 +3,22 @@ import { addChore, openChore } from "../lib/chores";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 import {
   expectKioskTargets,
+  openKioskActivity,
   openKioskChores,
   pairedKiosk,
   typePin,
 } from "../lib/kiosk";
 
-// Issue #15 on the kitchen iPad: the founder self-claims a chore on the
-// kiosk; when the partner taps their avatar, the "Needs your OK" banner shows
-// it. Since the owner's ruling of 2026-10-02 (issue #145, SPEC §12 decision
-// 27) only a dispute asks for the PIN: the founder (who never set a PIN)
-// undoes one of their own claims and the partner confirms one with no PIN,
-// then disputes the last with theirs.
+// Issue #15 on the kitchen iPad, in the activity log (issue #150): the
+// founder self-claims a chore twice on the kiosk, and Activity (in the
+// footer nav) lists both, newest first, as it does with nobody picked. The
+// founder (who never set a PIN) undoes one with no PIN (§12 decision 27).
+// The partner taps in: there is no Confirm, only Dispute, which asks for
+// their PIN in that request.
 
 const PIN = "2580";
 
-test("on the kiosk, undo and confirm need no PIN; a dispute asks for one", async ({
+test("on the kiosk's Activity, undo needs no PIN, a dispute asks for one, and nothing confirms", async ({
   page,
   browser,
 }, testInfo) => {
@@ -45,53 +46,55 @@ test("on the kiosk, undo and confirm need no PIN; a dispute asks for one", async
   const ipad = await pairedKiosk(browser, page, `iPad ${suffix}`);
   const kiosk = ipad.page;
 
-  // The founder logs it three times; the banner offers to undo them.
+  // With nobody picked, the log is there to read, without buttons.
+  await openKioskActivity(kiosk);
+  await expect(kiosk.getByTestId(`activity-bounty-${chore}`)).toContainText(
+    `${founder} added the bounty ${chore}.`,
+  );
+
+  // The founder logs it twice; the Bounties page has no banner any more.
   await openKioskChores(kiosk);
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     const sheet = await openChore(kiosk, chore);
     await sheet.getByRole("button", { name: "Log it" }).click();
     await expect(sheet).toBeHidden();
   }
-  const banner = kiosk.getByTestId("needs-ok-banner");
-  const mine = banner.getByTestId(`claim-${chore}`);
-  await expect(mine).toHaveCount(3);
-  await expectKioskTargets(mine.first());
+  await expect(kiosk.getByText(/needs? your OK/)).toHaveCount(0);
+
+  await openKioskActivity(kiosk);
+  const entries = kiosk.getByTestId(`activity-chore-${chore}`);
+  await expect(entries).toHaveCount(2);
+  await expect(entries.first()).toContainText(`${founder} did ${chore}`);
+  await expect(entries.first()).toContainText("+");
+  await expectKioskTargets(entries.first());
   // Undo needs no PIN on the kiosk, so the founder's missing PIN is fine.
-  await mine.first().getByRole("button", { name: "Undo" }).click();
+  await entries.first().getByRole("button", { name: "Undo" }).click();
   await expect(
     kiosk.getByRole("status").filter({ hasText: `Undid ${chore}.` }),
   ).toBeVisible();
-  await expect(mine).toHaveCount(2);
+  await expect(entries.first()).toHaveAttribute("data-status", "voided");
+  await expect(entries.first()).toContainText("Voided (undone).");
   await expect(
     kiosk.getByRole("dialog", { name: `${founder}'s PIN` }),
   ).toBeHidden();
 
-  // The partner taps in: the banner counts what waits on them.
+  // The partner taps in: Dispute on the claim still open, never Confirm.
   await kiosk.getByRole("button", { name: partner, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(partner);
-  await expect(
-    banner.getByRole("heading", { name: /^\d+ claims? needs? your OK$/ }),
-  ).toBeVisible();
-  const theirs = banner.getByTestId(`claim-${chore}`);
-  await expect(theirs.first()).toContainText(`${founder} did ${chore}`);
-  // Confirming asks no PIN.
-  await theirs.first().getByRole("button", { name: "Confirm" }).click();
-  await expect(
-    kiosk
-      .getByRole("status")
-      .filter({ hasText: `Confirmed: ${founder} did ${chore}.` }),
-  ).toBeVisible();
-  await expect(
-    kiosk.getByRole("dialog", { name: `${partner}'s PIN` }),
-  ).toBeHidden();
-  await expect(theirs).toHaveCount(1);
+  const open = kiosk.locator(
+    `[data-testid="activity-chore-${chore}"][data-status="pending"]`,
+  );
+  await expect(open).toHaveCount(1);
+  await expect(open.getByRole("button", { name: "Dispute" })).toBeVisible();
+  await expect(open.getByRole("button", { name: "Confirm" })).toHaveCount(0);
+  await expect(open.getByRole("button", { name: "Undo" })).toHaveCount(0);
 
-  // Disputing does: the pad opens in that request.
-  await theirs.getByRole("button", { name: "Dispute" }).click();
-  await theirs.getByLabel("Why was it not done?").fill("Still dirty");
-  await theirs.getByRole("button", { name: "Send dispute" }).click();
+  // Disputing asks for the PIN in that request.
+  await open.getByRole("button", { name: "Dispute" }).click();
+  await open.getByLabel("Why was it not done?").fill("Still dirty");
+  await open.getByRole("button", { name: "Send dispute" }).click();
   const pad = kiosk.getByRole("dialog", { name: `${partner}'s PIN` });
   await expect(pad).toBeVisible();
   await expectKioskTargets(pad);
@@ -100,6 +103,9 @@ test("on the kiosk, undo and confirm need no PIN; a dispute asks for one", async
   await expect(
     kiosk.getByRole("status").filter({ hasText: `Disputed ${chore}.` }),
   ).toBeVisible();
+  await expect(kiosk.getByTestId(`activity-dispute-${chore}`)).toContainText(
+    `${partner} disputed ${founder}'s ${chore}: "Still dirty". Open.`,
+  );
 
   await ipad.context.close();
   await member.context.close();
