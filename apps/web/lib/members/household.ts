@@ -3,6 +3,8 @@ import "server-only";
 import { cache } from "react";
 import { createHttpDb, type Queryable } from "@baumy/db";
 import { listActiveMembers } from "@baumy/db/members";
+import { avatarImageView } from "@/lib/avatars/paths";
+import type { DashboardMember } from "@/lib/kiosk/dashboard";
 import { rosterFrom } from "./characters";
 
 // The household's active members for one request (issue #128). A layout and
@@ -18,4 +20,19 @@ export const householdMembers = cache((householdId: string) =>
 /** Their looks, by id (`activeRoster`), from the same read. */
 export async function householdRoster(householdId: string) {
   return rosterFrom(await householdMembers(householdId));
+}
+
+/**
+ * The same members as client components take them (who a calendar event is
+ * for, issue #134): id, name, colour and gallery sprites, in join order.
+ */
+export async function householdPeople(
+  householdId: string,
+): Promise<DashboardMember[]> {
+  return (await householdMembers(householdId)).map((p) => ({
+    id: p.id,
+    displayName: p.displayName,
+    color: p.color,
+    sprites: avatarImageView(p.avatarImage),
+  }));
 }

@@ -150,32 +150,6 @@ export function agendaDays(
     : days.filter(busy);
 }
 
-/**
- * How many chips a kitchen-screen month cell shows before "+N more", until
- * the cell has been measured (`kioskMonthChips`).
- */
-export const KIOSK_MONTH_CHIPS = 3;
-
-// A kiosk month cell's geometry (packages/ui CalendarDayCell, CalendarChip,
-// CalendarMore), in px: frame and padding, the date, a chip and the gap.
-const CELL_CHROME = 4 + 12 + 24;
-const CHIP = 28;
-const GAP = 4;
-const MORE = 16;
-
-/**
- * How many rows of chips a kitchen-screen month cell `cellHeight` px tall
- * shows, so the page fits the screen (820×1180) and never scrolls: every
- * chip when they all fit, else as many as fit beside "+N more" (at least a
- * "+N more" on its own).
- */
-export function kioskMonthChips(cellHeight: number, events: number): number {
-  const room = cellHeight - CELL_CHROME;
-  const all = Math.floor((room + GAP) / (CHIP + GAP));
-  if (events <= all) return events;
-  return Math.max(0, Math.floor((room - MORE) / (CHIP + GAP)));
-}
-
 export const CALENDAR_VIEWS = ["day", "week", "month"] as const;
 export type CalendarViewKind = (typeof CALENDAR_VIEWS)[number];
 

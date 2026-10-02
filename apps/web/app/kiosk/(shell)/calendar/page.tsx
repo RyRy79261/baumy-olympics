@@ -1,59 +1,53 @@
 import type { Metadata } from "next";
-import { rosterColours } from "@/lib/members/characters";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { berlinDateKey } from "@baumy/core";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
-import { householdMembers } from "@/lib/members/household";
 import { PageHeading, buttonClass } from "@baumy/ui";
-import { CalendarBoard } from "@/components/calendar/calendar-board";
-import { CalendarStatus } from "@/components/calendar/calendar-status";
+import { KioskCalendarStatus } from "@/components/calendar/calendar-status";
+import { CalendarManager } from "@/components/kiosk/calendar-manager";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { runAction } from "@/lib/actions/registry";
 import { getKioskActor } from "@/lib/auth";
-import { now } from "@/lib/clock";
-import { parseViewParams, viewRange } from "@/lib/calendar/view";
+import { upcomingGroups, upcomingRange } from "@/lib/calendar/upcoming";
+import { householdPeople } from "@/lib/members/household";
 import {
   kioskCreateEventAction,
   kioskDeleteEventAction,
   kioskUpdateEventAction,
 } from "../../actions";
 
-// The house calendar on the kitchen iPad (SPEC §3.3, §8): the same board as
-// /calendar with 56px targets, acting as the member whose avatar was tapped.
-// Private events are never shown here (nor anywhere else).
+// The Calendar tab on the kitchen iPad (issue #134, SPEC §3.3, §8): the
+// dashboard at /kiosk already shows the month, so this is the manager.
+// Anyone can read what is coming up; the member whose avatar was tapped can
+// add, change or delete an event, and each change asks for their PIN in
+// that request (SPEC §6.2). Private events are never shown here (nor
+// anywhere else). Without Google, it says so and offers nothing to change.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Calendar · Kiosk" };
 
-export default async function KioskCalendarPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ view?: string; date?: string }>;
-}) {
+export default async function KioskCalendarPage() {
   const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
-  const today = berlinDateKey(now());
-  const { view, date } = parseViewParams(await searchParams, today);
-  const range = viewRange(view, date);
-  const ctx = kiosk.memberId
-    ? await kioskRequestCtx(undefined, undefined)
-    : null;
-  const [listed, people] = ctx
-    ? await Promise.all([
-        runAction("list_events", { from: range.from, to: range.to }, ctx),
-        householdMembers(HOUSEHOLD_ID),
-      ])
-    : [null, []];
+  const ctx = (await kioskRequestCtx(undefined, undefined))!;
+  const today = berlinDateKey(ctx.now);
+  const [listed, people] = await Promise.all([
+    runAction("list_events", upcomingRange(today), ctx),
+    householdPeople(HOUSEHOLD_ID),
+  ]);
+  const acting = Boolean(kiosk.memberId);
   return (
     <>
       <PageHeading
         eyebrow={kiosk.deviceName ?? "Kiosk"}
         title="Calendar"
         description={
-          ctx
-            ? "The house calendar. Times are Berlin time."
-            : "Tap your avatar at the top to see the calendar."
+          !listed.ok
+            ? "The house calendar."
+            : acting
+              ? "What's coming up. Tap an event to change it; changes ask for your PIN."
+              : "What's coming up. Tap your avatar at the top to add or change an event."
         }
         actions={
           <Link href="/kiosk" className={buttonClass("secondary", "kiosk")}>
@@ -61,17 +55,13 @@ export default async function KioskCalendarPage({
           </Link>
         }
       />
-      {listed === null ? null : listed.ok ? (
-        <CalendarBoard
-          range={range}
-          events={listed.data.events}
+      {listed.ok ? (
+        <CalendarManager
+          groups={upcomingGroups(listed.data.events, ctx.now)}
           today={today}
-          basePath="/kiosk/calendar"
-          kiosk
-          memberNames={Object.fromEntries(
-            people.map((p) => [p.id, p.displayName]),
-          )}
-          memberColors={rosterColours(people)}
+          people={people}
+          canEdit={acting}
+          pinLabel={`${kiosk.displayName ?? "Your"}'s PIN`}
           actions={{
             create: kioskCreateEventAction,
             update: kioskUpdateEventAction,
@@ -79,7 +69,7 @@ export default async function KioskCalendarPage({
           }}
         />
       ) : (
-        <CalendarStatus failure={listed} />
+        <KioskCalendarStatus failure={listed} />
       )}
     </>
   );
