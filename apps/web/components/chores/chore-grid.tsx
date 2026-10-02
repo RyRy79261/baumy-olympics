@@ -38,8 +38,10 @@ import { toast } from "@/lib/ui/toast";
 // whose avatar was tapped). The urgent ones come first; one row of tabs
 // narrows the board to the urgent, the new, or one kind. Tapping a row opens
 // a sheet with the preview ("+25, streak 2") and a confirm button. Logging
-// for someone else is a choice in the sheet; on the kiosk it asks for the
-// LOGGER's PIN (AttestedForm), on a phone the session vouches.
+// for someone else is a choice in the sheet, and vouches for them; it needs
+// no PIN on the kiosk (owner ruling 2026-10-02, issue #145). The form is
+// still an AttestedForm, so a PIN would be asked if the gate ever wanted
+// one.
 //
 // Outcomes: a floating "+N", a "STREAK BROKEN" banner when a streak ended,
 // and a toast for a refusal (a cooldown says when to try again, in Berlin
@@ -315,9 +317,7 @@ export function ChoreGrid({
             ) : null}
             {doneBy !== actorId ? (
               <p className="text-sm text-bm-muted">
-                {kiosk
-                  ? `You are vouching that ${nameOf(doneBy)} did it, so your PIN is needed.`
-                  : `You are vouching that ${nameOf(doneBy)} did it.`}
+                {`You are vouching that ${nameOf(doneBy)} did it.`}
               </p>
             ) : null}
             {open.proofMode !== "none" ? (

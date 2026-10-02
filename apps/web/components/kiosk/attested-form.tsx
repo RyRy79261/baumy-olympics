@@ -5,6 +5,8 @@ import { Button, Dialog, FormMessage, PinPad } from "@baumy/ui";
 import { useActionForm, type FormAction } from "@/components/use-action-form";
 import type { ActionResult } from "@/lib/actions/result";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
+import { useActingPin } from "./acting-pin";
+import { NoPinNotice } from "./no-pin-notice";
 
 // A kiosk form whose action may need the acting member's PIN (SPEC §6.2).
 // The first tap sends the request WITHOUT a PIN. If the gate answers
@@ -17,6 +19,11 @@ import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
 // pop): the form shows nothing inline except inside the PIN pad. The same
 // form works off the kiosk, where a session attests itself and the pad never
 // opens.
+//
+// A member with no personal PIN (the kiosk shell's `hasPin`, or the gate's
+// PIN_NOT_SET) never sees the pad: the same dialog says "<Name> hasn't set a
+// personal PIN yet", what it is for, and shows a QR code to Settings (issue
+// #145).
 
 export function AttestedForm<T>({
   action,
@@ -48,6 +55,9 @@ export function AttestedForm<T>({
   const needsPin =
     failed !== null && !failed.ok && PIN_PROMPT_CODES.has(failed.code);
   const pinOpen = needsPin && !dismissed;
+  const acting = useActingPin();
+  const failedCode = failed && !failed.ok ? failed.code : null;
+  const noPin = needsPin && (!acting.hasPin || failedCode === "PIN_NOT_SET");
 
   useEffect(() => {
     if (!state || !onResult) return;
@@ -80,13 +90,29 @@ export function AttestedForm<T>({
       <Dialog
         open={pinOpen}
         onClose={() => setDismissed(true)}
-        title={pinLabel}
+        title={noPin ? "Personal PIN needed" : pinLabel}
       >
         <div className="flex flex-col gap-4">
-          {failed && !failed.ok && failed.code !== "ATTESTATION_REQUIRED" ? (
+          {noPin ? (
+            <>
+              <NoPinNotice name={acting.name} />
+              <Button
+                type="button"
+                size="kiosk"
+                variant="secondary"
+                onClick={() => setDismissed(true)}
+              >
+                Close
+              </Button>
+            </>
+          ) : null}
+          {!noPin &&
+          failed &&
+          !failed.ok &&
+          failed.code !== "ATTESTATION_REQUIRED" ? (
             <FormMessage tone="error">{failed.message}</FormMessage>
           ) : null}
-          {pinOpen ? (
+          {pinOpen && !noPin ? (
             <PinPad
               key={attempt}
               label={pinLabel}

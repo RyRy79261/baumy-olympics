@@ -1,5 +1,7 @@
 // Kiosk constants that client components need too (no Node imports here).
 
+import { SITE_URL } from "@/lib/seo";
+
 /** How long the screen waits, untouched, before it forgets who is acting
  * and goes home (and, at night, before it sleeps again after a wake). */
 export const KIOSK_IDLE_MS = 60_000;
@@ -7,12 +9,20 @@ export const KIOSK_IDLE_MS = 60_000;
 /** The last stretch of that wait, when the screen shows a countdown. */
 export const KIOSK_IDLE_WARN_MS = 10_000;
 
-/** Result codes that mean "show the PIN pad" on the kiosk. */
+/**
+ * Result codes that mean "show the PIN pad" on the kiosk, or, for a member
+ * with no PIN (`PIN_NOT_SET`, or the acting member's `hasPin` false), the
+ * "hasn't set a personal PIN yet" help in its place (issue #145).
+ */
 export const PIN_PROMPT_CODES: ReadonlySet<string> = new Set([
   "ATTESTATION_REQUIRED",
   "ATTESTATION_FAILED",
   "RATE_LIMITED",
+  "PIN_NOT_SET",
 ]);
+
+/** Where a member sets their personal PIN: Settings on their phone. */
+export const SET_PIN_URL = `${SITE_URL}/settings#pin`;
 
 /** How long the screen waits, untouched, by day before the raccoon
  * screensaver comes on (ADR 0005 §6). */

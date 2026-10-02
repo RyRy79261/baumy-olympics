@@ -17,8 +17,9 @@ import { toast } from "@/lib/ui/toast";
 // "Needs your OK" (SPEC §4.3): open claims, each with exactly the buttons
 // `get_pending_confirmations` says would work for the member acting. The
 // same list is the phone's /inbox and the kiosk's banner. Every button is an
-// `AttestedForm`: on the kiosk it asks for the acting member's PIN, on a
-// phone the session vouches.
+// `AttestedForm`: on the kiosk only Dispute asks for the acting member's PIN
+// (owner ruling 2026-10-02, issue #145), and a member with no PIN is told
+// so with a QR code to Settings; on a phone the session vouches.
 //
 // Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
