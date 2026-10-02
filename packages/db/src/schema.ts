@@ -1238,6 +1238,33 @@ export const notes = pgTable(
 );
 
 /**
+ * Who has seen which note (issue #153): one row per member and note, with
+ * the last time they opened it (the Board, or the note on the kitchen
+ * screen). A note counts as seen by them while `seen_at` is at or after its
+ * words last changed (`coalesce(notes.edited_at, notes.created_at)`), so an
+ * edit after their view makes it unseen again without touching this table.
+ * Writing a note (adding or editing it) marks it seen for its writer.
+ */
+export const noteReads = pgTable(
+  "note_reads",
+  {
+    noteId: uuid("note_id")
+      .notNull()
+      .references(() => notes.id),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id),
+    seenAt: timestamp("seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.noteId, t.memberId] }),
+    index("note_reads_member_idx").on(t.memberId),
+  ],
+);
+
+/**
  * A reminder for everyone (ADR 0005 §4): "Handyman on Wednesday". The
  * kitchen screen shows it full-screen until every active member has
  * acknowledged it (`reminder_acks`), or a member dismisses it for everyone

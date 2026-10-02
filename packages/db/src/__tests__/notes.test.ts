@@ -1,17 +1,19 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { HOUSEHOLD_ID } from "../household";
 import type { Queryable } from "../index";
 import {
-  countNotesEditedSince,
+  countNotesUnseenByAnyone,
+  countUnseenNotes,
   findNote,
   insertNote,
   listNotes,
+  markNotesSeen,
   setNotePinned,
   softDeleteNote,
   updateNote,
 } from "../notes";
-import { households, members, notes } from "../schema";
+import { households, members, noteReads, notes } from "../schema";
 import { useTestDb } from "./_harness";
 
 const t = useTestDb();
@@ -69,6 +71,7 @@ describe("insertNote and findNote", () => {
       createdAt: T0,
       updatedAt: T0,
       editedAt: T0,
+      seenBy: [],
     });
   });
 
@@ -169,6 +172,7 @@ describe("setNotePinned", () => {
       updatedAt: at(4),
       // A change, but not an edit: the note is no newer as a message.
       editedAt: T0,
+      seenBy: [],
     });
     await setNotePinned(db(), {
       householdId: HOUSEHOLD_ID,
@@ -211,50 +215,180 @@ describe("softDeleteNote", () => {
   });
 });
 
-describe("countNotesEditedSince", () => {
-  const since = (min: number) =>
-    countNotesEditedSince(db(), { householdId: HOUSEHOLD_ID, since: at(min) });
+describe("seen notes (issue #153)", () => {
+  // Sam joined long before Ryan (the author, added at the real now).
+  let sam: string;
+  beforeEach(async () => {
+    sam = await member("Sam", at(-1000));
+  });
 
-  it("counts notes added or edited after the moment, not pinned ones", async () => {
-    const old = await add("Old", { now: at(-60) });
-    const pinnedLater = await add("Pinned later", { now: at(-60) });
-    await add("New", { now: at(5) });
-    expect(await since(0)).toBe(1);
+  async function member(displayName: string, createdAt: Date) {
+    const [m] = await t
+      .db()
+      .insert(members)
+      .values({
+        householdId: HOUSEHOLD_ID,
+        displayName,
+        avatarSprite: "cat",
+        color: "#445566",
+        createdAt,
+      })
+      .returning({ id: members.id });
+    return m!.id;
+  }
 
-    // Pinning (or unpinning) is not an edit.
-    await setNotePinned(db(), {
+  const see = (memberId: string, noteIds: string[], now: Date) =>
+    markNotesSeen(db(), { householdId: HOUSEHOLD_ID, memberId, noteIds, now });
+  const unseen = (memberId: string) =>
+    countUnseenNotes(db(), { householdId: HOUSEHOLD_ID, memberId });
+  const unseenByAnyone = () => countNotesUnseenByAnyone(db(), HOUSEHOLD_ID);
+  const seenBy = async (id: string) =>
+    (await findNote(db(), HOUSEHOLD_ID, id))!.seenBy;
+  const edit = (id: string, title: string, now: Date) =>
+    updateNote(db(), {
       householdId: HOUSEHOLD_ID,
-      id: pinnedLater,
-      pinned: true,
-      now: at(10),
-    });
-    expect(await since(0)).toBe(1);
-
-    // Editing its words is.
-    await updateNote(db(), {
-      householdId: HOUSEHOLD_ID,
-      id: old,
-      title: "Old, edited",
+      id,
+      title,
       bodyMd: "",
       color: null,
-      now: at(10),
+      now,
     });
-    expect(await since(0)).toBe(2);
 
-    // A deleted note never counts.
+  it("counts a note as unseen until the member opens it", async () => {
+    const a = await add("A", { now: at(0) });
+    const b = await add("B", { now: at(1) });
+    expect(await unseen(sam)).toBe(2);
+    expect(await seenBy(a)).toEqual([]);
+
+    expect(await see(sam, [a], at(2))).toEqual([a]);
+    expect(await unseen(sam)).toBe(1);
+    expect(await unseen(author)).toBe(2);
+    expect(await seenBy(a)).toEqual([sam]);
+    expect(await seenBy(b)).toEqual([]);
+  });
+
+  it("makes a note unseen again when its words change after the view, never when it is pinned", async () => {
+    const a = await add("A", { now: at(0) });
+    await see(sam, [a], at(5));
+    expect(await unseen(sam)).toBe(0);
+
+    await setNotePinned(db(), {
+      householdId: HOUSEHOLD_ID,
+      id: a,
+      pinned: true,
+      now: at(6),
+    });
+    expect(await unseen(sam)).toBe(0);
+
+    await edit(a, "A, edited", at(7));
+    expect(await unseen(sam)).toBe(1);
+    expect(await seenBy(a)).toEqual([]);
+
+    await see(sam, [a], at(8));
+    expect(await unseen(sam)).toBe(0);
+  });
+
+  it("counts a note seen at the very moment its words changed as seen", async () => {
+    const a = await add("A", { now: at(0) });
+    await see(sam, [a], at(0));
+    expect(await unseen(sam)).toBe(0);
+  });
+
+  it("dates a note from before edited_at from when it was added", async () => {
+    const a = await add("Legacy", { now: at(5) });
+    await t.db().update(notes).set({ editedAt: null }).where(eq(notes.id, a));
+    await see(sam, [a], at(4));
+    expect(await unseen(sam)).toBe(1);
+    await see(sam, [a], at(5));
+    expect(await unseen(sam)).toBe(0);
+  });
+
+  it("never moves seen_at back", async () => {
+    const a = await add("A", { now: at(0) });
+    await see(sam, [a], at(10));
+    await edit(a, "A2", at(9));
+    // An older view arriving late does not undo the newer one.
+    await see(sam, [a], at(1));
+    expect(await unseen(sam)).toBe(0);
+    const [row] = await t
+      .db()
+      .select()
+      .from(noteReads)
+      .where(and(eq(noteReads.noteId, a), eq(noteReads.memberId, sam)));
+    expect(row!.seenAt).toEqual(at(10));
+  });
+
+  it("marks only live notes of the household, once each", async () => {
+    const a = await add("A");
+    const gone = await add("Gone");
     await softDeleteNote(db(), {
       householdId: HOUSEHOLD_ID,
-      id: old,
-      now: at(11),
+      id: gone,
+      now: at(1),
     });
-    expect(await since(0)).toBe(1);
-    expect(await since(-120)).toBe(2);
+    const nowhere = "00000000-0000-4000-8000-000000000000";
+    expect(await see(sam, [a, gone, a, nowhere], at(2))).toEqual([a]);
+    expect(await see(sam, [gone], at(3))).toEqual([]);
+    expect(await see(sam, [], at(3))).toEqual([]);
+    expect(await t.db().select().from(noteReads)).toHaveLength(1);
   });
 
-  it("counts a note from before edited_at from when it was created", async () => {
-    const id = await add("Legacy", { now: at(5) });
-    await t.db().update(notes).set({ editedAt: null }).where(eq(notes.id, id));
-    expect(await since(0)).toBe(1);
-    expect(await since(10)).toBe(0);
+  it("never counts a deleted note", async () => {
+    const a = await add("A");
+    expect(await unseen(sam)).toBe(1);
+    expect(await unseenByAnyone()).toBe(1);
+    await softDeleteNote(db(), { householdId: HOUSEHOLD_ID, id: a, now: at(1) });
+    expect(await unseen(sam)).toBe(0);
+    expect(await unseenByAnyone()).toBe(0);
+  });
+
+  it("counts a note for the kitchen until every active member has seen it", async () => {
+    const a = await add("A", { now: at(0) });
+    const b = await add("B", { now: at(0) });
+    expect(await unseenByAnyone()).toBe(2);
+    await see(author, [a, b], at(1));
+    expect(await unseenByAnyone()).toBe(2);
+    await see(sam, [a], at(1));
+    expect(await unseenByAnyone()).toBe(1);
+    await see(sam, [b], at(2));
+    expect(await unseenByAnyone()).toBe(0);
+
+    // An edit brings it back until everyone has read it again.
+    await edit(a, "A2", at(3));
+    expect(await unseenByAnyone()).toBe(1);
+    await see(author, [a], at(4));
+    await see(sam, [a], at(4));
+    expect(await unseenByAnyone()).toBe(0);
+
+    // Someone who joins brings both back until they read them too.
+    const kim = await member("Kim", at(5));
+    expect(await unseenByAnyone()).toBe(2);
+    await see(kim, [a, b], at(6));
+    expect(await unseenByAnyone()).toBe(0);
+
+    // Someone who has left is not waited for, and is not in seenBy.
+    const lee = await member("Lee", at(7));
+    await see(lee, [a], at(8));
+    expect(await seenBy(a)).toContain(lee);
+    expect(await unseenByAnyone()).toBe(1);
+    await t
+      .db()
+      .update(members)
+      .set({ deactivatedAt: at(9) })
+      .where(eq(members.id, lee));
+    expect(await unseenByAnyone()).toBe(0);
+    expect(await seenBy(a)).not.toContain(lee);
+  });
+
+  it("lists who has seen each note in the order they joined", async () => {
+    const a = await add("A", { now: at(0) });
+    await see(author, [a], at(1));
+    await see(sam, [a], at(2));
+    const [row] = await listNotes(db(), {
+      householdId: HOUSEHOLD_ID,
+      limit: 5,
+    });
+    expect(row!.seenBy).toEqual([sam, author]);
   });
 });
+
