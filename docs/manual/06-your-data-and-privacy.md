@@ -7,6 +7,8 @@ covers:
   - apps/web/app/privacy/page.tsx
   - apps/web/app/terms/page.tsx
   - packages/core/src/scoring/lifecycle.ts
+  - apps/web/lib/actions/get-my-data.ts
+  - apps/web/app/(hub)/settings/your-data-card.tsx
 ---
 
 The full, exact answer is the [privacy page](/privacy). This is the short version, with a link to each part.
@@ -33,7 +35,9 @@ Proof photos are deleted {{PHOTO_RETENTION_DAYS}} days after their claim settled
 
 ## Seeing, changing or deleting it
 
-You can change your name, colour and character yourself in **Settings**. For a copy of what the app holds about you, or to have something removed, ask the owner. See [seeing, changing and deleting your data](/privacy#seeing-changing-and-deleting-your-data).
+To see what the app keeps about you, open **Settings → Your data**: counts and dates (your sign-in methods, devices, completions, notes, proof photos and when each is deleted, audit-log entries, Baumy usage and connected apps), with how long each is kept. Or ask Baumy "what do you keep about me?" on your own phone or computer; it never shows this on the kitchen iPad, and it only ever covers you.
+
+You can change your name, colour and character yourself in **Settings**. For a full copy of what the app holds about you, or to have something removed, ask the owner. See [seeing, changing and deleting your data](/privacy#seeing-changing-and-deleting-your-data).
 
 ## The house rules
 
