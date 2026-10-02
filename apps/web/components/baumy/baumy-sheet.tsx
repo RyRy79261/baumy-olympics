@@ -81,8 +81,9 @@ import { VoiceRecorder } from "./voice-recorder";
 // shows as "Got it! I'll do this:" with the same suggestion cards, "Confirm
 // all" and "Cancel", through the same transcribe, command and run calls as
 // the sheet. The bubble stays: once the cards are settled (or after a plain
-// answer, or Cancel) "Hold to talk" is there again, until "Done", a tap on
-// the cat, a minute untouched, or a reminder or the screensaver. "Type
+// answer, or Cancel) "Hold to talk" is there again, until "Done", its "×",
+// a tap on the cat or anywhere outside the bubble (never during a hold), a
+// minute untouched, or a reminder or the screensaver. "Type
 // instead" opens the sheet with the same conversation. With nobody tapped
 // in, the bubble first asks who is talking; without a microphone, a tap
 // opens the sheet.
@@ -586,6 +587,24 @@ export function BaumySheet({
     window.addEventListener(KIOSK_COVER_EVENT, onCover);
     return () => window.removeEventListener(KIOSK_COVER_EVENT, onCover);
   }, [bubbleOpen]);
+  // A tap or click anywhere else closes it, like Done: the microphone off,
+  // nothing sent (issue #155). The cat and its bubble are not "anywhere
+  // else" (the cat's own tap toggles it), and a finger holding "Hold to
+  // talk" is never interrupted by another touch.
+  const catRef = useRef<HTMLDivElement>(null);
+  const heldRef = useRef(held);
+  heldRef.current = held;
+  useEffect(() => {
+    if (!bubbleOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (heldRef.current) return;
+      const target = e.target;
+      if (target instanceof Node && catRef.current?.contains(target)) return;
+      hideLatest.current();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [bubbleOpen]);
 
   const pinLabel = actingName ? `${actingName}'s PIN` : "Your PIN";
 
@@ -623,7 +642,7 @@ export function BaumySheet({
         onContextMenu={(e) => e.preventDefault()}
       />
       {holdHint ? (
-        <p role="status" className="font-body text-[20px] text-[#b8243a]">
+        <p role="status" className="font-body text-[20px] text-bm-red">
           {holdHint}
         </p>
       ) : null}
@@ -669,7 +688,10 @@ export function BaumySheet({
         </CatBubble>
       ) : null
     ) : (
-      <CatBubble mode={bubble === "talk" && recording ? "listening" : bubble}>
+      <CatBubble
+        mode={bubble === "talk" && recording ? "listening" : bubble}
+        onClose={hideBubble}
+      >
         <div key="body">
           {bubble === "who" ? (
             <>
@@ -726,7 +748,7 @@ export function BaumySheet({
   return (
     <>
       {cat ? (
-        <div className="relative" data-voice-cat>
+        <div ref={catRef} className="relative" data-voice-cat>
           {catBubble}
           <button
             type="button"
