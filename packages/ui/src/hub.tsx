@@ -182,57 +182,46 @@ export function WidgetItem({
 /**
  * The Baumy button (SPEC §3.1, §3.6; ADR 0005 §1): the cat itself, bottom
  * right, over everything, the way into the command sheet. `state` is its
- * mood (lib/ai/mood.ts). `docked` (the hub's, issue #152): below lg it
- * sits in the top bar beside the menus, the cat at 1x on a slim plinth, so
- * on a phone or a tablet it never floats over the page; from lg up it is
- * the corner button.
+ * mood (lib/ai/mood.ts). `bar` (the hub's on a phone or a tablet, issue
+ * #152): the same cat at 1x on a slim plinth, in the flow of the top bar
+ * beside the menus, so it never floats over the page.
  */
 export function BaumyButton({
   state = "idle",
-  docked = false,
+  bar = false,
   className,
   type = "button",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   state?: SpriteState;
-  docked?: boolean;
+  bar?: boolean;
 }) {
   return (
     <button
       type={type}
       aria-label="Ask Baumy"
       className={cx(
-        // Baumy sits on a small raised plinth in the corner (the prototype's
-        // footer end), so it reads against any page; the shells keep that
-        // corner clear (AppShell's bottom padding, HubGrid's on the kiosk).
-        // Anchored to the viewport's bottom-right corner, clear of a phone's
-        // home bar and rounded corners (the safe-area insets), like a chat
-        // button (issue #152). Docked, it has no `lg:shadow-*`: a variant
-        // shadow would land after the frame's inset box-shadow and hide it.
         "inline-flex touch-manipulation justify-center",
         "pixel-frame bg-bm-raised [--pf:var(--color-bm-violet)] active:translate-y-px",
-        docked
-          ? "min-h-11 min-w-11 items-center px-1.5 lg:fixed lg:right-[max(0.75rem,env(safe-area-inset-right))] lg:bottom-[max(0.75rem,env(safe-area-inset-bottom))] lg:z-10 lg:items-end lg:pixel-frame-4 lg:px-3 lg:pt-2 lg:pb-3"
-          : "fixed right-[max(0.75rem,env(safe-area-inset-right))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 items-end pixel-frame-4 px-3 pt-2 pb-3 shadow-[0_6px_0_rgb(0_0_0/0.45)]",
+        bar
+          ? "min-h-11 min-w-11 items-center px-1.5"
+          : // Baumy sits on a small raised plinth in the corner (the
+            // prototype's footer end), so it reads against any page; the
+            // shells keep that corner clear (AppShell's bottom padding,
+            // HubGrid's on the kiosk). Anchored to the viewport's
+            // bottom-right corner, clear of a phone's home bar and rounded
+            // corners (the safe-area insets), like a chat button (#152).
+            "fixed right-[max(0.75rem,env(safe-area-inset-right))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 items-end pixel-frame-4 px-3 pt-2 pb-3 shadow-[0_6px_0_rgb(0_0_0/0.45)]",
         className,
       )}
       {...props}
     >
-      {/* Only one shows (the others are display: none). Docked: 1x in the
-          bar, 3x in the corner. Otherwise 2x on a phone, where the corner
-          covers more of the page, and 3x from sm up. */}
-      {docked ? (
-        <>
-          <Sprite name="baumy" state={state} size={2} className="lg:hidden" />
-          <Sprite
-            name="baumy"
-            state={state}
-            size={6}
-            className="max-lg:hidden"
-          />
-        </>
+      {bar ? (
+        <Sprite name="baumy" state={state} size={2} />
       ) : (
         <>
+          {/* 2x on a phone, where the corner covers more of the page; 3x
+              from sm up. Only one shows (the other is display: none). */}
           <Sprite name="baumy" state={state} size={4} className="sm:hidden" />
           <Sprite
             name="baumy"

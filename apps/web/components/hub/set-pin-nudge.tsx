@@ -55,6 +55,13 @@ export function SetPinNudge({ memberId }: { memberId: string }) {
     }
     hiddenThisVisit.add(memberId);
     for (const l of listeners) l();
+    // The × goes with the strip: focus moves on to the page's heading, the
+    // next thing, rather than falling back to the top of the document.
+    const heading = document.querySelector<HTMLElement>("main h1");
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus();
+    }
   };
   return (
     <div
@@ -62,7 +69,11 @@ export function SetPinNudge({ memberId }: { memberId: string }) {
       className="pixel-frame mb-4 flex items-center gap-3 bg-bm-surface py-1 pr-1 pl-4 text-base text-bm-text"
     >
       <p className="min-w-0 flex-1">
-        Set your personal PIN for the kitchen iPad
+        {/* One line on a phone too. */}
+        <span className="sm:hidden">Set your kitchen PIN</span>
+        <span className="max-sm:hidden">
+          Set your personal PIN for the kitchen iPad
+        </span>
         <span aria-hidden="true" className="text-bm-muted">
           {" · "}
         </span>{" "}

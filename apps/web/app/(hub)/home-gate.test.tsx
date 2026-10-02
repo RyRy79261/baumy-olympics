@@ -25,7 +25,6 @@ vi.mock("@baumy/db/members", () => ({
   findKioskPinLockedAt: async () => null,
 }));
 vi.mock("@/components/hub/hub-home", () => ({
-  HUB_GUTTER: "lg:pr-36 2xl:pr-0",
   HubHome: () => <div data-testid="hub-home" />,
 }));
 vi.mock("@/components/hub/post-reminder-form", () => ({

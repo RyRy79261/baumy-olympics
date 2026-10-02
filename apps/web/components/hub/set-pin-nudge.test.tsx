@@ -37,20 +37,32 @@ describe("SetPinNudge", () => {
     expect(strip()!.textContent).toContain(
       "Set your personal PIN for the kitchen iPad",
     );
+    // A shorter line for a phone, shown only below sm.
+    const short = [...strip()!.querySelectorAll("span")].find(
+      (s) => s.textContent === "Set your kitchen PIN",
+    )!;
+    expect(short.className).toBe("sm:hidden");
     const link = strip()!.querySelector("a")!;
     expect(link.textContent).toBe("Set it");
     expect(link.getAttribute("href")).toBe("/settings#pin");
   });
 
   it("hides for that member on this device when its × is tapped", () => {
+    const main = document.createElement("main");
+    main.innerHTML = "<h1>Hub</h1>";
+    document.body.append(main);
     act(() => root!.render(<SetPinNudge memberId="m1" />));
     expect(strip()).not.toBeNull();
     const close = div.querySelector<HTMLButtonElement>(
       'button[aria-label="Hide the PIN reminder"]',
     )!;
+    close.focus();
     act(() => close.click());
     expect(strip()).toBeNull();
     expect(window.localStorage.getItem(pinNudgeKey("m1"))).toBe("1");
+    // Focus moves on to the heading, not to the top of the document.
+    expect(document.activeElement).toBe(main.querySelector("h1"));
+    main.remove();
   });
 
   it("stays hidden for a member who hid it, and shows for another", () => {
