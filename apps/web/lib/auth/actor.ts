@@ -1,5 +1,6 @@
 import "server-only";
 
+import { DEFAULT_KIOSK_IDLE_MINUTES } from "@baumy/types";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -91,6 +92,16 @@ export interface KioskActor {
   memberId?: string;
   /** The picked member's display name, with `memberId`. */
   displayName?: string;
+  /**
+   * The picked member's role, with `memberId`: a kiosk admin may add and
+   * edit bounties and change points with their PIN (issue #147).
+   */
+  role?: "admin" | "member";
+  /**
+   * Minutes untouched before the screen forgets who is acting (issue
+   * #147): the device's own choice, or the default.
+   */
+  idleMinutes?: number;
 }
 
 /**
@@ -206,7 +217,14 @@ export const getKioskActor = cache(async (): Promise<KioskActor | null> => {
     kind: "kiosk",
     deviceId: device.id,
     deviceName: device.name,
-    ...(member ? { memberId: member.id, displayName: member.displayName } : {}),
+    idleMinutes: device.idleMinutes ?? DEFAULT_KIOSK_IDLE_MINUTES,
+    ...(member
+      ? {
+          memberId: member.id,
+          displayName: member.displayName,
+          role: member.role,
+        }
+      : {}),
   };
 });
 

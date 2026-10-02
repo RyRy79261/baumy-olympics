@@ -193,33 +193,39 @@ describe("requireAccount", () => {
 });
 
 describe("requireAdmin", () => {
-  it("accepts an admin session only", () => {
-    expect(requireAdmin(ctx(admin))).toEqual({ ok: true });
-    expect(requireAdmin(ctx(member))).toMatchObject({
+  const admin_ = (a: Actor, action: GatedAction = notKiosk, pin?: string) =>
+    requireAdmin(ctx(a, pin), action, pinIs("2580"));
+
+  it("accepts an admin session only", async () => {
+    expect(await admin_(admin)).toEqual({ ok: true });
+    expect(await admin_(member)).toMatchObject({
       ok: false,
       message: "Only a household admin can do this.",
     });
-    // An admin at the kiosk or through MCP is still not an admin; nor is a
-    // brain actor whose linked member's role was not read as admin.
-    for (const a of [kiosk, brain, mcpWrite, account]) {
-      expect(requireAdmin(ctx(a))).toMatchObject({
-        ok: false,
-        code: "FORBIDDEN",
-      });
+    // An admin through MCP is still not an admin; nor is a brain actor
+    // whose linked member's role was not read as admin, nor the kiosk for
+    // an action not offered there.
+    for (const a of [
+      { ...kiosk, role: "admin" } as Actor,
+      brain,
+      mcpWrite,
+      account,
+    ]) {
+      expect(await admin_(a)).toMatchObject({ ok: false, code: "FORBIDDEN" });
     }
   });
 
-  it("accepts brain in a linked admin's own name, never on someone's behalf (issue #107)", () => {
+  it("accepts brain in a linked admin's own name, never on someone's behalf (issue #107)", async () => {
     const brainAdmin: Actor = { ...brain, role: "admin" } as Actor;
-    expect(requireAdmin(ctx(brainAdmin))).toEqual({ ok: true });
-    expect(requireAdmin(ctx({ ...brain, role: "member" } as Actor))).toEqual({
+    expect(await admin_(brainAdmin)).toEqual({ ok: true });
+    expect(await admin_({ ...brain, role: "member" } as Actor)).toEqual({
       ok: false,
       code: "FORBIDDEN",
       message: "Only a household admin can do this.",
     });
     // Acting for a housemate: even an admin asker may not.
     expect(
-      requireAdmin(ctx({ ...brainAdmin, initiatorMemberId: "m9" } as Actor)),
+      await admin_({ ...brainAdmin, initiatorMemberId: "m9" } as Actor),
     ).toEqual({
       ok: false,
       code: "FORBIDDEN",
@@ -227,8 +233,41 @@ describe("requireAdmin", () => {
         "Admin changes can't be made on someone's behalf. Ask an admin to do it themself.",
     });
     expect(
-      requireAdmin(ctx({ ...brainUnlinked, role: "admin" } as Actor)),
+      await admin_({ ...brainUnlinked, role: "admin" } as Actor),
     ).toMatchObject({ ok: false, code: "FORBIDDEN" });
+  });
+
+  it("on the kiosk, needs an admin picked AND their PIN, for a kiosk action only (issue #147)", async () => {
+    const kioskAdmin = { ...kiosk, role: "admin" } as Actor;
+    const kioskMember = { ...kiosk, role: "member" } as Actor;
+    // A non-admin with a right PIN is refused.
+    expect(await admin_(kioskMember, everywhere, "2580")).toEqual({
+      ok: false,
+      code: "FORBIDDEN",
+      message: "Only a household admin can do this.",
+    });
+    // Nobody picked.
+    expect(await admin_(kioskNobody, everywhere, "2580")).toMatchObject({
+      ok: false,
+      code: "FORBIDDEN",
+    });
+    // An admin without a PIN, or with a wrong one, is refused.
+    expect(await admin_(kioskAdmin, everywhere)).toMatchObject({
+      ok: false,
+      code: "ATTESTATION_REQUIRED",
+    });
+    expect(await admin_(kioskAdmin, everywhere, "1111")).toMatchObject({
+      ok: false,
+      code: "ATTESTATION_FAILED",
+    });
+    // An admin with their PIN passes.
+    expect(await admin_(kioskAdmin, everywhere, "2580")).toEqual({ ok: true });
+    // Not for an admin action that is not offered on the kiosk, PIN or not.
+    expect(await admin_(kioskAdmin, notKiosk, "2580")).toEqual({
+      ok: false,
+      code: "FORBIDDEN",
+      message: "This can only be done signed in on your own phone or computer.",
+    });
   });
 });
 

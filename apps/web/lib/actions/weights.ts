@@ -313,7 +313,8 @@ export const schedulePointsChange = defineAction({
   consent: "Change how many points a chore is worth",
   kind: "write",
   risk: "confirm",
-  surfaces: ["ui"],
+  // The kiosk too, for an admin with their PIN (issue #147).
+  surfaces: ["ui", "kiosk"],
   requires: "admin",
   input: z.strictObject({
     choreId: z.uuid("Pick a bounty."),

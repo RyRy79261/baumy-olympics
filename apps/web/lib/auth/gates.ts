@@ -104,6 +104,11 @@ export function requireAccount(ctx: RequestCtx): GateResult {
 
 const ADMINS_ONLY = fail("FORBIDDEN", "Only a household admin can do this.");
 
+const SESSION_ONLY = fail(
+  "FORBIDDEN",
+  "This can only be done signed in on your own phone or computer.",
+);
+
 /** Why brain may not make an admin change for someone else (issue #107). */
 export const ADMIN_ON_BEHALF =
   "Admin changes can't be made on someone's behalf. Ask an admin to do it themself.";
@@ -112,10 +117,28 @@ export const ADMIN_ON_BEHALF =
  * An admin, signed in with a real session; or brain speaking in a linked
  * admin's own name, never on someone's behalf (issue #107). Only the admin
  * actions offered on the brain surface get that far: the surface check runs
- * first. Never the kiosk or an MCP token.
+ * first. Never an MCP token.
+ *
+ * The kitchen screen (owner ruling 2026-10-02, issue #147, SPEC §12
+ * decision 28): an admin
+ * action offered on the `kiosk` surface (adding and editing bounties,
+ * changing points) passes for a kiosk whose picked member is an admin AND
+ * whose request carries that admin's PIN, checked as `requireAttested`
+ * checks it. Every other admin action stays session-only, from the Baumy
+ * sheet on the kiosk too.
  */
-export function requireAdmin(ctx: RequestCtx): GateResult {
+export async function requireAdmin(
+  ctx: RequestCtx,
+  action: GatedAction,
+  verifyPin: PinVerifier,
+): Promise<GateResult> {
   const { actor } = ctx;
+  if (actor.kind === "kiosk") {
+    if (!action.surfaces.includes("kiosk")) return SESSION_ONLY;
+    if (!actor.memberId) return NOT_A_MEMBER;
+    if (actor.role !== "admin") return ADMINS_ONLY;
+    return requireAttested(ctx, action, verifyPin);
+  }
   if (actor.kind === "service") {
     if (!actor.memberId) return NOT_A_MEMBER;
     if (actor.initiatorMemberId) return fail("FORBIDDEN", ADMIN_ON_BEHALF);
@@ -218,7 +241,7 @@ export async function runGate(
     case "account":
       return requireAccount(ctx);
     case "admin":
-      return requireAdmin(ctx);
+      return requireAdmin(ctx, action, verifyPin);
     case "attested":
       return requireAttested(ctx, action, verifyPin);
     case "service":
