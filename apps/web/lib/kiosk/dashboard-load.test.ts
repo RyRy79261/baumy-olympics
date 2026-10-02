@@ -61,6 +61,7 @@ beforeEach(async () => {
             end: "2026-10-03T10:00:00Z",
             private: false,
             member: ryan,
+            forMember: null,
           },
           {
             id: "secret",
@@ -72,6 +73,7 @@ beforeEach(async () => {
             end: "2026-10-02",
             private: true,
             member: null,
+            forMember: null,
           },
         ],
       };

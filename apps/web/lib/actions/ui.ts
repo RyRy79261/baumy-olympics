@@ -72,9 +72,15 @@ export async function uiRequestCtx(
  * Run `name` with a form's fields, as the signed-in user, from the UI. Never
  * throws for a failure the user can act on; Next's redirects still propagate.
  */
+/** Turns a form's input into the action's, for what a form cannot say (a null). */
+export type FormInputMap = (
+  input: Record<string, unknown>,
+) => Record<string, unknown>;
+
 export async function actionForm<N extends ActionName>(
   name: N,
   form: FormData,
+  mapInput: FormInputMap = (i) => i,
 ): Promise<ActionResult<ActionOutput<N>>> {
   try {
     const requestId = form.get("requestId");
@@ -82,7 +88,7 @@ export async function actionForm<N extends ActionName>(
       typeof requestId === "string" && requestId !== "" ? requestId : undefined,
     );
     if (!ctx) return fail("UNAUTHENTICATED", "Sign in to do this.");
-    return await runAction(name, formDataToInput(form), ctx);
+    return await runAction(name, mapInput(formDataToInput(form)), ctx);
   } catch (err) {
     unstable_rethrow(err);
     console.error(`[actionForm:${name}]`, err);

@@ -377,14 +377,14 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns:
-      "`events`: id, title, notes, place, all day or not, first and last day, Berlin start and end (HH:MM), who added it.",
+      "`events`: id, title, notes, place, all day or not, first and last day, Berlin start and end (HH:MM), who added it (`addedBy`) and who it is for (`forMember`, null for the whole house), as member ids.",
     errors: ["INVALID_INPUT", ...CALENDAR_ERRORS],
     reply:
       'One line per event: "Sat 3 Oct 19:00–20:00 Dinner with Anna". Nothing on: say so.',
   },
   create_event: {
     purpose: "Adds an event to the house Google Calendar.",
-    when: "When someone asks to add something to the calendar. Resolve the day and time to Berlin `YYYY-MM-DD` and `HH:MM` first; no time means `all_day`.",
+    when: 'When someone asks to add something to the calendar. Resolve the day and time to Berlin `YYYY-MM-DD` and `HH:MM` first; no time means `all_day`. Only when it is clearly for one housemate ("Anna\'s dentist"), send their member id (from get_standings) as `forMemberId`; otherwise leave it out, and it is for the whole house.',
     examples: [
       {
         say: "add dinner with Anna Saturday 19:00",
@@ -396,12 +396,12 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns: "`event`: the event as stored, with its `id`.",
-    errors: CALENDAR_ERRORS,
+    errors: ["INVALID_INPUT", ...CALENDAR_ERRORS],
     reply: '"Added <title> on <day> <time>."',
   },
   update_event: {
     purpose: "Changes a calendar event; every field is replaced.",
-    when: "When someone moves or renames an event. Read it with list_events and send ALL its fields, changed and unchanged.",
+    when: "When someone moves or renames an event. Read it with list_events and send ALL its fields, changed and unchanged. Leave `forMemberId` out to keep who it is for; send a member id to change it, or null to make it the whole house's.",
     examples: [
       {
         say: "move dinner with Anna to 20:00",
@@ -409,7 +409,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns: "`event`: the event as it is now.",
-    errors: ["NOT_FOUND", ...CALENDAR_ERRORS],
+    errors: ["INVALID_INPUT", "NOT_FOUND", ...CALENDAR_ERRORS],
     reply: '"Moved <title> to <day> <time>."',
   },
   delete_event: {

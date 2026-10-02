@@ -1,15 +1,32 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  calendarClient,
-  setCalendarClientForTests,
-  unconfiguredCalendar,
-} from "./calendar";
-import {
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The browser's cookies, for the fake's per-browser outage (issue #134).
+const jar = vi.hoisted(() => ({
+  value: undefined as string | undefined,
+  throws: false,
+}));
+vi.mock("next/headers", () => ({
+  cookies: async () => {
+    if (jar.throws) throw new Error("outside a request");
+    return {
+      get: (name: string) =>
+        name === "baumy_e2e_calendar" && jar.value !== undefined
+          ? { name, value: jar.value }
+          : undefined,
+    };
+  },
+}));
+
+const { calendarClient, setCalendarClientForTests, unconfiguredCalendar } =
+  await import("./calendar");
+const {
+  CALENDAR_E2E_COOKIE,
+  calendarAsAsked,
   clearMemoryCalendar,
   memoryCalendar,
   seedMemoryEvent,
-} from "./calendar-memory";
+} = await import("./calendar-memory");
 import type { EventSpec } from "./google-calendar";
 
 // Which calendar each environment gets, and the E2E fake, which must answer
@@ -24,9 +41,14 @@ const at19 = (date: string): EventSpec => ({
   endDate: date,
   startTime: "19:00",
   endTime: "20:00",
+  forMember: null,
 });
 
-beforeEach(() => clearMemoryCalendar());
+beforeEach(() => {
+  clearMemoryCalendar();
+  jar.value = undefined;
+  jar.throws = false;
+});
 afterEach(() => setCalendarClientForTests(null));
 
 describe("calendarClient", () => {
@@ -64,6 +86,29 @@ describe("calendarClient", () => {
     });
     setCalendarClientForTests(unconfiguredCalendar);
     expect(calendarClient(configured)).toBe(unconfiguredCalendar);
+  });
+
+  it("in E2E test mode is unconnected or down for a browser that asks, and only for it", async () => {
+    expect(CALENDAR_E2E_COOKIE).toBe("baumy_e2e_calendar");
+    const fake = calendarClient({ E2E_TEST_MODE: "1" });
+    const range = { timeMin: new Date(0), timeMax: new Date() };
+    jar.value = "unconfigured";
+    const nc = { ok: false, reason: "not_configured" };
+    expect(await fake.list(range)).toEqual(nc);
+    expect(await fake.create("x1234", at19("2027-01-15"), "m")).toEqual(nc);
+    expect(await memoryCalendar().get("x1234")).toMatchObject({ ok: false });
+    jar.value = "down";
+    const down = { ok: false, reason: "unavailable" };
+    expect(await fake.get("x1234")).toEqual(down);
+    expect(await fake.delete("x1234")).toEqual(down);
+    jar.value = "up";
+    expect(await fake.create("x1234", at19("2027-01-15"), "m")).toMatchObject({
+      ok: true,
+    });
+    jar.throws = true;
+    expect(await calendarAsAsked(memoryCalendar()).get("x1234")).toMatchObject({
+      ok: true,
+    });
   });
 });
 
@@ -165,6 +210,41 @@ describe("the fake calendar", () => {
       ok: false,
       reason: "not_found",
     });
+  });
+
+  it("keeps who an event is for, and a PATCH changes it without losing who made it (issue #134)", async () => {
+    const c = memoryCalendar();
+    const made = await c.create(
+      "for00001",
+      { ...at19("2027-01-15"), forMember: "m-2" },
+      "m-1",
+    );
+    expect(made).toMatchObject({
+      ok: true,
+      data: { member: "m-1", forMember: "m-2" },
+    });
+    // Not said: kept.
+    expect(
+      await c.update("for00001", {
+        ...at19("2027-01-15"),
+        forMember: undefined,
+      }),
+    ).toMatchObject({ ok: true, data: { member: "m-1", forMember: "m-2" } });
+    expect(
+      await c.update("for00001", { ...at19("2027-01-15"), forMember: null }),
+    ).toMatchObject({ ok: true, data: { member: "m-1", forMember: null } });
+    expect(
+      await c.update("for00001", { ...at19("2027-01-15"), forMember: "m-3" }),
+    ).toMatchObject({ ok: true, data: { member: "m-1", forMember: "m-3" } });
+    // The same create again (the client's 409) puts back what was asked.
+    await c.delete("for00001");
+    expect(
+      await c.create(
+        "for00001",
+        { ...at19("2027-01-15"), forMember: "m-2" },
+        "m-1",
+      ),
+    ).toMatchObject({ ok: true, data: { member: "m-1", forMember: "m-2" } });
   });
 
   it("keeps events seeded as if made in Google, private ones included", async () => {

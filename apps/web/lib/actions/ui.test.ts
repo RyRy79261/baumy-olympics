@@ -94,6 +94,17 @@ describe("actionForm", () => {
     expect(audits[0]).toMatchObject({ source: "ui", actorMemberId: me });
   });
 
+  it("maps the form's input first when asked, for what a form cannot say", async () => {
+    const me = await seedMember(db(), { displayName: "Old" });
+    getActor.mockResolvedValue(sessionActor(me));
+    const res = await actionForm(
+      "update_my_profile",
+      form({ displayName: "typed", requestId: "form-request-0003" }),
+      (input) => ({ ...input, displayName: "Mapped" }),
+    );
+    expect(res).toMatchObject({ ok: true, data: { displayName: "Mapped" } });
+  });
+
   it("returns field errors a form can show inline", async () => {
     const me = await seedMember(db());
     getActor.mockResolvedValue(sessionActor(me));

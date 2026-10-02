@@ -2,29 +2,17 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { formatDateKey } from "@baumy/core";
 import {
   Button,
-  CalendarChip,
   CalendarDayCell,
   CalendarEventButton,
   CalendarGrid,
-  CalendarMore,
   Dialog,
-  Field,
   FormMessage,
-  Input,
-  Select,
-  Textarea,
-  cx,
   tabClass,
 } from "@baumy/ui";
-import {
-  EVENT_DESCRIPTION_MAX,
-  EVENT_LOCATION_MAX,
-  EVENT_TITLE_MAX,
-} from "@baumy/types";
 import {
   useActionForm,
   useReporting,
@@ -36,8 +24,6 @@ import type {
 } from "@/lib/actions/calendar";
 import {
   CALENDAR_VIEWS,
-  KIOSK_MONTH_CHIPS,
-  kioskMonthChips,
   agendaDays,
   eventAccent,
   eventsOnDay,
@@ -46,18 +32,22 @@ import {
   type CalendarViewKind,
   type ViewRange,
 } from "@/lib/calendar/view";
+import type { DashboardMember } from "@/lib/kiosk/dashboard";
 import { toast } from "@/lib/ui/toast";
+import { EventDetails } from "./event-details";
+import { EventForm } from "./event-form";
 
-// The house calendar (SPEC §3.3), the same on the phone (/calendar) and on
-// the kiosk (/kiosk/calendar, acting as the member whose avatar was tapped).
-// Day, Week and Month views move by links, so the server reads each range
-// from Google once. Tapping an event opens its sheet to edit it; deleting
-// asks again in a dialog of its own before anything is sent.
+// The house calendar on a phone or a computer (/calendar, SPEC §3.3). Day,
+// Week and Month views move by links, so the server reads each range from
+// Google once. Tapping an event opens its sheet to edit it; deleting asks
+// again in a dialog of its own before anything is sent. The kitchen screen
+// has its own manager (components/kiosk/calendar-manager.tsx, issue #134),
+// since its dashboard already shows the month.
 //
 // Layout only: the look is the pixel kit's (packages/ui, issue #64), laid
 // out as the approved prototype's month grid (ADR 0005 §1): the title
 // between ◀ and ▶, Today at the end, and each event chip in the colour of
-// the member who added it (the house's amber otherwise).
+// the member who added it (the house's otherwise).
 
 export interface CalendarActions {
   create: FormAction<CalendarWriteData>;
@@ -68,8 +58,8 @@ export interface CalendarActions {
 type Sheet =
   { mode: "new"; date: string } | { mode: "edit"; event: CalendarEventView };
 
-function href(basePath: string, view: CalendarViewKind, date: string): Route {
-  return `${basePath}?view=${view}&date=${date}` as Route;
+function href(view: CalendarViewKind, date: string): Route {
+  return `/calendar?view=${view}&date=${date}` as Route;
 }
 
 /** What an event's button says about its time on one day. */
@@ -84,9 +74,7 @@ export function CalendarBoard({
   range,
   events,
   today,
-  basePath,
-  kiosk = false,
-  memberNames,
+  people,
   memberColors = {},
   actions,
 }: {
@@ -94,41 +82,15 @@ export function CalendarBoard({
   events: CalendarEventView[];
   /** Today in Berlin, "YYYY-MM-DD". */
   today: string;
-  basePath: "/calendar" | "/kiosk/calendar";
-  kiosk?: boolean;
-  /** Member id → display name, for "Added by". */
-  memberNames: Record<string, string>;
+  /** The house's active members: who an event is for, and "Added by". */
+  people: readonly DashboardMember[];
   /** Member id → colour (`#rrggbb`), for the event chips. */
   memberColors?: Record<string, string>;
   actions: CalendarActions;
 }) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [deleting, setDeleting] = useState<CalendarEventView | null>(null);
-  const size = kiosk ? "kiosk" : "default";
-  const kioskMonth = kiosk && range.view === "month";
-  // The kitchen screen's month fills the page; each cell shows the chips
-  // its measured height holds (null until measured: KIOSK_MONTH_CHIPS).
-  const monthRef = useRef<HTMLDivElement>(null);
-  const [cellHeight, setCellHeight] = useState<number | null>(null);
-  const weeks = range.days.length / 7;
-  useEffect(() => {
-    const el = monthRef.current;
-    if (!kioskMonth || !el) return;
-    const measure = () => {
-      const cell = el.querySelector("li");
-      if (cell) setCellHeight(cell.getBoundingClientRect().height);
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [kioskMonth, weeks]);
-  const chipsFor = (n: number) =>
-    cellHeight === null
-      ? Math.min(n, KIOSK_MONTH_CHIPS)
-      : kioskMonthChips(cellHeight, n);
-  const phoneAgenda = !kiosk && range.view === "month";
+  const phoneAgenda = range.view === "month";
   const newDate =
     range.view === "day"
       ? range.date
@@ -137,140 +99,86 @@ export function CalendarBoard({
         : range.from;
 
   return (
-    // The kitchen screen's month fills what is left of the page, so it
-    // never scrolls under the footer (820×1180).
-    <div className={cx("flex flex-col gap-4", kioskMonth && "min-h-0 flex-1")}>
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Calendar view" className="flex gap-2">
           {CALENDAR_VIEWS.map((v) => (
             <Link
               key={v}
-              href={href(basePath, v, range.date)}
-              className={tabClass(v === range.view, "violet", kiosk)}
+              href={href(v, range.date)}
+              className={tabClass(v === range.view, "violet")}
               aria-current={v === range.view ? "page" : undefined}
             >
               {viewLabel(v)}
             </Link>
           ))}
         </nav>
-        <Button
-          size={size}
-          onClick={() => setSheet({ mode: "new", date: newDate })}
-        >
+        <Button onClick={() => setSheet({ mode: "new", date: newDate })}>
           New event
         </Button>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
         <Link
-          href={href(basePath, range.view, range.prev)}
+          href={href(range.view, range.prev)}
           aria-label="Previous"
-          className={tabClass(false, "violet", kiosk) + " px-4 text-bm-text"}
+          className={tabClass(false, "violet") + " px-4 text-bm-text"}
         >
           <span aria-hidden="true">◀</span>
         </Link>
         <h2
-          className={
-            kiosk
-              ? "min-w-0 flex-1 text-center font-display text-xl leading-snug text-bm-text"
-              : "min-w-0 flex-1 text-center font-display text-sm leading-snug text-bm-text sm:text-lg"
-          }
+          className="min-w-0 flex-1 text-center font-display text-sm leading-snug text-bm-text sm:text-lg"
           data-testid="calendar-title"
         >
           {range.title}
         </h2>
         <Link
-          href={href(basePath, range.view, range.next)}
+          href={href(range.view, range.next)}
           aria-label="Next"
-          className={tabClass(false, "violet", kiosk) + " px-4 text-bm-text"}
+          className={tabClass(false, "violet") + " px-4 text-bm-text"}
         >
           <span aria-hidden="true">▶</span>
         </Link>
         <Link
-          href={href(basePath, range.view, today)}
-          className={tabClass(false, "violet", kiosk)}
+          href={href(range.view, today)}
+          className={tabClass(false, "violet")}
         >
           Today
         </Link>
       </div>
 
       {/* The month on a phone is an agenda (below); the grid is for sm up. */}
-      <div
-        className={
-          phoneAgenda
-            ? "max-sm:hidden"
-            : kioskMonth
-              ? "flex min-h-0 flex-1 flex-col"
-              : undefined
-        }
-        ref={monthRef}
-      >
+      <div className={phoneAgenda ? "max-sm:hidden" : undefined}>
         <CalendarGrid
           columns={range.view === "day" ? 1 : 7}
           weekdays={range.view === "month"}
           label={range.title}
-          fill={kioskMonth ? { rows: range.days.length / 7 } : undefined}
         >
-          {range.days.map((day) => {
-            const onDay = eventsOnDay(events, day);
-            return (
-              <CalendarDayCell
-                key={day}
-                data-testid={`day-${day}`}
-                label={formatDateKey(day)}
-                shortLabel={
-                  range.view === "month"
-                    ? String(Number(day.slice(8)))
-                    : undefined
-                }
-                today={day === today}
-                muted={range.month !== null && !day.startsWith(range.month)}
-                tall={range.view !== "month"}
-                fill={kioskMonth}
-              >
-                {kioskMonth ? (
-                  // The kitchen screen's month (the prototype's): one-line
-                  // chips, "+N more", and the whole day a 56px target that
-                  // opens it, where each event is a button of its own.
-                  <>
-                    <Link
-                      href={href(basePath, "day", day)}
-                      aria-label={`${formatDateKey(day)}: ${
-                        onDay.length === 1
-                          ? "1 event"
-                          : `${onDay.length} events`
-                      }`}
-                      className="absolute inset-0"
-                    />
-                    {onDay.slice(0, chipsFor(onDay.length)).map((e) => (
-                      <CalendarChip
-                        key={e.id}
-                        title={e.title}
-                        accent={eventAccent(e, memberColors)}
-                        kiosk
-                      />
-                    ))}
-                    {onDay.length > chipsFor(onDay.length) ? (
-                      <CalendarMore
-                        count={onDay.length - chipsFor(onDay.length)}
-                      />
-                    ) : null}
-                  </>
-                ) : (
-                  onDay.map((e) => (
-                    <CalendarEventButton
-                      key={e.id}
-                      title={e.title}
-                      time={timeOn(e, day)}
-                      accent={eventAccent(e, memberColors)}
-                      kiosk={kiosk}
-                      aria-label={`${e.title}, ${e.when}`}
-                      onClick={() => setSheet({ mode: "edit", event: e })}
-                    />
-                  ))
-                )}
-              </CalendarDayCell>
-            );
-          })}
+          {range.days.map((day) => (
+            <CalendarDayCell
+              key={day}
+              data-testid={`day-${day}`}
+              label={formatDateKey(day)}
+              shortLabel={
+                range.view === "month"
+                  ? String(Number(day.slice(8)))
+                  : undefined
+              }
+              today={day === today}
+              muted={range.month !== null && !day.startsWith(range.month)}
+              tall={range.view !== "month"}
+            >
+              {eventsOnDay(events, day).map((e) => (
+                <CalendarEventButton
+                  key={e.id}
+                  title={e.title}
+                  time={timeOn(e, day)}
+                  accent={eventAccent(e, memberColors)}
+                  aria-label={`${e.title}, ${e.when}`}
+                  onClick={() => setSheet({ mode: "edit", event: e })}
+                />
+              ))}
+            </CalendarDayCell>
+          ))}
         </CalendarGrid>
         {events.length === 0 ? (
           <p className="mt-4 text-sm text-bm-muted">
@@ -333,12 +241,15 @@ export function CalendarBoard({
         {sheet ? (
           <div className="flex flex-col gap-4">
             {sheet.mode === "edit" ? (
-              <EventDetails event={sheet.event} memberNames={memberNames} />
+              <EventDetails event={sheet.event} people={people} />
             ) : null}
             <EventForm
               key={sheet.mode === "edit" ? sheet.event.id : sheet.date}
-              sheet={sheet}
-              kiosk={kiosk}
+              event={sheet.mode === "edit" ? sheet.event : null}
+              date={sheet.mode === "new" ? sheet.date : today}
+              kiosk={false}
+              pinLabel="Your PIN"
+              people={people}
               action={sheet.mode === "edit" ? actions.update : actions.create}
               onDone={(data) => {
                 setSheet(null);
@@ -353,7 +264,6 @@ export function CalendarBoard({
             {sheet.mode === "edit" ? (
               <Button
                 variant="danger"
-                size={size}
                 onClick={() => {
                   setDeleting(sheet.event);
                   setSheet(null);
@@ -375,7 +285,6 @@ export function CalendarBoard({
           <DeleteForm
             key={deleting.id}
             event={deleting}
-            kiosk={kiosk}
             action={actions.remove}
             onDone={(data) => {
               setDeleting(null);
@@ -389,195 +298,13 @@ export function CalendarBoard({
   );
 }
 
-function EventDetails({
-  event,
-  memberNames,
-}: {
-  event: CalendarEventView;
-  memberNames: Record<string, string>;
-}) {
-  return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-      <dt className="text-bm-muted">When</dt>
-      <dd data-testid="event-when">{event.when}</dd>
-      {event.location ? (
-        <>
-          <dt className="text-bm-muted">Where</dt>
-          <dd>{event.location}</dd>
-        </>
-      ) : null}
-      {event.addedBy ? (
-        <>
-          <dt className="text-bm-muted">Added by</dt>
-          <dd data-testid="event-added-by">
-            {memberNames[event.addedBy] ?? "a former member"}
-          </dd>
-        </>
-      ) : null}
-    </dl>
-  );
-}
-
-function EventForm({
-  sheet,
-  kiosk,
-  action,
-  onDone,
-  onCancel,
-}: {
-  sheet: Sheet;
-  kiosk: boolean;
-  action: FormAction<CalendarWriteData>;
-  onDone: (data: CalendarWriteData) => void;
-  onCancel: () => void;
-}) {
-  const e = sheet.mode === "edit" ? sheet.event : null;
-  const { state, formAction, pending, requestId, errors } = useActionForm(
-    useReporting(action, onDone),
-  );
-  const [kind, setKind] = useState<"timed" | "all_day">(
-    e?.allDay ? "all_day" : "timed",
-  );
-  const size = kiosk ? "kiosk" : "default";
-  const id = e ? `event-${e.id}` : "event-new";
-  const date = e?.startDate ?? (sheet.mode === "new" ? sheet.date : "");
-  const endDate = e && e.endDate !== e.startDate ? e.endDate : undefined;
-  const control = kiosk ? "min-h-14 text-lg" : undefined;
-  return (
-    <form action={formAction} className="flex flex-col gap-3">
-      <input type="hidden" name="requestId" value={requestId} />
-      {e ? <input type="hidden" name="eventId" value={e.id} /> : null}
-      <Field id={`${id}-title`} label="Title" errors={errors.title}>
-        {(c) => (
-          <Input
-            {...c}
-            name="title"
-            kiosk={kiosk}
-            maxLength={EVENT_TITLE_MAX}
-            defaultValue={e?.title}
-            required
-          />
-        )}
-      </Field>
-      <Field id={`${id}-kind`} label="When" errors={errors.kind}>
-        {(c) => (
-          <Select
-            {...c}
-            name="kind"
-            className={control}
-            value={kind}
-            onChange={(ev) => setKind(ev.target.value as "timed" | "all_day")}
-          >
-            <option value="timed">At a time</option>
-            <option value="all_day">All day</option>
-          </Select>
-        )}
-      </Field>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field id={`${id}-date`} label="Date" errors={errors.date}>
-          {(c) => (
-            <Input
-              {...c}
-              name="date"
-              type="date"
-              kiosk={kiosk}
-              defaultValue={date}
-              required
-            />
-          )}
-        </Field>
-        <Field
-          id={`${id}-end-date`}
-          label="Last day"
-          hint="Only if it goes on past the first day."
-          errors={errors.endDate}
-        >
-          {(c) => (
-            <Input
-              {...c}
-              name="endDate"
-              type="date"
-              kiosk={kiosk}
-              defaultValue={endDate}
-            />
-          )}
-        </Field>
-      </div>
-      {kind === "timed" ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field id={`${id}-start`} label="Starts" errors={errors.startTime}>
-            {(c) => (
-              <Input
-                {...c}
-                name="startTime"
-                type="time"
-                kiosk={kiosk}
-                defaultValue={e?.startTime ?? "19:00"}
-                required
-              />
-            )}
-          </Field>
-          <Field id={`${id}-end`} label="Ends" errors={errors.endTime}>
-            {(c) => (
-              <Input
-                {...c}
-                name="endTime"
-                type="time"
-                kiosk={kiosk}
-                defaultValue={e?.endTime ?? "20:00"}
-                required
-              />
-            )}
-          </Field>
-        </div>
-      ) : null}
-      <Field id={`${id}-location`} label="Where" errors={errors.location}>
-        {(c) => (
-          <Input
-            {...c}
-            name="location"
-            kiosk={kiosk}
-            maxLength={EVENT_LOCATION_MAX}
-            defaultValue={e?.location ?? undefined}
-          />
-        )}
-      </Field>
-      <Field id={`${id}-notes`} label="Notes" errors={errors.description}>
-        {(c) => (
-          <Textarea
-            {...c}
-            name="description"
-            kiosk={kiosk}
-            maxLength={EVENT_DESCRIPTION_MAX}
-            defaultValue={e?.description ?? undefined}
-          />
-        )}
-      </Field>
-      <p className="text-sm text-bm-muted">Times are Berlin time.</p>
-      {state && !state.ok && state.code !== "INVALID_INPUT" ? (
-        <FormMessage tone="error">{state.message}</FormMessage>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size={size} disabled={pending}>
-          {pending ? "Saving..." : e ? "Save" : "Add event"}
-        </Button>
-        <Button variant="secondary" size={size} onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 function DeleteForm({
   event,
-  kiosk,
   action,
   onDone,
   onCancel,
 }: {
   event: CalendarEventView;
-  kiosk: boolean;
   action: FormAction<DeleteEventData>;
   onDone: (data: DeleteEventData) => void;
   onCancel: () => void;
@@ -585,7 +312,6 @@ function DeleteForm({
   const { state, formAction, pending, requestId } = useActionForm(
     useReporting(action, onDone),
   );
-  const size = kiosk ? "kiosk" : "default";
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="requestId" value={requestId} />
@@ -598,10 +324,10 @@ function DeleteForm({
         <FormMessage tone="error">{state.message}</FormMessage>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="danger" size={size} disabled={pending}>
+        <Button type="submit" variant="danger" disabled={pending}>
           {pending ? "Deleting..." : "Delete event"}
         </Button>
-        <Button variant="secondary" size={size} onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel}>
           Keep it
         </Button>
       </div>
