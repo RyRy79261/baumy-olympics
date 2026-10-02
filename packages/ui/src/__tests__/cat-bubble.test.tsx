@@ -6,6 +6,7 @@ import {
   CatLink,
   CatSays,
   CatText,
+  HoldToTalk,
   LevelBars,
 } from "../cat-bubble";
 
@@ -69,5 +70,35 @@ describe("CatButton and CatLink", () => {
     const link = html(<CatLink>Type instead</CatLink>);
     expect(link).toContain("min-h-14");
     expect(link).toContain("underline");
+  });
+});
+
+describe("HoldToTalk", () => {
+  it("is a big hold target with no callout, selection or scrolling", () => {
+    const idle = html(<HoldToTalk state="idle" level={0} />);
+    expect(idle).toContain("Hold to talk");
+    expect(idle).toContain('aria-pressed="false"');
+    expect(idle).toContain('data-state="idle"');
+    expect(idle).toContain("h-24");
+    expect(idle).toContain("touch-none");
+    expect(idle).toContain("select-none");
+    expect(idle).toContain("[-webkit-touch-callout:none]");
+    expect(idle).toContain('type="button"');
+    expect(idle).not.toContain("data-level");
+  });
+
+  it("says it is opening the microphone", () => {
+    const opening = html(<HoldToTalk state="opening" level={0} />);
+    expect(opening).toContain("Opening the microphone…");
+    expect(opening).toContain('aria-busy="true"');
+  });
+
+  it("turns red, pulses and shows the level while held", () => {
+    const held = html(<HoldToTalk state="recording" level={0.5} />);
+    expect(held).toContain("Release to send");
+    expect(held).toContain('aria-pressed="true"');
+    expect(held).toContain("bg-[#b8243a]");
+    expect(held).toContain("motion-safe:animate-pulse");
+    expect(held).toContain('data-level="50"');
   });
 });
