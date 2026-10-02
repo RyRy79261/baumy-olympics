@@ -1,17 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KioskIndicator } from "@baumy/ui";
 import {
   keepScreenOn,
-  wakeLockNotice,
   type WakeLockEnv,
   type WakeLockStatus,
 } from "@/lib/kiosk/wake-lock";
 
 /**
- * Holds the screen wake lock while the kiosk is open (lib/kiosk/wake-lock.ts)
- * and shows a tag in the corner whenever it is not held.
+ * Holds the screen wake lock while the kiosk is open (lib/kiosk/wake-lock.ts).
+ * It shows nothing: the status sits on a hidden marker, for e2e only.
  */
 export function KeepScreenOn() {
   const [status, setStatus] = useState<WakeLockStatus>("pending");
@@ -27,9 +25,5 @@ export function KeepScreenOn() {
       ),
     [],
   );
-  const notice = wakeLockNotice(status);
-  if (!notice) return null;
-  return (
-    <KioskIndicator data-testid="wake-lock-notice">{notice}</KioskIndicator>
-  );
+  return <span hidden data-testid="wake-lock" data-status={status} />;
 }

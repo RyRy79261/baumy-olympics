@@ -43,14 +43,9 @@ Guided Access hold it (below).
 
 The kiosk asks for the Screen Wake Lock every time it opens, every time it
 comes back into view and on any touch while it does not hold it. iPadOS
-supports it from 16.4 in Safari and in home-screen apps. While the lock is
-not held, a tag in the bottom-left corner, just above the footer nav,
-says:
-
-- **Screen may sleep**: the browser refused or dropped the lock (Low Power
-  Mode, the page was hidden). Touch the screen and it asks again.
-- **Screen cannot stay on**: this browser has no wake lock at all (iPadOS
-  before 16.4). Update iPadOS, or rely on Auto-Lock below.
+supports it from 16.4 in Safari, and in home-screen apps from 18.4. The
+screen shows nothing about it: the "Screen may sleep" corner tag was taken
+out on 2026-10-02 at the household's ask.
 
 The wake lock is best effort, so set the fallback as well:
 
@@ -98,9 +93,8 @@ Guided Access keeps the iPad in Baumy: no swiping home, no notifications.
 
 - [ ] Launched from the home screen, it is full screen in portrait.
 - [ ] **2-hour soak test:** leave it on the kitchen home, untouched, for two
-      hours in the day. The screen stays on, the corner tag never appears,
-      and the clock is still ticking. Note the iPadOS version and the result
-      in the PR or issue #29.
+      hours in the day. The screen stays on and the clock is still ticking.
+      Note the iPadOS version and the result in the PR or issue #29.
 - [ ] Tap an avatar, open Chores, walk away: after 50 seconds the countdown
       shows, after 60 the screen is home, and Chores says "Tap your
       avatar".
