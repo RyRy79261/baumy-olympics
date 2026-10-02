@@ -15,6 +15,7 @@ import {
   githubIssues,
   type IssueFailureReason,
 } from "@/lib/integrations/github";
+import { redactSecrets } from "@/lib/redact";
 import { defineAction } from "./define";
 import { fail, type ActionFailure } from "./result";
 
@@ -71,12 +72,17 @@ export function issueFailure(reason: IssueFailureReason): ActionFailure {
   }
 }
 
-/** Every piece of text in the diagnostics, for the redaction screen. */
-function diagnosticsKinds(d: ReportDiagnostics): RedactionKind[] {
+/** Every piece of text in the diagnostics, for the screen. */
+function diagnosticsText(d: ReportDiagnostics | undefined): string[] {
+  if (!d) return [];
   return [
     ...d.environment.flatMap((f) => [f.label, f.value]),
     ...d.errors.flatMap((e) => [e.source, e.message, e.route ?? ""]),
-  ].flatMap(
+  ];
+}
+
+function kindsIn(texts: readonly string[]): RedactionKind[] {
+  return texts.flatMap(
     (text) => sanitizeReportText(text, REPORT_DESCRIPTION_MAX).redacted,
   );
 }
@@ -117,11 +123,14 @@ export const reportBug = defineAction({
       });
     }
 
-    const screen = screenReport(i.description, cleaned.redacted);
-    const withhold =
-      i.diagnostics !== undefined &&
-      (screen.withholdDiagnostics ||
-        screenReport("", diagnosticsKinds(i.diagnostics)).withholdDiagnostics);
+    // Everything the member's device sent is screened, not only the
+    // description: the route and the diagnostics land on the issue too.
+    const extra = [i.route ?? "", ...diagnosticsText(i.diagnostics)];
+    const screen = screenReport([i.description, ...extra].join("\n"), [
+      ...cleaned.redacted,
+      ...kindsIn(extra),
+    ]);
+    const withhold = i.diagnostics !== undefined && screen.withholdDiagnostics;
 
     const structured =
       i.useAi && !screen.needsHuman
@@ -142,7 +151,13 @@ export const reportBug = defineAction({
       diagnosticsWithheld: withhold,
     });
 
-    const filed = await tracker.create(issue);
+    // Last, every value this server holds as a secret, by value: redaction
+    // matches shapes, and a secret need not look like one.
+    const filed = await tracker.create({
+      ...issue,
+      title: redactSecrets(issue.title),
+      body: redactSecrets(issue.body),
+    });
     if (!filed.ok) {
       console.error(
         `[report_bug] GitHub answered ${filed.status ?? filed.reason}`,

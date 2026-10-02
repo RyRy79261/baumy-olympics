@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   REPORT_DESCRIPTION_MAX,
   type ReportBugInput,
@@ -71,6 +71,11 @@ export function ReportBugDialog({
   const [filed, setFiled] = useState<ReportBugData | null>(null);
   // One id per report, kept across retries of it: a retry is a replay.
   const [requestId, setRequestId] = useState(newRequestId);
+  // What the current request id was last sent with. The same input again
+  // (a retry after the transport failed) reuses the id, so the server
+  // replays instead of filing twice; different input gets a new id, which
+  // would otherwise be IDEMPOTENCY_CONFLICT.
+  const lastSent = useRef<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   // A fresh form on each closed→open.
@@ -83,24 +88,36 @@ export function ReportBugDialog({
     setError(null);
     setFiled(null);
     setRequestId(newRequestId());
+    lastSent.current = null;
   }, [open, defaultKind, defaultDescription]);
 
   function submit() {
     setError(null);
+    const input = {
+      kind,
+      description,
+      useAi: aiAvailable && useAi,
+      ...(attached ? { diagnostics: attached } : {}),
+      route: window.location.pathname,
+    };
+    const key = JSON.stringify(input);
+    let id = requestId;
+    if (lastSent.current !== null && lastSent.current !== key) {
+      id = newRequestId();
+      setRequestId(id);
+    }
+    lastSent.current = key;
     startTransition(async () => {
       try {
-        const result = await send(
-          {
-            kind,
-            description,
-            useAi: aiAvailable && useAi,
-            ...(attached ? { diagnostics: attached } : {}),
-            route: window.location.pathname,
-          },
-          requestId,
-        );
+        const result = await send(input, id);
         if (result.ok) setFiled(result.data);
-        else setError(result.message);
+        else {
+          setError(result.message);
+          // The server answered and recorded that answer under this id:
+          // the next try is a new request.
+          lastSent.current = null;
+          setRequestId(newRequestId());
+        }
       } catch {
         // The action returns a result, but its transport can still reject.
         setError("Couldn't send your report just now. Please try again.");

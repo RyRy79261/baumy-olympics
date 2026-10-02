@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Button, Card, PageHeading, buttonClass } from "@baumy/ui";
-import { openReportProblem } from "./report-problem";
+import {
+  openReportProblem,
+  reporterMounted,
+  subscribeReporter,
+} from "./report-problem";
 
 // What an error boundary shows (issue #133), after camp-404
 // `apps/web/components/error-recovery.tsx`: what happened, the trace to
 // quote, and three ways on: Report, Try again, and back home. It renders
 // inside the hub layout or the kiosk shell, so the reporter (FeedbackGate)
-// is still mounted and Report opens it with the trace filled in.
+// is still mounted and Report opens it with the trace filled in. A
+// signed-out visitor on the hub has no reporter, so no Report button.
 
 export function ErrorRecovery({
   error,
@@ -26,6 +31,11 @@ export function ErrorRecovery({
     console.error(error);
   }, [error]);
 
+  const canReport = useSyncExternalStore(
+    subscribeReporter,
+    reporterMounted,
+    () => false,
+  );
   const size = kiosk ? "kiosk" : "default";
   return (
     <div data-testid="error-recovery">
@@ -40,19 +50,21 @@ export function ErrorRecovery({
           </p>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          <Button
-            size={size}
-            variant="secondary"
-            onClick={() =>
-              openReportProblem({
-                description: error.digest
-                  ? `The page showed an error. Trace: ${error.digest}\n\nWhat I was doing: `
-                  : "The page showed an error.\n\nWhat I was doing: ",
-              })
-            }
-          >
-            Report
-          </Button>
+          {canReport ? (
+            <Button
+              size={size}
+              variant="secondary"
+              onClick={() =>
+                openReportProblem({
+                  description: error.digest
+                    ? `The page showed an error. Trace: ${error.digest}\n\nWhat I was doing: `
+                    : "The page showed an error.\n\nWhat I was doing: ",
+                })
+              }
+            >
+              Report
+            </Button>
+          ) : null}
           <Button size={size} onClick={reset}>
             Try again
           </Button>
