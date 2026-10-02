@@ -30,7 +30,6 @@ On your phone or laptop, the menu has:
 - **Shopping**: the house shopping list, the same one the Telegram group uses.
 - **Scores**: who is winning this season, and the streaks.
 - **Pot**: the money the winner takes at the end of the year.
-- **Needs your OK**: housemates' chores waiting for you to confirm, with a count when there are some.
 - **Settings**: your name, colour and character, your personal PIN for the kitchen iPad, Telegram, and how you sign in.
 
 The kitchen iPad shows the same household on one big screen. See [the kitchen iPad](/kiosk).
@@ -43,7 +42,7 @@ Baumy is the pixel cat in the corner. Tap it to ask something in your own words,
 - **Anything that changes something** comes back as a card that says in plain words what it will do, for example "Add milk, eggs to the shopping list". Nothing happens until you tap **Confirm all**. **Cancel** throws them all away, and the small × drops one card.
 - A card that is marked red deletes something. A card Baumy is not allowed to do is greyed out, with the reason.
 
-Baumy can only do what you could do yourself, as you. It never runs a change without a member confirming it. Baumy's answers come from an AI and can be wrong, so read the cards before you confirm them.
+Baumy can only do what you could do yourself, as you. It never runs a change until a member taps Confirm all. Baumy's answers come from an AI and can be wrong, so read the cards first.
 
 ## Admins
 

@@ -29,20 +29,17 @@ A bounty is **urgent** when it is overdue on its own rhythm, or falls due before
 Open **Bounties**, pick the chore and tap **Log it**. You can also tell Baumy ("I did the dishes"), the kitchen iPad, or Baumy in Telegram.
 
 - You can log a chore up to {{MAX_BACKDATE_H}} hours after you did it, but never in the future, and never before the chore's last completion.
-- You can log a chore for a housemate ("Jo did the dishes"). That counts as you vouching for them, so it is confirmed straight away.
+- You can log a chore for a housemate ("Jo did the dishes"). It is logged in their name, by you.
 - Some bounties need a **proof photo**; those can only be logged with one.
 - If you logged something by mistake, **Undo** it within {{UNDO_WINDOW_MIN}} minutes.
 
-## Confirming and disputing
+## Disputing
 
-When you log your own chore, your housemates have {{CHALLENGE_WINDOW_H}} hours to look at it.
+When a chore is logged, its points count straight away, shown dimmed as provisional.
 
-- The points count straight away, shown dimmed as provisional. After {{CHALLENGE_WINDOW_H}} hours with no dispute they are final.
-- Anyone else can **Confirm** it sooner, under **Needs your OK**.
-- Anyone else can **Dispute** it, with a reason. A disputed claim scores nothing while it is disputed. If the person who did it attached a photo in time, it waits for the two of you (or an admin) to settle it; otherwise it is dropped when the {{CHALLENGE_WINDOW_H}} hours end.
-- The person who disputed can **Withdraw** the dispute, and the person who did the chore can **Concede** it.
-
-Some bounties are set to need a housemate's OK first. Those score nothing until someone confirms them, and are dropped if nobody does within {{PARTNER_CONFIRM_EXPIRY_H}} hours.
+- Another housemate can **dispute** a logged chore within the dispute window, {{CHALLENGE_WINDOW_H}} hours after it was logged, with a reason. If nobody does, the points are final when the window ends.
+- A disputed chore scores nothing while it is disputed. If the person who did it attached a photo in time, it waits for them and the person who disputed (or an admin) to settle it; otherwise it is dropped when the window ends.
+- The person who disputed can **withdraw** the dispute, and the person who did the chore can **concede** it.
 
 ## How points work
 

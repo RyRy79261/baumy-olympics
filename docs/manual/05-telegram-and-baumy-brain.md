@@ -33,8 +33,8 @@ If the button does not work, send `/link` and the code the card shows to {{TELEG
 
 Anything you could ask Baumy in the app: "who's winning?", "what's on this weekend?", "I cleaned the bathroom", "add a note that the plumber comes Tuesday". It can also post reminders, and veto a points change that is waiting.
 
-- It asks you to tap a **confirm button** before most changes: logging, confirming or disputing a chore, changing or deleting something. Small things, like adding a note or a reminder, happen straight away.
-- It can do something **for a housemate** too ("Jo took the trash out"), but only after you tap the confirm button, and the app records both of you. Confirming, disputing or undoing a chore is never done for someone else: that is their own word.
+- It asks you to tap a **confirm button** before most changes, such as logging or disputing a chore, or changing or deleting something. Small things, like adding a note or a reminder, happen straight away.
+- It can do something **for a housemate** too ("Jo took the trash out"), but only after you tap the confirm button, and the app records both of you. Disputing or undoing a chore is never done for someone else: that is their own word.
 - An admin can add bounties, change them and record pot money from Telegram, only in their own name. Other admin things are only in the app.
 
 ## Signing in with Baumy

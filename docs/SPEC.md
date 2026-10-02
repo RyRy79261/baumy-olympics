@@ -150,7 +150,7 @@ Added 2026-10-02 (issue #133). Owner: "copy camp-404's feedback system" (camp-40
 
 ### 3.8 Help corpus
 
-Added 2026-10-02 (issue #142). Baumy should be able to explain how the app works, from words that stay true to the code. Members only (§12 decision 24).
+Added 2026-10-02 (issue #142). Baumy should be able to explain how the app works, from words that stay true to the code. Members only (§12 decision 25).
 
 - **The manual** is `docs/manual/NN-<slug>.md`: hand-written pages in plain English for housemates, each opening with frontmatter (`slug`, `title`, `audience` `member` or `admin`, `url` the in-app page it is about, `covers` the code it explains). Numbers are `{{NAME}}` placeholders filled from the constants the code uses (`apps/web/lib/help/constants.ts`, the way `/privacy` reads its own); an unknown placeholder, or a constant no page uses, fails the build. Security internals (rate limits, PIN lockout) stay out.
 - **The corpus** (`apps/web/lib/help/corpus.ts`) is the manual, then "What Baumy can do" (generated from `toolSpecs("ai")`: each action's title and description, whether Baumy answers or proposes a card, admin-only, own-word-only and whether the kitchen screen asks for a PIN, then the app-only actions by title), then every section of `/privacy` and `/terms`, read from the pages' own element trees so their constants flow through. Each `LegalSection` has an anchor id from its title (`/privacy#how-long-we-keep-it`). Nothing comes from the database.
@@ -913,7 +913,7 @@ Decided 2026-10-02 (issue #135, ADR 0007):
 
 Decided 2026-10-02 (issue #142):
 
-24. **Help is for members only.** Asked whether Baumy should also answer strangers' questions about the app on a public endpoint (option A of the help-bot research), the owner chose option B: members only, with no public help endpoint. The help corpus (§3.8) is read by members' Baumy (the in-app command, brain, MCP), never by an anonymous route. (Numbered 24 because two decisions of 2026-10-02 both took 23.)
+25. **Help is for members only.** Asked whether Baumy should also answer strangers' questions about the app on a public endpoint (option A of the help-bot research), the owner chose option B: members only, with no public help endpoint. The help corpus (§3.8) is read by members' Baumy (the in-app command, brain, MCP), never by an anonymous route. (Numbered 25: two decisions of 2026-10-02 both took 23, and the auth fix of PR #148 takes 24.)
 
 Still open:
 
