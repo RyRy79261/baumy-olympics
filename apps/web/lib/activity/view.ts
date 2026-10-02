@@ -70,6 +70,18 @@ export function choreStatusLine(
   }
 }
 
+/** "10 → 14 pts", plus the cooldown only when it changes. */
+function pointsChange(e: {
+  fromPoints: number;
+  toPoints: number;
+  fromCooldownMinutes: number;
+  toCooldownMinutes: number;
+}): string {
+  return e.fromCooldownMinutes === e.toCooldownMinutes
+    ? `${e.fromPoints} → ${e.toPoints} pts`
+    : changeLabel(e);
+}
+
 const OUTCOMES: Record<string, string> = {
   withdrawn: "Withdrawn.",
   conceded: "Conceded.",
@@ -85,7 +97,7 @@ export function entryLine(e: Exclude<ActivityView, ActivityChoreView>): string {
     case "dispute": {
       const outcome = e.resolution
         ? (OUTCOMES[e.resolution] ?? e.resolution)
-        : "Open.";
+        : "Still open.";
       return `${e.raisedBy.displayName} disputed ${e.doneBy.displayName}'s ${e.choreName}: "${e.reason}". ${outcome}`;
     }
     case "bounty": {
@@ -93,7 +105,7 @@ export function entryLine(e: Exclude<ActivityView, ActivityChoreView>): string {
       return `${who} ${e.change} the bounty ${e.choreName}.`;
     }
     case "points": {
-      const change = changeLabel(e);
+      const change = pointsChange(e);
       const reason = e.reason ? ` Reason: ${e.reason}` : "";
       switch (e.event) {
         case "scheduled": {
