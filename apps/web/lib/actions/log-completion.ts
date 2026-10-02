@@ -59,11 +59,9 @@ export interface LogCompletionData {
   loggedBy: string;
   status: CompletionRow["status"];
   occurredAt: string;
-  /** False while a partner-mode claim waits for someone to confirm it. */
-  counted: boolean;
   /** Whether a proof photo came with it. */
   hasPhoto: boolean;
-  /** The stored `completion_scores` row; null while not counted. */
+  /** The stored `completion_scores` row; null once it no longer counts. */
   totalPts: number | null;
   streakLen: number | null;
   breakPts: number | null;
@@ -198,7 +196,6 @@ export const logCompletionAction = defineAction({
       const names = await namesOf(ctx.db, [s.brokenMemberId]);
       line += `, breaking ${names.get(s.brokenMemberId) ?? "someone"}'s streak of ${s.brokenLen} for +${s.breakPts}`;
     }
-    if (!r.counted) line += ", once someone else confirms it";
     return line;
   },
   async execute(ctx, i) {
@@ -240,7 +237,6 @@ export const logCompletionAction = defineAction({
       loggedBy: c.loggedBy,
       status: c.status,
       occurredAt: c.occurredAt.toISOString(),
-      counted: s !== null,
       hasPhoto: c.photoPathname !== null,
       totalPts: s?.totalPts ?? null,
       streakLen: s?.streakLen ?? null,
