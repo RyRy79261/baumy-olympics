@@ -286,7 +286,7 @@
   {
     "name": "list_events",
     "title": "Calendar",
-    "description": "Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM) and who added it (a member id). Private events are left out.",
+    "description": "Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM), who added it and who it is for (member ids; null for the whole house). Private events are left out.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -308,7 +308,7 @@
   {
     "name": "create_event",
     "title": "Add a calendar event",
-    "description": "Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date.",
+    "description": "Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date. forMemberId names the one member it is for; leave it out for the whole house.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -353,6 +353,12 @@
           "description": "Timed events: the Berlin wall-clock end, HH:MM (24h), on endDate.",
           "type": "string",
           "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "forMemberId": {
+          "description": "Who it is for: one member's id. Leave it out when it is for the whole house.",
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -368,7 +374,7 @@
   {
     "name": "update_event",
     "title": "Change a calendar event",
-    "description": "Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event.",
+    "description": "Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event (leaving out forMemberId makes it for the whole house).",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -418,6 +424,12 @@
           "description": "Timed events: the Berlin wall-clock end, HH:MM (24h), on endDate.",
           "type": "string",
           "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "forMemberId": {
+          "description": "Who it is for: one member's id. Leave it out when it is for the whole house.",
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
