@@ -45,6 +45,11 @@ export async function verifyPasskeyStepUp(
 ): Promise<boolean> {
   const h = await headers();
   return refusedIsFalse(() =>
-    getAuth().api.verifyStepUpPasskey({ body: { response }, headers: h }),
+    // Better Auth's body schema checks the shape; a response with no `id`
+    // is refused there (400), which reads as `false` here.
+    getAuth().api.verifyStepUpPasskey({
+      body: { response: response as { id: string } },
+      headers: h,
+    }),
   );
 }

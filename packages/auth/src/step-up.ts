@@ -42,6 +42,13 @@ interface PasskeyRow {
   transports?: string | null;
 }
 
+/** What the passkey plugin stores for a challenge it issued. */
+const Challenge = z.object({
+  type: z.literal("authentication"),
+  expectedChallenge: z.string().min(1),
+  userData: z.object({ id: z.string() }),
+});
+
 const refuse = () =>
   new APIError("UNAUTHORIZED", {
     code: "STEP_UP_FAILED",
@@ -60,7 +67,7 @@ export function stepUpPasskey(scope: PasskeyScope | null) {
         STEP_UP_PASSKEY_PATH,
         {
           method: "POST",
-          body: z.object({ response: z.record(z.string(), z.unknown()) }),
+          body: z.object({ response: z.looseObject({ id: z.string() }) }),
           use: [sessionMiddleware],
           metadata: { SERVER_ONLY: true },
         },
@@ -83,26 +90,16 @@ export function stepUpPasskey(scope: PasskeyScope | null) {
           const stored =
             await ctx.context.internalAdapter.consumeVerificationValue(key);
           if (!stored) throw refuse();
-          let challenge: {
-            type?: string;
-            expectedChallenge?: string;
-            userData?: { id?: string };
-          };
-          try {
-            challenge = JSON.parse(stored.value) as typeof challenge;
-          } catch {
-            throw refuse();
-          }
-          if (
-            challenge.type !== "authentication" ||
-            !challenge.expectedChallenge ||
-            challenge.userData?.id !== userId
-          ) {
+          // An authentication challenge, made while THIS account was signed
+          // in (a registration challenge, or another account's, is refused).
+          const challenge = Challenge.safeParse(
+            JSON.parse(stored.value) as unknown,
+          );
+          if (!challenge.success || challenge.data.userData.id !== userId) {
             throw refuse();
           }
 
           // The passkey: one of this account's own.
-          if (typeof response.id !== "string") throw refuse();
           const passkey = await ctx.context.adapter.findOne<PasskeyRow>({
             model: "passkey",
             where: [
@@ -116,18 +113,16 @@ export function stepUpPasskey(scope: PasskeyScope | null) {
             ? scope.origin
             : ctx.headers?.get("origin");
           if (!origin) throw refuse();
-          const rpID =
-            scope.rpID ??
-            (typeof ctx.context.options.baseURL === "string"
-              ? new URL(ctx.context.options.baseURL).hostname
-              : "localhost");
+          // resolvePasskeyScope leaves the rp id out only when there is no
+          // base URL, where the passkey plugin uses "localhost" too.
+          const rpID = scope.rpID ?? "localhost";
           let verified: Awaited<
             ReturnType<typeof verifyAuthenticationResponse>
           >;
           try {
             verified = await verifyAuthenticationResponse({
               response,
-              expectedChallenge: challenge.expectedChallenge,
+              expectedChallenge: challenge.data.expectedChallenge,
               expectedOrigin: origin,
               expectedRPID: rpID,
               credential: {
