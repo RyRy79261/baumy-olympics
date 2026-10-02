@@ -37,8 +37,15 @@ export async function kioskRequestCtx(
   const actor = await getKioskActor();
   if (!actor) return null;
   return {
+    // A face tapped for one request acts with its OWN role, never the role
+    // of whoever the cookie picked (the kiosk admin gate, issue #147).
     actor: actAs
-      ? { ...actor, memberId: actAs.memberId, displayName: actAs.displayName }
+      ? {
+          ...actor,
+          memberId: actAs.memberId,
+          displayName: actAs.displayName,
+          role: actAs.role,
+        }
       : actor,
     source: "kiosk",
     householdId: HOUSEHOLD_ID,
