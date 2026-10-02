@@ -1664,7 +1664,7 @@ The household message board.
 
 **When to use it.** For "what's on the board?", and to find a `noteId` before changing, pinning or deleting a note.
 
-**Tool description** (the registry's, verbatim): Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets.
+**Tool description** (the registry's, verbatim): Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and seenBy: the member ids who have read it since its words last changed. Also `unseenCount`: how many notes you have not read yet, and `unseenByAnyoneCount`: how many notes not every member has read yet. Notes are shared household text, never secrets.
 
 **Examples.**
 
@@ -1703,7 +1703,7 @@ The household message board.
 }
 ```
 
-**Returns** (`data`): `notes`: id, title, markdown body, colour, pinned, author, created and changed times.
+**Returns** (`data`): `notes`: id, title, markdown body, colour, pinned, author, created and changed times, and `seenBy` (the member ids who have read its current words); `unseenCount` (the notes the sender has not read) and `unseenByAnyoneCount` (the notes not every member has read).
 
 **Its errors:** none of its own. Every call can also get the endpoint's codes (above).
 
@@ -2255,6 +2255,7 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `schedule_weight`: An admin action: UI only (SPEC §12 decision 10).
 - `schedule_points_change`: An admin action: UI only (SPEC §12 decision 10).
 - `dismiss_weight`: An admin action: UI only (SPEC §12 decision 10).
+- `acknowledge_note`: Marks notes read when a member opens them on the phone or the kitchen screen. Brain's own read button comes later (issue #163); until then, reading the board through list_notes marks nothing.
 - `add_shopping_items`: The shopping list is brain's own (`baumy_list_items`); brain changes it directly, and Olympics calls brain to do the same.
 - `check_off_shopping_items`: The shopping list is brain's own; brain ticks items off directly.
 - `report_bug`: Files an issue on the public bug tracker from the in-app reporter (a shake, or Settings); a report is the person's own words in the app. Tell them to shake their phone or use Settings → Bugs and feature requests.

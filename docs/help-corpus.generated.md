@@ -51,7 +51,7 @@ On your phone or laptop, the menu has:
 - **Hub**: the home page. The Urgent, New and Messages tiles at the top, the bounties that are due, today's calendar, the scores, the pinned notes and the shopping list.
 - **Bounties**: every chore, with its points, whose streak it is and when it is due.
 - **Calendar**: the house calendar (the house's Google Calendar).
-- **Board**: the notes everyone can read and change.
+- **Board**: the notes everyone can read and change. The **Messages** tile on the hub counts the notes you have not read yet; opening the Board marks them read. A note someone edits after you read it counts again, and a note you write or edit yourself never counts for you.
 - **Shopping**: the house shopping list, the same one the Telegram group uses.
 - **Scores**: who is winning this season, and the streaks.
 - **Pot**: the money the winner takes at the end of the year.
@@ -161,6 +161,8 @@ Section `kitchen-ipad` · link `/kiosk` · for members
 
 The iPad on the kitchen wall is the house's shared screen. Its home shows the date and the clock, the **Urgent**, **New** and **Messages** icons (tap one to see those bounties or notes), the month's calendar, and Baumy at the bottom. The bar along the bottom goes to Bounties, Calendar, Board, Shop and Scores.
 
+The **Messages** number on the iPad counts the notes that not everyone in the house has read yet, so it stays until every member has read them. Tap your avatar first, then open **Messages** or the **Board**: that marks those notes read for you only. With nobody picked, looking marks nothing. Reading them on your phone counts too.
+
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
 
 After 2 minutes untouched, the screen forgets who was acting and goes back home by itself; the last few seconds show a countdown, and any touch cancels it. To change how long it waits, tap your avatar, open **Bounties → Kitchen screen settings** and pick 1, 2, 5, 10, 15 minutes; it is saved for this screen.
@@ -253,7 +255,7 @@ The full, exact answer is the [privacy page](/privacy). This is the short versio
 
 ### What the app keeps about you
 
-Your account (email, name, how you sign in), your member profile (display name, colour, character, your PIN only as a scrambled hash, and your Telegram id if you link it), and what you do in the game and on the board: chores and disputes, notes and reminders. There is also an audit log of who changed what, and when. See [what we keep](/privacy#what-we-keep).
+Your account (email, name, how you sign in), your member profile (display name, colour, character, your PIN only as a scrambled hash, and your Telegram id if you link it), and what you do in the game and on the board: chores and disputes, notes and reminders, and which notes and reminders you have read. There is also an audit log of who changed what, and when. See [what we keep](/privacy#what-we-keep).
 
 ### Where it lives, and who else sees it
 
@@ -325,7 +327,7 @@ Ask Baumy (the cat on the hub and the kitchen screen) in your own words, typed o
 - **Get the streaks** (`get_streaks`): Returns the season's streak board: who holds each chore's streak now and how long it is, and the season's best runs (current or already broken), longest first, each with its chore, member, length, weight (base points added up) and dates. Times are ISO 8601 in UTC. _Baumy looks it up and answers._
 - **Get the pot** (`get_pot`): Returns the season's savings pot: each month's contributions (amounts in euro cents, who paid, notes), the running total after each month, the total, and the current leader who would take the whole pot at the end of the season (null when nobody leads outright). The pot is a ledger only; money moves at the bank. _Baumy looks it up and answers._
 - **Calendar** (`list_events`): Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM), who added it and who it is for (member ids; null for the whole house). Private events are left out. _Baumy looks it up and answers._
-- **Notes** (`list_notes`): Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets. _Baumy looks it up and answers._
+- **Notes** (`list_notes`): Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and seenBy: the member ids who have read it since its words last changed. Also `unseenCount`: how many notes you have not read yet, and `unseenByAnyoneCount`: how many notes not every member has read yet. Notes are shared household text, never secrets. _Baumy looks it up and answers._
 - **Shopping list** (`list_shopping`): Lists what is on the house shopping list (the same list the house Telegram group keeps with Baumy), oldest first: each item's id, its name and when it was added (ISO 8601, UTC). _Baumy looks it up and answers._
 - **Reminders** (`list_reminders`): Lists the household's active reminders (posted, and neither dismissed nor seen by every member yet), the oldest first, each with its id, title, body, who posted it, when (ISO 8601, UTC), the member ids who have seen it and those still to see it; and the active members (id, name, colour, and their gallery character if they picked one). _Baumy looks it up and answers._
 
@@ -355,7 +357,7 @@ Ask Baumy (the cat on the hub and the kitchen screen) in your own words, typed o
 
 ### Only in the app's own pages
 
-Baumy in the app cannot do these; use the app's own pages: Update my profile; Pick my character from the gallery; Clean an uploaded character set; Add a character to the gallery; Take a character out of the gallery; Put a character back in the gallery; Join with an invite code; Join as a founder; Create an invite code; Cancel an invite code; Manage members; Set my kiosk PIN; Create a Telegram link code; See my Telegram link; Connect an app to Baumy; List connected apps; Disconnect an app; See my sign-in security; Sign out a device; Sign out every other device; Rename a passkey; Remove a passkey; Unlink Google; Add a password; See how I can confirm it's me; Confirm it's me; Confirm it's me in Telegram; See my Telegram confirmation; Make an iPad the kitchen screen; Rename a kitchen screen; Revoke a kiosk; Create a service token; Rotate a service token; Revoke a service token; Manage chores; Rule on a dispute; Add a photo to a chore; Adjust points; Set the prize mode; Weights; Schedule a weight change; Change a bounty's points; Dismiss a weight suggestion; Veto a weight change; Points history; Report a bug.
+Baumy in the app cannot do these; use the app's own pages: Update my profile; Pick my character from the gallery; Clean an uploaded character set; Add a character to the gallery; Take a character out of the gallery; Put a character back in the gallery; Join with an invite code; Join as a founder; Create an invite code; Cancel an invite code; Manage members; Set my kiosk PIN; Create a Telegram link code; See my Telegram link; Connect an app to Baumy; List connected apps; Disconnect an app; See my sign-in security; Sign out a device; Sign out every other device; Rename a passkey; Remove a passkey; Unlink Google; Add a password; See how I can confirm it's me; Confirm it's me; Confirm it's me in Telegram; See my Telegram confirmation; Make an iPad the kitchen screen; Rename a kitchen screen; Revoke a kiosk; Create a service token; Rotate a service token; Revoke a service token; Manage chores; Rule on a dispute; Add a photo to a chore; Adjust points; Set the prize mode; Weights; Schedule a weight change; Change a bounty's points; Dismiss a weight suggestion; Veto a weight change; Points history; Mark notes seen; Report a bug.
 
 ## Privacy: Who runs this
 
@@ -375,7 +377,7 @@ Section `privacy-what-we-keep` · link `/privacy#what-we-keep` · for members
 - **"Confirm it's you":** when you sign in or confirm it is you before a sensitive change (for example a kiosk PIN), which way you used (passkey, two-factor code, Telegram, password or Google) and when, for that one signed-in device, so it does not ask again for 10 minutes. Never the password or the code itself. It goes when that device signs out, and the audit log keeps that you confirmed and how. For two-factor codes, we also keep which 30-second code you last used to confirm, so the same code cannot be used twice.
 - **Your member profile:** display name, colour, the gallery character you picked (if any), your role, your kiosk PIN (as a hash only), your Telegram user id if you link Telegram, and whether your membership is switched off. A drawn character chosen before characters moved to the gallery (hair, skin and shirt) is still stored on it but is no longer shown or used.
 - **The game:** chores, every completion (who did it, who logged it, when, from which screen, any note, confirmations and disputes), points, streaks, point adjustments, and the pot contributions (amount and who paid).
-- **The board:** notes (title, text, colour, author) and reminders, with who has read each reminder.
+- **The board:** notes (title, text, colour, author) and reminders, with who has read each note and each reminder, and when.
 - **Proof photos** you attach to a chore.
 - **Avatar images:** the pixel characters an admin adds to the household's gallery (up to three poses each, cleaned, 48 to 64 pixels tall), who added each, and which one each member picked. The files as uploaded are not kept.
 - **The audit log:** who changed what, when, from which screen, and a copy of what was entered: for example a note's text (also after the note is deleted), shopping items, a calendar event's title, times, place and description, and earlier display names. Passwords and PINs are never in it. Retried requests are remembered, with their result, so they do not run twice.
