@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { KioskShell } from "../kiosk-shell";
-import { KioskIndicator, KioskNotice } from "../kiosk-night";
+import { KioskNotice } from "../kiosk-night";
 import { SCREENSAVER_ART, Screensaver } from "../screensaver";
 
 // The kiosk's always-on pieces (SPEC §8, issue #29; ADR 0005 §6): the
@@ -46,6 +46,45 @@ describe("Screensaver", () => {
     expect(out).toContain("@keyframes bm-ss-run");
   });
 
+  it("moves every pixel: the room drifts, the clock hops, the light washes", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    root = createRoot(div);
+    act(() =>
+      root!.render(<Screensaver time="02:10" date="d" onWake={() => {}} />),
+    );
+    const screen = div.querySelector("button")!;
+    const drift = screen.querySelector<HTMLElement>("[data-drift]")!;
+    expect(drift.style.animation).toContain("bm-ss-drift-x");
+    expect(drift.querySelector<HTMLElement>("span")!.style.animation).toContain(
+      "bm-ss-drift-y",
+    );
+    // Everything drawn is inside the drift; beside it are only the scene's
+    // styles and the washes.
+    expect(
+      drift.querySelector('[data-testid="screensaver-time"]'),
+    ).not.toBeNull();
+    expect(drift.querySelectorAll("[data-raccoon]")).toHaveLength(3);
+    const outside = [...screen.children].filter((el) => el !== drift);
+    expect(outside.length).toBeGreaterThan(0);
+    for (const el of outside) {
+      expect(el.matches("style, [data-wash]"), el.outerHTML).toBe(true);
+    }
+    const washes = screen.querySelectorAll<HTMLElement>("[data-wash]");
+    expect(washes).toHaveLength(2);
+    for (const wash of washes) {
+      expect(wash.className).toContain("inset-0");
+      expect(
+        wash.querySelector<HTMLElement>("span")!.style.animation,
+      ).toContain("bm-ss-wash");
+    }
+    expect(
+      drift.querySelector<HTMLElement>("[data-clock]")!.style.animation,
+    ).toContain("bm-ss-clock");
+    // The floor reaches past the edges, so the drift never shows a gap.
+    expect(screen.innerHTML).toContain("-inset-x-8");
+  });
+
   it("draws the floor clutter from its own grids", () => {
     for (const grid of Object.values(SCREENSAVER_ART)) {
       const width = grid[0]!.length;
@@ -83,21 +122,6 @@ describe("KioskNotice", () => {
     expect(out).toContain('data-testid="n"');
     expect(out).toContain("pointer-events-none");
     expect(out).toContain("Back to the start in 5 s");
-  });
-});
-
-describe("KioskIndicator", () => {
-  it("is a status tag pinned out of the way of the avatar bar", () => {
-    const out = renderToStaticMarkup(
-      <KioskIndicator data-testid="w">Screen may sleep</KioskIndicator>,
-    );
-    expect(out).toContain('role="status"');
-    expect(out).toContain('data-testid="w"');
-    expect(out).toContain("Screen may sleep");
-    expect(out).toContain("fixed");
-    expect(out).toContain("pointer-events-none");
-    // In the gap over the footer nav (84px), never over its labels.
-    expect(out).toContain("bottom-[100px]");
   });
 });
 

@@ -9,8 +9,8 @@ import { cx } from "./cx";
 //
 // Where they sit keeps them off the other stacks: on the hub along the
 // bottom, above Baumy's plinth on a phone; on the kiosk (a page with
-// [data-kiosk]) under the header, because the kiosk's own notices
-// (KioskNotice, KioskIndicator) use the bottom edge. There the Dismiss
+// [data-kiosk]) under the header, because the kiosk's own notice
+// (KioskNotice) uses the bottom edge. There the Dismiss
 // button is a 56px kiosk target.
 
 export function ToastList({

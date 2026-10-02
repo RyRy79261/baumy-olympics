@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   keepScreenOn,
-  wakeLockNotice,
   type SentinelLike,
   type WakeLockEnv,
   type WakeLockStatus,
@@ -185,18 +184,5 @@ describe("keepScreenOn", () => {
     stop();
     await flush();
     expect(t.seen).toEqual(["pending"]);
-  });
-});
-
-describe("wakeLockNotice", () => {
-  it("says nothing while the lock is held or asked for", () => {
-    expect(wakeLockNotice("held")).toBeNull();
-    expect(wakeLockNotice("pending")).toBeNull();
-  });
-
-  it("says the screen may sleep otherwise", () => {
-    expect(wakeLockNotice("released")).toBe("Screen may sleep");
-    expect(wakeLockNotice("denied")).toBe("Screen may sleep");
-    expect(wakeLockNotice("unsupported")).toBe("Screen cannot stay on");
   });
 });

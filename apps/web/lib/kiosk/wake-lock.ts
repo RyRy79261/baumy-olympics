@@ -2,9 +2,9 @@
 // asked for when the kiosk opens and asked for again whenever the page comes
 // back into view (the browser drops the lock when the page is hidden) or the
 // screen is touched while the lock is not held. Best effort: the documented
-// fallback is Auto-Lock "Never" plus Guided Access (docs/kiosk-setup.md), and
-// the kiosk shows a small notice whenever the lock is not held, so nobody has
-// to guess.
+// fallback is Auto-Lock "Never" plus Guided Access (docs/kiosk-setup.md). The
+// kiosk shows nothing about it (the household asked for no corner tag); the
+// status is only on a hidden marker, for e2e.
 //
 // Framework-free so it can be tested with a fake navigator and document; the
 // React side is components/kiosk/keep-screen-on.tsx.
@@ -104,21 +104,4 @@ export function keepScreenOn(
     sentinel = null;
     if (held && !held.released) void held.release().catch(() => {});
   };
-}
-
-/**
- * The kiosk's corner tag while the lock is not held; null while it is (or
- * while it is being asked for). docs/kiosk-setup.md explains both.
- */
-export function wakeLockNotice(status: WakeLockStatus): string | null {
-  switch (status) {
-    case "held":
-    case "pending":
-      return null;
-    case "unsupported":
-      return "Screen cannot stay on";
-    case "denied":
-    case "released":
-      return "Screen may sleep";
-  }
 }
