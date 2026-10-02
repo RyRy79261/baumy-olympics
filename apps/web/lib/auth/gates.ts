@@ -165,8 +165,8 @@ function pinFailure(verdict: Exclude<PinVerdict, { ok: true }>): GateResult {
       return fail("ATTESTATION_FAILED", "That PIN is not right.");
     case "no_pin":
       return fail(
-        "ATTESTATION_FAILED",
-        "You have no kiosk PIN yet. Set one in Settings on your phone.",
+        "PIN_NOT_SET",
+        "You haven't set a personal PIN yet. Set one in Settings on your phone.",
       );
     case "locked":
       return fail(

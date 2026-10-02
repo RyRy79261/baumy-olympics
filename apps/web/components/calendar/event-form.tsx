@@ -33,12 +33,11 @@ import { HOUSE_COLOUR, type DashboardMember } from "@/lib/kiosk/dashboard";
 // and on the kitchen screen (/kiosk/calendar). It says who the event is for
 // (issue #134): one member, by their character, or the whole house.
 //
-// On the kiosk the first send goes without a PIN; when the gate asks for one
-// (`create_event` and `update_event` are attested), the pad opens inside
-// this form and its OK sends the same fields again with the PIN, as the
-// notes form does. The fields are controlled: React resets a form's
-// uncontrolled fields after each action, and a PIN prompt sends them twice.
-// On a phone the session vouches and the pad never opens.
+// The writes need no PIN on the kiosk (owner ruling 2026-10-02, issue
+// #145). The form stays an AttestedForm: if a gate ever asks for one, the
+// pad opens inside this form and its OK sends the same fields again with
+// the PIN. The fields are controlled: React resets a form's uncontrolled
+// fields after each action, and a PIN prompt sends them twice.
 
 /** The "for" value that means the whole house (null, once it arrives). */
 const HOUSE = FOR_EVERYONE;

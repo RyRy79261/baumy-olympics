@@ -26,8 +26,17 @@ How to turn the iPad into the always-on kitchen screen (SPEC §8, issue #29).
    it out on Admin → Kitchen screen.
 
    This is not the **personal PIN** in Settings: that is each housemate's
-   own 4 to 6 digits, which the kitchen screen asks for before it confirms
-   something as them. Pairing needs no PIN.
+   own 4 to 6 digits, which the kitchen screen asks for only before it
+   disputes a chore as them (owner ruling 2026-10-02, SPEC §12 decision
+   27). Everything else there (logging, confirming, notes, the calendar,
+   shopping, Baumy) runs as whoever tapped their avatar, with no PIN.
+   Pairing needs no PIN.
+
+   Someone who never set a PIN is never shown the PIN pad: the screen says
+   "<Name> hasn't set a personal PIN yet" with a QR code to Settings on
+   their phone, and Baumy's Confirm all does everything else and leaves
+   only the dispute waiting. After joining, the hub home reminds them to
+   set one.
 
 2. On `/kiosk`, tap Share → **Add to Home Screen**. Keep the name "Baumy".
 3. Open Baumy from the home screen. It opens full screen, with no Safari

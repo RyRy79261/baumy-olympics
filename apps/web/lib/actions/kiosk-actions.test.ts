@@ -568,8 +568,8 @@ describe("check_kiosk_pin: attestation on the kiosk", () => {
     const { ctx } = await kioskCtx(PIN, plain);
     await expect(runAction("check_kiosk_pin", {}, ctx)).resolves.toMatchObject({
       ok: false,
-      code: "ATTESTATION_FAILED",
-      message: expect.stringContaining("no kiosk PIN"),
+      code: "PIN_NOT_SET",
+      message: expect.stringContaining("haven't set a personal PIN"),
     });
   });
 });

@@ -169,10 +169,11 @@ export const logCompletionAction = defineAction({
   kind: "write",
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: (ctx, i) =>
-    i.doneBy !== undefined && i.doneBy !== ctx.actor.memberId
-      ? "attested"
-      : "member",
+  // No PIN on the kiosk, even logging for someone else (owner ruling
+  // 2026-10-02, SPEC §12 decision 27, issue #145; it was `attested` when
+  // doneBy named someone else). The vouch is still recorded: loggedBy is
+  // the member picked on the kiosk.
+  requires: "member",
   // "Jo did the dishes" is doneBy: Jo, logged (and vouched for) by the asker.
   memberField: "doneBy",
   input,

@@ -272,7 +272,11 @@ describe("requireAttested", () => {
   it("says why a PIN failed, in a sentence to act on", async () => {
     const cases: [PinVerdict, string, RegExp][] = [
       [WRONG, "ATTESTATION_FAILED", /not right/],
-      [{ ok: false, reason: "no_pin" }, "ATTESTATION_FAILED", /no kiosk PIN/],
+      [
+        { ok: false, reason: "no_pin" },
+        "PIN_NOT_SET",
+        /haven't set a personal PIN/,
+      ],
       [
         { ok: false, reason: "locked" },
         "PIN_LOCKED",

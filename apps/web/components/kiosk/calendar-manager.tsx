@@ -23,7 +23,8 @@ import { toast, toastActionError } from "@/lib/ui/toast";
 // to come is a list in Today, This week and Later, each event with who it
 // is for; a big "Add event" opens the form, and tapping an event opens it to
 // change or delete. Every change runs create_event, update_event or
-// delete_event as the member acting, with their PIN in that same request.
+// delete_event as the member acting, with no PIN (owner ruling 2026-10-02,
+// issue #145).
 //
 // Layout only, from the kit: the day sheet's event rows (DayEventRow,
 // WhoLine), the members' characters, buttons and dialogs. Nothing is drawn
