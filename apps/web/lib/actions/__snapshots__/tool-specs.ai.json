@@ -75,7 +75,9 @@
           "maxLength": 280
         }
       },
-      "required": ["choreId"],
+      "required": [
+        "choreId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -99,7 +101,10 @@
         "kind": {
           "default": "maintenance",
           "type": "string",
-          "enum": ["consumable", "maintenance"],
+          "enum": [
+            "consumable",
+            "maintenance"
+          ],
           "description": "consumable (something to buy or refill) or maintenance (something to clean or fix)."
         },
         "points": {
@@ -118,13 +123,20 @@
         "proofMode": {
           "default": "none",
           "type": "string",
-          "enum": ["none", "optional", "required"],
+          "enum": [
+            "none",
+            "optional",
+            "required"
+          ],
           "description": "Whether a proof photo is none, optional or required."
         },
         "confirmMode": {
           "default": "optimistic",
           "type": "string",
-          "enum": ["optimistic", "partner"],
+          "enum": [
+            "optimistic",
+            "partner"
+          ],
           "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
         },
         "effortFactorPct": {
@@ -135,7 +147,10 @@
           "description": "The effort factor in percent (100 is normal)."
         }
       },
-      "required": ["name", "points"],
+      "required": [
+        "name",
+        "points"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -164,7 +179,10 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["consumable", "maintenance"],
+          "enum": [
+            "consumable",
+            "maintenance"
+          ],
           "description": "consumable (something to buy or refill) or maintenance (something to clean or fix)."
         },
         "points": {
@@ -181,12 +199,19 @@
         },
         "proofMode": {
           "type": "string",
-          "enum": ["none", "optional", "required"],
+          "enum": [
+            "none",
+            "optional",
+            "required"
+          ],
           "description": "Whether a proof photo is none, optional or required."
         },
         "confirmMode": {
           "type": "string",
-          "enum": ["optimistic", "partner"],
+          "enum": [
+            "optimistic",
+            "partner"
+          ],
           "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
         },
         "effortFactorPct": {
@@ -196,7 +221,9 @@
           "description": "The effort factor in percent (100 is normal)."
         }
       },
-      "required": ["choreId"],
+      "required": [
+        "choreId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -232,7 +259,9 @@
           "description": "The completion's id, from get_pending_confirmations."
         }
       },
-      "required": ["completionId"],
+      "required": [
+        "completionId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -260,7 +289,10 @@
           "description": "Why you think it was not done."
         }
       },
-      "required": ["completionId", "reason"],
+      "required": [
+        "completionId",
+        "reason"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -282,7 +314,9 @@
           "description": "The completion's id, from get_pending_confirmations."
         }
       },
-      "required": ["completionId"],
+      "required": [
+        "completionId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -304,7 +338,9 @@
           "description": "The completion's id, from get_pending_confirmations."
         }
       },
-      "required": ["completionId"],
+      "required": [
+        "completionId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -326,7 +362,9 @@
           "description": "The completion's id, from get_pending_confirmations."
         }
       },
-      "required": ["completionId"],
+      "required": [
+        "completionId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -418,7 +456,10 @@
           "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
         },
         "amount": {
-          "type": ["string", "number"]
+          "type": [
+            "string",
+            "number"
+          ]
         },
         "contributedBy": {
           "type": "string",
@@ -430,7 +471,9 @@
           "maxLength": 200
         }
       },
-      "required": ["amount"],
+      "required": [
+        "amount"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -485,7 +528,10 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["timed", "all_day"],
+          "enum": [
+            "timed",
+            "all_day"
+          ],
           "description": "`timed` needs startTime and endTime; `all_day` fills whole days."
         },
         "date": {
@@ -520,7 +566,11 @@
           ]
         }
       },
-      "required": ["title", "kind", "date"],
+      "required": [
+        "title",
+        "kind",
+        "date"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -556,7 +606,10 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["timed", "all_day"],
+          "enum": [
+            "timed",
+            "all_day"
+          ],
           "description": "`timed` needs startTime and endTime; `all_day` fills whole days."
         },
         "date": {
@@ -591,7 +644,12 @@
           ]
         }
       },
-      "required": ["eventId", "title", "kind", "date"],
+      "required": [
+        "eventId",
+        "title",
+        "kind",
+        "date"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -611,7 +669,9 @@
           "description": "The event's id, from list_events."
         }
       },
-      "required": ["eventId"],
+      "required": [
+        "eventId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -633,7 +693,11 @@
             },
             {
               "type": "string",
-              "enum": ["true", "false", "on"]
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
             }
           ]
         },
@@ -673,7 +737,14 @@
           "anyOf": [
             {
               "type": "string",
-              "enum": ["yellow", "pink", "blue", "green", "orange", "purple"]
+              "enum": [
+                "yellow",
+                "pink",
+                "blue",
+                "green",
+                "orange",
+                "purple"
+              ]
             },
             {
               "type": "string",
@@ -689,12 +760,18 @@
             },
             {
               "type": "string",
-              "enum": ["true", "false", "on"]
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
             }
           ]
         }
       },
-      "required": ["title"],
+      "required": [
+        "title"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -730,7 +807,14 @@
           "anyOf": [
             {
               "type": "string",
-              "enum": ["yellow", "pink", "blue", "green", "orange", "purple"]
+              "enum": [
+                "yellow",
+                "pink",
+                "blue",
+                "green",
+                "orange",
+                "purple"
+              ]
             },
             {
               "type": "string",
@@ -739,7 +823,10 @@
           ]
         }
       },
-      "required": ["noteId", "title"],
+      "required": [
+        "noteId",
+        "title"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -767,12 +854,19 @@
             },
             {
               "type": "string",
-              "enum": ["true", "false", "on"]
+              "enum": [
+                "true",
+                "false",
+                "on"
+              ]
             }
           ]
         }
       },
-      "required": ["noteId", "pinned"],
+      "required": [
+        "noteId",
+        "pinned"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -793,7 +887,9 @@
           "description": "The note's id, from list_notes."
         }
       },
-      "required": ["noteId"],
+      "required": [
+        "noteId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -835,7 +931,9 @@
           ]
         }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -864,7 +962,9 @@
           ]
         }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -903,7 +1003,9 @@
           "maxLength": 280
         }
       },
-      "required": ["title"],
+      "required": [
+        "title"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -924,7 +1026,9 @@
           "description": "The reminder's id, from list_reminders."
         }
       },
-      "required": ["reminderId"],
+      "required": [
+        "reminderId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
@@ -945,7 +1049,9 @@
           "description": "The reminder's id, from list_reminders."
         }
       },
-      "required": ["reminderId"],
+      "required": [
+        "reminderId"
+      ],
       "additionalProperties": false
     },
     "kind": "write",
