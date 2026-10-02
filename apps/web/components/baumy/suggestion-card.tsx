@@ -222,11 +222,11 @@ export function SuggestionCard({
         data-state={state}
         data-tone={tone}
         className={cx(
-          "flex items-start gap-2 border-2 bg-white/70 px-3 py-2 font-body text-[22px] leading-snug",
-          tone === "destructive" && "border-[#b8243a] text-[#b8243a]",
-          tone === "invalid" && "border-[#c9bfd9] opacity-60",
-          tone === "normal" && "border-[#c9bfd9]",
-          state === "saved" && "border-[#1f9e66]",
+          "flex items-start gap-2 border-2 bg-bm-raised px-3 py-2 font-body text-[22px] leading-snug text-bm-text",
+          tone === "destructive" && "border-bm-red text-bm-red",
+          tone === "invalid" && "border-bm-dim opacity-60",
+          tone === "normal" && "border-bm-dim",
+          state === "saved" && "border-bm-green",
         )}
       >
         <span aria-hidden className="w-5 shrink-0 text-center">
@@ -242,7 +242,7 @@ export function SuggestionCard({
           {message ? (
             <span
               role={state === "failed" ? "alert" : "status"}
-              className="block text-[16px] text-[#4a3a66]"
+              className="block text-[16px] text-bm-muted"
             >
               {message}
             </span>

@@ -32,14 +32,45 @@ describe("CatBubble", () => {
     expect(html(<CatSays size="sm">Got it!</CatSays>)).toContain("text-[14px]");
   });
 
+  it("is the kit's dark panel in a violet pixel frame, not a white box (issue #155)", () => {
+    const out = html(<CatBubble mode="talk">Hi</CatBubble>);
+    expect(out).toContain("pixel-frame pixel-frame-4");
+    expect(out).toContain("bg-bm-surface");
+    expect(out).toContain("text-bm-text");
+    expect(out).toContain("[--pf:var(--color-bm-violet)]");
+    expect(out).not.toContain("bg-bm-bubble");
+    expect(out).not.toContain("bg-white");
+  });
+
+  it("has a 56px close button only when it can be closed", () => {
+    const out = html(
+      <CatBubble mode="talk" onClose={() => undefined}>
+        Hi
+      </CatBubble>,
+    );
+    expect(out).toContain('aria-label="Close"');
+    expect(out).toContain("size-14");
+    // In the corner, out of the flow: only the first line makes room, so
+    // the cards and buttons keep the whole width (not a float beside them).
+    expect(out).toContain("absolute top-3 right-3");
+    expect(out).not.toContain("float-right");
+    expect(out).toContain(":first-child]:pr-16");
+    expect(html(<CatBubble mode="talk">Hi</CatBubble>)).not.toContain(
+      ":first-child]:pr-16",
+    );
+    expect(out).toContain('type="button"');
+    expect(out).toContain("×");
+    expect(html(<CatBubble mode="says">Hi</CatBubble>)).not.toContain(
+      'aria-label="Close"',
+    );
+  });
+
   it("sets the hint muted and an error in red", () => {
     expect(html(<CatText tone="muted">Say it</CatText>)).toContain(
-      "text-[#4a3a66]",
+      "text-bm-muted",
     );
-    expect(html(<CatText tone="error">No</CatText>)).toContain(
-      "text-[#b8243a]",
-    );
-    expect(html(<CatText>Hi</CatText>)).not.toContain("text-[#");
+    expect(html(<CatText tone="error">No</CatText>)).toContain("text-bm-red");
+    expect(html(<CatText>Hi</CatText>)).not.toMatch(/text-bm-(muted|red)/);
   });
 });
 
@@ -56,15 +87,14 @@ describe("LevelBars", () => {
 });
 
 describe("CatButton and CatLink", () => {
-  it("are 56px targets in the prototype's three looks", () => {
-    expect(html(<CatButton>Done talking</CatButton>)).toContain(
-      "bg-bm-bubble-ink",
-    );
+  it("are 56px stepped kit buttons in three looks", () => {
+    expect(html(<CatButton>Done talking</CatButton>)).toContain("bg-bm-violet");
     expect(html(<CatButton variant="go">Yes, do it</CatButton>)).toContain(
-      "bg-[#1f9e66]",
+      "bg-bm-green",
     );
     const no = html(<CatButton variant="soft">No</CatButton>);
-    expect(no).toContain("bg-[#e4d6f5]");
+    expect(no).toContain("bg-bm-raised");
+    expect(no).toContain("pixel-frame");
     expect(no).toContain("h-14");
     expect(no).toContain('type="button"');
     const link = html(<CatLink>Type instead</CatLink>);
@@ -80,6 +110,7 @@ describe("HoldToTalk", () => {
     expect(idle).toContain('aria-pressed="false"');
     expect(idle).toContain('data-state="idle"');
     expect(idle).toContain("h-24");
+    expect(idle).toContain("bg-bm-violet");
     expect(idle).toContain("touch-none");
     expect(idle).toContain("select-none");
     expect(idle).toContain("[-webkit-touch-callout:none]");

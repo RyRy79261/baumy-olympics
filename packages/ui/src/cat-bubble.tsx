@@ -1,6 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cx } from "./cx";
-import { PixelBubble } from "./pixel-bubble";
 
 // Talking to Baumy on the kitchen screen (ADR 0005 §1; the approved
 // prototype's baumy-cat.tsx, ~/baumy-shots/cat-listen.png and
@@ -8,13 +7,26 @@ import { PixelBubble } from "./pixel-bubble";
 // growing leftwards. "Mrrp? I'm listening…" with level bars and "Done
 // talking", then what Baumy understood with "Yes, do it" and "No". The
 // wiring (recording, asking, approving) is the app's.
+//
+// Its look is the kit's panel (issue #155): a dark surface in a stepped
+// 4px pixel frame, violet like Baumy's plinth, light text, with the pixel
+// tail pointing down at the cat and a 56px "×" in its corner.
 
-/** The bubble over the cat; `mode` names what it is showing, for tests. */
+/** The bubble's tail: the panel's ground, edged in the frame's violet. */
+const TAIL =
+  "shadow-[4px_0_0_var(--color-bm-violet),-4px_0_0_var(--color-bm-violet),0_4px_0_var(--color-bm-violet)]";
+
+/**
+ * The bubble over the cat; `mode` names what it is showing, for tests.
+ * With `onClose`, an "×" in its corner closes it.
+ */
 export function CatBubble({
   mode,
+  onClose,
   children,
 }: {
   mode: string;
+  onClose?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -22,9 +34,42 @@ export function CatBubble({
       data-testid="cat-bubble"
       data-mode={mode}
       aria-live="polite"
-      className="absolute right-0 bottom-[calc(100%+10px)] z-10 w-[440px] max-w-[calc(100vw-28px)] motion-safe:animate-pixel-in"
+      className="absolute right-0 bottom-[calc(100%+10px)] z-10 w-[440px] max-w-[calc(100vw-28px)] drop-shadow-[0_10px_0_rgb(0_0_0/0.45)] motion-safe:animate-pixel-in"
     >
-      <PixelBubble tail="right">{children}</PixelBubble>
+      <div
+        data-bubble
+        className="pixel-frame pixel-frame-4 relative bg-bm-surface p-5 font-body text-xl text-bm-text [--pf:var(--color-bm-violet)]"
+      >
+        {onClose ? (
+          <button
+            type="button"
+            aria-label="Close"
+            data-testid="cat-bubble-close"
+            onClick={onClose}
+            className="pixel-frame absolute top-3 right-3 z-10 grid size-14 place-items-center bg-bm-raised font-display text-[22px] text-bm-text [--pf:var(--color-bm-muted)]"
+          >
+            {"\u00d7"}
+          </button>
+        ) : null}
+        {/* Only the first line (the first block of the first block: Baumy's
+            "Mrrp?" or answer) makes room for the "\u00d7", as tall as it, so the
+            cards and buttons below keep the bubble's whole width. */}
+        <div
+          className={cx(
+            onClose &&
+              "[&>:first-child>:first-child]:min-h-12 [&>:first-child>:first-child]:pr-16",
+          )}
+        >
+          {children}
+        </div>
+      </div>
+      <span
+        aria-hidden
+        className={cx(
+          "absolute right-[70px] -bottom-2 block h-3 w-5 bg-bm-surface",
+          TAIL,
+        )}
+      />
     </div>
   );
 }
@@ -61,8 +106,8 @@ export function CatText({
     <div
       className={cx(
         "mt-3 font-body text-[22px] leading-snug",
-        tone === "muted" && "text-[#4a3a66]",
-        tone === "error" && "text-[#b8243a]",
+        tone === "muted" && "text-bm-muted",
+        tone === "error" && "text-bm-red",
       )}
     >
       {children}
@@ -104,10 +149,11 @@ export function LevelBars({
   );
 }
 
+// The kit's stepped buttons, on the bubble's dark panel.
 const BUTTON = {
-  dark: "bg-bm-bubble-ink text-white",
-  go: "bg-[#1f9e66] text-white",
-  soft: "bg-[#e4d6f5] text-bm-bubble-ink",
+  dark: "bg-bm-violet text-bm-ink [--pf:var(--color-bm-violet)]",
+  go: "bg-bm-green text-bm-ink [--pf:var(--color-bm-green)]",
+  soft: "bg-bm-raised text-bm-text [--pf:var(--color-bm-text)]",
 } as const;
 
 /** A 56px bubble button: "Done talking", "Yes, do it", "No". */
@@ -123,7 +169,7 @@ export function CatButton({
     <button
       type={type}
       className={cx(
-        "h-14 flex-1 font-label text-[16px] font-bold uppercase disabled:opacity-50",
+        "pixel-frame h-14 flex-1 font-label text-[16px] font-bold uppercase disabled:opacity-50",
         BUTTON[variant],
         className,
       )}
@@ -170,7 +216,7 @@ export function HoldToTalk({
         "relative flex h-24 w-full touch-none items-center justify-center gap-4 font-label text-[18px] font-bold uppercase select-none [-webkit-touch-callout:none] [-webkit-user-select:none] disabled:opacity-50",
         recording
           ? "bg-[#b8243a] text-white outline-4 outline-offset-2 outline-[#ff5a7a] motion-safe:animate-pulse"
-          : "bg-bm-bubble-ink text-white",
+          : "bg-bm-violet text-bm-ink",
         className,
       )}
       {...props}
@@ -191,7 +237,7 @@ export function CatLink({
     <button
       type={type}
       className={cx(
-        "mt-3 min-h-14 w-full font-label text-[14px] font-bold text-[#4a3a66] uppercase underline underline-offset-4",
+        "mt-3 min-h-14 w-full font-label text-[14px] font-bold text-bm-muted uppercase underline underline-offset-4",
         className,
       )}
       {...props}
