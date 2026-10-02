@@ -119,3 +119,26 @@ export async function kioskActionAsFace<N extends ActionName>(
     return fail("INTERNAL", "Something went wrong. Please try again.");
   }
 }
+
+/**
+ * `kioskActionForm` for structured input (ui.ts `actionInput`), as the
+ * member who is acting on the kiosk. No PIN travels this way.
+ */
+export async function kioskActionInput<N extends ActionName>(
+  name: N,
+  input: unknown,
+  requestId: unknown,
+): Promise<ActionResult<ActionOutput<N>>> {
+  try {
+    const ctx = await kioskRequestCtx(
+      typeof requestId === "string" && requestId !== "" ? requestId : undefined,
+      undefined,
+    );
+    if (!ctx) return fail("UNAUTHENTICATED", NOT_PAIRED_MESSAGE);
+    return await runAction(name, input, ctx);
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error(`[kioskActionInput:${name}]`, err);
+    return fail("INTERNAL", "Something went wrong. Please try again.");
+  }
+}

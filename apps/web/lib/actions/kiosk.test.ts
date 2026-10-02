@@ -44,6 +44,7 @@ const {
   FACE_FIELD,
   kioskActionAsFace,
   kioskActionForm,
+  kioskActionInput,
   kioskRequestCtx,
   NOT_PAIRED_MESSAGE,
 } = await import("./kiosk");
@@ -259,5 +260,73 @@ describe("kioskActionAsFace", () => {
     ).resolves.toMatchObject({ ok: false, code: "INTERNAL" });
     expect(error).toHaveBeenCalledOnce();
     error.mockRestore();
+  });
+});
+
+describe("kioskActionInput", () => {
+  it("runs structured input as the acting member, from the kiosk surface", async () => {
+    const { setGithubIssuesForTests } = await import(
+      "@/lib/integrations/github"
+    );
+    const { memoryGithub } = await import("@/lib/integrations/github-memory");
+    setGithubIssuesForTests({
+      ok: true,
+      kind: "fake",
+      repo: "e2e/fake-tracker",
+      create: memoryGithub,
+    });
+    try {
+      const me = await seedMember(db());
+      getKioskActor.mockResolvedValue({
+        kind: "kiosk",
+        deviceId: "d1",
+        memberId: me,
+      });
+      const res = await kioskActionInput(
+        "report_bug",
+        { description: "The shop page is blank" },
+        "kiosk-input-0001",
+      );
+      expect(res).toMatchObject({ ok: true, data: { number: 1 } });
+    } finally {
+      setGithubIssuesForTests(null);
+      const { clearMemoryIssues } = await import(
+        "@/lib/integrations/github-memory"
+      );
+      clearMemoryIssues();
+    }
+  });
+
+  it("never carries a PIN", async () => {
+    const me = await seedMember(db(), { kioskPinHash: pinHash });
+    getKioskActor.mockResolvedValue({
+      kind: "kiosk",
+      deviceId: "d1",
+      memberId: me,
+    });
+    await expect(
+      kioskActionInput("check_kiosk_pin", {}, undefined),
+    ).resolves.toMatchObject({ ok: false, code: "ATTESTATION_REQUIRED" });
+  });
+
+  it("says so when the kiosk is not paired, and turns a throw into INTERNAL", async () => {
+    getKioskActor.mockResolvedValue(null);
+    await expect(
+      kioskActionInput("check_kiosk_pin", {}, "kiosk-input-0002"),
+    ).resolves.toEqual({
+      ok: false,
+      code: "UNAUTHENTICATED",
+      message: NOT_PAIRED_MESSAGE,
+    });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    getKioskActor.mockRejectedValue(new Error("db down"));
+    await expect(
+      kioskActionInput("check_kiosk_pin", {}, undefined),
+    ).resolves.toMatchObject({ ok: false, code: "INTERNAL" });
+    error.mockRestore();
+    getKioskActor.mockImplementation(async () => redirect("/kiosk/pair"));
+    await expect(
+      kioskActionInput("check_kiosk_pin", {}, undefined),
+    ).rejects.toThrow();
   });
 });

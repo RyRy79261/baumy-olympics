@@ -3,3 +3,4 @@
 export * from "./models";
 export * from "./command";
 export * from "./transcribe";
+export * from "./feedback";
