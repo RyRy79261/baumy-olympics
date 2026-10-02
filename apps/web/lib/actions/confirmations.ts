@@ -11,21 +11,21 @@ import { DisputeReason } from "@baumy/types";
 import { defineAction, type ActionCtx, type Gate } from "./define";
 import { fail, type ActionFailure } from "./result";
 
-// The honesty layer (SPEC §4.3): confirm, dispute, undo, withdraw, concede and
-// the admin's ruling. Each is one `transition` in packages/core, applied by
+// The honesty layer (SPEC §4.3): dispute, undo, withdraw, concede and the
+// admin's ruling. There is no confirming (§12 decision 29, issue #150): a
+// self-claim counts at once and settles when its window ends. Each is one `transition` in packages/core, applied by
 // `applyCompletionEvent` (packages/db) under the chore lock with a
 // compare-and-set on the stored status, in runAction's transaction. The
 // status every event is judged on is the one the claim has at `ctx.now`
 // (`effectiveStatus`), so the answer is the same whether or not the daily job
-// has written a finalize or an expiry yet.
+// has written a finalize yet.
 //
-// On the kiosk each of these needs the acting member's PIN (`attested`): the
-// iPad is shared, and these decide whose points count. A phone session, MCP
-// or brain is its own member.
+// On the kiosk only a dispute needs the acting member's PIN (`attested`,
+// §12 decision 27). A phone session, MCP or brain is its own member.
 
 const completionId = z
   .uuid("Pick a claim.")
-  .describe("The completion's id, from get_pending_confirmations.");
+  .describe("The completion's id, from get_activity.");
 
 /** What every claim event returns. */
 export interface ClaimEventData {
@@ -35,7 +35,7 @@ export interface ClaimEventData {
   status: string;
   /** How the open dispute ended, when this event ended it. */
   disputeResolution: string | null;
-  /** When a pending optimistic claim finalizes, ISO 8601. */
+  /** When a pending claim finalizes, ISO 8601. */
   finalizesAt: string | null;
 }
 
@@ -74,7 +74,6 @@ export function claimEventFailure(
 }
 
 const FORBIDDEN: Record<VerificationEvent["type"], string> = {
-  confirm: "You can't confirm your own claim. A housemate has to.",
   dispute: "You can't dispute your own claim. Undo or concede it instead.",
   withdraw: "Only the person who disputed it can withdraw the dispute.",
   concede: "Only the person who did it can concede.",
@@ -83,7 +82,6 @@ const FORBIDDEN: Record<VerificationEvent["type"], string> = {
 };
 
 const INVALID_STATE: Record<VerificationEvent["type"], string> = {
-  confirm: "This claim is not waiting for an OK any more.",
   dispute:
     "This claim can't be disputed any more: it is settled or already disputed.",
   withdraw: "There is no open dispute on this claim to withdraw.",
@@ -130,16 +128,16 @@ async function runEvent(ctx: ActionCtx, id: string, event: VerificationEvent) {
 }
 
 // The kiosk's PIN scope (owner ruling 2026-10-02, SPEC §12 decision 27,
-// issue #145): only a dispute asks the acting member's PIN. Confirming,
-// undoing, withdrawing and conceding run as the member picked on the kiosk,
-// with no PIN. Each is one constant, so the ruling flips in one line.
+// issue #145): only a dispute asks the acting member's PIN. Undoing,
+// withdrawing and conceding run as the member picked on the kiosk, with no
+// PIN. Each is one constant, so the ruling flips in one line.
 
-/** Confirm, undo, withdraw and concede: no PIN on the kiosk. */
+/** Undo, withdraw and concede: no PIN on the kiosk. */
 const CLAIM_GATE: Gate = "member";
 /** Dispute: the kiosk needs the acting member's PIN. */
 const DISPUTE_GATE: Gate = "attested";
 
-/** What confirm, undo, withdraw and concede share: only the claim's id. */
+/** What undo, withdraw and concede share: only the claim's id. */
 const byId = {
   kind: "write",
   risk: "confirm",
@@ -150,28 +148,13 @@ const byId = {
   input: z.strictObject({ completionId }),
 } as const;
 
-/** A preview line: "Confirm Ryan's Trash". */
+/** A preview line: "Undo Ryan's Trash". */
 function previewAs(verb: string) {
   return async (ctx: ActionCtx, i: { completionId: string }) => {
     const what = await describeClaim(ctx, i.completionId);
     return what ? `${verb} ${what}` : NOT_FOUND.message;
   };
 }
-
-export const confirmCompletion = defineAction({
-  ...byId,
-  name: "confirm_completion",
-  title: "Confirm a chore",
-  description:
-    "Confirms a housemate's self-claimed chore that is waiting for an OK (pending), which verifies it. You cannot confirm your own. Refused with INVALID_STATE once it has finalized, expired or been disputed. Get ids from get_pending_confirmations.",
-  consent: "Confirm your housemates' chores",
-  preview: previewAs("Confirm"),
-  execute: (ctx, i) =>
-    runEvent(ctx, i.completionId, {
-      type: "confirm",
-      actor: ctx.actor.memberId!,
-    }),
-});
 
 export const undoCompletion = defineAction({
   ...byId,
@@ -219,7 +202,7 @@ export const disputeCompletion = defineAction({
   name: "dispute_completion",
   title: "Dispute a chore",
   description:
-    "Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.",
+    "Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. Get ids from get_activity. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.",
   consent: "Dispute your housemates' chore claims",
   kind: "write",
   risk: "confirm",

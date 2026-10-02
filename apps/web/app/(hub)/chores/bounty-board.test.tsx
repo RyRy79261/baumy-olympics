@@ -52,7 +52,6 @@ const chore: ChoreView = {
   sprite: "trash",
   kind: "maintenance",
   proofMode: "none",
-  confirmMode: "optimistic",
   effortFactorPct: 100,
   archived: false,
   basePoints: 40,

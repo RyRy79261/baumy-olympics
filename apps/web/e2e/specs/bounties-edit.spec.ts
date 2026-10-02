@@ -7,7 +7,7 @@ import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 // button, then schedules new points with a reason from the dialog's Change
 // points (schedule_points_change: next Monday at the earliest, vetoable).
 // The partner, a member, sees the board without New bounty or Edit, vetoes
-// the change on /inbox, and the points history shows who proposed it and who
+// the change in Activity, and the points history shows who proposed it and who
 // vetoed it, to both of them. On /admin/chores, clearing both points and
 // cooldown is an inline "Required", not a silent keep. At 360px the Edit
 // button sits on its own line under the row, so the name never breaks.
@@ -132,16 +132,16 @@ test("an admin schedules any points on /chores; a member vetoes them; the histor
   await expect(p.getByRole("button", { name: `Edit ${renamed}` })).toHaveCount(
     0,
   );
-  // …and vetoes the change in /inbox, where its reason shows.
-  await p.goto("/inbox");
-  const scheduled = p.getByTestId(`scheduled-${renamed}`);
+  // …and vetoes the change in Activity, where its reason shows.
+  await p.goto("/activity");
+  const scheduled = p.locator(
+    `[data-testid="activity-points-${renamed}"][data-event="scheduled"]`,
+  );
   await expect(scheduled).toContainText("40 → 55 pts");
   await expect(scheduled).toContainText("Takes ages");
-  await scheduled
-    .getByRole("button", { name: `Veto the ${renamed} change` })
-    .click();
+  await scheduled.getByRole("button", { name: "Veto" }).click();
   await expect(toast(p, "Vetoed.")).toBeVisible();
-  await expect(p.getByTestId(`scheduled-${renamed}`)).toHaveCount(0);
+  await expect(scheduled.getByRole("button")).toHaveCount(0);
 
   // The history, for the member: from the Bounties page's link.
   await p.goto("/chores");

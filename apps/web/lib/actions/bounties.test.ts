@@ -113,7 +113,6 @@ describe("create_bounty", () => {
     expect(await choreRow(data.choreId)).toMatchObject({
       kind: "maintenance",
       proofMode: "none",
-      confirmMode: "optimistic",
       effortFactorPct: 100,
       sprite: "recycling-paper",
     });
@@ -143,7 +142,6 @@ describe("create_bounty", () => {
           points: 10,
           cooldownHours: 72,
           proofMode: "required",
-          confirmMode: "partner",
           effortFactorPct: 150,
         },
         asAdmin(),
@@ -152,9 +150,21 @@ describe("create_bounty", () => {
     expect(await choreRow(data.choreId)).toMatchObject({
       kind: "consumable",
       proofMode: "required",
-      confirmMode: "partner",
       effortFactorPct: 150,
     });
+    // There is no confirm mode any more (issue #150).
+    await expect(
+      runAction(
+        "create_bounty",
+        {
+          name: "Mop",
+          kind: "maintenance",
+          points: 10,
+          confirmMode: "partner",
+        },
+        asAdmin(),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
     expect(await weights(data.choreId)).toEqual([
       { base: 10, cooldown: 72 * 60, source: "manual" },
     ]);
@@ -408,7 +418,6 @@ describe("update_bounty", () => {
       name: "Bins",
       kind: "consumable",
       proofMode: before.proofMode,
-      confirmMode: before.confirmMode,
       effortFactorPct: before.effortFactorPct,
     });
 

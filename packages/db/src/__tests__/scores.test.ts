@@ -75,13 +75,16 @@ describe("listSeasonScores", () => {
     const ryan = await seedPlayer(db(), "Ryan");
     const partner = await seedPlayer(db(), "Partner");
     const { choreId: trash } = await seedChore(db(), SEED_CHORES.trash);
-    const { choreId: dishes } = await seedChore(db(), {
-      ...SEED_CHORES.dishes,
-      confirmMode: "partner",
-    });
+    const { choreId: dishes } = await seedChore(db(), SEED_CHORES.dishes);
     const first = await selfClaim(trash, ryan, NOW);
-    // Partner-mode self-claims are not counted, so they have no score.
-    await selfClaim(dishes, ryan, at(1));
+    // A voided claim is not counted, so it has no score.
+    const undone = await selfClaim(dishes, ryan, at(1));
+    await applyCompletionEvent(db(), {
+      householdId: HOUSEHOLD_ID,
+      completionId: undone.id,
+      event: { type: "undo", actor: ryan },
+      now: at(1),
+    });
     const second = await log({
       choreId: trash,
       doneBy: partner,
@@ -97,7 +100,6 @@ describe("listSeasonScores", () => {
       doneBy: partner,
       loggedBy: ryan,
       status: "confirmed",
-      confirmMode: "optimistic",
       verifiedBy: ryan,
       streakLen: 1,
       basePts: SEED_CHORES.trash.basePoints,

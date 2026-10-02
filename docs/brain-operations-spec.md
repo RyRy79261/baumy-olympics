@@ -57,7 +57,7 @@ plus `issues` (with `INVALID_INPUT`), `retryAt` (with `COOLDOWN`) or
 | ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | 400    | `INVALID_INPUT`                 | A bug on our side or a bad slot: `issues` says which field or header. Ask the person to rephrase.             |
 | 401    | `UNAUTHENTICATED`               | Olympics is not (correctly) connected. "Baumy Olympics isn't connected to me yet."                            |
-| 403    | `FORBIDDEN`                     | Not allowed for this member (for example confirming your own claim). Show `message`.                          |
+| 403    | `FORBIDDEN`                     | Not allowed for this member (for example disputing your own claim). Show `message`.                           |
 | 403    | `SURFACE_FORBIDDEN`             | Not Baumy's to do (admin or app-only). "That's done in the Olympics app."                                     |
 | 403    | `TELEGRAM_NOT_LINKED`           | "Link your Telegram first: Olympics → Settings → Link Telegram, then tap Start here (or DM me /link <code>)." |
 | 404    | `UNKNOWN_ACTION`, `NOT_FOUND`   | No such action, or the thing (event, note, reminder, claim, housemate) is gone. Show `message`.               |
@@ -146,10 +146,10 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   at once, and the record says truthfully who logged it. On-behalf would
   claim Jo logged it herself.
 - **Never for someone's own word** (403 `FORBIDDEN`, before any confirm
-  card): the claim events `confirm_completion`, `dispute_completion`,
-  `undo_completion`, `withdraw_dispute` and `concede_completion`
-  (`own_word_only` in the tool list). The member has to say it themself, or
-  the honesty layer (nobody confirms their own claim) would mean nothing.
+  card): the claim events `dispute_completion`, `undo_completion`,
+  `withdraw_dispute` and `concede_completion` (`own_word_only` in the tool
+  list). The member has to say it themself, or the honesty layer (nobody
+  disputes in someone else's name) would mean nothing.
   Tell the asker the housemate has to do it. Notes, reminders, calendar
   events and the rest do work on a housemate's behalf.
 - Admin actions stay unavailable, on anyone's behalf. The three admin writes
@@ -185,15 +185,15 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 - **Points and the pot.** Season points are scored completions plus approved
   adjustments. The pot is a savings ledger in euro cents; the leader at the
   end of the season takes it all (money moves at the bank, not in Olympics).
-- **Confirmations and the 24-hour dispute window.** Logging for someone else
-  verifies the claim at once. A self-claim is `pending`: it counts
-  provisionally and finalizes 24 hours after logging, unless someone confirms
-  it sooner or disputes it inside those 24 hours (a dispute needs a reason). A
-  disputed claim scores nothing; it is voided when the window ends unless the
-  doer attached a photo in time. The disputer can withdraw, the doer can
-  concede, and the logger can undo within 10 minutes. Some chores are in
-  partner mode: a self-claim counts only once someone confirms it (72 hours,
-  then it is voided).
+- **The 24-hour dispute window.** There is no confirming chores (owner,
+  2026-10-02): a self-claim is `pending`, counts at once and finalizes 24
+  hours after logging, unless someone disputes it inside those 24 hours (a
+  dispute needs a reason). Logging for someone else verifies the claim at
+  once. A disputed claim scores nothing; it is voided when the window ends
+  unless the doer attached a photo in time. The disputer can withdraw, the
+  doer can concede, and the logger can undo within 10 minutes.
+  `get_activity` is the activity log: what happened in the house, newest
+  first.
 - **Weights.** Every week Olympics suggests new points for chores from how
   often they are really done. An admin schedules a change; any other member
   may veto it before it applies (next Monday, 00:00 Berlin, at least 48 hours
@@ -224,8 +224,7 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 | [`log_completion`](#log_completion-log-a-chore) | write | confirm | always | no, use `doneBy` |
 | [`create_bounty`](#create_bounty-add-a-bounty) | write | confirm | always | no, only themself |
 | [`update_bounty`](#update_bounty-edit-a-bounty) | write | confirm | always | no, only themself |
-| [`get_pending_confirmations`](#get_pending_confirmations-claims-waiting-for-an-ok) | read | safe | never | yes |
-| [`confirm_completion`](#confirm_completion-confirm-a-chore) | write | confirm | always | no, only themself |
+| [`get_activity`](#get_activity-activity-log) | read | safe | never | yes |
 | [`dispute_completion`](#dispute_completion-dispute-a-chore) | write | confirm | always | no, only themself |
 | [`undo_completion`](#undo_completion-undo-a-logged-chore) | write | confirm | always | no, only themself |
 | [`withdraw_dispute`](#withdraw_dispute-withdraw-a-dispute) | write | confirm | always | no, only themself |
@@ -539,11 +538,11 @@ Logs that someone did a chore, and scores it.
 }
 ```
 
-**Returns** (`data`): `completionId`, `choreName`, `doneBy`/`doneByName`, `status`, `counted` (false while a partner-mode claim waits for someone to confirm), `totalPts`, `streakLen`, and a break (`breakPts`, `brokenMemberName`, `brokenLen`) if one happened.
+**Returns** (`data`): `completionId`, `choreName`, `doneBy`/`doneByName`, `status`, `totalPts`, `streakLen`, and a break (`breakPts`, `brokenMemberName`, `brokenLen`) if one happened.
 
 **Its errors:** `COOLDOWN` (422), `FUTURE` (422), `BACKDATE_TOO_FAR` (422), `OUT_OF_ORDER` (422), `SEASON_CLOSED` (422), `PHOTO_REQUIRED` (422), `ARCHIVED_CHORE` (422), `NO_RULE_VERSION` (422), `NOT_FOUND` (404). Every call can also get the endpoint's codes (above).
 
-**Say back:** "Logged <choreName> for <doneByName>: +<totalPts> (streak <streakLen>)", plus "and broke <brokenMemberName>'s streak of <brokenLen> for +<breakPts>" when there was a break, or "it counts once someone confirms it" when `counted` is false. On COOLDOWN say when it can be logged again (`retryAt`, in Berlin time). On PHOTO_REQUIRED: "that one needs a photo, log it in the app".
+**Say back:** "Logged <choreName> for <doneByName>: +<totalPts> (streak <streakLen>)", plus "and broke <brokenMemberName>'s streak of <brokenLen> for +<breakPts>" when there was a break. On COOLDOWN say when it can be logged again (`retryAt`, in Berlin time). On PHOTO_REQUIRED: "that one needs a photo, log it in the app".
 
 ### `create_bounty`: Add a bounty
 
@@ -560,7 +559,7 @@ Adds a bounty (a chore that scores points) to the board, as an admin.
 
 **When to use it.** Only when an admin asks for a new bounty. A non-admin gets FORBIDDEN: say an admin adds it. Give a name and points; the rest has defaults (maintenance, 24 h cooldown, no photo, counts at once).
 
-**Tool description** (the registry's, verbatim): Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none), confirm mode (default optimistic) and effort factor (default 100). Only a household admin may do this, in their own name.
+**Tool description** (the registry's, verbatim): Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none) and effort factor (default 100). Only a household admin may do this, in their own name.
 
 **Examples.**
 
@@ -611,15 +610,6 @@ Adds a bounty (a chore that scores points) to the board, as an admin.
       ],
       "description": "Whether a proof photo is none, optional or required."
     },
-    "confirmMode": {
-      "default": "optimistic",
-      "type": "string",
-      "enum": [
-        "optimistic",
-        "partner"
-      ],
-      "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
-    },
     "effortFactorPct": {
       "default": 100,
       "type": "integer",
@@ -655,9 +645,9 @@ Edits a bounty as an admin: only the fields sent change. A new weight counts fro
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
 
-**When to use it.** Only when an admin asks to change a bounty's name, kind, points, cooldown, photo or confirm rule. Find the `choreId` with list_chores. Archiving is done in the app.
+**When to use it.** Only when an admin asks to change a bounty's name, kind, points, cooldown or photo rule. Find the `choreId` with list_chores. Archiving is done in the app.
 
-**Tool description** (the registry's, verbatim): Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, confirm mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.
+**Tool description** (the registry's, verbatim): Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.
 
 **Examples.**
 
@@ -709,14 +699,6 @@ Edits a bounty as an admin: only the fields sent change. A new weight counts fro
       ],
       "description": "Whether a proof photo is none, optional or required."
     },
-    "confirmMode": {
-      "type": "string",
-      "enum": [
-        "optimistic",
-        "partner"
-      ],
-      "description": "optimistic (counts at once) or partner (counts once a housemate confirms)."
-    },
     "effortFactorPct": {
       "type": "integer",
       "minimum": 50,
@@ -737,9 +719,9 @@ Edits a bounty as an admin: only the fields sent change. A new weight counts fro
 
 **Say back:** "Done: <name> is now <what changed>."
 
-### `get_pending_confirmations`: Claims waiting for an OK
+### `get_activity`: Activity log
 
-Lists chore claims still waiting to settle, and what the asker may do to each.
+The activity log: what happened in the house in the last 30 days, newest first (chores logged, disputes, bounties added or edited, points changes scheduled, applied or vetoed), and what the asker may do to each.
 
 | | |
 | --- | --- |
@@ -750,50 +732,14 @@ Lists chore claims still waiting to settle, and what the asker may do to each.
 | `Idempotency-Key` | not needed |
 | Rate limit | 120 per Telegram user and 300 per IP in a minute |
 
-**When to use it.** For "anything waiting on me?", and to find the `completionId` before confirming, disputing, undoing, withdrawing or conceding. Use `can` to offer only what is allowed.
+**When to use it.** For "what happened today?" or "what did Sam log?", and to find the `completionId` before disputing, undoing, withdrawing or conceding. Use `can` (and `canVeto` on a scheduled points change) to offer only what is allowed. There is no confirming: a self-claim counts at once and settles when its 24-hour window ends.
 
-**Tool description** (the registry's, verbatim): Lists the household's chore claims still waiting to settle (pending or disputed), with who did and logged each, when its dispute window ends, any open dispute and its reason, and `can`: which of confirm, dispute, withdraw, concede, undo and attach a photo you may do to it now. `needsYou` marks the ones waiting on you. `recent` lists your own claims of the last 7 days that have settled (finalized, confirmed or voided). Times are ISO 8601 in UTC.
-
-**Examples.**
-
-- "anything I need to confirm?" → `get_pending_confirmations {}`
-
-**Input** (JSON Schema of the body):
-
-```json
-{
-  "type": "object",
-  "properties": {},
-  "additionalProperties": false
-}
-```
-
-**Returns** (`data`): `claims` (pending or disputed; who did and logged each, when its window ends, any dispute and reason, `can`, `needsYou`) and `recent` (the asker's own claims settled in the last 7 days).
-
-**Its errors:** none of its own. Every call can also get the endpoint's codes (above).
-
-**Say back:** The ones with `needsYou` first, each as "<doer> did <chore> <when>" with the actions `can` allows.
-
-### `confirm_completion`: Confirm a chore
-
-Confirms a housemate's self-claimed chore, which verifies it.
-
-| | |
-| --- | --- |
-| Kind | `write` |
-| Risk | `confirm`: always send `X-Baumy-Confirmed: 1`, only after the asker tapped the confirm button (428 without it) |
-| Who may | any linked member |
-| On a housemate's behalf | no (403 `FORBIDDEN`): only the member themself may, since it is their own word; ask them to do it in the app or in Telegram |
-| `Idempotency-Key` | required; the same key again replays |
-| Rate limit | 30 per Telegram user and 120 per IP in a minute |
-
-**When to use it.** When someone says a housemate really did it ("yes, Sam did clean the bathroom"). Not for your own claims, and never on behalf of someone else (403): if Jo says Sam did it, Jo confirms it herself.
-
-**Tool description** (the registry's, verbatim): Confirms a housemate's self-claimed chore that is waiting for an OK (pending), which verifies it. You cannot confirm your own. Refused with INVALID_STATE once it has finalized, expired or been disputed. Get ids from get_pending_confirmations.
+**Tool description** (the registry's, verbatim): Lists what happened in the house in the last 30 days, newest first: chores logged (who did and logged each, its status, points, any open dispute and when its dispute window ends), disputes raised and how they ended, bounties added or edited, and points changes scheduled, applied or vetoed. A chore entry's `can` says which of dispute, withdraw, concede, undo and attach a photo you may do to it now; a scheduled points change's `canVeto` says whether you may veto it. Times are ISO 8601 in UTC.
 
 **Examples.**
 
-- "yes Sam did the bathroom" → `confirm_completion {"completionId": "<from get_pending_confirmations>"}`
+- "what's been happening?" → `get_activity {}`
+- "anything I can still dispute?" → `get_activity {}`
 
 **Input** (JSON Schema of the body):
 
@@ -801,25 +747,22 @@ Confirms a housemate's self-claimed chore, which verifies it.
 {
   "type": "object",
   "properties": {
-    "completionId": {
-      "type": "string",
-      "format": "uuid",
-      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-      "description": "The completion's id, from get_pending_confirmations."
+    "limit": {
+      "description": "At most this many entries (default 50).",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
     }
   },
-  "required": [
-    "completionId"
-  ],
   "additionalProperties": false
 }
 ```
 
-**Returns** (`data`): `completionId`, `choreName`, the new `status` and `finalizesAt`.
+**Returns** (`data`): `entries`, newest first, each with a `kind`: `chore` (who did and logged it, `status`, `totalPts`, any open `dispute`, `windowEndsAt` and `can`), `dispute` (who raised it, the reason and its `resolution`), `bounty` (`added` or `edited`, and by whom) or `points` (`scheduled`, `applied` or `vetoed`, from and to, and `canVeto`); and `days`, how far back it reads.
 
-**Its errors:** `NOT_FOUND` (404), `INVALID_STATE` (422), `WINDOW_CLOSED` (422), `FORBIDDEN` (403). Every call can also get the endpoint's codes (above).
+**Its errors:** none of its own. Every call can also get the endpoint's codes (above).
 
-**Say back:** "Confirmed <doer>'s <choreName>."
+**Say back:** A few lines, newest first, each as "<who> <did what> <when>", with the actions `can` allows on the ones the asker may act on.
 
 ### `dispute_completion`: Dispute a chore
 
@@ -834,9 +777,9 @@ Disputes a housemate's self-claimed chore inside its 24-hour window, with a reas
 | `Idempotency-Key` | required; the same key again replays |
 | Rate limit | 30 per Telegram user and 120 per IP in a minute |
 
-**When to use it.** When someone says a claimed chore was not done. Ask for the reason if none was given; it is required.
+**When to use it.** When someone says a claimed chore was not done. Ask for the reason if none was given; it is required. Find the `completionId` with get_activity.
 
-**Tool description** (the registry's, verbatim): Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.
+**Tool description** (the registry's, verbatim): Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. Get ids from get_activity. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.
 
 **Examples.**
 
@@ -852,7 +795,7 @@ Disputes a housemate's self-claimed chore inside its 24-hour window, with a reas
       "type": "string",
       "format": "uuid",
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-      "description": "The completion's id, from get_pending_confirmations."
+      "description": "The completion's id, from get_activity."
     },
     "reason": {
       "type": "string",
@@ -906,7 +849,7 @@ Undoes a chore the asker logged, within 10 minutes of logging it.
       "type": "string",
       "format": "uuid",
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-      "description": "The completion's id, from get_pending_confirmations."
+      "description": "The completion's id, from get_activity."
     }
   },
   "required": [
@@ -953,7 +896,7 @@ Withdraws a dispute the asker raised; the claim counts again.
       "type": "string",
       "format": "uuid",
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-      "description": "The completion's id, from get_pending_confirmations."
+      "description": "The completion's id, from get_activity."
     }
   },
   "required": [
@@ -1000,7 +943,7 @@ Concedes a dispute on the asker's own claim; it is voided.
       "type": "string",
       "format": "uuid",
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-      "description": "The completion's id, from get_pending_confirmations."
+      "description": "The completion's id, from get_activity."
     }
   },
   "required": [

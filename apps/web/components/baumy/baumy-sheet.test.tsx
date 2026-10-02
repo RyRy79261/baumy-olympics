@@ -1001,8 +1001,8 @@ describe("BaumySheet on the kitchen dashboard", () => {
     const pinned = (n: number) => ({
       ...proposal,
       proposalId: `pin${n}`,
-      name: "confirm_completion",
-      preview: `Confirm claim ${n}`,
+      name: "dispute_completion",
+      preview: `Dispute claim ${n}`,
       needsPin: true,
     });
     const free = { ...proposal, proposalId: "free" };

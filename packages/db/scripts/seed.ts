@@ -1,4 +1,5 @@
-// `db:seed`: give the household the starter chores of SPEC §4.7, once.
+// `db:seed`: give the household the starter chores of SPEC §4.7, once, and
+// score any counted claim that has no score yet (issue #150).
 //
 // Safe to run on every deploy and by hand: `seedStarterChores` adds them only
 // when the household has no chores at all, so an admin's renames and
@@ -10,6 +11,7 @@
 import { Pool } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { seedStarterChores } from "../src/chores";
+import { rescoreUnscoredClaims } from "../src/completions";
 import { HOUSEHOLD_ID } from "../src/household";
 import { configureLocalProxy, type Queryable } from "../src/index";
 import { planMigrate } from "../src/migrate-guard";
@@ -38,6 +40,17 @@ try {
     created > 0
       ? `[seed] ${plan.host}: added ${created} starter chores.`
       : `[seed] ${plan.host}: the household already has chores; nothing to do.`,
+  );
+  // Issue #150: claims that migration 0024 made count get their scores.
+  // Idempotent, so every later deploy finds nothing to do.
+  const rescored = await db.transaction((tx) =>
+    rescoreUnscoredClaims(tx as unknown as Queryable, {
+      householdId: HOUSEHOLD_ID,
+      now: new Date(),
+    }),
+  );
+  console.log(
+    `[seed] ${plan.host}: re-scored ${rescored} chore-season(s) with unscored claims.`,
   );
 } finally {
   await pool.end();

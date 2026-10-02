@@ -578,7 +578,7 @@ without it.
       `apps/web/.env.local` (never commit it).
 - [ ] **After the deploy, try it:** set a chore's photo proof to Optional on
       `/admin/chores`, log it with a photo on `/chores`, and open
-      `/inbox`: the claim shows the photo. Opening that photo's
+      `/activity`: the claim shows the photo. Opening that photo's
       `/api/blob?pathname=…` link in a private window must answer 401.
 - The daily job (issue #18) deletes a photo 90 days after its claim
   settled; without a Blob store it leaves them alone. A file whose action
@@ -616,7 +616,7 @@ at once), and the schedule-then-veto flow end to end.
       `applyDueSuggestions`. In e2e, the test-only `POST /api/test/weights`
       runs them on any day (404 outside `E2E_TEST_MODE=1`).
 - [ ] **Decide the weight changes together.** A change one admin schedules
-      shows on `/inbox` ("Point changes coming") for everyone else to veto
+      shows on `/activity` (scheduled, with Veto) for everyone else to veto
       until it applies, at the first Monday 00:00 Berlin at least 48h away
       and at least 28 days after the chore's last change.
 - [ ] **Look and feel is deferred to issue #7.** The sparkline is a neutral
@@ -653,7 +653,7 @@ on PGlite and Docker Postgres (overlapping runs), so CI needs no secret.
 - [ ] **Decide the December pot** ([UNRESOLVED] in SPEC §4.5): money for
       last season can be recorded until the job closes it, about 2 January.
 - A season with a disputed claim that has a photo stays `closing` until an
-  admin rules on it on `/inbox`; then the next run writes the winner.
+  admin rules on it on `/activity`; then the next run writes the winner.
 
 ## Calendar (issue #19)
 

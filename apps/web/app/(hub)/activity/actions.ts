@@ -5,14 +5,13 @@ import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { ActionResult } from "@/lib/actions/result";
 import { actionForm } from "@/lib/actions/ui";
 
-// /inbox's server actions: thin wrappers around the registry (SPEC §6.3).
+// /activity's server actions: thin wrappers around the registry (SPEC §6.3).
 // Each refreshes the pages whose numbers a claim changes.
 
 type Result = ActionResult<ClaimEventData>;
 
 async function run(
   name:
-    | "confirm_completion"
     | "dispute_completion"
     | "undo_completion"
     | "withdraw_dispute"
@@ -22,14 +21,10 @@ async function run(
 ): Promise<Result> {
   const result = await actionForm(name, form);
   if (result.ok) {
-    revalidatePath("/inbox");
+    revalidatePath("/activity");
     revalidatePath("/chores");
   }
   return result;
-}
-
-export async function confirmClaimAction(_prev: Result | null, form: FormData) {
-  return run("confirm_completion", form);
 }
 
 export async function disputeClaimAction(_prev: Result | null, form: FormData) {

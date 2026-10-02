@@ -1,7 +1,7 @@
 // Shared fixtures for the SPEC §4.6 worked examples. The chores are the seed
 // values of SPEC §4.7; everything about scoring comes from RULESET_V1.
 import { berlinWallTimeToUtc } from "../../time";
-import type { ConfirmMode, CompletionStatus, RuleVersion } from "../ruleset";
+import type { CompletionStatus, RuleVersion } from "../ruleset";
 import type { ReplayCompletion } from "../replay";
 
 export const RYAN = "member-ryan";
@@ -50,7 +50,6 @@ export function completion(
     occurredAt,
     loggedAt: occurredAt,
     status: "confirmed" satisfies CompletionStatus,
-    confirmMode: "optimistic" satisfies ConfirmMode,
     ...overrides,
   };
 }

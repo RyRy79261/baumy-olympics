@@ -4,8 +4,6 @@ import { createHttpDb, type Queryable } from "@baumy/db";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { findKioskPinLockedAt } from "@baumy/db/members";
 import { AppShell, FormMessage, navItemClass } from "@baumy/ui";
-import { runAction } from "@/lib/actions/registry";
-import { uiRequestCtx } from "@/lib/actions/ui";
 import { memberOrVisitorPage } from "@/lib/auth";
 import { runSweepAfterResponse } from "@/lib/background-work";
 import { householdRoster } from "@/lib/members/household";
@@ -14,7 +12,7 @@ import { ScoreEmote } from "@/components/members/score-emote";
 import { HubBaumy } from "@/components/hub/hub-baumy";
 import { voiceConfigured } from "@/lib/integrations/groq";
 import { reportAiAvailable } from "@/lib/feedback/ai";
-import { HubMenu, InboxBadge, NavLinks, type NavItem } from "./nav-links";
+import { HubMenu, NavLinks, type NavItem } from "./nav-links";
 
 // The hub's shell (SPEC §7) around every page for household members. The
 // gate here is for the frame; each page runs its own gate too, because a
@@ -30,22 +28,17 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
   // SPEC §6.7: the daily job's sweep, at most every 15 minutes, after this
   // response (lib/background-work.ts). Nothing on the page waits on it.
   runSweepAfterResponse();
-  // The frame's three reads are independent, so they run side by side
-  // (issue #128): one database round trip of waiting, not three.
+  // The frame's two reads are independent, so they run side by side
+  // (issue #128): one database round trip of waiting, not two.
   const db = createHttpDb() as unknown as Queryable;
-  const [roster, pinLockedAt, pending] = await Promise.all([
+  const [roster, pinLockedAt] = await Promise.all([
     // Their look as every screen shows it (lib/members/characters.ts).
     householdRoster(HOUSEHOLD_ID),
     // SPEC §6.2: after 10 wrong PINs at the kiosk, the member hears about it
     // on their own device, on every page, until they set a new PIN.
     findKioskPinLockedAt(db, me.memberId),
-    // "Needs your OK" shows how many claims wait on this member (SPEC §4.3).
-    uiRequestCtx(undefined).then((ctx) =>
-      runAction("get_pending_confirmations", {}, ctx!),
-    ),
   ]);
   const look = roster.get(me.memberId);
-  const waiting = pending.ok ? pending.data.needsYouCount : 0;
   // The main pages are the nav, named as on the kitchen screen (ADR 0005:
   // chores are Bounties, notes are the Board); Admin and the account fold into menus
   // (issue #64), so the header is one row on a laptop.
@@ -57,11 +50,8 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
     { href: "/shopping", label: "Shopping" },
     { href: "/scores", label: "Scores" },
     { href: "/pot", label: "Pot" },
-    // With claims waiting, the inbox is pinned as a badge in the top row
-    // instead, so the count is seen at every width.
-    ...(waiting > 0
-      ? []
-      : ([{ href: "/inbox", label: "Needs your OK" }] as NavItem[])),
+    // What happened in the house (issue #150); not an inbox, and no count.
+    { href: "/activity", label: "Activity" },
   ];
   const admin: NavItem[] = [
     { href: "/admin/members", label: "Members" },
@@ -77,7 +67,6 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
       nav={<NavLinks items={items} />}
       user={
         <>
-          {waiting > 0 ? <InboxBadge waiting={waiting} /> : null}
           {me.role === "admin" ? (
             <HubMenu label="Admin" items={admin} data-testid="admin-menu" />
           ) : null}

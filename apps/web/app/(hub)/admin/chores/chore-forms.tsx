@@ -37,7 +37,6 @@ export interface ChoreFormValues {
   basePoints: number;
   cooldownHours: number;
   proofMode: ChoreView["proofMode"];
-  confirmMode: ChoreView["confirmMode"];
   effortFactorPct: number;
   /** The chore's `chores.sprite`; undefined for a new chore. */
   sprite?: string;
@@ -59,7 +58,6 @@ const NEW_CHORE: ChoreFormValues = {
   basePoints: 20,
   cooldownHours: 24,
   proofMode: "none",
-  confirmMode: "optimistic",
   effortFactorPct: 100,
 };
 
@@ -171,23 +169,6 @@ function ChoreFields({
             <option value="none">None</option>
             <option value="optional">Optional</option>
             <option value="required">Required</option>
-          </Select>
-        )}
-      </Field>
-      <Field
-        id={`${prefix}-confirm`}
-        label="Confirmation"
-        hint="Optimistic counts at once; partner waits for someone else."
-        errors={errors.confirmMode}
-      >
-        {(control) => (
-          <Select
-            {...control}
-            name="confirmMode"
-            defaultValue={values.confirmMode}
-          >
-            <option value="optimistic">Optimistic</option>
-            <option value="partner">Partner confirms</option>
           </Select>
         )}
       </Field>
@@ -316,7 +297,6 @@ export function EditChoreDialog({
                 ? chore.cooldownMinutes / 60
                 : NEW_CHORE.cooldownHours,
             proofMode: chore.proofMode,
-            confirmMode: chore.confirmMode,
             effortFactorPct: chore.effortFactorPct,
             sprite: chore.sprite,
           }}
@@ -381,7 +361,7 @@ export function ChoreAdminRow({ chore }: { chore: ChoreView }) {
         {chore.cooldownMinutes !== null
           ? ` · cooldown ${chore.cooldownMinutes / 60}h`
           : ""}
-        {` · ${chore.kind} · proof ${chore.proofMode} · ${chore.confirmMode} · effort ${chore.effortFactorPct}%`}
+        {` · ${chore.kind} · proof ${chore.proofMode} · effort ${chore.effortFactorPct}%`}
         {chore.archived ? " · archived" : ""}
       </span>
       <span className="ml-auto flex gap-2">

@@ -3,22 +3,23 @@
 // `now` (`effectiveStatus`), never against the stored one alone.
 //
 // Two kinds of transition exist:
-// - events (confirm, dispute, withdraw, concede, undo, resolve), which the
-//   caller persists as a compare-and-set on `expectedStatus`;
+// - events (dispute, withdraw, concede, undo, resolve), which the caller
+//   persists as a compare-and-set on `expectedStatus`;
 // - time-derived ones (⏱ in the SPEC table), which are computed on read and
 //   only persisted by the daily job (`settle`). None of them changes the
 //   counted set (`isCounted` in replay.ts), so stored scores never go stale.
-import {
-  RULESET_V1,
-  type CompletionStatus,
-  type ConfirmMode,
-  type Ruleset,
-} from "./ruleset";
+//
+// There is no confirming (SPEC §12 decision 29): a self-claim counts at once
+// and settles when its challenge window ends, unless someone disputes it.
+import { RULESET_V1, type CompletionStatus, type Ruleset } from "./ruleset";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 
-/** Why a completion was voided (`completions.void_reason`). */
+/**
+ * Why a completion was voided (`completions.void_reason`). `unconfirmed` is
+ * history only: a claim of the removed partner mode that nobody confirmed.
+ */
 export type VoidReason = "unconfirmed" | "conceded" | "disputed" | "undone";
 
 /** How an open dispute ended (`disputes.resolution`). */
@@ -28,11 +29,10 @@ export type DisputeResolution =
 /** The columns of a completion that decide its verification status. */
 export interface VerificationRow {
   status: CompletionStatus;
-  confirmMode: ConfirmMode;
   doneBy: string;
   loggedBy: string;
   loggedAt: Date;
-  /** Optimistic claims only: when `pending` becomes `finalized`. */
+  /** Self-claims only: when `pending` becomes `finalized`. */
   finalizesAt: Date | null;
   /** When the first proof photo was attached, if any. */
   photoAttachedAt: Date | null;
@@ -46,28 +46,26 @@ export interface VerificationRow {
 /** The fields `effectiveStatus` reads. */
 export type TimedRow = Pick<
   VerificationRow,
-  "status" | "confirmMode" | "loggedAt" | "finalizesAt" | "photoAttachedAt"
+  "status" | "loggedAt" | "finalizesAt" | "photoAttachedAt"
 >;
 
 export interface NewClaim {
   doneBy: string;
   loggedBy: string;
-  confirmMode: ConfirmMode;
   loggedAt: Date;
   photoAttachedAt?: Date | null;
 }
 
 /**
  * The row a new completion starts as. Logged for someone else, it is verified
- * on creation. A self-claim is `pending`: optimistic ones finalize at
- * `logged_at + 24h`, partner ones wait up to 72h for a confirmation.
+ * on creation. A self-claim is `pending`, counts at once and finalizes at
+ * `logged_at + 24h` unless it is disputed.
  */
 export function initialVerification(
   claim: NewClaim,
   ruleset: Ruleset = RULESET_V1,
 ): VerificationRow {
   const base = {
-    confirmMode: claim.confirmMode,
     doneBy: claim.doneBy,
     loggedBy: claim.loggedBy,
     loggedAt: claim.loggedAt,
@@ -87,18 +85,17 @@ export function initialVerification(
   return {
     ...base,
     status: "pending",
-    finalizesAt:
-      claim.confirmMode === "optimistic"
-        ? new Date(claim.loggedAt.getTime() + ruleset.challengeWindowH * HOUR)
-        : null,
+    finalizesAt: new Date(
+      claim.loggedAt.getTime() + ruleset.challengeWindowH * HOUR,
+    ),
     verifiedBy: null,
     verifiedAt: null,
   };
 }
 
 /**
- * When the challenge window closes: `finalizes_at` for an optimistic claim
- * (moved later by a withdrawn dispute), `logged_at + 24h` otherwise.
+ * When the challenge window closes: `finalizes_at` for a self-claim (moved
+ * later by a withdrawn dispute), `logged_at + 24h` otherwise.
  */
 export function challengeWindowEndsAt(
   row: Pick<TimedRow, "loggedAt" | "finalizesAt">,
@@ -107,16 +104,6 @@ export function challengeWindowEndsAt(
   return (
     row.finalizesAt ??
     new Date(row.loggedAt.getTime() + ruleset.challengeWindowH * HOUR)
-  );
-}
-
-/** When an unconfirmed partner-mode claim is voided. */
-export function partnerExpiresAt(
-  row: Pick<TimedRow, "loggedAt">,
-  ruleset: Ruleset = RULESET_V1,
-): Date {
-  return new Date(
-    row.loggedAt.getTime() + ruleset.partnerConfirmExpiryH * HOUR,
   );
 }
 
@@ -131,11 +118,6 @@ function timeDerived(
 ): { status: CompletionStatus; voidReason: VoidReason | null } | null {
   const t = now.getTime();
   if (row.status === "pending") {
-    if (row.confirmMode === "partner") {
-      return t >= partnerExpiresAt(row, ruleset).getTime()
-        ? { status: "voided", voidReason: "unconfirmed" }
-        : null;
-    }
     return row.finalizesAt !== null && t >= row.finalizesAt.getTime()
       ? { status: "finalized", voidReason: null }
       : null;
@@ -187,7 +169,6 @@ export function attachPhoto(row: VerificationRow, now: Date): VerificationRow {
 }
 
 export type VerificationEvent =
-  | { type: "confirm"; actor: string }
   | { type: "dispute"; actor: string; reason: string }
   | { type: "withdraw"; actor: string }
   | { type: "concede"; actor: string }
@@ -201,7 +182,7 @@ export type VerificationEvent =
 
 /**
  * - `INVALID_STATE`: at `now`, the row is not in a status the event applies
- *   to (time may have moved it on: finalized, expired or timed out).
+ *   to (time may have moved it on: finalized or timed out).
  * - `WINDOW_CLOSED`: the challenge window (dispute) or the undo window has
  *   passed.
  * - `FORBIDDEN`: this member may not do this to this row.
@@ -223,7 +204,6 @@ export type TransitionResult =
 
 /** The statuses each event applies to (at `now`). */
 const FROM: Record<VerificationEvent["type"], readonly CompletionStatus[]> = {
-  confirm: ["pending"],
   dispute: ["pending"],
   withdraw: ["disputed"],
   concede: ["disputed"],
@@ -263,14 +243,6 @@ export function transition(
   });
 
   switch (event.type) {
-    case "confirm":
-      if (event.actor === row.doneBy) return fail("FORBIDDEN");
-      return ok({
-        status: "confirmed",
-        verifiedBy: event.actor,
-        verifiedAt: now,
-      });
-
     case "dispute":
       if (event.actor === row.doneBy) return fail("FORBIDDEN");
       if (t >= challengeWindowEndsAt(row, ruleset).getTime()) {
@@ -286,10 +258,9 @@ export function transition(
         {
           status: "pending",
           disputedBy: null,
-          finalizesAt:
-            row.finalizesAt === null
-              ? null
-              : new Date(Math.max(row.finalizesAt.getTime(), grace)),
+          finalizesAt: new Date(
+            Math.max(challengeWindowEndsAt(row, ruleset).getTime(), grace),
+          ),
         },
         "withdrawn",
       );
@@ -335,8 +306,8 @@ export function transition(
 }
 
 /**
- * Verified (SPEC §4.1): someone other than `done_by` logged the completion or
- * confirmed it.
+ * Verified (SPEC §4.1): someone other than `done_by` logged the completion, or
+ * an admin upheld it.
  */
 export function isVerified(
   row: Pick<VerificationRow, "doneBy" | "verifiedBy">,

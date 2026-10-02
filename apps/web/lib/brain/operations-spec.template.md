@@ -57,7 +57,7 @@ plus `issues` (with `INVALID_INPUT`), `retryAt` (with `COOLDOWN`) or
 | ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | 400    | `INVALID_INPUT`                 | A bug on our side or a bad slot: `issues` says which field or header. Ask the person to rephrase.             |
 | 401    | `UNAUTHENTICATED`               | Olympics is not (correctly) connected. "Baumy Olympics isn't connected to me yet."                            |
-| 403    | `FORBIDDEN`                     | Not allowed for this member (for example confirming your own claim). Show `message`.                          |
+| 403    | `FORBIDDEN`                     | Not allowed for this member (for example disputing your own claim). Show `message`.                           |
 | 403    | `SURFACE_FORBIDDEN`             | Not Baumy's to do (admin or app-only). "That's done in the Olympics app."                                     |
 | 403    | `TELEGRAM_NOT_LINKED`           | "Link your Telegram first: Olympics → Settings → Link Telegram, then tap Start here (or DM me /link <code>)." |
 | 404    | `UNKNOWN_ACTION`, `NOT_FOUND`   | No such action, or the thing (event, note, reminder, claim, housemate) is gone. Show `message`.               |
@@ -146,10 +146,10 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   at once, and the record says truthfully who logged it. On-behalf would
   claim Jo logged it herself.
 - **Never for someone's own word** (403 `FORBIDDEN`, before any confirm
-  card): the claim events `confirm_completion`, `dispute_completion`,
-  `undo_completion`, `withdraw_dispute` and `concede_completion`
-  (`own_word_only` in the tool list). The member has to say it themself, or
-  the honesty layer (nobody confirms their own claim) would mean nothing.
+  card): the claim events `dispute_completion`, `undo_completion`,
+  `withdraw_dispute` and `concede_completion` (`own_word_only` in the tool
+  list). The member has to say it themself, or the honesty layer (nobody
+  disputes in someone else's name) would mean nothing.
   Tell the asker the housemate has to do it. Notes, reminders, calendar
   events and the rest do work on a housemate's behalf.
 - Admin actions stay unavailable, on anyone's behalf. The three admin writes
@@ -185,15 +185,15 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
 - **Points and the pot.** Season points are scored completions plus approved
   adjustments. The pot is a savings ledger in euro cents; the leader at the
   end of the season takes it all (money moves at the bank, not in Olympics).
-- **Confirmations and the 24-hour dispute window.** Logging for someone else
-  verifies the claim at once. A self-claim is `pending`: it counts
-  provisionally and finalizes 24 hours after logging, unless someone confirms
-  it sooner or disputes it inside those 24 hours (a dispute needs a reason). A
-  disputed claim scores nothing; it is voided when the window ends unless the
-  doer attached a photo in time. The disputer can withdraw, the doer can
-  concede, and the logger can undo within 10 minutes. Some chores are in
-  partner mode: a self-claim counts only once someone confirms it (72 hours,
-  then it is voided).
+- **The 24-hour dispute window.** There is no confirming chores (owner,
+  2026-10-02): a self-claim is `pending`, counts at once and finalizes 24
+  hours after logging, unless someone disputes it inside those 24 hours (a
+  dispute needs a reason). Logging for someone else verifies the claim at
+  once. A disputed claim scores nothing; it is voided when the window ends
+  unless the doer attached a photo in time. The disputer can withdraw, the
+  doer can concede, and the logger can undo within 10 minutes.
+  `get_activity` is the activity log: what happened in the house, newest
+  first.
 - **Weights.** Every week Olympics suggests new points for chores from how
   often they are really done. An admin schedules a change; any other member
   may veto it before it applies (next Monday, 00:00 Berlin, at least 48 hours

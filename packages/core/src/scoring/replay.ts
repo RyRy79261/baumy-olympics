@@ -8,7 +8,6 @@ import {
   RULESET_V1,
   ruleVersionAt,
   type CompletionStatus,
-  type ConfirmMode,
   type RuleVersion,
   type Ruleset,
 } from "./ruleset";
@@ -19,8 +18,6 @@ export interface ReplayCompletion {
   occurredAt: Date;
   loggedAt: Date;
   status: CompletionStatus;
-  /** The chore's confirm mode, which decides whether `pending` counts. */
-  confirmMode: ConfirmMode;
 }
 
 /** One `completion_scores` row (SPEC §5), minus `computed_at`. */
@@ -40,13 +37,17 @@ export interface CompletionScore {
 }
 
 /**
- * Counted for scoring (SPEC §4.1): confirmed, finalized, or optimistic
- * pending. Partner-mode pending, disputed and voided rows are skipped. None of
- * this depends on the time, so the counted set only changes on a write.
+ * Counted for scoring (SPEC §4.1): confirmed, finalized or pending. Disputed
+ * and voided rows are skipped. A self-claim counts from the moment it is
+ * logged (there is no confirming, §12 decision 29). None of this depends on
+ * the time, so the counted set only changes on a write.
  */
-export function isCounted(c: Pick<ReplayCompletion, "status" | "confirmMode">) {
-  if (c.status === "confirmed" || c.status === "finalized") return true;
-  return c.status === "pending" && c.confirmMode === "optimistic";
+export function isCounted(c: Pick<ReplayCompletion, "status">) {
+  return (
+    c.status === "confirmed" ||
+    c.status === "finalized" ||
+    c.status === "pending"
+  );
 }
 
 /** Replay order: `(occurred_at, logged_at, id)`. */
