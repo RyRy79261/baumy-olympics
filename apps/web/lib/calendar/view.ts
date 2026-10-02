@@ -35,6 +35,8 @@ export interface CalendarEventView {
   when: string;
   /** The member who added it in the app, or null. */
   addedBy: string | null;
+  /** The member it is for (issue #134), or null for the whole house. */
+  forMember: string | null;
 }
 
 /** The fields of a calendar event this needs (the adapter's CalendarEvent). */
@@ -47,6 +49,7 @@ export interface EventLike {
   start: string;
   end: string;
   member: string | null;
+  forMember?: string | null;
 }
 
 /** How long an event is on the calendar, for people. */
@@ -97,6 +100,7 @@ export function eventView(e: EventLike): CalendarEventView {
     ...base,
     when: whenLabel(base),
     addedBy: e.member,
+    forMember: e.forMember ?? null,
   };
 }
 

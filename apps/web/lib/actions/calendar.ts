@@ -13,6 +13,7 @@ import {
   NewCalendarEvent,
   daysBetween,
 } from "@baumy/types";
+import { findActiveMember } from "@baumy/db/members";
 import { eventView, type CalendarEventView } from "@/lib/calendar/view";
 import { calendarClient } from "@/lib/integrations/calendar";
 import type {
@@ -36,6 +37,10 @@ import { fail, type ActionFailure } from "./result";
 //
 // Private and confidential events are never shown, and cannot be changed or
 // deleted from here: the calendar is shared, and the kitchen screen is too.
+//
+// The writes are `attested` (SPEC §6.2: on the kiosk, changing calendar
+// entries takes the acting member's PIN; issue #134). A session, MCP and
+// brain are their own member, so only the kiosk is asked for a PIN.
 
 /** The calendar's failures as sentences people can act on. */
 export function calendarFailure(r: CalendarFailure): ActionFailure {
@@ -82,6 +87,7 @@ export function specOf(i: Fields): EventSpec {
     date: i.date,
     endDate: i.endDate ?? i.date,
     ...(allDay ? {} : { startTime: i.startTime!, endTime: i.endTime! }),
+    forMember: i.forMemberId ?? null,
   };
 }
 
@@ -96,7 +102,24 @@ export function specOfEvent(e: CalendarEvent): EventSpec {
     date: v.startDate,
     endDate: v.endDate,
     ...(e.allDay ? {} : { startTime: v.startTime!, endTime: v.endTime! }),
+    forMember: e.forMember,
   };
+}
+
+/**
+ * Who the event is for must be an active member of this household; anyone
+ * else is an input error on that field, before Google is called.
+ */
+async function checkForMember(
+  ctx: ActionCtx,
+  forMemberId: string | undefined,
+): Promise<ActionFailure | null> {
+  if (!forMemberId) return null;
+  const member = await findActiveMember(ctx.db, ctx.householdId, forMemberId);
+  if (member) return null;
+  return fail("INVALID_INPUT", "Pick someone in the house.", {
+    issues: [{ path: ["forMemberId"], message: "Pick someone in the house." }],
+  });
 }
 
 /** Private events stay hidden: to this app they do not exist. */
@@ -120,7 +143,7 @@ export const listEvents = defineAction({
   name: "list_events",
   title: "Calendar",
   description:
-    "Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM) and who added it (a member id). Private events are left out.",
+    "Lists the house calendar's events between two Berlin days (inclusive; both default to today), soonest first, with each event's id, title, notes, place, whether it is all day, its first and last day, its Berlin start and end time (HH:MM), who added it and who it is for (member ids; null for the whole house). Private events are left out.",
   consent: "See the house calendar",
   kind: "read",
   risk: "safe",
@@ -172,6 +195,7 @@ function previewWhen(i: Fields): string {
       ? addDaysToDateKey(s.endDate, 1)
       : berlinDateTimeToUtc(s.endDate, s.endTime).toISOString(),
     member: null,
+    forMember: null,
   }).when;
 }
 
@@ -179,18 +203,20 @@ export const createEvent = defineAction({
   name: "create_event",
   title: "Add a calendar event",
   description:
-    "Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date.",
+    "Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date. forMemberId names the one member it is for; leave it out for the whole house.",
   consent: "Add events to the house calendar",
   kind: "write",
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: "member",
+  requires: "attested",
   transactional: false,
   input: NewCalendarEvent,
   async preview(_ctx, i) {
     return `Add "${i.title}" on ${previewWhen(i)}`;
   },
   async execute(ctx: ActionCtx, i) {
+    const badFor = await checkForMember(ctx, i.forMemberId);
+    if (badFor) return badFor;
     const client = calendarClient();
     const eventId = eventIdFor(ctx);
     const created = await client.create(
@@ -222,18 +248,20 @@ export const updateEvent = defineAction({
   name: "update_event",
   title: "Change a calendar event",
   description:
-    "Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event.",
+    "Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event (leaving out forMemberId makes it for the whole house).",
   consent: "Change events on the house calendar",
   kind: "write",
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
-  requires: "member",
+  requires: "attested",
   transactional: false,
   input: CalendarEventUpdate,
   async preview(_ctx, i) {
     return `Change "${i.title}" to ${previewWhen(i)}`;
   },
-  async execute(_ctx, i) {
+  async execute(ctx, i) {
+    const badFor = await checkForMember(ctx, i.forMemberId);
+    if (badFor) return badFor;
     const before = await visibleEvent(i.eventId);
     if (!before.ok) return before;
     const client = calendarClient();
@@ -267,7 +295,7 @@ export const deleteEvent = defineAction({
   risk: "destructive",
   // Brain behind its confirm button (issue #70); never MCP.
   surfaces: ["ui", "kiosk", "ai", "brain"],
-  requires: "member",
+  requires: "attested",
   transactional: false,
   input: z.strictObject({
     eventId: CalendarEventId.describe("The event's id, from list_events."),

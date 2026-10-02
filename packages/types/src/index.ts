@@ -86,6 +86,7 @@ export {
   EVENT_LOCATION_MAX,
   EVENT_MAX_DAYS,
   EVENT_TITLE_MAX,
+  EventForMember,
   EventKind,
   EventRange,
   LIST_EVENTS_MAX_DAYS,

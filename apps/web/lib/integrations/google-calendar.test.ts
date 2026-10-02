@@ -51,6 +51,7 @@ const dinnerJan: EventSpec = {
   endDate: "2027-01-15",
   startTime: "19:00",
   endTime: "20:30",
+  forMember: null,
 };
 const dinnerJul: EventSpec = {
   ...dinnerJan,
@@ -64,6 +65,7 @@ const trip: EventSpec = {
   allDay: true,
   date: "2027-07-01",
   endDate: "2027-07-03",
+  forMember: null,
 };
 
 function json(status: number, body: unknown = {}): Response {
@@ -268,6 +270,11 @@ describe("request bodies", () => {
     expect(insertBody("evt00001", dinnerJan, "m-1")).not.toHaveProperty(
       "description",
     );
+    // Who it is for (issue #134), only when it is for someone.
+    expect(
+      insertBody("evt00001", { ...trip, forMember: "m-2" }, "m-1")
+        .extendedProperties,
+    ).toEqual({ private: { baumyMember: "m-1", baumyFor: "m-2" } });
   });
 
   it("clears the other time form and empty fields on a patch", () => {
@@ -288,7 +295,13 @@ describe("request bodies", () => {
         dateTime: "2027-01-15T20:30:00",
         timeZone: "Europe/Berlin",
       },
+      // The house: Google merges the private properties, so the key is set
+      // empty rather than left out, and who made it is not touched.
+      extendedProperties: { private: { baumyFor: "" } },
     });
+    expect(
+      patchBody({ ...dinnerJan, forMember: "m-2" }).extendedProperties,
+    ).toEqual({ private: { baumyFor: "m-2" } });
   });
 });
 
@@ -304,7 +317,22 @@ describe("fromGoogle", () => {
       end: "2027-01-15T19:30:00.000Z",
       private: false,
       member: "m-1",
+      forMember: null,
     });
+    expect(
+      fromGoogle({
+        ...googleDinner,
+        extendedProperties: {
+          private: { baumyMember: "m-1", baumyFor: " m-2 " },
+        },
+      })?.forMember,
+    ).toBe("m-2");
+    expect(
+      fromGoogle({
+        ...googleDinner,
+        extendedProperties: { private: { baumyMember: "m-1", baumyFor: "" } },
+      })?.forMember,
+    ).toBeNull();
     expect(
       fromGoogle({
         id: "x1234",
