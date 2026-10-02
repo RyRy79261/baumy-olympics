@@ -10,6 +10,11 @@ import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
 import { listAvatars } from "@baumy/db/avatars";
 import { avatarImageView } from "@/lib/avatars/paths";
+import { ReportSettingsCard } from "@/components/feedback/report-settings-card";
+import { reportAiAvailable } from "@/lib/feedback/ai";
+import { filingState } from "@/lib/feedback/config";
+import { githubIssues } from "@/lib/integrations/github";
+import { isTestMode } from "@/lib/test-mode";
 import { showsGalleryForm } from "@/lib/avatars/settings-card";
 import { telegramBotUsername } from "@/lib/telegram/deep-link";
 import { GalleryForm } from "./gallery-form";
@@ -18,7 +23,8 @@ import { KioskPinForm, TelegramLinkForm } from "./settings-forms";
 // /settings (SPEC §6.2): the member's own character (a pick from the
 // avatar gallery, issue #111), kiosk PIN and Telegram link. Every
 // action here needs the member's own session (requireSession), never the
-// kiosk.
+// kiosk. Also the bug reporter's card (issue #133) and, for admins, the
+// way to System status.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Settings" };
@@ -47,6 +53,7 @@ export default async function SettingsPage() {
   ]);
   const { show, live, worn } = showsGalleryForm(gallery, row?.avatarImageId);
   const colour = row?.color ?? "var(--color-bm-muted)";
+  const tracker = githubIssues();
 
   return (
     <>
@@ -117,6 +124,21 @@ export default async function SettingsPage() {
             Manage connected apps
           </Link>
         </Card>
+        <ReportSettingsCard
+          filing={filingState(process.env, isTestMode())}
+          repo={tracker.ok ? tracker.repo : null}
+          aiAvailable={reportAiAvailable()}
+        />
+        {me.role === "admin" ? (
+          <Card
+            title="System status"
+            description="Whether each service Baumy relies on is set up and answering. Admins only."
+          >
+            <Link href="/settings/system" className="text-sm underline">
+              Open system status
+            </Link>
+          </Card>
+        ) : null}
       </div>
     </>
   );
