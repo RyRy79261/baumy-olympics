@@ -140,6 +140,9 @@ describe("BaumyButton", () => {
     expect(cls).toContain("min-h-11");
     expect(cls).not.toContain("fixed");
     expect(cls).toContain("lg:fixed");
+    // The violet frame is an inset box-shadow; a variant shadow would hide it.
+    expect(cls).toContain("pixel-frame");
+    expect(cls.some((c) => c.startsWith("lg:shadow"))).toBe(false);
     expect(cls).toContain(
       "lg:bottom-[max(0.75rem,env(safe-area-inset-bottom))]",
     );
