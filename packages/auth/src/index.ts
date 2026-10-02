@@ -51,6 +51,11 @@ export {
   accountSecurityPlugins,
 } from "./security";
 export {
+  PASSKEY_NOT_CONFIRMED,
+  STEP_UP_PASSKEY_PATH,
+  stepUpPasskey,
+} from "./step-up";
+export {
   AUTH_RP_NAME,
   SECURITY_COOKIES,
   resolvePasskeyScope,
