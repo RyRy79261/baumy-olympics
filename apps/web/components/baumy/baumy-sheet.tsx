@@ -44,6 +44,7 @@ import {
   PIN_PROMPT_CODES,
 } from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
+import { setKioskBusy } from "@/lib/kiosk/busy";
 import { announceScore } from "@/lib/ui/scored";
 import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
 import { SuggestionCards } from "./suggestion-cards";
@@ -88,6 +89,9 @@ type CatMode = "who" | "talk" | "thinking" | "answer";
 
 const VOICE_NOTE_HINT =
   "Say it like a voice note: \u201cI bought cat food and the bins are out.\u201d";
+
+/** This bubble's flag in lib/kiosk/busy.ts. */
+const BUSY_ID = "baumy-cat";
 
 /** How long the "+N" stays after a save that scored. */
 const POP_MS = 1_600;
@@ -481,9 +485,9 @@ export function BaumySheet({
     recorder.finish();
   }
 
-  // A hold that starts on an answer re-renders the bubble as "listening",
-  // and the button under the finger is a new one: whichever element the
-  // finger lifts from, letting go sends.
+  // The button keeps its element across the bubble's modes (its keyed
+  // slot below), but whichever element the finger lifts from, letting go
+  // sends: a release outside the button must never leave it recording.
   const held = recorder.state === "recording" || recorder.state === "starting";
   const finishLatest = useRef(recorder.finish);
   finishLatest.current = recorder.finish;
@@ -533,8 +537,16 @@ export function BaumySheet({
     close();
   }
 
-  // A bubble left open closes after a minute untouched.
-  useIdle(cat && bubble !== null, KIOSK_IDLE_MS, hideBubble);
+  // A bubble left open closes after a minute untouched; not while a finger
+  // holds the button or Baumy is still listening back, thinking or saving
+  // (the minute starts again when that ends). The kiosk's idle reset and
+  // screensaver wait for the same (lib/kiosk/busy.ts).
+  const catBusy = cat && bubble !== null && (held || busy || bulk);
+  useIdle(cat && bubble !== null && !catBusy, KIOSK_IDLE_MS, hideBubble);
+  useEffect(() => {
+    setKioskBusy(BUSY_ID, catBusy);
+  }, [catBusy]);
+  useEffect(() => () => setKioskBusy(BUSY_ID, false), []);
   // A reminder or the screensaver taking the screen closes it at once, and
   // drops any recording: nothing listens under them.
   const hideLatest = useRef(hideBubble);
@@ -557,8 +569,16 @@ export function BaumySheet({
     (confirmAllTargets(rows).length === 0 &&
       rows.some((r) => r.state === "saved"));
 
+  const showHold =
+    showMic && (bubble === "talk" || (bubble === "answer" && cardsSettled));
+  const showDone =
+    bubble === "answer" && (Boolean(reply?.error) || rows.length === 0);
+
+  // One button, always in the same place in the bubble (its own keyed
+  // slot), so a hold that starts on an answer keeps the element under the
+  // finger: iOS sends the rest of a touch to the element it started on.
   const holdButton = (
-    <div className="mt-4 flex flex-col gap-2">
+    <div key="hold" className="mt-4 flex flex-col gap-2">
       <HoldToTalk
         state={
           recording
@@ -583,15 +603,7 @@ export function BaumySheet({
   );
 
   const answer = reply?.error ? (
-    <>
-      <CatText tone="error">{reply.text}</CatText>
-      {showMic ? holdButton : null}
-      <div className="mt-3 flex gap-3">
-        <CatButton variant="soft" onClick={hideBubble}>
-          Done
-        </CatButton>
-      </div>
-    </>
+    <CatText tone="error">{reply.text}</CatText>
   ) : rows.length > 0 ? (
     <>
       {praise ? (
@@ -612,18 +624,9 @@ export function BaumySheet({
         onDone={hideBubble}
         onDrop={drop}
       />
-      {cardsSettled && showMic ? holdButton : null}
     </>
   ) : (
-    <>
-      <CatText>{reply?.text ?? ""}</CatText>
-      {showMic ? holdButton : null}
-      <div className="mt-3 flex gap-3">
-        <CatButton variant="soft" onClick={hideBubble}>
-          Done
-        </CatButton>
-      </div>
-    </>
+    <CatText>{reply?.text ?? ""}</CatText>
   );
 
   const catBubble =
@@ -637,43 +640,56 @@ export function BaumySheet({
       ) : null
     ) : (
       <CatBubble mode={bubble === "talk" && recording ? "listening" : bubble}>
-        {bubble === "who" ? (
-          <>
-            <CatSays>Mrrp? Who&apos;s talking?</CatSays>
-            <CatText tone="muted">Tap yourself first.</CatText>
-            {/* The bubble grows up from the cat, so a long list scrolls
+        <div key="body">
+          {bubble === "who" ? (
+            <>
+              <CatSays>Mrrp? Who&apos;s talking?</CatSays>
+              <CatText tone="muted">Tap yourself first.</CatText>
+              {/* The bubble grows up from the cat, so a long list scrolls
                 inside it rather than running off the top of the screen. */}
-            <div
-              className="mt-3 flex max-h-[45vh] flex-wrap gap-2 overflow-y-auto"
-              data-testid="who-list"
-            >
-              {who}
-            </div>
-          </>
-        ) : bubble === "talk" ? (
-          <>
+              <div
+                className="mt-3 flex max-h-[45vh] flex-wrap gap-2 overflow-y-auto"
+                data-testid="who-list"
+              >
+                {who}
+              </div>
+            </>
+          ) : bubble === "talk" ? (
+            <>
+              <CatSays>
+                {recording
+                  ? "Mrrp? I’m listening…"
+                  : actingName
+                    ? `Mrrp? Hi ${actingName}.`
+                    : "Mrrp?"}
+              </CatSays>
+              <CatText tone="muted">
+                {recording
+                  ? "Let go when you’re done."
+                  : `Hold the button and talk. ${VOICE_NOTE_HINT}`}
+              </CatText>
+            </>
+          ) : bubble === "thinking" ? (
             <CatSays>
-              {recording
-                ? "Mrrp? I’m listening…"
-                : actingName
-                  ? `Mrrp? Hi ${actingName}.`
-                  : "Mrrp?"}
+              {transcribing
+                ? "Listening back\u2026"
+                : "Hmm, let me think\u2026"}
             </CatSays>
-            <CatText tone="muted">
-              {recording
-                ? "Let go when you’re done."
-                : `Hold the button and talk. ${VOICE_NOTE_HINT}`}
-            </CatText>
-            {holdButton}
-          </>
-        ) : bubble === "thinking" ? (
-          <CatSays>
-            {transcribing ? "Listening back\u2026" : "Hmm, let me think\u2026"}
-          </CatSays>
-        ) : (
-          answer
-        )}
-        <CatLink onClick={typeInstead}>Type instead</CatLink>
+          ) : (
+            answer
+          )}
+        </div>
+        {showHold ? holdButton : null}
+        {showDone ? (
+          <div key="done" className="mt-3 flex gap-3">
+            <CatButton variant="soft" onClick={hideBubble}>
+              Done
+            </CatButton>
+          </div>
+        ) : null}
+        <CatLink key="type" onClick={typeInstead}>
+          Type instead
+        </CatLink>
       </CatBubble>
     );
 

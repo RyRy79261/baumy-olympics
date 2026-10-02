@@ -84,7 +84,9 @@ export function SuggestionCards({
   const actions =
     targets.length === 0 && anySaved ? (
       bubble ? (
-        <CatButton onClick={onDone}>Done</CatButton>
+        <CatButton variant="soft" onClick={onDone}>
+          Done
+        </CatButton>
       ) : (
         <Button size={size} onClick={onDone}>
           Done

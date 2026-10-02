@@ -74,7 +74,14 @@ export function CatText({
  * Five bars that rise with the microphone's level (0…1), the prototype's
  * red equaliser. Still (a low row) when nothing is heard.
  */
-export function LevelBars({ level }: { level: number }) {
+export function LevelBars({
+  level,
+  tone = "red",
+}: {
+  level: number;
+  /** "light" on a red ground (the held "Hold to talk"). */
+  tone?: "red" | "light";
+}) {
   const shape = [0.55, 0.9, 1, 0.8, 0.6];
   const l = Math.min(1, Math.max(0, level));
   return (
@@ -86,7 +93,10 @@ export function LevelBars({ level }: { level: number }) {
       {shape.map((s, i) => (
         <span
           key={i}
-          className="block w-2 bg-[#ff5a7a]"
+          className={cx(
+            "block w-2",
+            tone === "light" ? "bg-white" : "bg-[#ff5a7a]",
+          )}
           style={{ height: `${Math.round((0.3 + 0.7 * l * s) * 100)}%` }}
         />
       ))}
@@ -165,7 +175,7 @@ export function HoldToTalk({
       )}
       {...props}
     >
-      {recording ? <LevelBars level={level} /> : null}
+      {recording ? <LevelBars level={level} tone="light" /> : null}
       <span>{HOLD_LABEL[state]}</span>
     </button>
   );

@@ -5,7 +5,9 @@ import {
   MAX_RECORDING_MS,
   MIC_OFF,
   MIN_CLIP_MS,
+  SILENT_CLIP,
   clipType,
+  heardNothing,
   levelOf,
   micFailure,
   micStep,
@@ -17,8 +19,9 @@ import {
 // Recording a clip for Baumy (SPEC §3.6, issue #22), shared by the sheet's
 // hold-to-speak button (voice-recorder.tsx) and the kitchen cat's "Hold to
 // talk" (issue #132). MediaRecorder writing webm/opus, or mp4 on Safari
-// (iPad), and a level from an analyser. A clip is cut at a minute; one too
-// short to hold words is dropped. A blocked or missing microphone calls
+// (iPad), and a level from an analyser. A clip is cut at 45 seconds; one too
+// short to hold words, or that the meter heard only silence in, is dropped.
+// A blocked or missing microphone calls
 // `onUnavailable`, and the caller falls back to typing. Unmounting drops a
 // recording without sending it.
 //
@@ -100,6 +103,10 @@ export function useRecorder(callbacks: RecorderCallbacks): Recorder {
   const cutoff = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef(0);
   const shown = useRef(0);
+  // The loudest the meter heard during this clip, and whether it was
+  // really listening (running audio), for dropping a silent clip.
+  const peak = useRef(0);
+  const meterRan = useRef(false);
   const mounted = useRef(true);
   // Which request a granted stream answers: one that comes back after a
   // close (or a newer open) is turned straight off.
@@ -124,13 +131,20 @@ export function useRecorder(callbacks: RecorderCallbacks): Recorder {
   }, [showLevel]);
 
   const startMeter = useCallback(() => {
+    peak.current = 0;
+    meterRan.current = false;
     const node = analyser.current;
     if (!node || frame.current !== null) return;
     void audioCtx.current?.resume().catch(() => undefined);
     const buf = new Uint8Array(node.fftSize);
     const tick = () => {
       node.getByteTimeDomainData(buf);
-      showLevel(levelOf(buf));
+      const l = levelOf(buf);
+      if (audioCtx.current?.state === "running") {
+        meterRan.current = true;
+        peak.current = Math.max(peak.current, l);
+      }
+      showLevel(l);
       frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
@@ -249,6 +263,10 @@ export function useRecorder(callbacks: RecorderCallbacks): Recorder {
       const clip = new Blob(chunks, { type });
       if (Date.now() - startedAt.current < MIN_CLIP_MS || clip.size === 0) {
         latest.current.onCancel("Hold the button while you speak.");
+        return;
+      }
+      if (heardNothing(peak.current, meterRan.current)) {
+        latest.current.onCancel(SILENT_CLIP);
         return;
       }
       latest.current.onClip(clip, type);
