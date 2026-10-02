@@ -3,30 +3,24 @@ import { hashKioskPin } from "@baumy/auth/kiosk-pin";
 import { clearKioskPinAttempts } from "@baumy/db/kiosk-pin";
 import { hasKioskPin, setKioskPinHash } from "@baumy/db/members";
 import { KioskPin } from "@baumy/types";
-import { verifyCurrentPassword } from "@/lib/auth/password-check";
+import { requireRecentAuth } from "@/lib/auth/recent-auth";
 import { defineAction } from "./define";
 import { fail } from "./result";
 
 // /settings: set your own kiosk PIN (SPEC §6.2). Only from your own session,
 // never the kiosk. Setting the first PIN needs nothing more; changing one
-// needs the account password or a session signed in under 10 minutes ago,
-// so a phone left unlocked on the table cannot be used to take over
+// needs "Confirm it's you" (`requireRecentAuth`, issue #135): a session
+// signed in, or confirmed by any of the member's methods, in the last 10
+// minutes, so a phone left unlocked on the table cannot be used to take over
 // someone's kiosk attestation. Setting it also lifts a lock from failed PIN
 // attempts (`kiosk_pin_locked_at`) and forgets the attempts counted so far,
 // on every kiosk, in the same transaction.
 //
-// Neither the PIN nor the password reaches the ledger or the audit row: the
-// fingerprint leaves both out, and the result holds neither.
-
-export const FRESH_SESSION_MS = 10 * 60_000;
+// The PIN never reaches the ledger or the audit row: the fingerprint leaves
+// it out, and the result does not hold it.
 
 const input = z.strictObject({
   pin: KioskPin.describe("4 to 6 digits."),
-  currentPassword: z
-    .string()
-    .max(256)
-    .optional()
-    .describe("Your account password, needed to change an existing PIN."),
 });
 
 export interface SetKioskPinData {
@@ -38,17 +32,16 @@ export const setKioskPin = defineAction({
   name: "set_kiosk_pin",
   title: "Set my kiosk PIN",
   description:
-    "Sets or changes the signed-in member's own kiosk PIN (4 to 6 digits). Changing an existing PIN needs the account password or a session under 10 minutes old.",
+    "Sets or changes the signed-in member's own kiosk PIN (4 to 6 digits). Changing an existing PIN needs a recent 'Confirm it's you'.",
   consent: "Set your kiosk PIN",
   kind: "write",
   risk: "safe",
   surfaces: ["ui"],
   requires: "session",
-  // Each attempt may check a password: keep guessing slow.
-  rateLimit: { perMember: 5, perIp: 20, windowMs: 15 * 60_000 },
+  rateLimit: { perMember: 10, perIp: 30, windowMs: 15 * 60_000 },
   fingerprint: () => ({ pin: "[hidden]" }),
   input,
-  async execute(ctx, { pin, currentPassword }) {
+  async execute(ctx, { pin }) {
     const { actor } = ctx;
     // The session gate has checked both.
     if (actor.kind !== "member" || !actor.memberId) {
@@ -56,19 +49,8 @@ export const setKioskPin = defineAction({
     }
     const changed = await hasKioskPin(ctx.db, actor.memberId);
     if (changed) {
-      const age = ctx.now.getTime() - Date.parse(actor.sessionCreatedAt);
-      const fresh = age >= 0 && age < FRESH_SESSION_MS;
-      if (!fresh) {
-        if (!currentPassword) {
-          return fail(
-            "REAUTH_REQUIRED",
-            "Enter your account password to change your PIN, or sign in again and change it within 10 minutes.",
-          );
-        }
-        if (!(await verifyCurrentPassword(currentPassword))) {
-          return fail("REAUTH_REQUIRED", "That password is not right.");
-        }
-      }
+      const recent = await requireRecentAuth(ctx);
+      if (!recent.ok) return recent;
     }
     await setKioskPinHash(ctx.db, actor.memberId, await hashKioskPin(pin));
     await clearKioskPinAttempts(ctx.db, actor.memberId);

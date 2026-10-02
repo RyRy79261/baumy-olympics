@@ -5,13 +5,9 @@ import {
   mintServiceToken,
   revokeServiceToken,
 } from "@baumy/db/service-tokens";
-import type { MemberActor } from "@/lib/auth";
-import { verifyCurrentPassword } from "@/lib/auth/password-check";
-import { isFailure, liveActor } from "./account-security";
-import type { ActionCtx } from "./define";
+import { confirmedActor, isFailure } from "./account-security";
 import { defineAction } from "./define";
-import { fail, type ActionFailure } from "./result";
-import { FRESH_SESSION_MS } from "./set-kiosk-pin";
+import { fail } from "./result";
 
 // /admin/connections (issue #104): the service tokens baumy-brain sends to
 // /api/v1/actions, managed without a terminal. Admin only, UI only, and
@@ -20,12 +16,20 @@ import { FRESH_SESSION_MS } from "./set-kiosk-pin";
 // Security page does), so a device signed out elsewhere cannot use its
 // cookie cache to mint a token.
 //
-// Creating and rotating hand out a new way into the household's data, so they
-// also need the admin's password or a session signed in under 10 minutes ago
-// (the rule set_kiosk_pin uses). The plaintext token is in the result once:
-// `storedData` keeps it out of the idempotency ledger, the audit row names
-// only the token, and only its sha256 reaches the database
+// Creating and rotating hand out a new way into the household's data, and
+// revoking cuts brain off, so each also needs "Confirm it's you"
+// (`requireRecentAuth`, issue #135): a session signed in, or confirmed by any
+// of the admin's methods, in the last 10 minutes. The plaintext token is in
+// the result once: `storedData` keeps it out of the idempotency ledger, the
+// audit row names only the token, and only its sha256 reaches the database
 // (packages/db/src/service-tokens.ts, shared with the CLI).
+//
+// ORDER MATTERS in `confirmedActor`: the sudo window is read BEFORE
+// `liveActor` share-locks the session row. Before issue #135 the password was
+// checked here by Better Auth's verifyPassword, which reads the session on
+// its own connection and may refresh it (an UPDATE of that row); holding
+// `FOR SHARE` on it first hung the request (PR #105 review). The proofs now
+// run in `confirm_identity`, which keeps the same order.
 
 /** What every token minted here may do: call the brain surface. */
 export const SERVICE_TOKEN_SCOPES = [BRAIN_SCOPE];
@@ -35,9 +39,6 @@ export const DEFAULT_SERVICE_TOKEN_NAME = "baumy-brain";
 const SIGNED_OUT =
   "This device was signed out. Sign in again to manage service tokens.";
 
-const REAUTH_MESSAGE =
-  "Enter your account password, or sign in again and do this within 10 minutes.";
-
 const Name = z
   .string()
   .trim()
@@ -46,44 +47,11 @@ const Name = z
     "Use lowercase letters, digits and dashes, like baumy-brain.",
   );
 
-const CurrentPassword = z
-  .string()
-  .max(256)
-  .optional()
-  .describe(
-    "Your account password; not needed within 10 minutes of signing in.",
-  );
-
 export interface ServiceTokenData {
   name: string;
   scopes: string[];
   /** The plaintext, shown once. Null on a replay: it is never stored. */
   token: string | null;
-}
-
-/**
- * The session was signed in lately or proves the password, and is live.
- *
- * ORDER MATTERS. The password is checked BEFORE `liveActor` share-locks the
- * session row. Better Auth's verifyPassword reads the session on its own
- * connection and may refresh it (an UPDATE of that row). If our
- * transaction already held `FOR SHARE` on it, that UPDATE would wait on us
- * while we wait on it, and Postgres cannot see that as a deadlock, so the
- * request would hang (PR #105 review). Checking freshness needs no lock.
- */
-async function reauthenticated(
-  ctx: ActionCtx,
-  currentPassword: string | undefined,
-): Promise<MemberActor | ActionFailure> {
-  const claimed = ctx.actor as MemberActor;
-  const age = ctx.now.getTime() - Date.parse(claimed.sessionCreatedAt);
-  if (!(age >= 0 && age < FRESH_SESSION_MS)) {
-    if (!currentPassword) return fail("REAUTH_REQUIRED", REAUTH_MESSAGE);
-    if (!(await verifyCurrentPassword(currentPassword))) {
-      return fail("REAUTH_REQUIRED", "That password is not right.");
-    }
-  }
-  return liveActor(ctx, SIGNED_OUT);
 }
 
 const shown = (data: ServiceTokenData) => ({
@@ -100,12 +68,7 @@ const common = {
   surfaces: ["ui"],
   requires: "admin",
   kind: "write",
-  // Each attempt may check a password: keep guessing slow.
-  rateLimit: { perMember: 5, perIp: 20, windowMs: 15 * 60_000 },
-  fingerprint: (input: { name: string }) => ({
-    name: input.name,
-    currentPassword: "[hidden]",
-  }),
+  rateLimit: { perMember: 10, perIp: 30, windowMs: 15 * 60_000 },
 } as const;
 
 export const createServiceToken = defineAction({
@@ -113,15 +76,14 @@ export const createServiceToken = defineAction({
   name: "create_service_token",
   title: "Create a service token",
   description:
-    "Creates a service token (for baumy-brain) that may call the brain actions, and shows it once. Only its hash is stored. Needs the admin's password or a fresh sign-in.",
+    "Creates a service token (for baumy-brain) that may call the brain actions, and shows it once. Only its hash is stored. Needs a recent 'Confirm it's you'.",
   consent: "Create service tokens for baumy-brain",
   risk: "confirm",
   input: z.strictObject({
     name: Name.default(DEFAULT_SERVICE_TOKEN_NAME),
-    currentPassword: CurrentPassword,
   }),
-  async execute(ctx, { name, currentPassword }) {
-    const actor = await reauthenticated(ctx, currentPassword);
+  async execute(ctx, { name }) {
+    const actor = await confirmedActor(ctx, SIGNED_OUT);
     if (isFailure(actor)) return actor;
     const minted = await mintServiceToken(ctx.db, {
       name,
@@ -151,15 +113,12 @@ export const rotateServiceToken = defineAction({
   name: "rotate_service_token",
   title: "Rotate a service token",
   description:
-    "Replaces a live service token with a new one, shown once. The old token stops working at once, so brain needs the new one before its next call. Needs the admin's password or a fresh sign-in.",
+    "Replaces a live service token with a new one, shown once. The old token stops working at once, so brain needs the new one before its next call. Needs a recent 'Confirm it's you'.",
   consent: "Replace baumy-brain's service token",
   risk: "destructive",
-  input: z.strictObject({
-    name: Name,
-    currentPassword: CurrentPassword,
-  }),
-  async execute(ctx, { name, currentPassword }) {
-    const actor = await reauthenticated(ctx, currentPassword);
+  input: z.strictObject({ name: Name }),
+  async execute(ctx, { name }) {
+    const actor = await confirmedActor(ctx, SIGNED_OUT);
     if (isFailure(actor)) return actor;
     // One transaction (runAction's): never two live tokens, never none.
     const minted = await mintServiceToken(ctx.db, {
@@ -190,15 +149,13 @@ export const revokeServiceTokenAction = defineAction({
   name: "revoke_service_token",
   title: "Revoke a service token",
   description:
-    "Revokes a live service token. Brain's next call with it gets a 401 until it has a new token.",
+    "Revokes a live service token. Brain's next call with it gets a 401 until it has a new token. Needs a recent 'Confirm it's you'.",
   consent: "Cut baumy-brain off",
-  kind: "write",
+  ...common,
   risk: "destructive",
-  surfaces: ["ui"],
-  requires: "admin",
   input: z.strictObject({ name: Name }),
   async execute(ctx, { name }) {
-    const actor = await liveActor(ctx, SIGNED_OUT);
+    const actor = await confirmedActor(ctx, SIGNED_OUT);
     if (isFailure(actor)) return actor;
     const revoked = await revokeServiceToken(ctx.db, { name, now: ctx.now });
     if (!revoked) {

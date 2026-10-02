@@ -24,12 +24,22 @@ import { fail } from "./result";
 //
 // Each decision is a compare-and-set on `pending` under the row's lock, so a
 // second tap, a replay with a new key or an expired request changes nothing.
+//
+// The same buttons answer a "Confirm it's you" request (issue #135, ADR
+// 0007): a member already signed in confirms that session from Telegram.
+// The decision is the same; `purpose` in the answer tells brain which reply
+// to send, and approving one signs nobody in.
 
 export interface LoginDecision {
   /** `approved`: the browser signs in; `blocked`: a decoy was tapped. */
   outcome: "approved" | "blocked" | "denied";
   /** "Chrome on macOS", for brain's reply. */
   device: string;
+  /**
+   * `sign_in`, or `step_up` for a "Confirm it's you" request (issue #135):
+   * the browser is already signed in, and the tap confirms that session.
+   */
+  purpose: "sign_in" | "step_up";
 }
 
 const GONE = fail(
@@ -103,6 +113,7 @@ export const approveLogin = defineAction({
     const data: LoginDecision = {
       outcome: right ? "approved" : "blocked",
       device: row.device,
+      purpose: row.purpose,
     };
     return {
       ok: true,
@@ -135,7 +146,11 @@ export const denyLogin = defineAction({
       now: ctx.now,
     });
     if (!decided) return notPending("expired");
-    const data: LoginDecision = { outcome: "denied", device: row.device };
+    const data: LoginDecision = {
+      outcome: "denied",
+      device: row.device,
+      purpose: row.purpose,
+    };
     return { ok: true, data, audit: audit(row.id, "denied") };
   },
 });

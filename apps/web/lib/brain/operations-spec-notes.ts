@@ -93,10 +93,10 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns:
-      "`outcome`: `approved` (the browser signs in now) or `blocked` (that was not the number on the screen, so the sign-in was refused and Sign in with Baumy is off for this member for 15 minutes); `device`, e.g. `Chrome on macOS`.",
+      '`outcome`: `approved` (the browser signs in now) or `blocked` (that was not the number on the screen, so the sign-in was refused and Sign in with Baumy is off for this member for 15 minutes); `device`, e.g. `Chrome on macOS`; `purpose`: `sign_in`, or `step_up` when the DM was a "Confirm it\'s you" request (`purpose: "step_up"` in the login-approval call): the member is already signed in on that device and is confirming a sensitive change there (issue #135). Approving one signs nobody in.',
     errors: ["NOT_FOUND", "INVALID_STATE"],
     reply:
-      'Edit the DM, dropping the buttons. approved: "✅ Signed in on <device>." blocked: "🚫 That wasn\'t the number on the screen, so I blocked this sign-in. If it wasn\'t you, nothing happened; sign in with your password if it was." NOT_FOUND or INVALID_STATE: show `message`.',
+      'Edit the DM, dropping the buttons. approved: "✅ Signed in on <device>." (`step_up`: "✅ Confirmed it\'s you on <device>.") blocked: "🚫 That wasn\'t the number on the screen, so I blocked this sign-in. If it wasn\'t you, nothing happened; sign in with your password if it was." (`step_up`: "🚫 That wasn\'t the number on the screen, so I didn\'t confirm it.") NOT_FOUND or INVALID_STATE: show `message`.',
   },
   deny_login: {
     purpose: "Denies a 'Sign in with Baumy' request: the member tapped Deny.",
@@ -108,10 +108,10 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns:
-      "`outcome`: `denied` (Sign in with Baumy is then off for this member for 15 minutes); `device`.",
+      "`outcome`: `denied` (Sign in with Baumy is then off for this member for 15 minutes); `device`; `purpose` (`sign_in` or `step_up`, as for approve_login).",
     errors: ["NOT_FOUND", "INVALID_STATE"],
     reply:
-      'Edit the DM, dropping the buttons: "✖️ Denied the sign-in on <device>." NOT_FOUND or INVALID_STATE: show `message`.',
+      'Edit the DM, dropping the buttons: "✖️ Denied the sign-in on <device>." (`step_up`: "✖️ Didn\'t confirm it on <device>.") NOT_FOUND or INVALID_STATE: show `message`.',
   },
   list_chores: {
     purpose:

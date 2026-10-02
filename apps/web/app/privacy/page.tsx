@@ -29,6 +29,7 @@ import {
   LOGIN_REQUEST_RETENTION_MS,
   LOGIN_REQUEST_TTL_MS,
 } from "@baumy/db/login-requests";
+import { STEP_UP_WINDOW_MS } from "@baumy/db/step-ups";
 import {
   LOGIN_COOKIE,
   LOGIN_COOKIE_MAX_AGE_S,
@@ -52,6 +53,7 @@ const PASSKEY_CHALLENGE_MIN =
   SECURITY_COOKIES.passkeyChallengeMaxAgeSeconds / 60;
 const LOGIN_REQUEST_MIN = LOGIN_REQUEST_TTL_MS / 60_000;
 const LOGIN_REQUEST_HOURS = LOGIN_REQUEST_RETENTION_MS / 3_600_000;
+const STEP_UP_MIN = STEP_UP_WINDOW_MS / 60_000;
 const KIOSK_PAIRING_HOURS = KIOSK_PAIRING_RETENTION_MS / 3_600_000;
 
 export const metadata: Metadata = { title: "Privacy" };
@@ -106,6 +108,15 @@ export default function PrivacyPage() {
             worked out from the browser (for example &quot;Chrome on
             macOS&quot;) and when each was used; it does not show the IP address
             or a place.
+          </li>
+          <li>
+            <strong>&quot;Confirm it&apos;s you&quot;:</strong> when you confirm
+            it is you before a sensitive change (for example a kiosk PIN), which
+            way you used (passkey, two-factor code, Telegram or password) and
+            when, for that one signed-in device, so it does not ask again for{" "}
+            {STEP_UP_MIN} minutes. Never the password or the code itself. It
+            goes when that device signs out, and the audit log keeps that you
+            confirmed and how.
           </li>
           <li>
             <strong>Your member profile:</strong> display name, colour, the
@@ -246,7 +257,8 @@ export default function PrivacyPage() {
             record that it was asked for, with the asking device&apos;s IP
             address, stays in the audit log. baumy-brain keeps its own copy of
             the device name and the numbers, in the pending sign-in card it
-            sends and in its log.
+            sends and in its log. Confirming it&apos;s you from Telegram works
+            the same way, for the device you are already signed in on.
           </li>
           <li>
             <strong>Chatbots you connect:</strong> a chatbot you connect (for

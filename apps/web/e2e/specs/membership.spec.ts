@@ -127,16 +127,21 @@ test("a member sets a kiosk PIN and creates a Telegram link code", async ({
     p.getByRole("status").filter({ hasText: "PIN saved." }),
   ).toBeVisible();
 
-  // Changing it now asks for the current password field, but a session this
-  // fresh (under 10 minutes) does not need it.
+  // Changing it needs "Confirm it's you" (issue #135), but a session this
+  // fresh (under 10 minutes) counts, so no dialog opens and no password
+  // field is on the form.
   await p.reload();
-  await expect(p.getByLabel("Your account password")).toBeVisible();
+  await expect(p.getByLabel("New PIN")).toBeVisible();
+  await expect(p.getByLabel("Your account password")).toHaveCount(0);
   await p.getByLabel("New PIN").fill("135790");
   await p.getByLabel("Type it again").fill("135790");
   await p.getByRole("button", { name: "Change PIN" }).click();
   await expect(
     p.getByRole("status").filter({ hasText: "PIN changed." }),
   ).toBeVisible();
+  await expect(
+    p.getByRole("dialog", { name: "Confirm it's you" }),
+  ).toBeHidden();
 
   await p.getByRole("button", { name: "Link Telegram" }).click();
   await expect(p.getByTestId("telegram-link-code")).toHaveText(

@@ -58,7 +58,9 @@ const KNOWN: Record<string, string | string[]> = {
 /** Better Auth plugins and social providers the page was written against. */
 // baumy-approval-sign-in (issue #80) sets only the session cookies and
 // dont_remember, which the page names; the account-security plugins (issue
-// #79) set the cookies in SECURITY_COOKIES, named below.
+// #79) set the cookies in SECURITY_COOKIES, named below. baumy-step-up
+// (issue #135) sets no cookie: it reads the passkey challenge cookie the
+// passkey plugin set.
 const AUTH_PLUGINS = [
   "bearer",
   "two-factor",
@@ -68,6 +70,7 @@ const AUTH_PLUGINS = [
   "baumy-trusted-devices",
   "baumy-new-way-in",
   "baumy-approval-sign-in",
+  "baumy-step-up",
 ];
 const AUTH_SOCIAL = ["google"];
 

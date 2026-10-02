@@ -508,6 +508,16 @@ export const loginRequestStatus = pgEnum("login_request_status", [
 ]);
 
 /**
+ * What a login request is for (issue #135, ADR 0007): `sign_in` makes a new
+ * session (ADR 0006); `step_up` confirms the member behind a session that is
+ * already signed in ("Confirm it's you"), and makes no session.
+ */
+export const loginRequestPurpose = pgEnum("login_request_purpose", [
+  "sign_in",
+  "step_up",
+]);
+
+/**
  * "Sign in with Baumy" (issue #80, ADR 0006): a browser asks to sign in as an
  * address; brain DMs the member's linked Telegram account "Tap the number on
  * the screen", and the tap approves or denies it through `approve_login` /
@@ -543,11 +553,54 @@ export const loginRequests = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     usedAt: timestamp("used_at", { withTimezone: true }),
+    purpose: loginRequestPurpose("purpose").notNull().default("sign_in"),
+    /**
+     * `step_up` only: the session the approval is for. Only that session can
+     * trade it for a sudo window (`step_ups`), and the row goes with it.
+     */
+    sessionId: text("session_id").references(() => session.id, {
+      onDelete: "cascade",
+    }),
   },
   (t) => [
     index("login_requests_member_id_idx").on(t.memberId, t.decidedAt),
     index("login_requests_created_at_idx").on(t.createdAt),
     check("login_requests_code_two_digits", sql`${t.code} BETWEEN 10 AND 99`),
+    // A step-up is always for one session; a sign-in never is.
+    check(
+      "login_requests_step_up_has_session",
+      sql`(${t.purpose} = 'step_up') = (${t.sessionId} IS NOT NULL)`,
+    ),
+  ],
+);
+
+/**
+ * "Confirm it's you" (issue #135, ADR 0007): the sudo window of ONE session.
+ * A member who has just proven it is them (a passkey, a two-factor code, a
+ * Telegram tap or the password) may do sensitive things from this session,
+ * without being asked again, until `expires_at` (10 minutes). Keyed by the
+ * Better Auth session, so another device, or a new sign-in, has no window,
+ * and signing the session out deletes the row. Nothing secret is stored:
+ * only which method was used and when.
+ */
+export const stepUps = pgTable(
+  "step_ups",
+  {
+    sessionId: text("session_id")
+      .primaryKey()
+      .references(() => session.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    method: text("method").notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    check(
+      "step_ups_method",
+      sql`${t.method} IN ('passkey', 'totp', 'baumy', 'password')`,
+    ),
   ],
 );
 
