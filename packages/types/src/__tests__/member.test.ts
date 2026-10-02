@@ -6,6 +6,9 @@ import {
   DisplayName,
   KIOSK_PIN_MAX_DIGITS,
   KIOSK_PIN_MIN_DIGITS,
+  DEFAULT_KIOSK_IDLE_MINUTES,
+  KIOSK_IDLE_MINUTES_CHOICES,
+  KioskIdleMinutes,
   KioskPin,
   MEMBER_COLORS,
   MemberColor,
@@ -51,6 +54,21 @@ describe("AvatarSprite and MemberRole", () => {
     expect(AvatarSprite.safeParse("dragon").success).toBe(false);
     expect(MemberRole.parse("admin")).toBe("admin");
     expect(MemberRole.safeParse("owner").success).toBe(false);
+  });
+});
+
+describe("KioskIdleMinutes (issue #147)", () => {
+  it("accepts the kiosk's choices only, the default among them", () => {
+    for (const m of KIOSK_IDLE_MINUTES_CHOICES) {
+      expect(KioskIdleMinutes.parse(m)).toBe(m);
+    }
+    expect(KIOSK_IDLE_MINUTES_CHOICES).toContain(DEFAULT_KIOSK_IDLE_MINUTES);
+    for (const bad of [0, 3, 2.5, 16, 60, "2"]) {
+      expect(KioskIdleMinutes.safeParse(bad).success, String(bad)).toBe(false);
+    }
+    expect(KioskIdleMinutes.safeParse(3).error?.issues[0]?.message).toBe(
+      "Pick 1, 2, 5, 10, 15 minutes.",
+    );
   });
 });
 
