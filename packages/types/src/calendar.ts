@@ -81,6 +81,9 @@ export const CalendarEventId = z
   .string({ error: "Pick an event." })
   .regex(/^[A-Za-z0-9_]{5,1024}$/, "Pick an event.");
 
+/** The member an event is for (issue #134); none means the whole house. */
+export const EventForMember = z.uuid("Pick someone in the house.");
+
 /** The fields of an event, before the checks that tie them together. */
 export const eventFieldsShape = {
   title: EventTitle,
@@ -100,6 +103,9 @@ export const eventFieldsShape = {
   ),
   endTime: CalendarTime.optional().describe(
     "Timed events: the Berlin wall-clock end, HH:MM (24h), on endDate.",
+  ),
+  forMemberId: EventForMember.optional().describe(
+    "Who it is for: one member's id. Leave it out when it is for the whole house.",
   ),
 };
 

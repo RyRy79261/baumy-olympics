@@ -51,6 +51,29 @@ describe("CalendarDate and CalendarTime", () => {
   });
 });
 
+describe("forMemberId (issue #134)", () => {
+  it("takes one member's id, or nothing for the whole house", () => {
+    const id = "6f1c2b9e-3a4d-4e5f-8a9b-0c1d2e3f4a5b";
+    expect(NewCalendarEvent.parse({ ...timed, forMemberId: id })).toMatchObject(
+      { forMemberId: id },
+    );
+    expect(NewCalendarEvent.parse(timed).forMemberId).toBeUndefined();
+    expect(
+      CalendarEventUpdate.parse({ ...timed, eventId: "abc12", forMemberId: id })
+        .forMemberId,
+    ).toBe(id);
+  });
+
+  it("refuses anything that is not a member id", () => {
+    for (const bad of ["Ryan", "house", "123"]) {
+      expect(
+        issues(NewCalendarEvent.safeParse({ ...timed, forMemberId: bad })),
+        bad,
+      ).toEqual([["forMemberId", "Pick someone in the house."]]);
+    }
+  });
+});
+
 describe("CalendarEventId", () => {
   it("takes Google's base32hex ids and refuses anything else", () => {
     expect(CalendarEventId.parse("abc0123456789v")).toBe("abc0123456789v");
