@@ -1254,9 +1254,7 @@ export const noteReads = pgTable(
     memberId: uuid("member_id")
       .notNull()
       .references(() => members.id),
-    seenAt: timestamp("seen_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ columns: [t.noteId, t.memberId] }),

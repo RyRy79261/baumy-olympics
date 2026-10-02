@@ -27,9 +27,12 @@ export interface DashboardData {
   chores: { ok: true; data: ChoreView[] } | { ok: false; message: string };
   events:
     { ok: true; data: CalendarEventView[] } | { ok: false; message: string };
-  /** The notes, and list_notes' recentCount (the Messages count). */
+  /**
+   * The notes, and list_notes' unseenByAnyoneCount (the Messages count: the
+   * notes not every active member has seen, issue #153).
+   */
   notes:
-    | { ok: true; data: { notes: NoteView[]; recentCount: number } }
+    | { ok: true; data: { notes: NoteView[]; unseenByAnyoneCount: number } }
     | { ok: false; message: string };
 }
 
@@ -71,7 +74,10 @@ export async function loadDashboard(
     ),
     read(
       () => runAction("list_notes", {}, ctx),
-      (d) => ({ notes: d.notes, recentCount: d.recentCount }),
+      (d) => ({
+        notes: d.notes,
+        unseenByAnyoneCount: d.unseenByAnyoneCount,
+      }),
     ),
     readMembers(),
   ]);

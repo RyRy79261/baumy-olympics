@@ -18,10 +18,11 @@ import {
   isUrgentBounty,
   monthCells,
   parseMonthParams,
-  recentMessages,
+  unseenMessages,
 } from "@/lib/kiosk/dashboard";
 import { loadDashboard } from "@/lib/kiosk/dashboard-load";
 import { clearPickAction } from "../actions";
+import { kioskSeeNotesAction } from "../note-actions";
 
 // The kitchen screen's home (ADR 0005, issue #65): the portrait dashboard,
 // glanceable across the room with no taps. The header has the date, a big
@@ -71,12 +72,18 @@ export default async function KioskHomePage({
           data.notes.ok
             ? {
                 ok: true,
-                rows: recentMessages(data.notes.data.notes, ctx.now),
-                count: data.notes.data.recentCount,
+                rows: unseenMessages(
+                  data.notes.data.notes,
+                  data.members,
+                  ctx.now,
+                ),
+                count: data.notes.data.unseenByAnyoneCount,
               }
             : data.notes
         }
         members={data.members}
+        actingId={kiosk.memberId ?? null}
+        seeNotes={kioskSeeNotesAction}
       />
       <MonthCalendar
         key={month}

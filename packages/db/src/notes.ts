@@ -64,9 +64,7 @@ const noteColumns = {
   authorName: members.displayName,
   createdAt: notes.createdAt,
   updatedAt: notes.updatedAt,
-  editedAt: sql<Date>`${editedAtSql}`
-    .mapWith(notes.createdAt)
-    .as("edited_at"),
+  editedAt: sql<Date>`${editedAtSql}`.mapWith(notes.createdAt).as("edited_at"),
 };
 
 function live(householdId: string, id?: string) {
