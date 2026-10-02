@@ -25,9 +25,14 @@ export const MAX_RECORDING_MS = 45_000;
  */
 export const SILENCE_LEVEL = 0.03;
 
-/** A clip to drop unheard: the meter ran, and never rose above silence. */
+/**
+ * A clip to drop unheard: the meter ran and heard a room's faint noise, but
+ * never a voice. A peak of exactly 0 proves nothing: a real microphone is
+ * never that quiet, and some iOS versions report running audio while the
+ * source reads flat (a dead meter), so that clip is sent.
+ */
 export function heardNothing(peak: number, meterRan: boolean): boolean {
-  return meterRan && peak < SILENCE_LEVEL;
+  return meterRan && peak > 0 && peak < SILENCE_LEVEL;
 }
 
 export const SILENT_CLIP = "I didn't hear anything — hold and speak.";
