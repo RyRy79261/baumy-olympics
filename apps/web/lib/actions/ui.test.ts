@@ -20,7 +20,8 @@ const headersMock = vi.fn(
 vi.mock("@/lib/auth", () => ({ getActor: () => getActor() }));
 vi.mock("next/headers", () => ({ headers: () => headersMock() }));
 
-const { actionForm, formDataToInput, uiRequestCtx } = await import("./ui");
+const { actionForm, actionInput, formDataToInput, uiRequestCtx } =
+  await import("./ui");
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -147,6 +148,46 @@ describe("actionForm", () => {
 
     getActor.mockImplementation(async () => redirect("/auth/sign-in"));
     await expect(actionForm("whoami", form({}))).rejects.toThrow(
+      "NEXT_REDIRECT",
+    );
+  });
+});
+
+describe("actionInput", () => {
+  it("runs the action with structured input, once per request id", async () => {
+    const me = await seedMember(db(), { displayName: "Old" });
+    getActor.mockResolvedValue(sessionActor(me));
+    const input = { displayName: "Ryan" };
+    const res = await actionInput("update_my_profile", input, "input-req-0001");
+    expect(res).toMatchObject({ ok: true, data: { displayName: "Ryan" } });
+    await actionInput("update_my_profile", input, "input-req-0001");
+    const audits = await t.db().select().from(auditEvents);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({ source: "ui", actorMemberId: me });
+  });
+
+  it("needs a request id for a write, and a signed-in person", async () => {
+    const me = await seedMember(db());
+    getActor.mockResolvedValue(sessionActor(me));
+    const res = await actionInput("update_my_profile", { displayName: "R" }, 7);
+    expect(fieldErrors(res)).toHaveProperty("requestId");
+    getActor.mockResolvedValue(null);
+    await expect(actionInput("whoami", {}, undefined)).resolves.toMatchObject({
+      ok: false,
+      code: "UNAUTHENTICATED",
+    });
+  });
+
+  it("turns a throw into INTERNAL, but lets Next's redirect through", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    getActor.mockRejectedValue(new Error("db down"));
+    await expect(actionInput("whoami", {}, undefined)).resolves.toMatchObject({
+      ok: false,
+      code: "INTERNAL",
+    });
+    error.mockRestore();
+    getActor.mockImplementation(async () => redirect("/auth/sign-in"));
+    await expect(actionInput("whoami", {}, undefined)).rejects.toThrow(
       "NEXT_REDIRECT",
     );
   });

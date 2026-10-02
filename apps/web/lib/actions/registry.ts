@@ -65,6 +65,7 @@ import {
   dismissReminder,
   listReminders,
 } from "./reminders";
+import { reportBug } from "./report-bug";
 import { revokeInvite } from "./revoke-invite";
 import { revokeKiosk } from "./revoke-kiosk";
 import {
@@ -172,6 +173,7 @@ export const REGISTRY = {
   create_reminder: createReminder,
   acknowledge_reminder: acknowledgeReminder,
   dismiss_reminder: dismissReminder,
+  report_bug: reportBug,
 } satisfies { [N in ActionName]: AnyActionDef & { name: N } };
 
 export type ActionOutput<N extends ActionName> =

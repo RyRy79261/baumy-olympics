@@ -38,6 +38,8 @@ export const BRAIN_EXCLUDED: Partial<Record<ActionName, string>> = {
     "The shopping list is brain's own; brain ticks items off directly.",
   check_kiosk_pin:
     "Checks a PIN typed on the kitchen screen; only the kiosk has one.",
+  report_bug:
+    "Files an issue on the public bug tracker from the in-app reporter (a shake, or Settings); a report is the person's own words in the app. Tell them to shake their phone or use Settings → Bugs and feature requests.",
 };
 
 const CLAIM_ERRORS: ActionErrorCode[] = [
