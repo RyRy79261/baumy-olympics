@@ -203,10 +203,19 @@ test("the bubble closes on a tap outside or its ×, never during a hold", async 
   const ipad = await pairedKiosk(browser, page, `Bubble iPad ${suffix}`);
   await ipad.context.grantPermissions(["microphone"]);
   const kiosk = ipad.page;
-  // Keep every microphone stream the page opens, to see it turned off.
+  // Keep every microphone stream the page opens, to see it turned off, and
+  // every pointer that goes down or up, to see which finger lifted.
   await kiosk.addInitScript(() => {
     const md = navigator.mediaDevices;
     const real = md.getUserMedia.bind(md);
+    const ptr: string[] = [];
+    (window as unknown as { __ptr: string[] }).__ptr = ptr;
+    for (const t of ["pointerdown", "pointerup", "pointercancel"])
+      window.addEventListener(
+        t,
+        (e) => ptr.push(`${t}:${(e as PointerEvent).pointerId}`),
+        true,
+      );
     const streams: MediaStream[] = [];
     (window as unknown as { __streams: MediaStream[] }).__streams = streams;
     md.getUserMedia = async (c) => {
@@ -268,8 +277,8 @@ test("the bubble closes on a tap outside or its ×, never during a hold", async 
   await expect.poll(micLive).toBe(false);
   expect(new URL(kiosk.url()).pathname).toBe("/kiosk");
 
-  // A hold with a second finger landing outside: still listening, and
-  // letting go sends it and answers in the bubble.
+  // A hold with a second finger landing outside and lifting again: still
+  // listening, and letting the first go sends it and answers in the bubble.
   await cat.tap();
   await expect(holdButton).toHaveAttribute("data-state", "idle");
   const box = (await holdButton.boundingBox())!;
@@ -288,8 +297,28 @@ test("the bubble closes on a tap outside or its ×, never during a hold", async 
       { ...outside, id: 2 },
     ],
   });
-  await kiosk.waitForTimeout(900);
+  await kiosk.waitForTimeout(400);
   await expect(bubble).toHaveAttribute("data-mode", "listening");
+  // The second finger lifts while the first still holds (CDP's touchEnd
+  // lifts the points it names): still listening.
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [{ ...outside, id: 2 }],
+  });
+  // The page saw the second finger (and only it) lift.
+  await expect
+    .poll(() =>
+      kiosk.evaluate(() => {
+        const [, second, up] = (
+          window as unknown as { __ptr: string[] }
+        ).__ptr.slice(-3);
+        return up === `pointerup:${second?.split(":")[1]}`;
+      }),
+    )
+    .toBe(true);
+  await kiosk.waitForTimeout(500);
+  await expect(bubble).toHaveAttribute("data-mode", "listening");
+  await expect(holdButton).toHaveAttribute("aria-pressed", "true");
   await cdp.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
     touchPoints: [],
