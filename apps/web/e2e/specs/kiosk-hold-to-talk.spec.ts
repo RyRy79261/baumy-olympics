@@ -165,11 +165,9 @@ test("tap the cat, hold to talk, see the answer and confirm, and stay", async ({
   //    "Hold to talk" for the next thing.
   await bubble.getByRole("button", { name: "Confirm all" }).tap();
   await expect(bubble).toContainText(`Purrfect. +12 for ${founder} ✦`);
-  await expect(
-    bubble
-      .getByTestId("suggestion-log_completion")
-      .getByTestId("proposal-state"),
-  ).toHaveText("Done");
+  const card = bubble.getByTestId("suggestion-log_completion");
+  await expect(card).toHaveAttribute("data-state", "saved");
+  await expect(card).toContainText("Saved: +12 points.");
   await expect(holdButton).toHaveText("Hold to talk");
   await shot(kiosk, "5-confirmed");
 
