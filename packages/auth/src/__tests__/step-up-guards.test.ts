@@ -153,12 +153,15 @@ async function enrol(cookie: string) {
     password: PASSWORD,
   });
   expect(enabled.status).toBe(200);
-  const { totpURI } = (await enabled.json()) as { totpURI: string };
+  const { totpURI, backupCodes } = (await enabled.json()) as {
+    totpURI: string;
+    backupCodes: string[];
+  };
   const verified = await call("/two-factor/verify-totp", cookie, {
     code: totpFromUri(totpURI),
   });
   expect(verified.status).toBe(200);
-  return { totpURI, cookie: fresh(jar(verified, cookie)) };
+  return { totpURI, backupCodes, cookie: fresh(jar(verified, cookie)) };
 }
 
 describe("a real sign-in opens a window", () => {
@@ -197,6 +200,109 @@ describe("a real sign-in opens a window", () => {
     expect(sessions).toHaveLength(before + 1);
     expect(await windowOf(sessions.at(-1)!.id)).toMatchObject({
       method: "totp",
+    });
+  });
+
+  it("the backup-code step of a sign-in opens one", async () => {
+    const { email, userId, cookie } = await account();
+    const { backupCodes } = await enrol(cookie);
+    const first = await call("/sign-in/email", "", {
+      email,
+      password: PASSWORD,
+    });
+    expect(await first.json()).toMatchObject({ twoFactorRedirect: true });
+    const before = (await sessionsOf(userId)).length;
+    const second = await call("/two-factor/verify-backup-code", jar(first), {
+      code: backupCodes[0],
+    });
+    expect(second.status).toBe(200);
+    const sessions = await sessionsOf(userId);
+    expect(sessions).toHaveLength(before + 1);
+    expect(await windowOf(sessions.at(-1)!.id)).toMatchObject({
+      method: "backup_code",
+    });
+  });
+
+  it("a Google sign-in opens one for the session its callback makes", async () => {
+    const google = createAuth({
+      BETTER_AUTH_URL: ORIGIN,
+      E2E_TEST_MODE: "1",
+      GOOGLE_CLIENT_ID: "client-id",
+      GOOGLE_CLIENT_SECRET: "client-secret",
+    });
+    const start = await google.handler(
+      new Request(`${ORIGIN}/api/auth/sign-in/social`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: ORIGIN },
+        body: JSON.stringify({
+          provider: "google",
+          callbackURL: "/",
+          disableRedirect: true,
+        }),
+      }),
+    );
+    expect(start.status).toBe(200);
+    const { url } = (await start.json()) as { url: string };
+    const state = new URL(url).searchParams.get("state")!;
+
+    // Google's token endpoint, faked: an id token for a new address (Better
+    // Auth's Google provider reads the profile from it, unverified, as the
+    // token came straight from Google over TLS).
+    seq += 1;
+    const email = `google${seq}@example.com`;
+    const b64 = (o: object) =>
+      Buffer.from(JSON.stringify(o)).toString("base64url");
+    const idToken = `${b64({ alg: "RS256", typ: "JWT" })}.${b64({
+      iss: "https://accounts.google.com",
+      aud: "client-id",
+      sub: `google-sub-${seq}`,
+      email,
+      email_verified: true,
+      name: "Googler",
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })}.sig`;
+    const realFetch = globalThis.fetch;
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input, init) => {
+        const target =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (target.startsWith("https://oauth2.googleapis.com/token")) {
+          return Response.json({
+            access_token: "access",
+            id_token: idToken,
+            token_type: "Bearer",
+            expires_in: 3600,
+            scope: "openid email profile",
+          });
+        }
+        return realFetch(input, init);
+      });
+    try {
+      const callback = await google.handler(
+        new Request(
+          `${ORIGIN}/api/auth/callback/google?code=the-code&state=${encodeURIComponent(state)}`,
+          { headers: { cookie: jar(start), origin: ORIGIN } },
+        ),
+      );
+      expect(callback.status).toBe(302);
+      expect(callback.headers.get("location")).not.toContain("error");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+    const [made] = await db
+      .select()
+      .from(schema.user)
+      .where(eq(schema.user.email, email));
+    const sessions = await sessionsOf(made!.id);
+    expect(sessions).toHaveLength(1);
+    expect(await windowOf(sessions[0]!.id)).toMatchObject({
+      method: "google",
     });
   });
 
@@ -287,18 +393,22 @@ describe("Better Auth's security endpoints need an open window", () => {
     expect(options.status).toBe(200);
   });
 
-  it("registering a passkey also needs a sign-in under 10 minutes old", async () => {
+  it("lets an old session register a passkey once it has confirmed: the window is the only check", async () => {
     const { userId, cookie } = await account();
     const [mine] = await sessionsOf(userId);
+    // Signed in two days ago (past Better Auth's default freshAge of a day).
     await db
       .update(schema.session)
-      .set({ createdAt: new Date(Date.now() - 11 * 60_000) })
+      .set({ createdAt: new Date(Date.now() - 2 * 24 * 3_600_000) })
       .where(eq(schema.session.id, mine!.id));
-    // The window is open; Better Auth's freshAge (600s) still refuses.
+    await closeWindows(userId);
+    const refused = await call("/passkey/generate-register-options", cookie);
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ code: "STEP_UP_REQUIRED" });
+    // It confirms it's them: Better Auth's age check does not refuse it.
     await openWindow(mine!.id, userId);
     const res = await call("/passkey/generate-register-options", cookie);
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "SESSION_NOT_FRESH" });
+    expect(res.status).toBe(200);
   });
 });
 
