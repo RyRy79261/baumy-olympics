@@ -54,9 +54,10 @@ describe("the idle kiosk", () => {
     ).toMatchObject({ totalPts: 20 });
   });
 
-  it("reads the standings, the pot, today's events and the notes", async () => {
+  it("reads the standings, the pot, today's events, the notes and the activity log", async () => {
     for (const [name, input] of [
       ["get_standings", { recent: 0 }],
+      ["get_activity", {}],
       ["get_pot", {}],
       ["list_events", {}],
       ["list_notes", { pinnedOnly: true }],
@@ -67,7 +68,7 @@ describe("the idle kiosk", () => {
   });
 
   it("reads nothing the hub does not show", async () => {
-    for (const name of ["get_streaks", "get_pending_confirmations", "whoami"]) {
+    for (const name of ["get_streaks", "whoami"]) {
       expect(await runAction(name, {}, idle()), name).toMatchObject({
         ok: false,
         code: "FORBIDDEN",

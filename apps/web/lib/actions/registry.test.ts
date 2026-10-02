@@ -52,7 +52,7 @@ describe("the registry", () => {
     }
   });
 
-  it("keeps exactly the five claim events, the sign-in answers and the admin writes brain gets to the member's own word", () => {
+  it("keeps exactly the four claim events, the sign-in answers and the admin writes brain gets to the member's own word", () => {
     expect(
       entries
         .filter(([, d]) => d.ownWordOnly)
@@ -62,7 +62,6 @@ describe("the registry", () => {
       "add_pot_contribution",
       "approve_login",
       "concede_completion",
-      "confirm_completion",
       "create_bounty",
       "deny_login",
       "dispute_completion",
