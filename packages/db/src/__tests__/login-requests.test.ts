@@ -8,17 +8,20 @@ import {
   LOGIN_REQUEST_TTL_MS,
   LOGIN_DENIAL_LOCK_MS,
   claimApprovedLoginRequest,
+  claimApprovedStepUpRequest,
   decideLoginRequest,
   findLoginCandidate,
   findLoginRequestBySecret,
+  findStepUpRequest,
   hashLoginSecret,
   insertLoginRequest,
+  insertStepUpRequest,
   isLoginLocked,
   lockLoginRequest,
   loginRequestState,
   pruneLoginRequests,
 } from "../login-requests";
-import { loginRequests, members, user } from "../schema";
+import { loginRequests, members, session, user } from "../schema";
 import { useTestDb } from "./_harness";
 
 // "Sign in with Baumy" (issue #80): every step is one statement whose WHERE is
@@ -206,6 +209,7 @@ describe("lockLoginRequest and decideLoginRequest", () => {
       code: 47,
       device: "Chrome on macOS",
       state: "pending",
+      purpose: "sign_in",
     });
     expect(await lockLoginRequest(db(), id, other.id, NOW)).toBeNull();
   });
@@ -313,6 +317,160 @@ describe("claimApprovedLoginRequest", () => {
     await decideLoginRequest(db(), id, { status: "approved", now: NOW });
     await t.db().update(members).set({ deactivatedAt: NOW });
     expect(await claimApprovedLoginRequest(db(), SECRET, NOW)).toBeNull();
+  });
+});
+
+/** A Better Auth session row for the member's account. */
+async function sessionOf(authUserId: string | null, id = `s-${Math.random()}`) {
+  await t
+    .db()
+    .insert(session)
+    .values({
+      id,
+      token: `tok-${id}`,
+      userId: authUserId!,
+      expiresAt: at(24 * 3_600_000),
+    });
+  return id;
+}
+
+async function stepUp(memberId: string, sessionId: string) {
+  return insertStepUpRequest(db(), {
+    memberId,
+    sessionId,
+    code: 47,
+    choices: [12, 47, 83],
+    device: "Chrome on macOS",
+    now: NOW,
+  });
+}
+
+describe("step-up requests (issue #135)", () => {
+  it("is found, decided and used only by the session that asked", async () => {
+    const m = await member();
+    const mine = await sessionOf(m.authUserId);
+    const other = await sessionOf(m.authUserId);
+    const { id, expiresAt } = await stepUp(m.id, mine);
+    expect(expiresAt).toEqual(at(LOGIN_REQUEST_TTL_MS));
+    expect(
+      await findStepUpRequest(db(), { id, sessionId: mine, now: NOW }),
+    ).toBe("pending");
+    expect(
+      await findStepUpRequest(db(), { id, sessionId: other, now: NOW }),
+    ).toBeNull();
+    // Brain's tap finds it like a sign-in, and says what it is for.
+    expect(await lockLoginRequest(db(), id, m.id, NOW)).toMatchObject({
+      purpose: "step_up",
+      state: "pending",
+    });
+
+    const claim = (sessionId: string, now = at(1000)) =>
+      claimApprovedStepUpRequest(db(), {
+        id,
+        sessionId,
+        memberId: m.id,
+        now,
+      });
+    // Not approved yet.
+    expect(await claim(mine)).toBe(false);
+    await decideLoginRequest(db(), id, { status: "approved", now: NOW });
+    expect(
+      await findStepUpRequest(db(), { id, sessionId: mine, now: NOW }),
+    ).toBe("approved");
+    // Another session of the same account cannot use it.
+    expect(await claim(other)).toBe(false);
+    expect(await claim(mine)).toBe(true);
+    // Once.
+    expect(await claim(mine, at(2000))).toBe(false);
+    expect(
+      await findStepUpRequest(db(), { id, sessionId: mine, now: NOW }),
+    ).toBe("used");
+  });
+
+  it("is refused after the grace, and for another member", async () => {
+    const m = await member();
+    const someoneElse = await member();
+    const mine = await sessionOf(m.authUserId);
+    const { id } = await stepUp(m.id, mine);
+    await decideLoginRequest(db(), id, { status: "approved", now: NOW });
+    expect(
+      await claimApprovedStepUpRequest(db(), {
+        id,
+        sessionId: mine,
+        memberId: someoneElse.id,
+        now: NOW,
+      }),
+    ).toBe(false);
+    expect(
+      await claimApprovedStepUpRequest(db(), {
+        id,
+        sessionId: mine,
+        memberId: m.id,
+        now: at(LOGIN_REQUEST_TTL_MS + LOGIN_EXCHANGE_GRACE_MS),
+      }),
+    ).toBe(false);
+    expect(
+      await claimApprovedStepUpRequest(db(), {
+        id,
+        sessionId: mine,
+        memberId: m.id,
+        now: at(LOGIN_REQUEST_TTL_MS + LOGIN_EXCHANGE_GRACE_MS - 1),
+      }),
+    ).toBe(true);
+  });
+
+  it("is never traded for a session, and a sign-in is never a step-up", async () => {
+    const m = await member();
+    const mine = await sessionOf(m.authUserId);
+    const step = await stepUp(m.id, mine);
+    await decideLoginRequest(db(), step.id, { status: "approved", now: NOW });
+    // The sign-in path looks rows up by their secret; give the step-up row a
+    // known one to prove the purpose, not the secret, keeps it out.
+    await t
+      .db()
+      .update(loginRequests)
+      .set({ secretHash: hashLoginSecret(SECRET) })
+      .where(eq(loginRequests.id, step.id));
+    expect(await findLoginRequestBySecret(db(), SECRET, NOW)).toBeNull();
+    expect(await claimApprovedLoginRequest(db(), SECRET, NOW)).toBeNull();
+
+    const other = "sign-in-secret-0123456789abcdefghijk";
+    const signIn = await request(m.id, other);
+    await decideLoginRequest(db(), signIn.id, { status: "approved", now: NOW });
+    expect(
+      await findStepUpRequest(db(), {
+        id: signIn.id,
+        sessionId: mine,
+        now: NOW,
+      }),
+    ).toBeNull();
+    expect(
+      await claimApprovedStepUpRequest(db(), {
+        id: signIn.id,
+        sessionId: mine,
+        memberId: m.id,
+        now: NOW,
+      }),
+    ).toBe(false);
+  });
+
+  it("goes with its session, and a step-up needs one", async () => {
+    const m = await member();
+    const mine = await sessionOf(m.authUserId);
+    await stepUp(m.id, mine);
+    await t.db().delete(session).where(eq(session.id, mine));
+    expect(await t.db().select().from(loginRequests)).toEqual([]);
+    await expect(
+      t.db().insert(loginRequests).values({
+        memberId: m.id,
+        purpose: "step_up",
+        secretHash: "x",
+        code: 47,
+        choices: [47],
+        device: "d",
+        expiresAt: NOW,
+      }),
+    ).rejects.toThrow();
   });
 });
 
