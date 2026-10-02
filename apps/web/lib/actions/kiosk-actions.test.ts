@@ -573,3 +573,78 @@ describe("check_kiosk_pin: attestation on the kiosk", () => {
     });
   });
 });
+
+describe("set_kiosk_idle_minutes (issue #147)", () => {
+  function atKiosk(deviceId: string, memberId?: string) {
+    const actor: Actor = {
+      kind: "kiosk",
+      deviceId,
+      ...(memberId ? { memberId, displayName: "Jo", role: "member" } : {}),
+    };
+    return ctxFor(actor, { source: "kiosk" });
+  }
+
+  it("lets the member picked on the kiosk set its idle minutes, with no PIN, and audits it", async () => {
+    const { ctx: admin } = await adminCtx();
+    const deviceId = await pairedDevice(admin);
+    expect((await device(deviceId)).idleMinutes).toBeNull();
+    // A member with no PIN at all ([UNRESOLVED 2026-10-02] who may).
+    const jo = await seedMember(db(), { displayName: "Jo" });
+    await expect(
+      runAction(
+        "set_kiosk_idle_minutes",
+        { minutes: 5 },
+        atKiosk(deviceId, jo),
+      ),
+    ).resolves.toEqual({ ok: true, data: { minutes: 5 } });
+    expect((await device(deviceId)).idleMinutes).toBe(5);
+    const [audit] = await t
+      .db()
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "set_kiosk_idle_minutes"));
+    expect(audit).toMatchObject({
+      source: "kiosk",
+      actorMemberId: jo,
+      entity: "kiosk_device",
+      entityId: deviceId,
+      payload: { minutes: 5, before: null },
+    });
+  });
+
+  it("offers only the choices, needs someone picked, and only on the kiosk", async () => {
+    const { ctx: admin } = await adminCtx();
+    const deviceId = await pairedDevice(admin);
+    const jo = await seedMember(db(), { displayName: "Jo" });
+    for (const minutes of [0, 3, 16, 60]) {
+      await expect(
+        runAction("set_kiosk_idle_minutes", { minutes }, atKiosk(deviceId, jo)),
+      ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    }
+    await expect(
+      runAction("set_kiosk_idle_minutes", { minutes: 2 }, atKiosk(deviceId)),
+    ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
+    await expect(
+      runAction("set_kiosk_idle_minutes", { minutes: 2 }, admin),
+    ).resolves.toMatchObject({ ok: false, code: "SURFACE_FORBIDDEN" });
+    expect((await device(deviceId)).idleMinutes).toBeNull();
+  });
+
+  it("says so on a screen that was signed out", async () => {
+    const { ctx: admin } = await adminCtx();
+    const deviceId = await pairedDevice(admin);
+    const jo = await seedMember(db(), { displayName: "Jo" });
+    await t
+      .db()
+      .update(kioskDevices)
+      .set({ revokedAt: FIXED_NOW })
+      .where(eq(kioskDevices.id, deviceId));
+    await expect(
+      runAction(
+        "set_kiosk_idle_minutes",
+        { minutes: 10 },
+        atKiosk(deviceId, jo),
+      ),
+    ).resolves.toMatchObject({ ok: false, code: "NOT_FOUND" });
+  });
+});
