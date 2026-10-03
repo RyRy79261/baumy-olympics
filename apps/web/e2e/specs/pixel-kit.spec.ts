@@ -175,8 +175,11 @@ test("on a laptop the whole header is one row", async ({ page }, testInfo) => {
 // Issue #67: every hub page in the kit, as the approved prototype lays it
 // out: the page title in the display font, nothing wider than the screen,
 // and a screenshot of each attached to the report for a look.
-const PAGES: { path: string; title: string }[] = [
-  { path: "/", title: "Hub" },
+// The hub home (`/`) has no visible heading block, only a screen-reader
+// h1 (owner ruling 2026-10-03), so it is checked for width but not for the
+// display font.
+const PAGES: { path: string; title: string; srOnly?: boolean }[] = [
+  { path: "/", title: "Hub", srOnly: true },
   { path: "/chores", title: "Bounties" },
   { path: "/calendar?view=month", title: "Calendar" },
   { path: "/notes", title: "Board" },
@@ -210,13 +213,18 @@ test("every hub page is in the kit and fits the screen", async ({
     await expect(tile.locator("[data-unavailable]")).toHaveCount(0);
   }
 
-  for (const { path, title } of PAGES) {
+  for (const { path, title, srOnly } of PAGES) {
     await page.goto(path);
     const h1 = page.getByRole("heading", { name: title, level: 1 });
-    await expect(h1).toBeVisible();
-    expect(await h1.evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(
-      /Press Start 2P/,
-    );
+    if (srOnly) {
+      await expect(h1).toHaveCount(1);
+      await expect(h1).toHaveClass(/sr-only/);
+    } else {
+      await expect(h1).toBeVisible();
+      expect(
+        await h1.evaluate((el) => getComputedStyle(el).fontFamily),
+      ).toMatch(/Press Start 2P/);
+    }
     const width = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
       client: document.documentElement.clientWidth,
