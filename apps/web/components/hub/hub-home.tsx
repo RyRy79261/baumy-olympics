@@ -30,13 +30,12 @@ import { LiveClock } from "./live-clock";
 // the kitchen screen's calm look in a normal scrolling page. On top, the
 // clock and the three status tiles (Urgent, New, Messages), each dim at
 // zero and a link to its slice. Then the urgent bounties and today's agenda
-// in the wide column, the standings with the pot, the pinned notes (the
+// in the wide column, the scores with the pot, the pinned notes (the
 // Board) and the shopping list in the narrow one. Each widget keeps its own
 // empty and unavailable state (lib/hub/load.ts). The page's own card (Post a
 // reminder) stacks under the wide column's, so the short column leaves no
-// gap (issue #152); on one column it comes last. Below lg the columns are
-// `display: contents`, so every card is a cell of the one-column grid and
-// `order-last` can move the extra card past the narrow column's.
+// gap (issue #152). It comes right after Today at every width, so what is
+// seen and what is read or tabbed through keep one order.
 
 const TILES: {
   key: "urgent" | "new" | "messages";
@@ -215,19 +214,16 @@ export function HubHome({
   shopping: ShoppingActions;
   /** Offer hold-to-speak in the Baumy sheet (a transcriber is configured). */
   voice?: boolean;
-  /** A card of the page's own, stacked last in the wide column. */
+  /** A card of the page's own, stacked under Today in the wide column. */
   children?: ReactNode;
 }) {
   const { chores, standings, pot, notes, counts } = hub;
   return (
-    // From lg up the page keeps clear of the corner Baumy's button sits in
-    // (fixed, bottom right), so it never covers a widget's link or the
-    // shopping list's Add; from 2xl the page's own margin is wide enough.
-    <div className="lg:pr-32 2xl:pr-0">
+    <div>
       <section
         aria-label="At a glance"
         data-testid="hub-glance"
-        className="mb-6 flex flex-wrap items-end justify-between gap-4"
+        className="mb-6 flex flex-wrap items-center justify-between gap-4"
       >
         <LiveClock serverNow={hub.now} />
         <nav aria-label="Needs attention" className="flex gap-3">
@@ -259,7 +255,7 @@ export function HubHome({
         data-testid="hub"
         className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
       >
-        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <Widget
             id="widget-chores"
             data-testid="widget-chores"
@@ -304,21 +300,19 @@ export function HubHome({
             )}
           </Deferred>
 
-          {children ? (
-            <div className="order-last min-w-0 lg:order-none">{children}</div>
-          ) : null}
+          {children}
         </div>
 
-        <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <Widget
             id="widget-leaderboard"
             data-testid="widget-leaderboard"
-            title="Standings"
+            title="Scores"
             status={standings.status}
             message={
               standings.status === "ready" ? undefined : standings.message
             }
-            action={<More href="/scores" label="Scores" />}
+            action={<More href="/scores" label="All scores" />}
             footer={
               <p
                 data-testid="hub-pot"
@@ -387,7 +381,12 @@ export function HubHome({
           </Deferred>
         </div>
       </div>
-      <BaumySheet voice={voice} />
+      {/* Last on the page, so on a wide screen (89rem, 1424px, up) the
+          corner button is tabbed to last, as it is drawn; it sits in the
+          page's side margin there, and the shell's bottom padding keeps the
+          page's end clear of it. Below that the top bar's button opens this
+          sheet. */}
+      <BaumySheet voice={voice} docked />
     </div>
   );
 }

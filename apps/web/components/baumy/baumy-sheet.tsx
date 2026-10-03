@@ -51,6 +51,7 @@ import { announceScore } from "@/lib/ui/scored";
 import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
 import { SuggestionCards } from "./suggestion-cards";
 import { useBaumyMood } from "./use-mood";
+import { usePublishToBar } from "./bar-relay";
 import { useRecorder } from "./use-recorder";
 import { VoiceRecorder } from "./voice-recorder";
 
@@ -109,6 +110,7 @@ export function BaumySheet({
   actingName,
   voice = false,
   cat = false,
+  docked = false,
   who,
 }: {
   kiosk?: boolean;
@@ -122,6 +124,13 @@ export function BaumySheet({
    * scored once the sheet closes. Otherwise the button on its plinth.
    */
   cat?: boolean;
+  /**
+   * The hub home's (issue #152): the corner button shows from 89rem
+   * (1424px, where the page's side margin clears it) up only; below that
+   * the top bar's button (components/hub/hub-baumy.tsx) opens this
+   * sheet through the relay (./bar-relay.ts).
+   */
+  docked?: boolean;
   /** The kiosk's avatars, while nobody is acting: "Who's asking?". */
   who?: ReactNode;
 }) {
@@ -364,6 +373,7 @@ export function BaumySheet({
     setSays(null);
     setOpen(true);
   }
+  usePublishToBar(docked, mood, wake);
 
   // ---------------------------------------------- the dashboard's cat
   const [bubble, setBubble] = useState<CatMode | null>(null);
@@ -799,7 +809,11 @@ export function BaumySheet({
           </button>
         </div>
       ) : (
-        <BaumyButton state={mood} onClick={wake} />
+        <BaumyButton
+          state={mood}
+          onClick={wake}
+          className={docked ? "max-[89rem]:hidden" : undefined}
+        />
       )}
       <Dialog open={open} onClose={close} title="Ask Baumy">
         <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">

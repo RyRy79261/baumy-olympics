@@ -134,9 +134,10 @@ describe("HubHome's streamed widgets", () => {
 });
 
 // Issue #152: the page's own card (Post a reminder) stacks under Today in the
-// wide column, so the short column leaves no gap; on one column it goes last.
+// wide column, so the short column leaves no gap, in the same order at every
+// width.
 describe("HubHome's extra card", () => {
-  it("sits in the wide column after Today, last on one column", () => {
+  it("sits in the wide column right after Today", () => {
     const html = renderToStaticMarkup(
       <HubHome
         hub={hub({ urgent: 0, new: 0, messages: 0 })}
@@ -151,8 +152,8 @@ describe("HubHome's extra card", () => {
     expect(extra).toBeLessThan(
       html.indexOf('data-testid="widget-leaderboard"'),
     );
-    const wrapper = html.slice(html.lastIndexOf("<div", extra), extra);
-    expect(wrapper).toContain("order-last");
-    expect(wrapper).toContain("lg:order-none");
+    // No reordering by CSS: what is seen is what is read and tabbed through.
+    expect(html).toContain('data-testid="widget-events"');
+    expect(html).not.toMatch(/\border-(last|first|none|\d)/);
   });
 });

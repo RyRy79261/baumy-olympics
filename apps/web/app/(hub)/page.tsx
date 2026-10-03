@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { rosterColours } from "@/lib/members/characters";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { householdMembers } from "@/lib/members/household";
-import { PageHeading } from "@baumy/ui";
 import { HubHome } from "@/components/hub/hub-home";
 import { PostReminderForm } from "@/components/hub/post-reminder-form";
 import { SetPinNudge } from "@/components/hub/set-pin-nudge";
@@ -14,15 +13,16 @@ import {
   LandingPage,
 } from "@/components/landing/landing-page";
 import { startHub } from "@/lib/hub/load";
-import { landingMetadata } from "@/lib/seo";
 import { voiceConfigured } from "@/lib/integrations/groq";
+import { landingMetadata } from "@/lib/seo";
 import { createReminderAction } from "./reminder-actions";
 import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
 
 // The hub home (SPEC §3.1, issue #20; ADR 0005): the clock and the Urgent,
 // New and Messages tiles, the urgent bounties, today's events, the
 // standings and the pot, the pinned notes, brain's shopping list and the
-// Baumy button, in the kitchen screen's calm look on a scrolling page. The
+// Baumy button (mounted by the frame, components/hub/hub-baumy.tsx), in the
+// kitchen screen's calm look on a scrolling page. The
 // kitchen screen has its own home at /kiosk. Nobody signed in gets the
 // public landing page instead (issue #96), never a redirect.
 
@@ -47,16 +47,15 @@ export default async function HubPage() {
   ]);
   return (
     <>
-      <PageHeading
-        eyebrow="Baumy Olympics"
-        title="Hub"
-        description={`Welcome, ${me.displayName}.`}
-      />
-      {hasPin ? null : (
-        <div className="mb-6 max-w-xl">
-          <SetPinNudge />
-        </div>
-      )}
+      {/* No visible heading block (owner ruling 2026-10-03, issue #152):
+          the header row is the page's head, as on the kiosk dashboard, and
+          this h1 names the page for a screen reader. tabIndex -1 lets the
+          PIN strip's × hand the focus to it. */}
+      <h1 className="sr-only" tabIndex={-1}>
+        Hub
+      </h1>
+      {/* A slim strip above everything, never a card (issue #152). */}
+      {hasPin ? null : <SetPinNudge memberId={me.memberId} />}
       <HubHome
         hub={{ ...hub, events, shopping }}
         voice={voiceConfigured()}

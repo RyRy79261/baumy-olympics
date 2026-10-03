@@ -126,6 +126,24 @@ describe("BaumyButton", () => {
     expect(out).toContain('data-state="listening"');
   });
 
+  it("sits in the viewport's bottom-right corner, inside the safe area", () => {
+    const out = html(<BaumyButton />);
+    expect(out).toContain("fixed");
+    expect(out).toContain("bottom-[max(0.75rem,env(safe-area-inset-bottom))]");
+    expect(out).toContain("right-[max(0.75rem,env(safe-area-inset-right))]");
+  });
+
+  it("in a bar, sits in the flow: the cat at 1x on a 44px framed plinth", () => {
+    const out = html(<BaumyButton bar />);
+    const cls = out.match(/<button[^>]*class="([^"]*)"/)![1]!.split(" ");
+    expect(cls).toContain("min-h-11");
+    expect(cls).toContain("pixel-frame");
+    expect(cls).not.toContain("fixed");
+    // One cat, 34 x 32.
+    expect(out).toContain("width:34px;height:32px");
+    expect(out.match(/data-sprite="baumy"/g)).toHaveLength(1);
+  });
+
   it("keeps the kiosk grid clear of the corner Baumy sits in", () => {
     expect(html(<HubGrid kiosk />)).toContain("pb-32");
     expect(html(<HubGrid />)).not.toContain("pb-32");
