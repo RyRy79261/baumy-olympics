@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import {
   ModuleBountyRow,
@@ -285,8 +286,19 @@ export function DashboardHeader({
   seeNotes: SeenAction;
 }) {
   const [open, setOpen] = useState<ModuleKey | null>(null);
+  // The Messages box keeps the rows it opened with: reading them marks them
+  // seen (issue #153), and the last reader must not see a note vanish while
+  // it is open. Closing it refreshes the page, so the count catches up.
+  const [opened, setOpened] = useState<Listed<MessageView> | null>(null);
+  const router = useRouter();
   const id = useId();
-  const close = () => setOpen(null);
+  const close = () => {
+    if (open === "messages") {
+      setOpened(null);
+      router.refresh();
+    }
+    setOpen(null);
+  };
   // A module left open closes after a minute untouched.
   useIdle(open !== null, KIOSK_IDLE_MS, close);
   const count = (l: Listed<unknown>) =>
@@ -319,7 +331,10 @@ export function DashboardHeader({
           tone="pink"
           count={count(messages)}
           data-icon="messages"
-          onClick={() => setOpen("messages")}
+          onClick={() => {
+            setOpened(messages);
+            setOpen("messages");
+          }}
         />
       </div>
       <KioskModal open={open !== null} onClose={close} labelledBy={titleId}>
@@ -346,7 +361,7 @@ export function DashboardHeader({
         ) : open === "messages" ? (
           <MessagesModule
             titleId={titleId}
-            listed={messages}
+            listed={opened ?? messages}
             members={members}
             actingId={actingId}
             seeNotes={seeNotes}
