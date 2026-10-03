@@ -17,6 +17,10 @@ const SHARED_CLOCK_SPECS = [
   "**/telegram-link-expiry.spec.ts",
   "**/kiosk-pairing-expiry.spec.ts",
   "**/confirm-its-you.spec.ts",
+  // Not the clock, but the same need to run alone: it has every member of
+  // the household read a note on the kiosk, which no parallel spec's
+  // Messages count must see happen (issue #153).
+  "**/notes-seen.spec.ts",
 ];
 
 export default defineConfig({

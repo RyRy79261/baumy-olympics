@@ -15,7 +15,7 @@ import {
 import type { Actor } from "@/lib/auth";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { RequestCtx } from "./define";
-import { NOTE_RECENT_MS, type NoteView } from "./notes";
+import type { NoteView } from "./notes";
 import { REGISTRY, runAction } from "./registry";
 
 // The note actions through the real runAction on PGlite (issue #20):
@@ -221,35 +221,84 @@ describe("list_notes", () => {
     expect(limited.notes).toHaveLength(2);
   });
 
-  it("counts the notes added or edited in the last 24 hours, not pins, past any limit", async () => {
-    const day = NOTE_RECENT_MS / MIN;
-    const old = await add("Old", {}, as(ryan, { now: at(-day - 1) }));
-    const pinLater = await add("Pin me", {}, as(ryan, { now: at(-day - 1) }));
-    await add("Fresh", {}, as(ryan, { now: at(-5) }));
-    await add("Fresher", {}, as(ryan, { now: at(-1) }));
-    const count = async (input = {}) =>
-      ok(await runAction("list_notes", input, as(ryan))).recentCount;
-    expect(await count()).toBe(2);
+  it("counts the notes the caller has not seen, past any limit; the writer has seen theirs", async () => {
+    const a = await add("A", {}, as(partner, { now: at(-10) }));
+    const b = await add("B", {}, as(partner, { now: at(-9) }));
+    await add("Mine", {}, as(ryan, { now: at(-8) }));
+    const counts = async (who: string, input = {}) => {
+      const d = ok(await runAction("list_notes", input, as(who)));
+      return [d.unseenCount, d.unseenByAnyoneCount];
+    };
+    // Ryan has seen his own note only; Partner has seen A and B only.
+    expect(await counts(ryan)).toEqual([2, 3]);
+    expect(await counts(partner)).toEqual([1, 3]);
     // Counted over every note, not only the ones listed.
-    expect(await count({ limit: 1, pinnedOnly: true })).toBe(2);
-    // Pinning is not an edit.
+    expect(await counts(ryan, { limit: 1, pinnedOnly: true })).toEqual([2, 3]);
+    const listed = ok(await runAction("list_notes", {}, as(ryan))).notes;
+    expect(listed.find((n) => n.id === a.id)!.seenBy).toEqual([partner]);
+
+    ok(
+      await runAction(
+        "acknowledge_note",
+        { noteIds: [a.id, b.id] },
+        as(ryan, { now: at(-5) }),
+      ),
+    );
+    expect(await counts(ryan)).toEqual([0, 1]);
+    expect(
+      ok(await runAction("list_notes", {}, as(ryan))).notes.find(
+        (n) => n.id === a.id,
+      )!.seenBy,
+    ).toEqual([ryan, partner]);
+  });
+
+  it("brings a note back for everyone but the editor when its words change, not when it is pinned", async () => {
+    const a = await add("A", {}, as(partner, { now: at(-10) }));
+    ok(
+      await runAction(
+        "acknowledge_note",
+        { noteIds: a.id },
+        as(ryan, { now: at(-9) }),
+      ),
+    );
+    const counts = async (who: string) => {
+      const d = ok(await runAction("list_notes", {}, as(who)));
+      return [d.unseenCount, d.unseenByAnyoneCount];
+    };
+    expect(await counts(ryan)).toEqual([0, 0]);
     ok(
       await runAction(
         "pin_note",
-        { noteId: pinLater.id, pinned: true },
-        as(ryan, { now: at(-2) }),
+        { noteId: a.id, pinned: true },
+        as(partner, { now: at(-8) }),
       ),
     );
-    expect(await count()).toBe(2);
-    // Editing the words is.
+    expect(await counts(ryan)).toEqual([0, 0]);
+    // Ryan edits it: Partner, who wrote it, has not seen his words.
     ok(
       await runAction(
         "update_note",
-        { noteId: old.id, title: "Old, edited" },
-        as(ryan, { now: at(-2) }),
+        { noteId: a.id, title: "A, edited" },
+        as(ryan, { now: at(-7) }),
       ),
     );
-    expect(await count()).toBe(3);
+    expect(await counts(ryan)).toEqual([0, 1]);
+    expect(await counts(partner)).toEqual([1, 1]);
+  });
+
+  it("has no count of its own for a kiosk with nobody picked", async () => {
+    await add("A", {}, as(partner));
+    const nobody = ctxFor(
+      { kind: "kiosk", deviceId: "dev-1" },
+      { source: "kiosk" },
+    );
+    const d = ok(await runAction("list_notes", {}, nobody));
+    expect(d.unseenCount).toBeNull();
+    expect(d.unseenByAnyoneCount).toBe(1);
+    // Picked, the kiosk counts for the member picked.
+    expect(ok(await runAction("list_notes", {}, kiosk(ryan))).unseenCount).toBe(
+      1,
+    );
   });
 
   it("is offered on every surface", async () => {
@@ -507,5 +556,145 @@ describe("delete_note", () => {
         { ...as(ryan), requestId: undefined },
       ),
     ).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+  });
+});
+
+describe("acknowledge_note", () => {
+  const unseen = async (ctx: RequestCtx) =>
+    ok(await runAction("list_notes", {}, ctx)).unseenCount;
+
+  it("marks the notes seen by the member, audited, and replays a retry", async () => {
+    const a = await add("A", {}, as(partner));
+    const b = await add("B", {}, as(partner));
+    expect(await unseen(as(ryan))).toBe(2);
+    const ctx = as(ryan);
+    const input = { noteIds: [a.id, b.id] };
+    const first = ok(await runAction("acknowledge_note", input, ctx));
+    expect(first).toEqual({ memberId: ryan, noteIds: [a.id, b.id] });
+    expect(await unseen(as(ryan))).toBe(0);
+    // Partner's own count is untouched.
+    expect(await unseen(as(partner))).toBe(0);
+    const [audit] = await t
+      .db()
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "acknowledge_note"));
+    expect(audit).toMatchObject({
+      actorMemberId: ryan,
+      source: "ui",
+      entity: "note",
+      entityId: null,
+      payload: { noteIds: [a.id, b.id] },
+    });
+    // The same request again: the stored result.
+    expect(ok(await runAction("acknowledge_note", input, ctx))).toEqual(first);
+    expect(
+      await t
+        .db()
+        .select()
+        .from(actionRequests)
+        .where(eq(actionRequests.action, "acknowledge_note")),
+    ).toHaveLength(1);
+  });
+
+  it("names the note in the audit when it is one, and skips notes gone since", async () => {
+    const a = await add("A", {}, as(partner));
+    const gone = await add("Gone", {}, as(partner));
+    ok(await runAction("delete_note", { noteId: gone.id }, as(partner)));
+    expect(
+      ok(
+        await runAction(
+          "acknowledge_note",
+          { noteIds: [a.id, gone.id] },
+          as(ryan),
+        ),
+      ).noteIds,
+    ).toEqual([a.id]);
+    ok(await runAction("acknowledge_note", { noteIds: a.id }, as(ryan)));
+    const rows = await audits(a.id);
+    expect(rows.map((r) => r.action)).toContain("acknowledge_note");
+  });
+
+  it("says NOT_FOUND when none of the notes is there", async () => {
+    const gone = await add("Gone", {}, as(partner));
+    ok(await runAction("delete_note", { noteId: gone.id }, as(partner)));
+    expect(
+      await runAction("acknowledge_note", { noteIds: gone.id }, as(ryan)),
+    ).toMatchObject({
+      ok: false,
+      code: "NOT_FOUND",
+      message: expect.stringContaining("not there"),
+    });
+    expect(
+      await runAction(
+        "acknowledge_note",
+        { noteIds: [gone.id, "00000000-0000-4000-8000-000000000000"] },
+        as(ryan),
+      ),
+    ).toMatchObject({ ok: false, code: "NOT_FOUND" });
+  });
+
+  it("refuses no ids, or ids that are not ids", async () => {
+    for (const noteIds of [[], "nope", undefined]) {
+      expect(
+        await runAction("acknowledge_note", { noteIds }, as(ryan)),
+      ).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    }
+  });
+
+  it("marks for the picked member only on the kiosk, with no PIN", async () => {
+    const a = await add("A", {}, as(partner));
+    ok(await runAction("acknowledge_note", { noteIds: a.id }, kiosk(ryan)));
+    expect(await unseen(as(ryan))).toBe(0);
+    const [audit] = await t
+      .db()
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, "acknowledge_note"));
+    expect(audit).toMatchObject({ source: "kiosk", actorMemberId: ryan });
+    // Partner wrote it and Ryan has read it: everyone has, so the kitchen
+    // no longer counts it.
+    expect(
+      ok(await runAction("list_notes", {}, kiosk(ryan))).unseenByAnyoneCount,
+    ).toBe(0);
+  });
+
+  it("marks nothing for a kiosk with nobody picked", async () => {
+    const a = await add("A", {}, as(partner));
+    const nobody = ctxFor(
+      { kind: "kiosk", deviceId: "dev-1" },
+      { source: "kiosk" },
+    );
+    expect(
+      await runAction("acknowledge_note", { noteIds: a.id }, nobody),
+    ).toMatchObject({ ok: false, code: "FORBIDDEN" });
+    expect(await unseen(as(ryan))).toBe(1);
+  });
+
+  it("is on the phone and the kiosk only, for household members", async () => {
+    const a = await add("A", {}, as(partner));
+    for (const ctx of [
+      mcp(ryan, ["baumy:read", "baumy:write"]),
+      brain(ryan),
+      ctxFor(sessionActor(ryan), { source: "ai" }),
+      ctxFor(accountActor("u")),
+    ]) {
+      expect(
+        await runAction("acknowledge_note", { noteIds: a.id }, ctx),
+      ).toMatchObject({ ok: false });
+    }
+    expect(await unseen(as(ryan))).toBe(1);
+    expect(REGISTRY.acknowledge_note.surfaces).toEqual(["ui", "kiosk"]);
+  });
+
+  it("previews how many it marks", async () => {
+    const ctx = { ...as(ryan), db: db() };
+    const id = "00000000-0000-4000-8000-000000000000";
+    expect(
+      await REGISTRY.acknowledge_note.preview!(ctx, { noteIds: [id] }),
+    ).toBe("Mark the note as seen");
+    expect(
+      await REGISTRY.acknowledge_note.preview!(ctx, { noteIds: [id, id] }),
+    ).toBe("Mark 2 notes as seen");
   });
 });

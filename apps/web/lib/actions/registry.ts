@@ -51,6 +51,7 @@ import {
 } from "./mcp-connections";
 import { mintInvite } from "./mint-invite";
 import {
+  acknowledgeNote,
   createNote,
   deleteNote,
   listNotes,
@@ -178,6 +179,7 @@ export const REGISTRY = {
   update_note: updateNote,
   pin_note: pinNote,
   delete_note: deleteNote,
+  acknowledge_note: acknowledgeNote,
   list_shopping: listShopping,
   add_shopping_items: addShoppingItems,
   check_off_shopping_items: checkOffShoppingItems,

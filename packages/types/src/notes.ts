@@ -106,3 +106,24 @@ export const NotePin = z.strictObject({
 export const NoteRef = z.strictObject({
   noteId: NoteId.describe("The note's id, from list_notes."),
 });
+
+/**
+ * One or more note ids, as they are: an array (JSON, a repeated form field)
+ * or one string (a form with a single note).
+ */
+export const NoteIds = z
+  .union([z.array(z.string()), z.string()], { error: "Pick a note." })
+  .transform((v) => (Array.isArray(v) ? v : [v]))
+  .pipe(
+    z
+      .array(NoteId)
+      .min(1, "Pick a note.")
+      .max(NOTE_LIST_MAX, `Mark at most ${NOTE_LIST_MAX} at once.`),
+  );
+
+/** `acknowledge_note`: the notes the member has just read (issue #153). */
+export const NoteAcknowledge = z.strictObject({
+  noteIds: NoteIds.describe(
+    'The ids of the notes you have read, from list_notes: ["<id>"].',
+  ),
+});

@@ -116,7 +116,11 @@ describe("loadDashboard", () => {
     });
     expect(data.notes).toMatchObject({
       ok: true,
-      data: { notes: [{ title: "Pasta", authorId: ryan }], recentCount: 1 },
+      // Ryan wrote it, so has read it; he is everyone here.
+      data: {
+        notes: [{ title: "Pasta", authorId: ryan, seenBy: [ryan] }],
+        unseenByAnyoneCount: 0,
+      },
     });
     expect(data.members).toEqual([
       { id: ryan, displayName: "Ryan", color: "#336699", sprites: null },
