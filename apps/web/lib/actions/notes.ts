@@ -133,6 +133,9 @@ export const listNotes = defineAction({
       listNoteRows(ctx.db, {
         householdId: ctx.householdId,
         pinnedOnly: input.pinnedOnly ?? false,
+        // At most NOTE_LIST_MAX notes are listed, but both counts below run
+        // over every live note: past that many, a count can name notes the
+        // list (and so the Board, which marks only what it shows) leaves out.
         limit: input.limit ?? NOTE_LIST_MAX,
       }),
       memberId
