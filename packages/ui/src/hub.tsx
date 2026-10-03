@@ -182,33 +182,55 @@ export function WidgetItem({
 /**
  * The Baumy button (SPEC §3.1, §3.6; ADR 0005 §1): the cat itself, bottom
  * right, over everything, the way into the command sheet. `state` is its
- * mood (lib/ai/mood.ts).
+ * mood (lib/ai/mood.ts). `bar` (the hub's on a phone or a tablet, issue
+ * #152): the same cat at 1x on a slim plinth, in the flow of the top bar
+ * beside the menus, so it never floats over the page.
  */
 export function BaumyButton({
   state = "idle",
+  bar = false,
   className,
   type = "button",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { state?: SpriteState }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  state?: SpriteState;
+  bar?: boolean;
+}) {
   return (
     <button
       type={type}
       aria-label="Ask Baumy"
       className={cx(
-        // Baumy sits on a small raised plinth in the corner (the prototype's
-        // footer end), so it reads against any page; the shells keep that
-        // corner clear (AppShell's bottom padding, HubGrid's on the kiosk).
-        "fixed right-3 bottom-3 z-10 inline-flex touch-manipulation items-end justify-center",
-        "pixel-frame pixel-frame-4 bg-bm-raised px-3 pt-2 pb-3 [--pf:var(--color-bm-violet)]",
-        "shadow-[0_6px_0_rgb(0_0_0/0.45)] active:translate-y-px",
+        "inline-flex touch-manipulation justify-center",
+        "pixel-frame bg-bm-raised [--pf:var(--color-bm-violet)] active:translate-y-px",
+        bar
+          ? "min-h-11 min-w-11 items-center px-1.5"
+          : // Baumy sits on a small raised plinth in the corner (the
+            // prototype's footer end), so it reads against any page; the
+            // shells keep that corner clear (AppShell's bottom padding,
+            // HubGrid's on the kiosk). Anchored to the viewport's
+            // bottom-right corner, clear of a phone's home bar and rounded
+            // corners (the safe-area insets), like a chat button (#152).
+            "fixed right-[max(0.75rem,env(safe-area-inset-right))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 items-end pixel-frame-4 px-3 pt-2 pb-3 shadow-[0_6px_0_rgb(0_0_0/0.45)]",
         className,
       )}
       {...props}
     >
-      {/* 2x on a phone, where the corner covers more of the page; 3x from
-          sm up. Only one shows (the other is display: none). */}
-      <Sprite name="baumy" state={state} size={4} className="sm:hidden" />
-      <Sprite name="baumy" state={state} size={6} className="max-sm:hidden" />
+      {bar ? (
+        <Sprite name="baumy" state={state} size={2} />
+      ) : (
+        <>
+          {/* 2x on a phone, where the corner covers more of the page; 3x
+              from sm up. Only one shows (the other is display: none). */}
+          <Sprite name="baumy" state={state} size={4} className="sm:hidden" />
+          <Sprite
+            name="baumy"
+            state={state}
+            size={6}
+            className="max-sm:hidden"
+          />
+        </>
+      )}
     </button>
   );
 }

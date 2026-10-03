@@ -9,6 +9,7 @@ import { runSweepAfterResponse } from "@/lib/background-work";
 import { householdRoster } from "@/lib/members/household";
 import { FeedbackGate } from "@/components/feedback/feedback-gate";
 import { ScoreEmote } from "@/components/members/score-emote";
+import { HubBaumy } from "@/components/hub/hub-baumy";
 import { reportAiAvailable } from "@/lib/feedback/ai";
 import { HubMenu, NavLinks, type NavItem } from "./nav-links";
 
@@ -95,6 +96,9 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
               Sign out
             </Link>
           </HubMenu>
+          {/* The hub home's Baumy below 89rem; from there it is the corner
+              button at the end of the page (HubHome), tabbed to last. */}
+          <HubBaumy />
         </>
       }
     >

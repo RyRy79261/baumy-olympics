@@ -11,6 +11,7 @@ covers:
   - apps/web/lib/ai/voice.ts
   - apps/web/app/(hub)/admin/kitchen-screen/page.tsx
   - docs/kiosk-setup.md
+  - apps/web/components/hub/set-pin-nudge.tsx
 ---
 
 ## What it shows
@@ -27,7 +28,7 @@ After {{KIOSK_IDLE_DEFAULT_MIN}} minutes untouched, the screen forgets who was a
 
 The kitchen screen is shared, but almost everything there runs as whoever tapped their avatar, with no PIN: logging a chore (for yourself or someone else), undoing, notes, the calendar, the shopping list and Baumy. The iPad asks for **your personal PIN** only before it **disputes** a chore as you, and, for an admin, before it adds or edits a bounty or changes a bounty's points. Your own settings are only changed on your phone.
 
-If you have not set a PIN, the iPad never shows a PIN pad you cannot use: it says "<your name> hasn't set a personal PIN yet" with a QR code that opens Settings on your phone. When you ask Baumy for several things, **Confirm all** does the rest and leaves only the dispute waiting. After you join, the hub reminds you to set one.
+If you have not set a PIN, the iPad never shows a PIN pad you cannot use: it says "<your name> hasn't set a personal PIN yet" with a QR code that opens Settings on your phone. When you ask Baumy for several things, **Confirm all** does the rest and leaves only the dispute waiting. After you join, a line at the top of the hub reminds you to set one; tap its × to hide it on that device.
 
 Set your PIN on your phone, in **Settings → Your personal PIN**: {{KIOSK_PIN_MIN_DIGITS}} to {{KIOSK_PIN_MAX_DIGITS}} digits, yours alone. Changing a PIN you already have asks you to confirm it's you first. On the iPad, **Check my PIN** on the Bounties page checks it without changing anything. Keep it to yourself, and never use someone else's.
 
