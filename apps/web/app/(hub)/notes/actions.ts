@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { DeleteNoteData, NoteWriteData } from "@/lib/actions/notes";
+import type {
+  AcknowledgeNoteData,
+  DeleteNoteData,
+  NoteWriteData,
+} from "@/lib/actions/notes";
 import type { ActionResult } from "@/lib/actions/result";
 import { actionForm } from "@/lib/actions/ui";
 
@@ -39,6 +43,18 @@ export async function pinNoteAction(
 ): Promise<WriteResult> {
   const result = await actionForm("pin_note", form);
   if (result.ok) refresh();
+  return result;
+}
+
+/**
+ * The member has the Board open: the notes on it are seen by them (issue
+ * #153). The hub's Messages count reads it on its next render.
+ */
+export async function seeNotesAction(
+  form: FormData,
+): Promise<ActionResult<AcknowledgeNoteData>> {
+  const result = await actionForm("acknowledge_note", form);
+  if (result.ok) revalidatePath("/");
   return result;
 }
 

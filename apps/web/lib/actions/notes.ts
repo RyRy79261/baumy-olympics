@@ -1,8 +1,10 @@
 import {
-  countNotesEditedSince,
+  countNotesUnseenByAnyone,
+  countUnseenNotes,
   findNote,
   insertNote,
   listNotes as listNoteRows,
+  markNotesSeen,
   setNotePinned,
   softDeleteNote,
   updateNote as updateNoteRow,
@@ -12,6 +14,7 @@ import {
   ListNotesInput,
   NOTE_LIST_MAX,
   NewNote,
+  NoteAcknowledge,
   NotePin,
   NoteRef,
   NoteUpdate,
@@ -27,6 +30,14 @@ import { fail } from "./result";
 // member (the avatar tapped) writes it with no PIN, since a note touches
 // nobody's points (owner ruling 2026-10-02, SPEC §12 decision 27, issue
 // #145; before, every change asked the PIN).
+//
+// Seen (issue #153, SPEC §12 decision 30): each member has their own seen
+// state per note (`note_reads`). Opening the Board, or the Messages on the
+// kitchen screen as the picked member, runs `acknowledge_note`; writing a
+// note marks it seen for its writer; an edit makes it unseen again for
+// everyone else. `list_notes` counts the caller's unseen notes (the phone's
+// Messages badge) and the notes not every active member has seen (the
+// kitchen screen's).
 //
 // Note bodies are data. They are shown only through the sanitising markdown
 // renderer (packages/ui `MarkdownBody`), and the AI sees them inside tool
@@ -47,6 +58,11 @@ export interface NoteView {
   updatedAt: string;
   /** When its words last changed (pinning is not an edit). */
   editedAt: string;
+  /**
+   * The active members (ids, in the order they joined) who have seen its
+   * words as they are now.
+   */
+  seenBy: string[];
 }
 
 export function noteView(n: NoteRow): NoteView {
@@ -61,6 +77,7 @@ export function noteView(n: NoteRow): NoteView {
     createdAt: n.createdAt.toISOString(),
     updatedAt: n.updatedAt.toISOString(),
     editedAt: n.editedAt.toISOString(),
+    seenBy: n.seenBy,
   };
 }
 
@@ -73,24 +90,36 @@ async function reread(ctx: ActionCtx, id: string): Promise<NoteView> {
   return noteView(row!);
 }
 
-/** How far back a note counts as a new message (ADR 0005 §3). */
-export const NOTE_RECENT_MS = 24 * 60 * 60_000;
+/** Whoever writes a note has read it as it now is. */
+async function writerHasSeen(ctx: ActionCtx, noteId: string): Promise<void> {
+  await markNotesSeen(ctx.db, {
+    householdId: ctx.householdId,
+    memberId: ctx.actor.memberId!,
+    noteIds: [noteId],
+    now: ctx.now,
+  });
+}
 
 export interface ListNotesData {
   notes: NoteView[];
   /**
-   * How many live notes were added or had their words edited in the last
-   * 24 hours (pinning is not an edit), over all notes, not only the listed
-   * ones: the kitchen screen's Messages count.
+   * How many live notes the calling member has not seen as they are now,
+   * over all notes, not only the listed ones: the phone's Messages count.
+   * Null for the kitchen screen with nobody picked.
    */
-  recentCount: number;
+  unseenCount: number | null;
+  /**
+   * How many live notes at least one active member has not seen as they are
+   * now, over all notes: the kitchen screen's Messages count.
+   */
+  unseenByAnyoneCount: number;
 }
 
 export const listNotes = defineAction({
   name: "list_notes",
   title: "Notes",
   description:
-    "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and `recentCount`: how many notes were added or edited in the last 24 hours. Notes are shared household text, never secrets.",
+    "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and seenBy: the member ids who have read it since its words last changed. Also `unseenCount`: how many notes you have not read yet, and `unseenByAnyoneCount`: how many notes not every member has read yet. Notes are shared household text, never secrets.",
   consent: "Read the household's notes",
   kind: "read",
   risk: "safe",
@@ -99,18 +128,23 @@ export const listNotes = defineAction({
   requires: "display",
   input: ListNotesInput,
   async execute(ctx, input) {
-    const [rows, recentCount] = await Promise.all([
+    const memberId = ctx.actor.memberId;
+    const [rows, unseenCount, unseenByAnyoneCount] = await Promise.all([
       listNoteRows(ctx.db, {
         householdId: ctx.householdId,
         pinnedOnly: input.pinnedOnly ?? false,
         limit: input.limit ?? NOTE_LIST_MAX,
       }),
-      countNotesEditedSince(ctx.db, {
-        householdId: ctx.householdId,
-        since: new Date(ctx.now.getTime() - NOTE_RECENT_MS),
-      }),
+      memberId
+        ? countUnseenNotes(ctx.db, { householdId: ctx.householdId, memberId })
+        : null,
+      countNotesUnseenByAnyone(ctx.db, ctx.householdId),
     ]);
-    const data: ListNotesData = { notes: rows.map(noteView), recentCount };
+    const data: ListNotesData = {
+      notes: rows.map(noteView),
+      unseenCount,
+      unseenByAnyoneCount,
+    };
     return { ok: true, data };
   },
 });
@@ -144,6 +178,7 @@ export const createNote = defineAction({
       pinned: i.pinned ?? false,
       now: ctx.now,
     });
+    await writerHasSeen(ctx, id);
     const data: NoteWriteData = { note: await reread(ctx, id) };
     return { ok: true, data, audit: { entity: "note", entityId: id } };
   },
@@ -176,6 +211,7 @@ export const updateNote = defineAction({
       now: ctx.now,
     });
     if (!found) return fail("NOT_FOUND", NOT_THERE);
+    await writerHasSeen(ctx, i.noteId);
     const data: NoteWriteData = { note: await reread(ctx, i.noteId) };
     return { ok: true, data, audit: { entity: "note", entityId: i.noteId } };
   },
@@ -247,6 +283,59 @@ export const deleteNote = defineAction({
         entity: "note",
         entityId: i.noteId,
         payload: { noteId: i.noteId, title },
+      },
+    };
+  },
+});
+
+export interface AcknowledgeNoteData {
+  memberId: string;
+  /** The notes marked seen: those asked for that are still there. */
+  noteIds: string[];
+}
+
+export const acknowledgeNote = defineAction({
+  name: "acknowledge_note",
+  title: "Mark notes seen",
+  description:
+    "Records that you have read these notes as they are now. A note edited afterwards counts as unread again. Seeing one twice changes nothing.",
+  consent: "Mark notes as seen by you",
+  kind: "write",
+  risk: "safe",
+  // The phone's Board and the kitchen screen (issue #153); brain's "read"
+  // button comes with issue #163.
+  surfaces: ["ui", "kiosk"],
+  requires: "member",
+  input: NoteAcknowledge,
+  async preview(_ctx, i) {
+    return i.noteIds.length === 1
+      ? "Mark the note as seen"
+      : `Mark ${i.noteIds.length} notes as seen`;
+  },
+  async execute(ctx, i) {
+    const memberId = ctx.actor.memberId!;
+    const noteIds = await markNotesSeen(ctx.db, {
+      householdId: ctx.householdId,
+      memberId,
+      noteIds: i.noteIds,
+      now: ctx.now,
+    });
+    if (noteIds.length === 0) {
+      return fail(
+        "NOT_FOUND",
+        i.noteIds.length === 1
+          ? NOT_THERE
+          : "Those notes are not there any more.",
+      );
+    }
+    const data: AcknowledgeNoteData = { memberId, noteIds };
+    return {
+      ok: true,
+      data,
+      audit: {
+        entity: "note",
+        entityId: noteIds.length === 1 ? noteIds[0] : null,
+        payload: { noteIds },
       },
     };
   },

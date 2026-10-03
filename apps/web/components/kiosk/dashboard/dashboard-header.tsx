@@ -29,13 +29,18 @@ import {
   type MessageView,
 } from "@/lib/kiosk/dashboard";
 import { KIOSK_IDLE_MS } from "@/lib/kiosk/constants";
+import {
+  MarkNotesSeen,
+  type SeenAction,
+} from "@/components/notes/mark-notes-seen";
 import { useIdle } from "../use-idle";
 
 // The dashboard's header (ADR 0005 §1, issue #65): the date, a big clock
 // in Berlin time and at most three notification icons, Urgent, New and
 // Messages. Each opens its calm module: the bounties (All, Consumables,
-// Maintenance) with "I'll do it" leading to the log flow, or the notes
-// board's last day.
+// Maintenance) with "I'll do it" leading to the log flow, or the notes not
+// every member has seen yet (issue #153); opening those with someone picked
+// marks them seen by that member only.
 
 /** A list, or why it could not be read; `count` overrides its length. */
 type Listed<T> =
@@ -191,11 +196,16 @@ function MessagesModule({
   titleId,
   listed,
   members,
+  actingId,
+  seeNotes,
   onClose,
 }: {
   titleId: string;
   listed: Listed<MessageView>;
   members: readonly DashboardMember[];
+  /** The picked member, who has now seen them; null with nobody picked. */
+  actingId: string | null;
+  seeNotes: SeenAction;
   onClose: () => void;
 }) {
   return (
@@ -206,15 +216,23 @@ function MessagesModule({
       tone="pink"
       subtitle={
         listed.ok
-          ? `${listed.count ?? listed.rows.length} on the board in the last day`
+          ? `${listed.count ?? listed.rows.length} not read by everyone yet`
           : "The notes board"
       }
       onClose={onClose}
     >
+      {listed.ok && actingId ? (
+        <MarkNotesSeen
+          noteIds={listed.rows
+            .filter((m) => !m.seenBy.includes(actingId))
+            .map((m) => m.id)}
+          action={seeNotes}
+        />
+      ) : null}
       {!listed.ok ? (
         <ModuleEmpty>{listed.message}</ModuleEmpty>
       ) : listed.rows.length === 0 ? (
-        <ModuleEmpty>No new notes today.</ModuleEmpty>
+        <ModuleEmpty>Everyone has read every note.</ModuleEmpty>
       ) : (
         <ul className="flex flex-col">
           {listed.rows.map((m) => {
@@ -252,6 +270,8 @@ export function DashboardHeader({
   fresh,
   messages,
   members,
+  actingId,
+  seeNotes,
 }: {
   /** The instant the page was read at, ISO 8601. */
   serverNow: string;
@@ -259,6 +279,10 @@ export function DashboardHeader({
   fresh: Listed<BountyRowView>;
   messages: Listed<MessageView>;
   members: DashboardMember[];
+  /** The member picked on the kiosk, or null. */
+  actingId: string | null;
+  /** acknowledge_note as the picked member (app/kiosk/note-actions.ts). */
+  seeNotes: SeenAction;
 }) {
   const [open, setOpen] = useState<ModuleKey | null>(null);
   const id = useId();
@@ -324,6 +348,8 @@ export function DashboardHeader({
             titleId={titleId}
             listed={messages}
             members={members}
+            actingId={actingId}
+            seeNotes={seeNotes}
             onClose={close}
           />
         ) : null}
