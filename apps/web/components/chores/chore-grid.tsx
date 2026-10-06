@@ -303,6 +303,9 @@ export function ChoreGrid({
                 kiosk={kiosk}
                 value={doneBy}
                 onChange={setDoneBy}
+                // The form is keyed by who: a new pick mid-send would lose
+                // the answer and allow a second log (#174).
+                disabled={sending}
                 options={members.map((m) => ({
                   value: m.id,
                   label:
@@ -326,6 +329,7 @@ export function ChoreGrid({
                 <PhotoPicker
                   key={open.id}
                   kiosk={kiosk}
+                  disabled={sending}
                   label={
                     open.proofMode === "required"
                       ? "Add a photo (required)"
