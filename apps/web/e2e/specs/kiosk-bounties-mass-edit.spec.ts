@@ -77,7 +77,7 @@ test("on the kiosk, an admin edits many bounties in one save with their PIN", as
       cat.x < box.x + box.width &&
       box.y < cat.y + cat.height &&
       cat.y < box.y + box.height;
-    expect(overlaps, await b.textContent()).toBe(false);
+    expect(overlaps, (await b.textContent()) ?? "").toBe(false);
   }
   await save.click();
   const pad = kiosk.getByRole("dialog", { name: `${founder}'s PIN` });
