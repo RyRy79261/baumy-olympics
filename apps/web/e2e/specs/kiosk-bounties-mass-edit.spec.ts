@@ -55,7 +55,6 @@ test("on the kiosk, an admin edits many bounties in one save with their PIN", as
   await row(towels).getByLabel("Status").selectOption("archived");
   await expect(row(kettle)).toHaveAttribute("data-changed", "true");
   await expect(row(towels)).toHaveAttribute("data-changed", "true");
-  await expectKioskTargets(row(kettle));
   await expectKioskTargets(editor);
   for (const field of ["Name", "Points", "Kind", "Status"]) {
     const box = (await row(kettle).getByLabel(field).boundingBox())!;
@@ -67,6 +66,7 @@ test("on the kiosk, an admin edits many bounties in one save with their PIN", as
   await expect(pad).toBeVisible();
   // The rows are kept for the PIN's second send.
   await expect(row(kettle).getByLabel("Points")).toHaveValue("33");
+  await expect(row(kettle).getByLabel("Kind")).toHaveValue("consumable");
   await typePin(pad, PIN);
   await expect(pad).toBeHidden();
   await expect(

@@ -49,6 +49,15 @@ export interface BulkEditorBounty extends BulkBounty {
 
 type Errors = Partial<Record<BountyField, string[]>>;
 
+/**
+ * The rows' controls name no form (no element has this id), so they belong
+ * to none. React resets a form once its action answers (the kiosk's first,
+ * PIN-less send does), and a reset puts a controlled list back on its first
+ * option while the state, and so what is sent, still holds the edit. The
+ * edits travel in the one hidden JSON field instead.
+ */
+const DETACHED = "bounty-bulk-editor-rows";
+
 export function BountyBulkEditor({
   bounties,
   action,
@@ -261,6 +270,7 @@ function BulkRow({
 }) {
   const id = (f: string) => `bulk-${b.id}-${f}`;
   const control = kiosk ? "min-h-14 text-xl" : undefined;
+  const wide = kiosk ? undefined : "col-span-2 sm:col-span-1";
   return (
     <li
       data-testid={`bulk-bounty-${b.name}`}
@@ -286,8 +296,10 @@ function BulkRow({
       </div>
       <div
         className={cx(
-          "grid gap-3",
-          kiosk ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-8",
+          // items-end: a label that wraps never pushes its control out of
+          // line with its neighbours'.
+          "grid items-end gap-3",
+          kiosk ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
         )}
       >
         <div className="col-span-2">
@@ -295,6 +307,7 @@ function BulkRow({
             {(c) => (
               <Input
                 {...c}
+                form={DETACHED}
                 kiosk={kiosk}
                 maxLength={CHORE_NAME_MAX}
                 value={d.name}
@@ -303,42 +316,51 @@ function BulkRow({
             )}
           </Field>
         </div>
-        <Field id={id("status")} label="Status" errors={errors.archived}>
-          {(c) => (
-            <Select
-              {...c}
-              className={control}
-              value={d.archived ? "archived" : "active"}
-              onChange={(e) =>
-                onChange({ archived: e.currentTarget.value === "archived" })
-              }
-            >
-              <option value="active">On the board</option>
-              <option value="archived">Archived</option>
-            </Select>
-          )}
-        </Field>
-        <Field id={id("kind")} label="Kind" errors={errors.kind}>
-          {(c) => (
-            <Select
-              {...c}
-              className={control}
-              value={d.kind}
-              onChange={(e) =>
-                onChange({
-                  kind: e.currentTarget.value as BountyDraft["kind"],
-                })
-              }
-            >
-              <option value="maintenance">Maintenance</option>
-              <option value="consumable">Consumable</option>
-            </Select>
-          )}
-        </Field>
+        {/* On a phone the two lists get the whole width, so "Maintenance"
+            is never cut off. */}
+        <div className={wide}>
+          <Field id={id("status")} label="Status" errors={errors.archived}>
+            {(c) => (
+              <Select
+                {...c}
+                form={DETACHED}
+                className={control}
+                value={d.archived ? "archived" : "active"}
+                onChange={(e) =>
+                  onChange({ archived: e.currentTarget.value === "archived" })
+                }
+              >
+                <option value="active">On the board</option>
+                <option value="archived">Archived</option>
+              </Select>
+            )}
+          </Field>
+        </div>
+        <div className={wide}>
+          <Field id={id("kind")} label="Kind" errors={errors.kind}>
+            {(c) => (
+              <Select
+                {...c}
+                form={DETACHED}
+                className={control}
+                value={d.kind}
+                onChange={(e) =>
+                  onChange({
+                    kind: e.currentTarget.value as BountyDraft["kind"],
+                  })
+                }
+              >
+                <option value="maintenance">Maintenance</option>
+                <option value="consumable">Consumable</option>
+              </Select>
+            )}
+          </Field>
+        </div>
         <Field id={id("points")} label="Points" errors={errors.points}>
           {(c) => (
             <Input
               {...c}
+              form={DETACHED}
               kiosk={kiosk}
               type="number"
               inputMode="numeric"
@@ -357,6 +379,7 @@ function BulkRow({
           {(c) => (
             <Input
               {...c}
+              form={DETACHED}
               kiosk={kiosk}
               type="number"
               inputMode="decimal"
@@ -374,6 +397,7 @@ function BulkRow({
           {(c) => (
             <Select
               {...c}
+              form={DETACHED}
               className={control}
               value={d.proofMode}
               onChange={(e) =>
@@ -396,6 +420,7 @@ function BulkRow({
           {(c) => (
             <Input
               {...c}
+              form={DETACHED}
               kiosk={kiosk}
               type="number"
               inputMode="numeric"
