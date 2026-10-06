@@ -271,11 +271,19 @@ describe("ChoreGrid's floating score (issue #181)", () => {
         ),
       );
     await render(chores);
-    return { render, answer: () => answer(LOGGED) };
+    return {
+      render,
+      answer: (r: ActionResult<LogCompletionData> = LOGGED) => answer(r),
+    };
   }
 
   /** Tap a row that sits at `box` on the screen and log it. */
-  async function tapAndLog(name: string, answer: () => void) {
+  async function tapAndLog(
+    name: string,
+    answer: () => void,
+    /** What happens between the tap and the answer. */
+    meanwhile?: () => void,
+  ) {
     const row = document.querySelector<HTMLButtonElement>(
       `[data-testid="chore-${name}"] button`,
     )!;
@@ -288,6 +296,7 @@ describe("ChoreGrid's floating score (issue #181)", () => {
     )!;
     expect(sheet.open).toBe(true);
     await act(async () => sheet.querySelector("form")!.requestSubmit());
+    meanwhile?.();
     await act(async () => answer());
     expect(sheet.open).toBe(false);
   }
@@ -357,5 +366,33 @@ describe("ChoreGrid's floating score (issue #181)", () => {
     expect(pop.className).toContain("inset-0");
     expect(pop.style.top).toBe("");
     expect(scrolls).not.toHaveBeenCalled();
+  });
+
+  it("floats in the middle when the tapped spot is off the screen by then", async () => {
+    const height = window.innerHeight;
+    try {
+      const { answer } = await board([bathroom, chore]);
+      // The tapped row's middle (y 541) is on a 768px-tall screen; turned
+      // sideways before the answer, the screen is 400px tall.
+      expect(window.innerHeight).toBeGreaterThan(541);
+      await tapAndLog("Trash", answer, () => {
+        window.innerHeight = 400;
+      });
+      const pop = theFloat();
+      expect(pop.textContent).toBe("+40");
+      expect(pop.getAttribute("data-placement")).toBe("middle");
+      expect(pop.style.top).toBe("");
+    } finally {
+      window.innerHeight = height;
+    }
+  });
+
+  it("shows no float when the log fails", async () => {
+    const { answer } = await board([bathroom, chore]);
+    await tapAndLog("Trash", () =>
+      answer({ ok: false, code: "COOLDOWN", message: "Not yet." }),
+    );
+    expect(getToasts().map((t) => t.title)).toContain("Not yet.");
+    expect(document.querySelector('[data-testid="score-pop"]')).toBeNull();
   });
 });
