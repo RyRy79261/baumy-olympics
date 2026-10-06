@@ -54,6 +54,22 @@ describe("ScorePop and StreakBrokenBanner", () => {
     expect(pop).toContain('role="status"');
     expect(pop).toContain("+25");
     expect(pop).toContain("motion-safe:");
+    // A third of the way down by default; the middle, or a box on the
+    // screen, when asked (issue #181).
+    expect(pop).toContain('data-placement="screen"');
+    expect(pop).toContain("top-1/3");
+    const middle = html(<ScorePop points={25} at="middle" />);
+    expect(middle).toContain('data-placement="middle"');
+    expect(middle).toContain("inset-0");
+    const box = html(
+      <ScorePop
+        points={25}
+        at={{ top: 480, left: 16, width: 788, height: 122 }}
+      />,
+    );
+    expect(box).toContain('data-placement="box"');
+    expect(box).toContain("top:480px;left:16px;width:788px;height:122px");
+    expect(box).not.toContain("top-1/3");
     const banner = html(
       <StreakBrokenBanner holderName="Ryan" length={3} bonus={12} />,
     );

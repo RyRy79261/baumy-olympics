@@ -795,7 +795,7 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
   - Baumy has 7 states (section 3.6). Each chore has an icon, and each member has an avatar.
   - **Source art:** AI-generated pixel art based on the reference picture `design/baumy-reference.png` (a black fluffy cat with heterochromia, one green eye and one blue-violet eye, a pastel party hat with stars, purple and teal fairy lights and trinkets around the neck, in a cosy cluttered maker den), cleaned up by hand and approved by the owner before it ships.
   - Honour `prefers-reduced-motion`, using camp-404's global kill switch.
-- **Juice:** a "+25" floating score and a streak flame counter. Breaking a streak shows a "STREAK BROKEN" banner with the broken length.
+- **Juice:** a "+25" floating score and a streak flame counter. Breaking a streak shows a "STREAK BROKEN" banner with the broken length. [CORRECTION 2026-10-06, issue #181, §12 decision 34] On the bounty board (`/chores`, `/kiosk/chores`) the "+25" floats where the bounty was on the screen when it was tapped, even though logging re-sorts the board and that row moves or leaves the tab; the page never scrolls. A log sheet opened from the home screen's "I'll do it" floats it in the middle of the screen. It was fixed a third of the way down the screen, over whichever row sat there. It says the same points as the toast.
 - **Base:** components start from shadcn/ui (Radix) in `packages/ui` with a restyled cva, as in camp-404 `packages/ui/components.json`.
 
 ## 8. Kiosk mode
@@ -954,6 +954,8 @@ Decided 2026-10-06 (issue #174):
 Decided 2026-10-06 (issue #179, in the review of PR #180):
 
 33. **The mass editor's sliders: − and + for points, and Clear.** The owner answered two multiple-choice questions on 2026-10-06, in the review of PR #180 (issue #179). Asked "On a finger screen, the Points slider moves about 1 point per pixel. Exact values like 26 are hard to hit. How should Points work?", the owner chose "Add − and + buttons (Recommended)": "Slider for big moves, plus small − / + buttons beside it for exact steps of 1. Any value 1 to 200 stays possible." Asked "Keep the small Clear button? It only shows when you touch the slider of a bounty with no points yet. It puts it back to 'Not set'.", the owner chose "Keep Clear (Recommended)": "A stray touch is fixed in one tap. It shows only in this rare case." So the Points slider alone has − and + beside it, each one point, held to 1 to 200; effort and cooldown are sliders only.
+
+34. **The floating points stay where you tapped.** The owner answered a multiple-choice question on 2026-10-06, in the review of PR #183 (issue #181). Asked "After you log a bounty, the list re-sorts and that bounty moves (often to the end). Where should the floating points go?", the owner chose "Where you tapped (Recommended)": "The points float where the bounty was when you tapped it. The page never jumps. If you came from the home screen's 'I'll do it', they float in the middle of the screen." So the bounty board keeps where the tapped row was on the screen when its log sheet opens, and the "+N" floats there, wherever the row goes after logging (§7 "Juice").
 
 Still open:
 

@@ -10,6 +10,7 @@ import {
   Dialog,
   ScorePop,
   StreakBrokenBanner,
+  type ScorePopBox,
   TabLabel,
   tabClass,
   type TabAccent,
@@ -47,6 +48,11 @@ import { toast } from "@/lib/ui/toast";
 // Outcomes: a floating "+N", a "STREAK BROKEN" banner when a streak ended,
 // and a toast for a refusal (a cooldown says when to try again, in Berlin
 // time). The page re-renders from the server action's revalidatePath.
+//
+// The "+N" floats where the bounty was when it was tapped, even though the
+// board re-sorts and that row moves; the page never scrolls. A sheet opened
+// from the dashboard's "I'll do it" had no tap on a row, so its "+N" floats
+// in the middle of the screen (owner ruling 2026-10-06, issue #181).
 
 export interface GridMember {
   id: string;
@@ -73,6 +79,17 @@ const EMPTY: Record<BountyFilter, string> = {
   maintenance: "No maintenance bounties.",
 };
 const BANNER_MS = 6000;
+
+/**
+ * Whether the middle of a tapped row's box is still on the screen. The screen
+ * can change between the tap and the answer (a phone turned sideways); then
+ * the "+N" floats in the middle instead.
+ */
+function onScreen(box: ScorePopBox): boolean {
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  return x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight;
+}
 
 export function ChoreGrid({
   chores,
@@ -110,7 +127,14 @@ export function ChoreGrid({
       : null,
   );
   const [doneBy, setDoneBy] = useState(actorId);
-  const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
+  const [pop, setPop] = useState<{
+    key: number;
+    points: number;
+    at: ScorePopBox | "middle";
+  } | null>(null);
+  // Where the open sheet's row was on the screen when it was tapped; null
+  // for a sheet the dashboard opened.
+  const tappedAt = useRef<ScorePopBox | null>(null);
   const [broken, setBroken] = useState<LogCompletionData | null>(null);
   const router = useRouter();
   const photo = useRef<Blob | null>(null);
@@ -152,8 +176,15 @@ export function ChoreGrid({
     setHasPhoto(p !== null);
   }
 
-  function onResult(result: ActionResult<LogCompletionData>) {
+  /** Put the sheet down, forgetting where its row was tapped. */
+  function closeSheet() {
     setOpenId(null);
+    tappedAt.current = null;
+  }
+
+  function onResult(result: ActionResult<LogCompletionData>) {
+    const tapped = tappedAt.current;
+    closeSheet();
     const sentPhoto = photo.current !== null;
     choosePhoto(null);
     if (sentPhoto && result.ok) router.refresh();
@@ -163,7 +194,11 @@ export function ChoreGrid({
     }
     const d = result.data;
     if (d.totalPts !== null) {
-      setPop({ key: Date.now(), points: d.totalPts });
+      setPop({
+        key: Date.now(),
+        points: d.totalPts,
+        at: tapped && onScreen(tapped) ? tapped : "middle",
+      });
       announceScore(d.totalPts);
       toast.success(
         `Logged ${d.choreName} for ${d.doneByName}: +${d.totalPts}.`,
@@ -217,7 +252,7 @@ export function ChoreGrid({
           />
         </div>
       ) : null}
-      {pop ? <ScorePop key={pop.key} points={pop.points} /> : null}
+      {pop ? <ScorePop key={pop.key} points={pop.points} at={pop.at} /> : null}
 
       <div
         role="group"
@@ -272,7 +307,14 @@ export function ChoreGrid({
               kiosk={kiosk}
               disabled={c.state === "unavailable"}
               className={rowAction ? "min-w-0 sm:flex-1" : undefined}
-              onClick={() => {
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                tappedAt.current = {
+                  top: r.top,
+                  left: r.left,
+                  width: r.width,
+                  height: r.height,
+                };
                 setDoneBy(actorId);
                 choosePhoto(null);
                 setOpenId(c.id);
@@ -290,7 +332,7 @@ export function ChoreGrid({
 
       <Dialog
         open={open !== null}
-        onClose={() => setOpenId(null)}
+        onClose={closeSheet}
         busy={sending}
         title={open ? `Log ${open.name}` : "Log a chore"}
       >
@@ -366,7 +408,7 @@ export function ChoreGrid({
               variant="secondary"
               size="kiosk"
               disabled={sending}
-              onClick={() => setOpenId(null)}
+              onClick={closeSheet}
             >
               Cancel
             </Button>

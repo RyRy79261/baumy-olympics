@@ -102,3 +102,71 @@ test("on the kiosk, break the partner's streak and log for someone else", async 
   await ipad.context.close();
   await member.context.close();
 });
+
+// Issue #181, owner ruling 2026-10-06: the floating "+N" says the toast's
+// points and floats where the bounty was when it was tapped, though logging
+// re-sorts the board (its cooldown sends it to the end); the page never
+// scrolls. The logged bounty is not the first row.
+test("on the kiosk, the floating score floats where the bounty was tapped", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const first = `Aaa first ${suffix}`;
+  const chore = `Take the bins out ${suffix}`;
+  const founder = `Founder ${project}`;
+
+  await founderAdmin(page, project);
+  await addChore(page, { name: first, basePoints: 26, cooldownHours: 0 });
+  await addChore(page, { name: chore, basePoints: 5, cooldownHours: 24 });
+  const ipad = await pairedKiosk(browser, page, `iPad ${suffix}`);
+  const kiosk = ipad.page;
+  await openKioskChores(kiosk);
+  await kiosk.getByRole("button", { name: founder, exact: true }).click();
+  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+
+  const rows = kiosk.getByRole("list", { name: "Bounties" }).locator("li");
+  const order = () =>
+    rows.evaluateAll((lis) => lis.map((li) => li.getAttribute("data-testid")));
+  await expect(rows.first()).toBeVisible();
+  const before = await order();
+  expect(before).toContain(`chore-${first}`);
+  expect(before.indexOf(`chore-${chore}`)).toBeGreaterThan(0);
+
+  // Where the row is on the screen when it is tapped, and where the page is.
+  const row = tile(kiosk, chore);
+  await row.scrollIntoViewIfNeeded();
+  const tapped = (await row.boundingBox())!;
+  const heading = kiosk.getByRole("heading", { name: "Bounties", level: 1 });
+  const headingY = (await heading.boundingBox())!.y;
+  const sheet = await openChore(kiosk, chore);
+  await expect(sheet.getByTestId("log-preview")).toContainText("+5, streak 1");
+  await sheet.getByRole("button", { name: "Log it" }).click();
+  await expect(sheet).toBeHidden();
+
+  const toast = kiosk
+    .getByRole("status")
+    .filter({ hasText: `Logged ${chore} for ${founder}:` });
+  await expect(toast).toContainText(`Logged ${chore} for ${founder}: +5.`);
+  const pop = kiosk.getByTestId("score-pop");
+  await expect(pop).toHaveText("+5");
+  const box = (await pop.boundingBox())!;
+  // The board re-sorted: the logged bounty, now in its cooldown, moved down
+  // and away from where it was tapped.
+  await expect
+    .poll(async () => (await order()).indexOf(`chore-${chore}`))
+    .toBeGreaterThan(before.indexOf(`chore-${chore}`));
+  expect((await row.boundingBox())!.y).not.toBe(tapped.y);
+  // The "+5" sits where the row was tapped (give or take the 6px hop).
+  const middle = box.y + box.height / 2;
+  expect(middle).toBeGreaterThanOrEqual(tapped.y);
+  expect(middle).toBeLessThanOrEqual(tapped.y + tapped.height);
+  expect(Math.abs(box.x - tapped.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(box.width - tapped.width)).toBeLessThanOrEqual(1);
+  // And the page did not scroll.
+  expect((await heading.boundingBox())!.y).toBe(headingY);
+
+  await ipad.context.close();
+});
