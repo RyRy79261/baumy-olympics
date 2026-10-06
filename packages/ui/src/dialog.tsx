@@ -53,8 +53,7 @@ export function Dialog({
         pressedOutside.current = e.target === e.currentTarget;
       }}
       onClick={(e) => {
-        const outside =
-          e.target === e.currentTarget && pressedOutside.current;
+        const outside = e.target === e.currentTarget && pressedOutside.current;
         pressedOutside.current = false;
         if (outside) close();
       }}
