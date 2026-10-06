@@ -153,8 +153,12 @@ test("on the kiosk, the floating score floats where the bounty was tapped", asyn
   const pop = kiosk.getByTestId("score-pop");
   await expect(pop).toHaveText("+5");
   const box = (await pop.boundingBox())!;
-  // The board re-sorted: the logged bounty went to the end.
-  await expect.poll(async () => (await order()).at(-1)).toBe(`chore-${chore}`);
+  // The board re-sorted: the logged bounty, now in its cooldown, moved down
+  // and away from where it was tapped.
+  await expect
+    .poll(async () => (await order()).indexOf(`chore-${chore}`))
+    .toBeGreaterThan(before.indexOf(`chore-${chore}`));
+  expect((await row.boundingBox())!.y).not.toBe(tapped.y);
   // The "+5" sits where the row was tapped (give or take the 6px hop).
   const middle = box.y + box.height / 2;
   expect(middle).toBeGreaterThanOrEqual(tapped.y);
