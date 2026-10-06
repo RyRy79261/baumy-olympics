@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BountyList,
   BountyRow,
+  Button,
   ChoiceGroup,
   Dialog,
   ScorePop,
@@ -352,6 +353,14 @@ export function ChoreGrid({
               }
               onResult={onResult}
             />
+            {/* A way out that says so, as well as the corner's × (#174). */}
+            <Button
+              variant="secondary"
+              size="kiosk"
+              onClick={() => setOpenId(null)}
+            >
+              Cancel
+            </Button>
           </div>
         ) : null}
       </Dialog>

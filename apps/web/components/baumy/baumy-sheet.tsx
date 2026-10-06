@@ -906,11 +906,7 @@ export function BaumySheet({
               onDrop={drop}
               onEdit={edit}
             />
-          ) : (
-            <Button variant="secondary" size={size} onClick={close}>
-              Close
-            </Button>
-          )}
+          ) : null}
         </div>
       </Dialog>
     </>

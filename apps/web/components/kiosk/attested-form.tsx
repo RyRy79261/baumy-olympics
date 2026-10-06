@@ -127,19 +127,7 @@ export function AttestedForm<T>({
         title={noPin ? "Personal PIN needed" : pinLabel}
       >
         <div className="flex flex-col gap-4">
-          {noPin ? (
-            <>
-              <NoPinNotice name={acting.name} />
-              <Button
-                type="button"
-                size="kiosk"
-                variant="secondary"
-                onClick={() => setDismissed(true)}
-              >
-                Close
-              </Button>
-            </>
-          ) : null}
+          {noPin ? <NoPinNotice name={acting.name} /> : null}
           {!noPin &&
           failed &&
           !failed.ok &&
