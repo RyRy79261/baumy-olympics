@@ -120,7 +120,7 @@ So doing a chore over and over pays more and more, and leaving a chore to one pe
 
 Baumy watches how often each bounty is really done. Each week it may suggest new points for one that is done much more or less often than its points expect; a suggestion lands between 5 and 60 points.
 
-An admin can schedule a suggestion, or set any bounty's points with a reason. A scheduled change lands on a Monday at least 48 hours away, and until then any other member can **veto** it in **Activity**. An admin can also change points at once when they edit a bounty, or edit many bounties together under **Admin → Edit chores → Edit many at once**: one row per bounty, one **Save**, and either every change is saved or none is. A change never touches points already scored.
+An admin can schedule a suggestion, or set any bounty's points with a reason. A scheduled change lands on a Monday at least 48 hours away, and until then any other member can **veto** it in **Activity**. An admin can also change points at once when they edit a bounty, or edit many bounties together under **Admin → Edit chores → Edit many at once**: one row per bounty (points, cooldown and effort are sliders), one **Save**, and either every change is saved or none is. A change never touches points already scored.
 
 Every change, who made it and why, is in **Points history** under the bounties board.
 
@@ -201,7 +201,7 @@ An admin can do a few admin things on the kitchen iPad, after tapping their own 
 
 - **Add or edit a bounty**: ask Baumy ("add a bounty for the recycling, 15 points"); **Confirm all** asks for your PIN.
 - **Change a bounty's points**: **Bounties → Kitchen screen settings → Change a bounty's points**. Like on your phone, the change waits for the next Monday at least 48 hours ahead, so the others can veto it.
-- **Edit many bounties at once**: **Bounties → Kitchen screen settings → Edit bounties**. Each bounty has its own row: its name, kind, points, cooldown, photo proof, effort, and whether it is on the board or archived. Change as many rows as you like (changed rows are marked **Changed**), then tap **Save** once (it stays at the bottom of the screen) and type your PIN. A number left empty says **Required** until you fill it in. Either every change is saved or none is, and it says why. **Discard** throws the changes away. New points count from now on.
+- **Edit many bounties at once**: **Bounties → Kitchen screen settings → Edit bounties**. Each bounty has its own row: its name, kind, points, cooldown, photo proof, effort, and whether it is on the board or archived. Change as many rows as you like (changed rows are marked **Changed**), then tap **Save** once (it stays at the bottom of the screen) and type your PIN. Points, cooldown and effort are sliders: drag one or tap along it, and its value (say "84 h · 3.5 days") shows next to it. A bounty with no points yet says **Not set**; once you set its points or its cooldown, the other says **Required** until you set it too, and **Clear** puts it back to not set. Either every change is saved or none is, and it says why. **Discard** throws the changes away. New points count from now on.
 
 Everything else an admin does (members, the pot, pairing) stays on your phone.
 
