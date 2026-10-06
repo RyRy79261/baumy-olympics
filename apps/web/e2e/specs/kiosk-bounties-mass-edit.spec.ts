@@ -129,10 +129,16 @@ test("on the kiosk, an admin edits many bounties in one save with their PIN", as
     let box = (await field.boundingBox())!;
     let barBox = (await bar.boundingBox())!;
     // Its bottom edge at the middle of the bar: on screen, but covered.
-    const by = box.y + box.height - (barBox.y + barBox.height / 2);
-    await main.evaluate((m, dy) => m.scrollBy(0, dy), by);
-    box = (await field.boundingBox())!;
-    barBox = (await bar.boundingBox())!;
+    // Near the end of the list the bar rides with the rows for the last
+    // 56px (the page's bottom padding) before it sticks, so aim again
+    // until the field stays under it.
+    for (let i = 0; i < 3; i++) {
+      const by = box.y + box.height - (barBox.y + barBox.height / 2);
+      await main.evaluate((m, dy) => m.scrollBy(0, dy), by);
+      box = (await field.boundingBox())!;
+      barBox = (await bar.boundingBox())!;
+      if (box.y + box.height > barBox.y) break;
+    }
     expect(box.y + box.height, `${label} starts covered`).toBeGreaterThan(
       barBox.y,
     );
