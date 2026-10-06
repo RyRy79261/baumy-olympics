@@ -149,11 +149,42 @@ const button = (el: HTMLElement, text: string | RegExp) =>
       : text.test(b.textContent!),
   )!;
 
+/** A slider's value in words, as it is read out. */
+const said = (input: HTMLInputElement) => input.getAttribute("aria-valuetext");
+
+/** Press a key on a slider. */
+async function press(input: HTMLInputElement, key: string) {
+  await act(async () => {
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
+  });
+}
+
+/** Move a slider with the arrow keys until it says `text`. */
+async function slideTo(input: HTMLInputElement, text: string) {
+  await press(input, "Home");
+  for (let i = 0; said(input) !== text; i++) {
+    if (i > 250) throw new Error(`The slider never said ${text}.`);
+    await press(input, "ArrowRight");
+  }
+}
+
+/** A bounty with no points yet: no points, no cooldown. */
+const SHELF: BulkEditorBounty = {
+  id: "44444444-4444-4444-8444-444444444444",
+  name: "Shelf",
+  sprite: "box",
+  kind: "maintenance",
+  proofMode: "none",
+  effortFactorPct: 123,
+  basePoints: null,
+  cooldownMinutes: null,
+  archived: false,
+};
+
 async function editTwo(el: HTMLElement) {
-  await set(
-    control<HTMLInputElement>(el, "Trash", "Points"),
-    String(BASE_POINTS_MAX),
-  );
+  await press(control<HTMLInputElement>(el, "Trash", "Points"), "End");
   await set(control<HTMLInputElement>(el, "Dishes", "Name"), "Plates");
   await set(control<HTMLSelectElement>(el, "Fridge", "Status"), "active");
 }
@@ -179,10 +210,20 @@ describe("BountyBulkEditor", () => {
   it("shows one row per bounty, with nothing to save until a row changes", async () => {
     const { el } = await mount(OK);
     for (const b of BOUNTIES) expect(row(el, b.name)).not.toBeNull();
-    expect(control<HTMLInputElement>(el, "Trash", "Points").value).toBe("20");
-    expect(control<HTMLInputElement>(el, "Trash", "Cooldown (h)").value).toBe(
-      "24",
+    expect(said(control<HTMLInputElement>(el, "Trash", "Points"))).toBe(
+      "20 pts",
     );
+    expect(said(control<HTMLInputElement>(el, "Trash", "Cooldown (h)"))).toBe(
+      "24 h · 1 day",
+    );
+    expect(said(control<HTMLInputElement>(el, "Fridge", "Cooldown (h)"))).toBe(
+      "168 h · 7 days",
+    );
+    expect(said(control<HTMLInputElement>(el, "Trash", "Effort (%)"))).toBe(
+      "100%",
+    );
+    // The value is written next to each slider too.
+    expect(row(el, "Trash").textContent).toContain("20 pts");
     expect(control<HTMLSelectElement>(el, "Fridge", "Status").value).toBe(
       "archived",
     );
@@ -306,38 +347,108 @@ describe("BountyBulkEditor", () => {
       { pinLabel: "Ryan's PIN" },
     );
     await set(control<HTMLSelectElement>(el, "Trash", "Kind"), "consumable");
-    await set(control<HTMLInputElement>(el, "Trash", "Points"), "7");
+    await slideTo(control<HTMLInputElement>(el, "Trash", "Points"), "7 pts");
     await act(async () => button(el, "Save 1 change").click());
     // React resets a form after its action answers; the rows are not part
     // of it, so what they show is still what will be sent.
     expect(control<HTMLSelectElement>(el, "Trash", "Kind").value).toBe(
       "consumable",
     );
-    expect(control<HTMLInputElement>(el, "Trash", "Points").value).toBe("7");
+    expect(said(control<HTMLInputElement>(el, "Trash", "Points"))).toBe(
+      "7 pts",
+    );
   });
 
-  it("says Required under a cleared number, and saves nothing until it is filled", async () => {
-    const { el, action } = await mount(OK);
-    await set(control<HTMLInputElement>(el, "Trash", "Cooldown (h)"), "");
-    expect(row(el, "Trash").textContent).toContain("Required.");
+  it("sends a slider's number, marks its row, and moving it back clears both", async () => {
+    const action = vi.fn(async (_p: Result | null, _f: FormData) => OK);
+    const { el } = await mountWith(action);
+    const cooldown = control<HTMLInputElement>(el, "Trash", "Cooldown (h)");
+    // 24 h, then six-hour steps: 30, 36 … 84.
+    for (let i = 0; i < 10; i++) await press(cooldown, "ArrowRight");
+    expect(said(cooldown)).toBe("84 h · 3.5 days");
+    expect(row(el, "Trash").textContent).toContain("84 h · 3.5 days");
+    expect(row(el, "Trash").dataset.changed).toBe("true");
+    for (let i = 0; i < 10; i++) await press(cooldown, "ArrowLeft");
+    expect(said(cooldown)).toBe("24 h · 1 day");
+    expect(row(el, "Trash").dataset.changed).toBeUndefined();
+    expect(el.textContent).toContain("No changes yet.");
+    const effort = control<HTMLInputElement>(el, "Dishes", "Effort (%)");
+    await press(effort, "ArrowRight");
+    expect(said(effort)).toBe("105%");
+    await press(cooldown, "PageUp");
+    expect(said(cooldown)).toBe("84 h · 3.5 days");
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(sentChanges(action)).toEqual([
+      { choreId: BOUNTIES[0]!.id, cooldownHours: 84 },
+      { choreId: BOUNTIES[1]!.id, effortFactorPct: 105 },
+    ]);
+  });
+
+  it("names each slider for its bounty", async () => {
+    const { el } = await mount(OK);
     expect(
-      control<HTMLInputElement>(el, "Trash", "Cooldown (h)").getAttribute(
-        "aria-invalid",
+      control<HTMLInputElement>(el, "Dishes", "Effort (%)").getAttribute(
+        "aria-label",
       ),
-    ).toBe("true");
+    ).toBe("Effort (%) for Dishes");
+  });
+
+  it("can put back a value that is off the slider's scale", async () => {
+    const action = vi.fn(async (_p: Result | null, _f: FormData) => OK);
+    const { el } = await mountWith(action, {}, [SHELF]);
+    const effort = control<HTMLInputElement>(el, "Shelf", "Effort (%)");
+    expect(said(effort)).toBe("123%");
+    await press(effort, "ArrowRight");
+    expect(said(effort)).toBe("125%");
+    expect(row(el, "Shelf").dataset.changed).toBe("true");
+    await press(effort, "ArrowLeft");
+    expect(said(effort)).toBe("123%");
+    expect(row(el, "Shelf").dataset.changed).toBeUndefined();
+  });
+
+  it("says Not set for a bounty with no points, Required for the other half once one is set, and Clear undoes it", async () => {
+    const action = vi.fn(async (_p: Result | null, _f: FormData) => OK);
+    const { el } = await mountWith(action, {}, [SHELF]);
+    const points = control<HTMLInputElement>(el, "Shelf", "Points");
+    const cooldown = control<HTMLInputElement>(el, "Shelf", "Cooldown (h)");
+    expect(said(points)).toBe("Not set");
+    expect(said(cooldown)).toBe("Not set");
+    expect(row(el, "Shelf").textContent).not.toContain("Required.");
+    expect(button(el, /^Clear$/)).toBeUndefined();
+
+    await slideTo(points, "26 pts");
+    expect(row(el, "Shelf").textContent).toContain("Required.");
+    expect(cooldown.getAttribute("aria-invalid")).toBe("true");
     expect(button(el, "Save 1 change").disabled).toBe(true);
     expect(el.textContent).toContain("Fill in the fields marked Required.");
     await act(async () => el.querySelector("form")!.requestSubmit());
     expect(action).not.toHaveBeenCalled();
-    await set(control<HTMLInputElement>(el, "Trash", "Cooldown (h)"), "6");
-    expect(row(el, "Trash").textContent).not.toContain("Required.");
-    expect(button(el, "Save 1 change").disabled).toBe(false);
+
+    // Clear puts the points back to not set, and nothing is left to save.
+    const clear = el.querySelector<HTMLButtonElement>(
+      'button[aria-label="Clear Points for Shelf"]',
+    )!;
+    expect(clear.textContent).toBe("Clear");
+    await act(async () => clear.click());
+    expect(said(points)).toBe("Not set");
+    expect(row(el, "Shelf").textContent).not.toContain("Required.");
+    expect(row(el, "Shelf").dataset.changed).toBeUndefined();
+    expect(el.textContent).toContain("No changes yet.");
+
+    // Both halves set: it saves.
+    await slideTo(points, "26 pts");
+    await slideTo(cooldown, "0 h");
+    expect(row(el, "Shelf").textContent).not.toContain("Required.");
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(sentChanges(action)).toEqual([
+      { choreId: SHELF.id, points: 26, cooldownHours: 0 },
+    ]);
   });
 
   it("never sends back a field the admin did not touch", async () => {
     const action = vi.fn(async (_p: Result | null, _f: FormData) => OK);
     const { el, rerender } = await mountWith(action);
-    await set(control<HTMLInputElement>(el, "Trash", "Points"), "7");
+    await slideTo(control<HTMLInputElement>(el, "Trash", "Points"), "7 pts");
     // Another admin makes Trash a consumable; the page refreshes.
     await rerender([
       { ...BOUNTIES[0]!, kind: "consumable" },
@@ -346,7 +457,9 @@ describe("BountyBulkEditor", () => {
     expect(control<HTMLSelectElement>(el, "Trash", "Kind").value).toBe(
       "consumable",
     );
-    expect(control<HTMLInputElement>(el, "Trash", "Points").value).toBe("7");
+    expect(said(control<HTMLInputElement>(el, "Trash", "Points"))).toBe(
+      "7 pts",
+    );
     await act(async () => el.querySelector("form")!.requestSubmit());
     expect(sentChanges(action)).toEqual([
       { choreId: BOUNTIES[0]!.id, points: 7 },
@@ -432,16 +545,22 @@ describe("BountyBulkEditor", () => {
 
   it("on the kitchen screen, says what is wrong in the bar by Save", async () => {
     const message = "There is already a chore called Trash. Pick another name.";
-    const { el } = await mount(
-      { ok: false, code: "CHORE_NAME_TAKEN", message },
+    const { el } = await mountWith(
+      async () => ({ ok: false, code: "CHORE_NAME_TAKEN", message }),
       { pinLabel: "Ryan's PIN" },
+      [...BOUNTIES, SHELF],
     );
     const bar = () =>
       el.querySelector<HTMLElement>('[data-testid="bulk-save-bar"]')!;
     expect(bar().textContent).toContain("No changes yet.");
-    await set(control<HTMLInputElement>(el, "Trash", "Points"), "");
+    await press(control<HTMLInputElement>(el, "Shelf", "Points"), "End");
     expect(bar().textContent).toContain("Fill in the fields marked Required.");
-    await set(control<HTMLInputElement>(el, "Trash", "Points"), "20");
+    // Clear is a kiosk-sized button.
+    const clear = el.querySelector<HTMLButtonElement>(
+      'button[aria-label="Clear Points for Shelf"]',
+    )!;
+    expect(clear.className).toContain("min-h-14");
+    await act(async () => clear.click());
     await set(control<HTMLInputElement>(el, "Dishes", "Name"), "Trash");
     expect(bar().textContent).toContain("1 bounty changed, not saved yet.");
     await act(async () => button(bar(), "Save 1 change").click());
