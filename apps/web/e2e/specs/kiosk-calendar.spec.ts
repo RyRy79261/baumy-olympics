@@ -98,7 +98,7 @@ test("add, see, edit and delete an event on the kiosk, with no PIN", async ({
   await kiosk.screenshot({ path: join(shots, "1-list.png") });
 
   // A tap outside closes the empty sheet; once a title is typed it does
-  // nothing (owner ruling 2026-10-06, SPEC §12 decision 31), and the ×
+  // nothing (owner ruling 2026-10-06, SPEC §12 decision 32), and the ×
   // still closes it (issue #174).
   const sheet = kiosk.getByRole("dialog", { name: "New event" });
   await add.click();
