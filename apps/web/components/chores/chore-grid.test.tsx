@@ -82,7 +82,12 @@ const LOGGED: ActionResult<LogCompletionData> = {
   },
 };
 
-async function openSheet() {
+async function openSheet(
+  opts: {
+    members?: { id: string; displayName: string }[];
+    chore?: ChoreView;
+  } = {},
+) {
   let answer!: (r: ActionResult<LogCompletionData>) => void;
   const action = vi.fn(
     () =>
@@ -96,8 +101,8 @@ async function openSheet() {
   await act(async () =>
     root!.render(
       <ChoreGrid
-        chores={[chore]}
-        members={[{ id: "m-1", displayName: "Ryan" }]}
+        chores={[opts.chore ?? chore]}
+        members={opts.members ?? [{ id: "m-1", displayName: "Ryan" }]}
         actorId="m-1"
         kiosk
         action={action}
@@ -173,5 +178,33 @@ describe("ChoreGrid's log sheet", () => {
     expect(button("Close").disabled).toBe(false);
     await tapOutside(sheet);
     expect(sheet.open).toBe(false);
+  });
+
+  it("locks who did it and the photo while Log it is sending", async () => {
+    const { sheet, answer } = await openSheet({
+      members: [
+        { id: "m-1", displayName: "Ryan" },
+        { id: "m-2", displayName: "Felix" },
+      ],
+      chore: { ...chore, proofMode: "optional" },
+    });
+    const radios = () => [
+      ...sheet.querySelectorAll<HTMLInputElement>('input[type="radio"]'),
+    ];
+    const photo = () =>
+      sheet.querySelector<HTMLInputElement>('input[type="file"]')!;
+    expect(radios()).toHaveLength(2);
+    expect(photo()).not.toBeNull();
+    expect(radios().some((r) => r.disabled)).toBe(false);
+    expect(photo().disabled).toBe(false);
+    await act(async () => sheet.querySelector("form")!.requestSubmit());
+    try {
+      // The form is keyed by who did it: a new pick now would remount it,
+      // lose the answer and allow a second log.
+      expect(radios().every((r) => r.disabled)).toBe(true);
+      expect(photo().disabled).toBe(true);
+    } finally {
+      await act(async () => answer());
+    }
   });
 });

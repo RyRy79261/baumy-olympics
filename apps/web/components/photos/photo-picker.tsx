@@ -13,10 +13,13 @@ import { downscalePhoto } from "./downscale";
 export function PhotoPicker({
   label = "Add a photo",
   kiosk = false,
+  disabled = false,
   onPhoto,
 }: {
   label?: string;
   kiosk?: boolean;
+  /** While the form it belongs to is sending. */
+  disabled?: boolean;
   onPhoto: (photo: Blob | null) => void;
 }) {
   const id = useId();
@@ -59,7 +62,7 @@ export function PhotoPicker({
           className={buttonClass(
             "secondary",
             kiosk ? "kiosk" : "default",
-            "w-full",
+            disabled ? "w-full opacity-50" : "w-full",
           )}
         >
           {busy ? "Preparing the photo…" : preview ? "Change photo" : label}
@@ -69,7 +72,8 @@ export function PhotoPicker({
           type="file"
           accept="image/*"
           aria-label={label}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          disabled={disabled}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
           onChange={(e) => void pick(e.currentTarget.files?.[0])}
         />
       </div>
