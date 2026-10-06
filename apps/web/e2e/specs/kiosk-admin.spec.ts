@@ -1,11 +1,12 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { addChore } from "../lib/chores";
 import { founderAdmin, mintCode, newAccount, redeem } from "../lib/household";
 import {
   expectKioskTargets,
   openBaumySheet,
-  openKioskChores,
+  openKioskSettings as openSettings,
   pairedKiosk,
+  setPersonalPin,
   typePin,
 } from "../lib/kiosk";
 
@@ -22,31 +23,6 @@ async function say(sheet: Locator, text: string) {
   await sheet.getByRole("button", { name: "Send" }).click();
 }
 
-/** The admin's personal PIN, set (or set again) from their own phone. */
-async function setPin(page: Page) {
-  await page.goto("/settings");
-  const change = page.getByLabel("New PIN");
-  const first = page.getByLabel("PIN", { exact: true });
-  await expect(change.or(first)).toBeVisible();
-  const had = await change.isVisible();
-  await (had ? change : first).fill(PIN);
-  await page.getByLabel("Type it again").fill(PIN);
-  await page
-    .getByRole("button", { name: had ? "Change PIN" : "Set PIN" })
-    .click();
-  await expect(
-    page.getByRole("status").filter({ hasText: /PIN (saved|changed)\./ }),
-  ).toBeVisible();
-}
-
-async function openSettings(kiosk: Page) {
-  await openKioskChores(kiosk);
-  await kiosk.getByRole("link", { name: "Kitchen screen settings" }).click();
-  await expect(
-    kiosk.getByRole("heading", { name: "Settings", level: 1 }),
-  ).toBeVisible();
-}
-
 test("on the kiosk: the idle minutes, and an admin's points and bounty with a PIN", async ({
   page,
   browser,
@@ -60,7 +36,7 @@ test("on the kiosk: the idle minutes, and an admin's points and bounty with a PI
   const partner = `Partner ${tag}`;
 
   await founderAdmin(page, project);
-  await setPin(page);
+  await setPersonalPin(page, PIN);
   const invite = await mintCode(page, 1);
   const member = await newAccount(browser, `kadmin-${project}`);
   await redeem(member.page, invite, partner);
@@ -95,6 +71,8 @@ test("on the kiosk: the idle minutes, and an admin's points and bounty with a PI
     idle.getByRole("button", { name: "5 min", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(kiosk.getByTestId("kiosk-points-form")).toHaveCount(0);
+  // Nor the bounty editor (issue #175).
+  await expect(kiosk.getByTestId("bounty-bulk-editor")).toHaveCount(0);
   // It is this screen's: still 5 after a reload.
   await kiosk.reload();
   await expect(kiosk.getByText("Now: 5 min.")).toBeVisible();
