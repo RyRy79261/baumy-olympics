@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Button,
   Dialog,
@@ -38,6 +38,7 @@ export function AttestedForm<T>({
   fields,
   success,
   onResult,
+  onPending,
   disabled = false,
   variant = "primary",
   bar,
@@ -53,6 +54,11 @@ export function AttestedForm<T>({
   success?: (data: T) => ReactNode;
   /** Called once per answer that does not ask for a PIN. */
   onResult?: (result: ActionResult<T>) => void;
+  /**
+   * Told when a request starts and when its answer is in, so a sheet
+   * around the form stays open until then (issue #174).
+   */
+  onPending?: (pending: boolean) => void;
   disabled?: boolean;
   /** The start button's look; primary unless given. */
   variant?: ButtonVariant;
@@ -81,6 +87,14 @@ export function AttestedForm<T>({
     // Once per answer: `state` is a new object for every submission, while
     // `onResult` may be a new function on every render.
   }, [state]);
+
+  const pendingLatest = useRef(onPending);
+  pendingLatest.current = onPending;
+  useEffect(() => {
+    pendingLatest.current?.(pending);
+  }, [pending]);
+  // Gone mid-request (it cannot be while a sheet waits on it): not sending.
+  useEffect(() => () => pendingLatest.current?.(false), []);
 
   return (
     <form
