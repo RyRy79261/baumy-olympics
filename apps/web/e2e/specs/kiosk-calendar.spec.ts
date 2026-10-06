@@ -97,9 +97,26 @@ test("add, see, edit and delete an event on the kiosk, with no PIN", async ({
   await expectKioskTargets(kiosk.locator("main"));
   await kiosk.screenshot({ path: join(shots, "1-list.png") });
 
+  // A tap outside closes the empty sheet; once a title is typed it does
+  // nothing (owner ruling 2026-10-06, SPEC §12 decision 32), and the ×
+  // still closes it (issue #174).
+  const sheet = kiosk.getByRole("dialog", { name: "New event" });
+  await add.click();
+  await expect(sheet).toBeVisible();
+  expect((await sheet.boundingBox())!.x).toBeGreaterThan(20);
+  await kiosk.mouse.click(10, 10);
+  await expect(sheet).toBeHidden();
+  await add.click();
+  await expect(sheet).toBeVisible();
+  await sheet.getByLabel("Title").fill(title);
+  await kiosk.mouse.click(10, 10);
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel("Title")).toHaveValue(title);
+  await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(sheet).toBeHidden();
+
   // Add: for the founder, three weeks out, 19:00 to 20:00.
   await add.click();
-  const sheet = kiosk.getByRole("dialog", { name: "New event" });
   await expect(sheet).toBeVisible();
   await expectKioskTargets(sheet);
   await sheet.getByLabel("Title").fill(title);

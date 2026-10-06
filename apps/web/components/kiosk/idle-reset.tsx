@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { KioskNotice } from "@baumy/ui";
+import { forceCloseDialog, KioskNotice } from "@baumy/ui";
 import { clearPickAction } from "@/app/kiosk/actions";
 import {
   KIOSK_COVER_EVENT,
@@ -63,7 +63,8 @@ export function IdleReset({
 /** Close every open native dialog (a PIN pad, a sheet) before going home. */
 export function closeOpenDialogs(doc: Document): void {
   for (const dialog of doc.querySelectorAll("dialog[open]")) {
-    (dialog as HTMLDialogElement).close();
+    // Even one waiting on an answer: the kiosk is taking the screen.
+    forceCloseDialog(dialog as HTMLDialogElement);
   }
   // What is open without being a dialog (Baumy's speech bubble, and any
   // recording in it) closes on this too.

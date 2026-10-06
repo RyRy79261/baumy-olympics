@@ -65,7 +65,7 @@ The kitchen iPad shows the same household on one big screen. See [the kitchen iP
 Baumy is the pixel cat. On the hub home it sits in the bottom-right corner on a wide screen, and in the top bar next to your menu on a laptop, tablet or phone. Tap it to ask something in your own words, typed or spoken: "who's winning?", "what's on Saturday?", "I took the trash out", "add milk and eggs".
 
 - **Questions** are answered straight away in Baumy's speech bubble.
-- **Anything that changes something** comes back as a card that says in plain words what it will do, for example "Add milk, eggs to the shopping list". Nothing happens until you tap **Confirm all**. **Cancel** throws them all away, and the small × drops one card.
+- **Anything that changes something** comes back as a card that says in plain words what it will do, for example "Add milk, eggs to the shopping list". Nothing happens until you tap **Confirm all**. **Cancel** throws them all away, and the small × drops one card. Closing the sheet with the × in its corner throws them all away too, so the next person never sees your cards.
 - A card that is marked red deletes something. A card Baumy is not allowed to do is greyed out, with the reason.
 
 Baumy can only do what you could do yourself, as you. It never runs a change until a member taps Confirm all. Baumy's answers come from an AI and can be wrong, so read the cards first.
@@ -165,6 +165,8 @@ The iPad on the kitchen wall is the house's shared screen. Its home shows the da
 The **Messages** number on the iPad counts the notes that not everyone in the house has read yet, so it stays until every member has read them. Tap your avatar first, then open **Messages** or the **Board**: that marks those notes read for you only. With nobody picked, looking marks nothing. Reading them on your phone counts too.
 
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
+
+Changed your mind? Anything that opens over the screen closes with the **×** in its corner, or with a tap on the dimmed screen around it. Once you have typed something in it, a tap outside does nothing, so nothing you typed is lost: use the **×** or **Cancel**. A bounty's **Log** sheet also has **Cancel**, and nothing is logged. Once you tap **Log it**, the sheet stays until the answer is in.
 
 After 2 minutes untouched, the screen forgets who was acting and goes back home by itself; the last few seconds show a countdown, and any touch cancels it. To change how long it waits, tap your avatar, open **Bounties → Kitchen screen settings** and pick 1, 2, 5, 10, 15 minutes; it is saved for this screen.
 

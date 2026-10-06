@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buttonClass } from "./button";
 import { cx } from "./cx";
+import { DIALOG_TYPED_EVENT } from "./use-modal-dialog";
 
 // The kiosk PIN pad in the pixel kit (SPEC §6.2, §8; ADR 0005). It sits INSIDE the form of the request it attests and submits the PIN
 // as a hidden field with that one request. It keeps the digits only until
@@ -39,6 +40,15 @@ export function PinPad({
   onCancel?: () => void;
 }) {
   const [digits, setDigits] = useState("");
+  const pad = useRef<HTMLDivElement>(null);
+  // A half-typed PIN is typed text: a tap outside its dialog keeps it
+  // (owner ruling 2026-10-06, SPEC §12 decision 32).
+  useEffect(() => {
+    if (digits === "") return;
+    pad.current?.dispatchEvent(
+      new Event(DIALOG_TYPED_EVENT, { bubbles: true }),
+    );
+  }, [digits]);
 
   const press = (d: string) =>
     setDigits((cur) => (cur.length >= PIN_MAX_LENGTH ? cur : cur + d));
@@ -57,7 +67,12 @@ export function PinPad({
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
   return (
-    <div role="group" aria-label={label} className="flex flex-col gap-3">
+    <div
+      ref={pad}
+      role="group"
+      aria-label={label}
+      className="flex flex-col gap-3"
+    >
       <input type="hidden" name={name} value={digits} />
       <p className="text-center font-display text-sm leading-relaxed">
         {label}
@@ -126,6 +141,9 @@ export function PinPad({
           <button
             type="button"
             className={buttonClass("secondary", "kiosk", "flex-1")}
+            // Not while the PIN is checked: its answer (a wrong PIN, a
+            // rest) must find the pad still there (#174).
+            disabled={pending}
             onClick={onCancel}
           >
             Cancel
