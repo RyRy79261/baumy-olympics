@@ -35,6 +35,28 @@ export function tile(page: Page, name: string): Locator {
   return page.getByTestId(`chore-${name}`).getByRole("button").first();
 }
 
+/**
+ * Move a slider (the mass editor's points, effort and cooldown, issue #179)
+ * with the keyboard until it says `text` (its aria-valuetext, e.g.
+ * "25 pts"): one arrow press at a time from where it stands.
+ */
+export async function slideTo(slider: Locator, text: string, max = 250) {
+  const said = () => slider.getAttribute("aria-valuetext");
+  const number = (s: string | null) => parseFloat(s ?? "");
+  const target = number(text);
+  for (let i = 0; (await said()) !== text; i++) {
+    expect(i, `the slider never said ${text}`).toBeLessThan(max);
+    const now = await said();
+    // "Not set" is no number: start from the first stop.
+    const key = Number.isNaN(number(now))
+      ? "Home"
+      : number(now) < target
+        ? "ArrowRight"
+        : "ArrowLeft";
+    await slider.press(key);
+  }
+}
+
 /** Tap a chore's tile and return its sheet. */
 export async function openChore(page: Page, name: string): Promise<Locator> {
   await tile(page, name).click();
