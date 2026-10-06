@@ -1,15 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { BASE_POINTS_MAX } from "@baumy/types";
+import {
+  BASE_POINTS_MAX,
+  BASE_POINTS_MIN,
+  COOLDOWN_HOURS_MAX,
+  EFFORT_FACTOR_MAX,
+  EFFORT_FACTOR_MIN,
+} from "@baumy/types";
 import {
   CHANGES_FIELD,
+  COOLDOWN_STOPS,
+  EFFORT_STOPS,
+  POINT_STOPS,
   REQUIRED,
   blankErrors,
   changeOf,
   changesFromForm,
   changesOf,
+  cooldownText,
   draftOf,
+  effortText,
+  pointsText,
   rowErrors,
   saveLabel,
+  sliderValue,
   type BulkBounty,
 } from "./bulk-edit";
 
@@ -210,5 +223,45 @@ describe("saveLabel", () => {
     expect(saveLabel(0)).toBe("Save changes");
     expect(saveLabel(1)).toBe("Save 1 change");
     expect(saveLabel(3)).toBe("Save 3 changes");
+  });
+});
+
+describe("the sliders (issue #179)", () => {
+  it("spans each field's limits", () => {
+    expect(POINT_STOPS[0]).toBe(BASE_POINTS_MIN);
+    expect(POINT_STOPS.at(-1)).toBe(BASE_POINTS_MAX);
+    expect(POINT_STOPS).toHaveLength(BASE_POINTS_MAX - BASE_POINTS_MIN + 1);
+    expect(EFFORT_STOPS[0]).toBe(EFFORT_FACTOR_MIN);
+    expect(EFFORT_STOPS.at(-1)).toBe(EFFORT_FACTOR_MAX);
+    expect(EFFORT_STOPS).toContain(100);
+    expect(COOLDOWN_STOPS[0]).toBe(0);
+    expect(COOLDOWN_STOPS.at(-1)).toBe(COOLDOWN_HOURS_MAX);
+  });
+
+  it("puts the common cooldowns on the scale, in order, once each", () => {
+    for (const h of [1, 6, 12, 24, 48, 72, 84, 168, 336, 720]) {
+      expect(COOLDOWN_STOPS).toContain(h);
+    }
+    expect(COOLDOWN_STOPS).toEqual(
+      [...new Set(COOLDOWN_STOPS)].sort((a, b) => a - b),
+    );
+    expect(COOLDOWN_STOPS).toHaveLength(72);
+  });
+
+  it("says each value with its unit", () => {
+    expect(pointsText(1)).toBe("1 pt");
+    expect(pointsText(26)).toBe("26 pts");
+    expect(effortText(100)).toBe("100%");
+    expect(cooldownText(0)).toBe("0 h");
+    expect(cooldownText(1.5)).toBe("1.5 h");
+    expect(cooldownText(24)).toBe("24 h · 1 day");
+    expect(cooldownText(84)).toBe("84 h · 3.5 days");
+  });
+
+  it("reads a draft's number, or none", () => {
+    expect(sliderValue("26")).toBe(26);
+    expect(sliderValue(" 1.5 ")).toBe(1.5);
+    expect(sliderValue("")).toBeNull();
+    expect(sliderValue("x")).toBeNull();
   });
 });

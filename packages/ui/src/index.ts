@@ -194,6 +194,7 @@ export { ReminderScreen, type ReminderFace } from "./reminder-screen";
 export { SCREENSAVER_ART, Screensaver } from "./screensaver";
 export { Points, Stat, StreakFlame, Table, Td, Th } from "./scores";
 export { PIN_MAX_LENGTH, PIN_MIN_LENGTH, PinPad } from "./pin-pad";
+export { Slider, stepStops, stopIndex, withStop } from "./slider";
 export { Sparkline, type SparklineProps } from "./sparkline";
 export {
   BAUMY_STATES,

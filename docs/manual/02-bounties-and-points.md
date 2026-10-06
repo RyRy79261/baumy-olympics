@@ -56,7 +56,7 @@ So doing a chore over and over pays more and more, and leaving a chore to one pe
 
 Baumy watches how often each bounty is really done. Each week it may suggest new points for one that is done much more or less often than its points expect; a suggestion lands between {{SUGGESTED_POINTS_MIN}} and {{SUGGESTED_POINTS_MAX}} points.
 
-An admin can schedule a suggestion, or set any bounty's points with a reason. A scheduled change lands on a Monday at least {{WEIGHT_VETO_LEAD_H}} hours away, and until then any other member can **veto** it in **Activity**. An admin can also change points at once when they edit a bounty, or edit many bounties together under **Admin → Edit chores → Edit many at once**: one row per bounty, one **Save**, and either every change is saved or none is. A change never touches points already scored.
+An admin can schedule a suggestion, or set any bounty's points with a reason. A scheduled change lands on a Monday at least {{WEIGHT_VETO_LEAD_H}} hours away, and until then any other member can **veto** it in **Activity**. An admin can also change points at once when they edit a bounty, or edit many bounties together under **Admin → Edit chores → Edit many at once**: one row per bounty (points, cooldown and effort are sliders, and points also have **−** and **+** for one point at a time), one **Save**, and either every change is saved or none is. A change never touches points already scored.
 
 Every change, who made it and why, is in **Points history** under the bounties board.
 
