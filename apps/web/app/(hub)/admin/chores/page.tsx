@@ -3,10 +3,12 @@ import { Card, FormMessage, PageHeading } from "@baumy/ui";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireAdminPage } from "@/lib/auth";
-import { ChoreAdminRow, CreateChoreForm } from "./chore-forms";
+import { CreateChoreForm } from "./chore-forms";
+import { ChoresCard } from "./chores-card";
 
 // /admin/chores (SPEC §4.4): admins add chores, change their points,
-// cooldown, proof and confirmation, and archive or restore them. Anyone else
+// cooldown, proof and effort, and archive or restore them, one at a time or
+// many at once (issue #175). Anyone else
 // gets a 404 from the page gate, and `manage_chore` refuses them anyway.
 
 export const dynamic = "force-dynamic";
@@ -25,19 +27,13 @@ export default async function AdminChoresPage() {
       />
       <div className="flex flex-col gap-6">
         <CreateChoreForm />
-        <Card title="Chores">
-          {!listed.ok ? (
+        {listed.ok ? (
+          <ChoresCard chores={listed.data.chores} />
+        ) : (
+          <Card title="Chores">
             <FormMessage tone="error">{listed.message}</FormMessage>
-          ) : listed.data.chores.length === 0 ? (
-            <p className="text-sm text-bm-muted">No chores yet.</p>
-          ) : (
-            <ul>
-              {listed.data.chores.map((c) => (
-                <ChoreAdminRow key={c.id} chore={c} />
-              ))}
-            </ul>
-          )}
-        </Card>
+          </Card>
+        )}
       </div>
     </>
   );

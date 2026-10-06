@@ -95,7 +95,9 @@ async function audits() {
     .where(eq(auditEvents.action, "update_bounties"));
 }
 async function archive(id: string) {
-  ok(await runAction("manage_chore", { op: "archive", choreId: id }, asAdmin()));
+  ok(
+    await runAction("manage_chore", { op: "archive", choreId: id }, asAdmin()),
+  );
 }
 
 /** Nothing about the three bounties changed. */
@@ -385,7 +387,10 @@ describe("update_bounties", () => {
     ).resolves.toMatchObject({ ok: false, code: "FORBIDDEN" });
     // Nobody picked.
     await expect(
-      run(change, ctxFor({ kind: "kiosk", deviceId: "d" }, { source: "kiosk" })),
+      run(
+        change,
+        ctxFor({ kind: "kiosk", deviceId: "d" }, { source: "kiosk" }),
+      ),
     ).resolves.toMatchObject({ ok: false });
     // An admin without a PIN, or with a wrong one.
     await expect(run(change, atKiosk(admin, "admin"))).resolves.toMatchObject({
