@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  BASE_POINTS_MAX,
-  BASE_POINTS_MIN,
-  CHORE_NAME_MAX,
-  COOLDOWN_HOURS_MAX,
-  EFFORT_FACTOR_MAX,
-  EFFORT_FACTOR_MIN,
-} from "@baumy/types";
+import { CHORE_NAME_MAX } from "@baumy/types";
 import {
   BountyGlyph,
   Button,
@@ -16,7 +9,9 @@ import {
   FormMessage,
   Input,
   Select,
+  Slider,
   cx,
+  withStop,
 } from "@baumy/ui";
 import { AttestedForm } from "@/components/kiosk/attested-form";
 import { useActionForm, type FormAction } from "@/components/use-action-form";
@@ -24,11 +19,18 @@ import type { ActionResult } from "@/lib/actions/result";
 import type { UpdateBountiesData } from "@/lib/actions/update-bounties";
 import {
   CHANGES_FIELD,
+  COOLDOWN_STOPS,
+  EFFORT_STOPS,
+  POINT_STOPS,
   blankErrors,
   changeOf,
   changesOf,
+  cooldownText,
+  effortText,
+  pointsText,
   rowErrors,
   saveLabel,
+  sliderValue,
   viewOf,
   type BountyChangeInput,
   type BountyDraft,
@@ -36,6 +38,7 @@ import {
   type BulkBounty,
   type Touched,
 } from "@/lib/chores/bulk-edit";
+import { hoursField } from "@/lib/weights/view";
 import { toast } from "@/lib/ui/toast";
 
 // Mass editing of bounties (issue #175, SPEC §12 decision 31): one editable
@@ -128,6 +131,16 @@ export function BountyBulkEditor({
     setTouched((all) => ({ ...all, [b.id]: { ...all[b.id], ...patch } }));
   };
 
+  // A slider of a bounty with no points yet, back to "not set": untouched.
+  const clear = (b: BulkBounty, field: keyof Touched) => {
+    setResult(null);
+    setTouched((all) => {
+      const row = { ...all[b.id] };
+      delete row[field];
+      return { ...all, [b.id]: row };
+    });
+  };
+
   const fields = (
     <>
       <input
@@ -146,10 +159,12 @@ export function BountyBulkEditor({
                 key={b.id}
                 bounty={b}
                 draft={viewOf(b, t)}
+                touched={t}
                 changed={Boolean(t && changeOf(b, t))}
                 errors={mergeErrors(serverErrors[b.id] ?? {}, blanks[b.id]!)}
                 kiosk={kiosk}
                 onChange={(patch) => update(b, patch)}
+                onClear={(field) => clear(b, field)}
               />
             );
           })}
@@ -295,28 +310,37 @@ function HubForm({
   );
 }
 
+/** The three number fields, each a slider. */
+type SliderField = "points" | "cooldownHours" | "effortFactorPct";
+
 /**
  * One bounty's row: every setting. Its title names the bounty, and each
- * control's description points at it, so "Points" is heard as Trash's.
- * The kiosk's six columns: name and status; kind, cooldown and points;
- * effort and photo proof. The admin page: four at `lg`, three at `sm`, and
- * on a phone the lists and the cooldown take the whole width, so each pair
- * left side by side has one-line labels.
+ * control's description points at it, so "Points" is heard as Trash's (a
+ * slider's own name says it too: "Points for Trash"). The kiosk's six
+ * columns: name and status; kind and photo proof; points and effort; the
+ * cooldown, the slider with the most stops, the whole width. The admin
+ * page: four at `lg`, three at `sm`, and on a phone the lists and the
+ * cooldown take the whole width, so each pair left side by side has
+ * one-line labels.
  */
 function BulkRow({
   bounty: b,
   draft: d,
+  touched: t,
   changed,
   errors,
   kiosk,
   onChange,
+  onClear,
 }: {
   bounty: BulkEditorBounty;
   draft: BountyDraft;
+  touched: Touched | undefined;
   changed: boolean;
   errors: Errors;
   kiosk: boolean;
   onChange: (patch: Touched) => void;
+  onClear: (field: SliderField) => void;
 }) {
   const id = (f: string) => `bulk-${b.id}-${f}`;
   const titleId = id("title");
@@ -326,6 +350,51 @@ function BulkRow({
   // Grid spans: [kiosk, admin page].
   const span = (k: string, hub: string) => (kiosk ? k : hub);
   const wide = "col-span-2 sm:col-span-1";
+
+  /**
+   * A number as a slider over `stops`, with the bounty's own value among
+   * them. A bounty with no points yet has no value to show: its slider says
+   * "Not set" until touched, and Clear (once touched) puts it back to that.
+   */
+  const slider = (
+    field: SliderField,
+    label: string,
+    stops: readonly number[],
+    was: number | null,
+    text: (n: number) => string,
+  ) => (
+    <Field id={id(field)} label={label} errors={errors[field]}>
+      {(c) => (
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <Slider
+              form={DETACHED}
+              {...c}
+              aria-label={`${label} for ${b.name}`}
+              aria-describedby={describe(c)}
+              kiosk={kiosk}
+              stops={withStop(stops, was)}
+              value={sliderValue(d[field])}
+              valueText={text}
+              onValueChange={(n) => onChange({ [field]: String(n) })}
+            />
+          </div>
+          {was === null && t?.[field] !== undefined ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size={kiosk ? "kiosk" : "default"}
+              aria-label={`Clear ${label} for ${b.name}`}
+              onClick={() => onClear(field)}
+            >
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      )}
+    </Field>
+  );
+
   return (
     <li
       data-testid={`bulk-bounty-${b.name}`}
@@ -396,7 +465,7 @@ function BulkRow({
             )}
           </Field>
         </div>
-        <div className={span("col-span-2", wide)}>
+        <div className={span("col-span-3", wide)}>
           <Field id={id("kind")} label="Kind" errors={errors.kind}>
             {(c) => (
               <Select
@@ -417,74 +486,7 @@ function BulkRow({
             )}
           </Field>
         </div>
-        <div className={span("col-span-2", wide)}>
-          <Field
-            id={id("cooldown")}
-            label="Cooldown (h)"
-            errors={errors.cooldownHours}
-          >
-            {(c) => (
-              <Input
-                form={DETACHED}
-                {...c}
-                aria-describedby={describe(c)}
-                kiosk={kiosk}
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={COOLDOWN_HOURS_MAX}
-                step="any"
-                value={d.cooldownHours}
-                onChange={(e) =>
-                  onChange({ cooldownHours: e.currentTarget.value })
-                }
-              />
-            )}
-          </Field>
-        </div>
-        <div className={span("col-span-2", "")}>
-          <Field id={id("points")} label="Points" errors={errors.points}>
-            {(c) => (
-              <Input
-                form={DETACHED}
-                {...c}
-                aria-describedby={describe(c)}
-                kiosk={kiosk}
-                type="number"
-                inputMode="numeric"
-                min={BASE_POINTS_MIN}
-                max={BASE_POINTS_MAX}
-                value={d.points}
-                onChange={(e) => onChange({ points: e.currentTarget.value })}
-              />
-            )}
-          </Field>
-        </div>
-        <div className={span("col-span-3", "")}>
-          <Field
-            id={id("effort")}
-            label="Effort (%)"
-            errors={errors.effortFactorPct}
-          >
-            {(c) => (
-              <Input
-                form={DETACHED}
-                {...c}
-                aria-describedby={describe(c)}
-                kiosk={kiosk}
-                type="number"
-                inputMode="numeric"
-                min={EFFORT_FACTOR_MIN}
-                max={EFFORT_FACTOR_MAX}
-                value={d.effortFactorPct}
-                onChange={(e) =>
-                  onChange({ effortFactorPct: e.currentTarget.value })
-                }
-              />
-            )}
-          </Field>
-        </div>
-        <div className={span("col-span-3", "col-span-2 lg:col-span-1")}>
+        <div className={span("col-span-3", wide)}>
           <Field id={id("proof")} label="Photo proof" errors={errors.proofMode}>
             {(c) => (
               <Select
@@ -506,6 +508,29 @@ function BulkRow({
               </Select>
             )}
           </Field>
+        </div>
+        <div className={span("col-span-3", "")}>
+          {slider("points", "Points", POINT_STOPS, b.basePoints, pointsText)}
+        </div>
+        <div className={span("col-span-3", "")}>
+          {slider(
+            "effortFactorPct",
+            "Effort (%)",
+            EFFORT_STOPS,
+            b.effortFactorPct,
+            effortText,
+          )}
+        </div>
+        <div className={span("col-span-6", "col-span-2 lg:col-span-1")}>
+          {slider(
+            "cooldownHours",
+            "Cooldown (h)",
+            COOLDOWN_STOPS,
+            b.cooldownMinutes === null
+              ? null
+              : Number(hoursField(b.cooldownMinutes)),
+            cooldownText,
+          )}
         </div>
       </div>
     </li>

@@ -1,6 +1,15 @@
-import type { ChoreKind, ProofMode } from "@baumy/types";
+import {
+  BASE_POINTS_MAX,
+  BASE_POINTS_MIN,
+  COOLDOWN_HOURS_MAX,
+  EFFORT_FACTOR_MAX,
+  EFFORT_FACTOR_MIN,
+  type ChoreKind,
+  type ProofMode,
+} from "@baumy/types";
+import { stepStops } from "@baumy/ui";
 import type { ActionResult } from "@/lib/actions/result";
-import { hoursField } from "@/lib/weights/view";
+import { formatMinutes, hoursField } from "@/lib/weights/view";
 
 // The mass bounty editor's pure half (issue #175): each bounty's editable
 // draft, the changes a save sends (only the fields that differ, only the
@@ -206,6 +215,48 @@ export function rowErrors(
     (row[field as BountyField] ??= []).push(issue.message);
   }
   return out;
+}
+
+// The sliders' stops (issue #179). A bounty's own value is added to its
+// row's stops (`withStop`), so a value off the scale can be put back.
+
+/** Points: every whole point, since the formula may suggest any of them. */
+export const POINT_STOPS = stepStops(BASE_POINTS_MIN, BASE_POINTS_MAX, 1);
+
+/** Effort: fives, from 50% to 300%. */
+export const EFFORT_STOPS = stepStops(EFFORT_FACTOR_MIN, EFFORT_FACTOR_MAX, 5);
+
+/**
+ * Cooldown hours, finer where the choice is finer: every hour up to a day,
+ * every 6 hours up to a week (so 48, 84 and 168 are on it), then every day
+ * up to 30 days. 72 stops in all, where hours alone would be 721.
+ */
+export const COOLDOWN_STOPS = [
+  ...stepStops(0, 24, 1),
+  ...stepStops(30, 7 * 24, 6),
+  ...stepStops(8 * 24, COOLDOWN_HOURS_MAX, 24),
+];
+
+/** "1 pt", "26 pts". */
+export function pointsText(n: number): string {
+  return `${n} ${n === 1 ? "pt" : "pts"}`;
+}
+
+/** "100%". */
+export function effortText(n: number): string {
+  return `${n}%`;
+}
+
+/** "12 h", and from a day up its days too: "84 h · 3.5 days". */
+export function cooldownText(hours: number): string {
+  const h = `${Math.round(hours * 100) / 100} h`;
+  return hours >= 24 ? `${h} · ${formatMinutes(hours * 60)}` : h;
+}
+
+/** A draft's number for its slider, or null while it has none. */
+export function sliderValue(text: string): number | null {
+  const t = text.trim();
+  return t === "" || !Number.isFinite(Number(t)) ? null : Number(t);
 }
 
 /** "Save 1 change", "Save 3 changes". */
