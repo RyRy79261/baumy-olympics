@@ -10,6 +10,7 @@ import {
   Dialog,
   ScorePop,
   StreakBrokenBanner,
+  type ScorePopBox,
   TabLabel,
   tabClass,
   type TabAccent,
@@ -44,9 +45,14 @@ import { toast } from "@/lib/ui/toast";
 // still an AttestedForm, so a PIN would be asked if the gate ever wanted
 // one.
 //
-// Outcomes: a floating "+N" over the row that was logged (issue #181), a "STREAK BROKEN" banner when a streak ended,
+// Outcomes: a floating "+N", a "STREAK BROKEN" banner when a streak ended,
 // and a toast for a refusal (a cooldown says when to try again, in Berlin
 // time). The page re-renders from the server action's revalidatePath.
+//
+// The "+N" floats where the bounty was when it was tapped, even though the
+// board re-sorts and that row moves; the page never scrolls. A sheet opened
+// from the dashboard's "I'll do it" had no tap on a row, so its "+N" floats
+// in the middle of the screen (owner ruling 2026-10-06, issue #181).
 
 export interface GridMember {
   id: string;
@@ -113,8 +119,11 @@ export function ChoreGrid({
   const [pop, setPop] = useState<{
     key: number;
     points: number;
-    choreId: string;
+    at: ScorePopBox | "middle";
   } | null>(null);
+  // Where the open sheet's row was on the screen when it was tapped; null
+  // for a sheet the dashboard opened.
+  const tappedAt = useRef<ScorePopBox | null>(null);
   const [broken, setBroken] = useState<LogCompletionData | null>(null);
   const router = useRouter();
   const photo = useRef<Blob | null>(null);
@@ -167,7 +176,11 @@ export function ChoreGrid({
     }
     const d = result.data;
     if (d.totalPts !== null) {
-      setPop({ key: Date.now(), points: d.totalPts, choreId: d.choreId });
+      setPop({
+        key: Date.now(),
+        points: d.totalPts,
+        at: tappedAt.current ?? "middle",
+      });
       announceScore(d.totalPts);
       toast.success(
         `Logged ${d.choreName} for ${d.doneByName}: +${d.totalPts}.`,
@@ -201,18 +214,6 @@ export function ChoreGrid({
 
   const counts = bountyCounts(chores);
   const shown = filterBounties(sortBounties(chores), filter);
-  // The "+N" floats over the row that was logged. If the tab no longer shows
-  // that row, it floats over the screen instead.
-  const popRow = pop ? shown.findIndex((c) => c.id === pop.choreId) : -1;
-  const popOnRow = popRow !== -1;
-  // A row below the fold (logged from the dashboard's "I'll do it"), or one
-  // that moved when the board re-sorted, is brought into view with its "+N".
-  useEffect(() => {
-    if (!pop || popRow === -1) return;
-    document
-      .querySelector('[data-testid="score-pop"][data-placement="row"]')
-      ?.scrollIntoView?.({ block: "nearest" });
-  }, [pop, popRow]);
 
   if (chores.length === 0) {
     return (
@@ -233,7 +234,7 @@ export function ChoreGrid({
           />
         </div>
       ) : null}
-      {pop && !popOnRow ? <ScorePop key={pop.key} points={pop.points} /> : null}
+      {pop ? <ScorePop key={pop.key} points={pop.points} at={pop.at} /> : null}
 
       <div
         role="group"
@@ -272,13 +273,10 @@ export function ChoreGrid({
             data-testid={`chore-${c.name}`}
             className={
               rowAction
-                ? "relative flex flex-col gap-2 sm:flex-row sm:items-center"
-                : "relative"
+                ? "flex flex-col gap-2 sm:flex-row sm:items-center"
+                : undefined
             }
           >
-            {pop && popOnRow && pop.choreId === c.id ? (
-              <ScorePop key={pop.key} points={pop.points} placement="row" />
-            ) : null}
             <BountyRow
               name={c.name}
               sprite={c.sprite}
@@ -291,7 +289,14 @@ export function ChoreGrid({
               kiosk={kiosk}
               disabled={c.state === "unavailable"}
               className={rowAction ? "min-w-0 sm:flex-1" : undefined}
-              onClick={() => {
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                tappedAt.current = {
+                  top: r.top,
+                  left: r.left,
+                  width: r.width,
+                  height: r.height,
+                };
                 setDoneBy(actorId);
                 choosePhoto(null);
                 setOpenId(c.id);

@@ -58,6 +58,7 @@ export {
   type ChoiceOption,
   type ChoreTileProps,
   type ChoreTileState,
+  type ScorePopBox,
 } from "./chores";
 export { cx } from "./cx";
 export { Dialog } from "./dialog";

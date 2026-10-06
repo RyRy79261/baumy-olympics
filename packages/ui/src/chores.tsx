@@ -134,28 +134,47 @@ export function ChoreTile({
  * status message, so screen readers hear it; the float honours
  * prefers-reduced-motion. The caller removes it after a moment.
  *
- * `placement="screen"` floats it a third of the way down the screen;
- * `placement="row"` floats it over the middle of its nearest positioned
- * parent, the bounty row that was logged (issue #181), so it never sits over
- * some other row.
+ * Where it floats (`at`): a third of the way down the screen by default;
+ * `"middle"`, the middle of the screen; or a box on the screen (viewport
+ * pixels), such as where the bounty was when it was tapped (issue #181).
  */
+export interface ScorePopBox {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
 export function ScorePop({
   points,
-  placement = "screen",
+  at,
 }: {
   points: number;
-  placement?: "screen" | "row";
+  at?: ScorePopBox | "middle";
 }) {
+  const box = typeof at === "object" ? at : null;
   return (
     <p
       role="status"
       data-testid="score-pop"
-      data-placement={placement}
+      data-placement={box ? "box" : (at ?? "screen")}
+      style={
+        box
+          ? {
+              top: box.top,
+              left: box.left,
+              width: box.width,
+              height: box.height,
+            }
+          : undefined
+      }
       className={cx(
-        "pointer-events-none z-50 font-display text-5xl text-bm-yellow [text-shadow:4px_4px_0_var(--color-bm-ink)] motion-safe:animate-pixel-hop",
-        placement === "row"
-          ? "absolute inset-0 flex items-center justify-center"
-          : "fixed inset-x-0 top-1/3 text-center",
+        "pointer-events-none fixed z-50 font-display text-5xl text-bm-yellow [text-shadow:4px_4px_0_var(--color-bm-ink)] motion-safe:animate-pixel-hop",
+        box
+          ? "flex items-center justify-center"
+          : at === "middle"
+            ? "inset-0 flex items-center justify-center"
+            : "inset-x-0 top-1/3 text-center",
       )}
     >
       +{points}
