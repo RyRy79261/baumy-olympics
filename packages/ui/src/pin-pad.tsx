@@ -141,6 +141,9 @@ export function PinPad({
           <button
             type="button"
             className={buttonClass("secondary", "kiosk", "flex-1")}
+            // Not while the PIN is checked: its answer (a wrong PIN, a
+            // rest) must find the pad still there (#174).
+            disabled={pending}
             onClick={onCancel}
           >
             Cancel
