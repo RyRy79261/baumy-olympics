@@ -235,8 +235,8 @@ describe("BaumySheet voice", () => {
     const started = vi.spyOn(FakeRecorder.prototype, "start");
     mount(true);
     await act(async () => mic()!.click());
-    const close = [...document.querySelectorAll("button")].find(
-      (b) => b.textContent === "Close",
+    const close = document.querySelector<HTMLButtonElement>(
+      'dialog[aria-label="Ask Baumy"] button[aria-label="Close"]',
     )!;
     await act(async () => close.click());
     await act(async () => grant({ getTracks: () => [{ stop }] }));

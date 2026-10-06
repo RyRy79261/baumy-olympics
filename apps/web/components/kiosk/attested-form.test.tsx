@@ -152,8 +152,8 @@ describe("AttestedForm", () => {
     await act(async () => el.querySelector("form")!.requestSubmit());
     expect(el.querySelector('[data-testid="no-pin-notice"]')).not.toBeNull();
     expect(el.querySelector("textarea")!.value).toBe("Still dirty");
-    const close = [...el.querySelectorAll("button")].find(
-      (b) => b.textContent === "Close",
+    const close = el.querySelector<HTMLButtonElement>(
+      "dialog[open] button[aria-label=\"Close\"]",
     )!;
     await act(async () => close.click());
     expect(el.querySelector("textarea")!.value).toBe("Still dirty");
