@@ -242,11 +242,12 @@ describe("Dialog's ways out (issue #174)", () => {
       expect(onClose).not.toHaveBeenCalled();
     });
 
-    it("comes straight back if the browser closes it anyway", async () => {
+    it("still closes, and says so, when the kiosk closes every dialog", async () => {
+      // Going home or a reminder coming up wins over waiting for an answer.
       const { dialog, onClose } = await mount({ busy: true });
       await act(async () => dialog.close());
-      expect(dialog.open).toBe(true);
-      expect(onClose).not.toHaveBeenCalled();
+      expect(dialog.open).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it("lets Escape through when not busy", async () => {
