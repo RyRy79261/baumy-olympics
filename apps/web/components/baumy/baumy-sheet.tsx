@@ -373,6 +373,10 @@ export function BaumySheet({
 
   function close() {
     sheetGeneration.current += 1;
+    // A question or a clip still on its way belongs to this opening: the
+    // next one starts ready, not "thinking" (#174).
+    setAsking(false);
+    setTranscribing(false);
     // A recording in progress is dropped when the recorder unmounts.
     feel({ type: "record_cancel" });
     setMicHint(null);

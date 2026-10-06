@@ -1423,6 +1423,50 @@ describe("BaumySheet editing a card", () => {
     await act(async () => buttonNamed("Check it")!.click());
   }
 
+  it("opens ready again, not thinking, when closed mid-question (#174)", async () => {
+    let answer: () => void = () => undefined;
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = () =>
+            resolve(
+              json({ ok: true, data: { reply: "Late.", proposals: [] } }),
+            );
+        }),
+    );
+    mount(false);
+    await typeAndSend("who is winning");
+    const says = () =>
+      document.querySelector('[data-testid="baumy-says"]')!.textContent ?? "";
+    expect(says()).toContain("Hmm, let me think");
+    const sheet = document.querySelector<HTMLDialogElement>(
+      'dialog[aria-label="Ask Baumy"]',
+    )!;
+    try {
+      await act(async () =>
+        sheet
+          .querySelector<HTMLButtonElement>(
+            ':scope > div > button[aria-label="Close"]',
+          )!
+          .click(),
+      );
+      await act(async () =>
+        document
+          .querySelector<HTMLButtonElement>('button[aria-label="Ask Baumy"]')!
+          .click(),
+      );
+      expect(sheet.open).toBe(true);
+      expect(says()).not.toContain("Hmm, let me think");
+      expect(
+        document.querySelector<HTMLInputElement>("#baumy-text")!.disabled,
+      ).toBe(false);
+    } finally {
+      await act(async () => answer());
+      await settle();
+    }
+    expect(says()).not.toContain("Late.");
+  });
+
   it("drops an answer that comes back after the sheet was closed (#174)", async () => {
     let answer: () => void = () => undefined;
     fetchMock.mockImplementation(async (url: string) => {
