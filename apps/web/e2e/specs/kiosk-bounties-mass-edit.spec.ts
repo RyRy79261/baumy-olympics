@@ -79,6 +79,28 @@ test("on the kiosk, an admin edits many bounties in one save with their PIN", as
       cat.y < box.y + box.height;
     expect(overlaps, (await b.textContent()) ?? "").toBe(false);
   }
+  // A field hidden behind the bar comes out from under it when it gets the
+  // focus: each of the last row's fields, scrolled behind the bar first.
+  const main = kiosk.locator("main");
+  const last = editor.getByRole("listitem").last();
+  for (const label of ["Kind", "Effort (%)", "Photo proof"]) {
+    const field = last.getByLabel(label);
+    await field.scrollIntoViewIfNeeded();
+    let box = (await field.boundingBox())!;
+    let barBox = (await bar.boundingBox())!;
+    // Its bottom edge at the middle of the bar: on screen, but covered.
+    const by = box.y + box.height - (barBox.y + barBox.height / 2);
+    await main.evaluate((m, dy) => m.scrollBy(0, dy), by);
+    box = (await field.boundingBox())!;
+    barBox = (await bar.boundingBox())!;
+    expect(box.y + box.height, `${label} starts covered`).toBeGreaterThan(
+      barBox.y,
+    );
+    await field.focus();
+    box = (await field.boundingBox())!;
+    barBox = (await bar.boundingBox())!;
+    expect(box.y + box.height, label).toBeLessThanOrEqual(barBox.y);
+  }
   await save.click();
   const pad = kiosk.getByRole("dialog", { name: `${founder}'s PIN` });
   await expect(pad).toBeVisible();

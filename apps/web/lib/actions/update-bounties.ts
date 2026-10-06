@@ -22,12 +22,12 @@ import { nameTaken, type ManageChoreData } from "./manage-chore";
 import { fail, type ActionFailure } from "./result";
 
 // Mass editing of bounties (issue #175, SPEC §12 decision 31): one editable
-// row per bounty, many rows changed, one Save. Owner: "All save in one
-// transaction or none." So every row is locked first (in id order, so two
-// saves never deadlock), each change is applied in turn, and the names are
-// checked once everything is applied: a swap of two names, or two rows given
-// the same name, is judged on the end state. Any failure returns
-// `{ok: false}` and runAction rolls the whole batch back.
+// row per bounty (the owner's words), many rows changed, one Save, and the
+// rows save in one transaction or not at all. So every row is locked first
+// (in id order, so two saves never deadlock), each change is applied in
+// turn, and the names are checked once everything is applied: a swap of two
+// names, or two rows given the same name, is judged on the end state. Any
+// failure returns `{ok: false}` and runAction rolls the whole batch back.
 //
 // Admin only, on the admin page and on the kitchen screen for a picked admin
 // with their PIN (the kiosk admin gate, decision 28). Not on the AI command,

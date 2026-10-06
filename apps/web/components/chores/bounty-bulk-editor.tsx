@@ -122,8 +122,11 @@ export function BountyBulkEditor({
     if (count === 0) onClose?.();
   };
 
-  const update = (b: BulkBounty, patch: Touched) =>
+  // Any edit makes the last answer stale: its notes go until the next Save.
+  const update = (b: BulkBounty, patch: Touched) => {
+    setResult(null);
     setTouched((all) => ({ ...all, [b.id]: { ...all[b.id], ...patch } }));
+  };
 
   const fields = (
     <>
@@ -185,30 +188,32 @@ export function BountyBulkEditor({
           pinLabel={pinLabel}
           onResult={onResult}
           disabled={!canSave}
-          fields={
-            <>
-              {fields}
-              {status}
-              {error}
-            </>
-          }
-          // Always in view at the bottom of the page, so the admin never
-          // scrolls to the end to save; its right end stays clear of
-          // Baumy, who stands over the footer's corner.
+          fields={fields}
+          // Always in view at the bottom of the page, with what is wrong
+          // above its buttons, so the admin never scrolls to the end to
+          // save or to read why not. It spans the Card's padding, and its
+          // right end stays clear of Baumy, who stands over the footer's
+          // corner.
           bar={{
             testId: "bulk-save-bar",
             className:
-              "sticky bottom-0 z-20 -mx-4 grid grid-cols-2 gap-3 border-t-4 border-bm-line bg-bm-bg py-3 pr-32 pl-4",
+              "sticky bottom-0 z-20 -mx-4 grid grid-cols-2 gap-3 border-t-4 border-bm-line bg-bm-bg py-3 pr-32 pl-4 sm:-mx-6 sm:pl-6",
             extra: (
-              <Button
-                type="button"
-                size="kiosk"
-                variant="secondary"
-                disabled={count === 0}
-                onClick={discard}
-              >
-                Discard
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  size="kiosk"
+                  variant="secondary"
+                  disabled={count === 0}
+                  onClick={discard}
+                >
+                  Discard
+                </Button>
+                <div className="order-first col-span-2 flex flex-col gap-2">
+                  {status}
+                  {error}
+                </div>
+              </>
             ),
           }}
         />
@@ -327,6 +332,9 @@ function BulkRow({
       data-changed={changed ? "true" : undefined}
       className={cx(
         "pixel-frame flex flex-col gap-3 p-3",
+        // On the kiosk a focused field scrolls clear of the sticky Save
+        // bar (with its status and any error), never resting under it.
+        kiosk && "[&_input]:scroll-mb-60 [&_select]:scroll-mb-60",
         changed
           ? "bg-bm-amber/10 [--pf:var(--color-bm-amber)]"
           : "bg-bm-ink/40",
@@ -476,7 +484,7 @@ function BulkRow({
             )}
           </Field>
         </div>
-        <div className={span("col-span-3", wide)}>
+        <div className={span("col-span-3", "col-span-2 lg:col-span-1")}>
           <Field id={id("proof")} label="Photo proof" errors={errors.proofMode}>
             {(c) => (
               <Select
