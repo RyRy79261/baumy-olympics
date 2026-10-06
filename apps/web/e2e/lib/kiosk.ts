@@ -138,3 +138,29 @@ export async function openKioskActivity(kiosk: Page) {
     kiosk.getByRole("heading", { name: "Activity", level: 1 }),
   ).toBeVisible();
 }
+
+/** The member's personal PIN, set (or set again) from their own phone. */
+export async function setPersonalPin(page: Page, pin: string) {
+  await page.goto("/settings");
+  const change = page.getByLabel("New PIN");
+  const first = page.getByLabel("PIN", { exact: true });
+  await expect(change.or(first)).toBeVisible();
+  const had = await change.isVisible();
+  await (had ? change : first).fill(pin);
+  await page.getByLabel("Type it again").fill(pin);
+  await page
+    .getByRole("button", { name: had ? "Change PIN" : "Set PIN" })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: /PIN (saved|changed)\./ }),
+  ).toBeVisible();
+}
+
+/** Open the kitchen screen's own Settings (issue #147), from Bounties. */
+export async function openKioskSettings(kiosk: Page) {
+  await openKioskChores(kiosk);
+  await kiosk.getByRole("link", { name: "Kitchen screen settings" }).click();
+  await expect(
+    kiosk.getByRole("heading", { name: "Settings", level: 1 }),
+  ).toBeVisible();
+}

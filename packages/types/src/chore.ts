@@ -92,6 +92,12 @@ export function cooldownMinutesFromHours(hours: number): number {
   return Math.round(hours * 60);
 }
 
+/**
+ * The most bounties one mass edit may change at once (issue #175): far more
+ * than a household has, so it only stops a runaway request.
+ */
+export const BOUNTY_EDITS_MAX = 100;
+
 export const COMPLETION_NOTE_MAX = 280;
 
 /** An optional note on a completion. */

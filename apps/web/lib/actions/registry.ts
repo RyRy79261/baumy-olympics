@@ -90,6 +90,7 @@ import {
   listShopping,
 } from "./shopping";
 import { setPrizeMode } from "./set-prize-mode";
+import { updateBounties } from "./update-bounties";
 import { updateMyProfile } from "./update-my-profile";
 import {
   dismissWeight,
@@ -151,6 +152,7 @@ export const REGISTRY = {
   manage_chore: manageChore,
   create_bounty: createBounty,
   update_bounty: updateBounty,
+  update_bounties: updateBounties,
   get_activity: getActivity,
   dispute_completion: disputeCompletion,
   undo_completion: undoCompletion,

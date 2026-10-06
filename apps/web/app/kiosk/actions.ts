@@ -15,6 +15,7 @@ import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { LogCompletionData } from "@/lib/actions/log-completion";
 import type { KioskIdleData } from "@/lib/actions/kiosk-idle";
 import type { DeleteNoteData, NoteWriteData } from "@/lib/actions/notes";
+import type { UpdateBountiesData } from "@/lib/actions/update-bounties";
 import type { WeightDecisionData } from "@/lib/actions/weights";
 import type {
   AddShoppingData,
@@ -29,6 +30,7 @@ import {
   walkInCookieOptions,
 } from "@/lib/kiosk/cookies";
 import { pickKioskMember } from "@/lib/kiosk/selection";
+import { changesFromForm } from "@/lib/chores/bulk-edit";
 import { splitItemsForm } from "@/lib/shopping/view";
 
 // The kiosk's server actions (SPEC §8). Picking who is acting is the
@@ -273,5 +275,26 @@ export async function kioskSchedulePointsAction(
 ): Promise<ActionResult<WeightDecisionData>> {
   const result = await kioskActionForm("schedule_points_change", form);
   if (result.ok) revalidatePath("/kiosk/settings");
+  return result;
+}
+
+/**
+ * A kiosk admin edits many bounties in one save (issue #175): all or none,
+ * with their PIN in this request, through the form's PinPad.
+ */
+export async function kioskUpdateBountiesAction(
+  _prev: ActionResult<UpdateBountiesData> | null,
+  form: FormData,
+): Promise<ActionResult<UpdateBountiesData>> {
+  const result = await kioskActionForm(
+    "update_bounties",
+    form,
+    undefined,
+    changesFromForm,
+  );
+  if (result.ok) {
+    revalidatePath("/kiosk/settings");
+    revalidateKioskChores();
+  }
   return result;
 }

@@ -259,6 +259,43 @@ describe("listActivity", () => {
     });
   });
 
+  it("lists each bounty a mass edit changed, not the ones it only archived (issue #175)", async () => {
+    const ryan = await seedPlayer(db(), "Ryan");
+    const trash = await seedChore(db(), TRASH);
+    const dishes = await seedChore(db(), SEED_CHORES.dishes);
+    const bathroom = await seedChore(db(), SEED_CHORES.bathroom);
+    await t
+      .db()
+      .insert(auditEvents)
+      .values({
+        actorMemberId: ryan,
+        source: "kiosk",
+        action: "update_bounties",
+        entity: "chore",
+        entityId: null,
+        payload: {
+          changes: [
+            { choreId: trash.choreId, points: 30 },
+            { choreId: dishes.choreId, name: "Dishes!" },
+            { choreId: bathroom.choreId, archived: true },
+          ],
+          edited: [trash.choreId, dishes.choreId],
+        },
+        at: at(1),
+      });
+    const entries = await read(at(2));
+    expect(entries.map(label).sort()).toEqual([
+      `bounty ${SEED_CHORES.dishes.name} edited`,
+      `bounty ${TRASH.name} edited`,
+    ]);
+    expect(entries.map(label)).not.toContain(
+      `bounty ${SEED_CHORES.bathroom.name} edited`,
+    );
+    expect(entries[0]).toMatchObject({
+      by: { memberId: ryan, displayName: "Ryan" },
+    });
+  });
+
   it("judges claims and disputes at now: finalized, timed out, expired", async () => {
     const ryan = await seedPlayer(db(), "Ryan");
     const sam = await seedPlayer(db(), "Sam");
