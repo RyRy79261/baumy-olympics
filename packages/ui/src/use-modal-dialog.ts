@@ -137,7 +137,8 @@ export function useModalDialog({
       // Busy, and closed by the browser anyway (a second Escape is not
       // cancelable): back at once, and nobody is told it closed.
       if (busyNow.current && !wasForced) {
-        dialog.showModal();
+        // Not once it has left the page (showModal would throw there).
+        if (dialog.isConnected) dialog.showModal();
         return;
       }
       onClose();

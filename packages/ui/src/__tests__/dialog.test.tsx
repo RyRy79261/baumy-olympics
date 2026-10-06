@@ -18,6 +18,9 @@ beforeAll(() => {
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
   HTMLDialogElement.prototype.showModal = function () {
+    // As a browser does: a dialog no longer in the page cannot open.
+    if (!this.isConnected)
+      throw new DOMException("Not in the page", "InvalidStateError");
     this.setAttribute("open", "");
   };
   HTMLDialogElement.prototype.close = function () {
@@ -257,6 +260,30 @@ describe("Dialog's ways out (issue #174)", () => {
       });
       expect(dialog.open).toBe(true);
       expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("does not try to come back once it has left the page", async () => {
+      const { dialog, onClose } = await mount({ busy: true });
+      const parent = dialog.parentNode!;
+      dialog.remove();
+      expect(dialog.isConnected).toBe(false);
+      // A close the browser forces on a detached busy dialog: no throw
+      // (an event listener's throw is reported to the window, not raised).
+      const errors: unknown[] = [];
+      const onError = (e: ErrorEvent) => {
+        errors.push(e.error);
+        e.preventDefault();
+      };
+      window.addEventListener("error", onError);
+      try {
+        await act(async () => dialog.close());
+      } finally {
+        window.removeEventListener("error", onError);
+      }
+      expect(errors).toEqual([]);
+      expect(dialog.open).toBe(false);
+      expect(onClose).not.toHaveBeenCalled();
+      parent.appendChild(dialog);
     });
 
     it("still closes, and says so, when the kiosk takes the screen", async () => {
