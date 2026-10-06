@@ -13,7 +13,8 @@ import {
 // the kiosk edits many bounties on its Settings page, one row per bounty,
 // and the one Save asks their PIN. Nobody picked sees no editor (a member
 // neither: kiosk-admin.spec.ts). Points, effort and cooldown are sliders
-// (issue #179), driven here by keys and by a finger's tap.
+// (issue #179), driven here by keys, by − and + (points only, SPEC §12
+// decision 33) and by a finger's tap (Chromium only).
 
 const PIN = "1357";
 
@@ -60,7 +61,18 @@ test("on the kiosk, an admin edits many bounties in one save with their PIN", as
 
   await slideTo(points(kettle), "33 pts");
   await expect(row(kettle)).toContainText("33 pts");
+  // − and + step the points by one (SPEC §12 decision 33).
+  await row(kettle)
+    .getByRole("button", { name: `One point more for ${kettle}` })
+    .click();
+  await expect(points(kettle)).toHaveAttribute("aria-valuetext", "34 pts");
+  await row(kettle)
+    .getByRole("button", { name: `One point less for ${kettle}` })
+    .click();
+  await expect(points(kettle)).toHaveAttribute("aria-valuetext", "33 pts");
   // A finger's tap at the start of the effort track sets the least effort.
+  // Chromium only: iPad Safari does not jump to a tap on the track (there
+  // you drag the thumb, as the manual says), and this project is Chromium.
   const effort = slider(kettle, "Effort (%)");
   const track = (await effort.boundingBox())!;
   await effort.tap({ position: { x: 2, y: track.height / 2 } });
@@ -89,6 +101,12 @@ test("on the kiosk, an admin edits many bounties in one save with their PIN", as
   const bar = editor.getByTestId("bulk-save-bar");
   const save = bar.getByRole("button", { name: "Save 2 changes" });
   await expect(save).toBeInViewport();
+  // Flush on the footer: no rows show under the bar.
+  const mainBox = (await kiosk.locator("main").boundingBox())!;
+  const barAt = (await bar.boundingBox())!;
+  expect(
+    Math.abs(barAt.y + barAt.height - (mainBox.y + mainBox.height)),
+  ).toBeLessThanOrEqual(1);
   const cat = (await kiosk
     .getByRole("button", { name: "Ask Baumy" })
     .boundingBox())!;

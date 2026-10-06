@@ -7,7 +7,8 @@ import { founderAdmin } from "../lib/household";
 // changes three rows (points and photo proof, a name, a restore), sees them
 // marked, and saves them in one go. A save with one bad row (two bounties
 // given the same name) says why and saves none of them. Points, effort and
-// cooldown are sliders (issue #179), driven here by keys and by a tap.
+// cooldown are sliders (issue #179), driven here by keys, by − and + (points
+// only, SPEC §12 decision 33) and by a click (Chromium only).
 
 function toast(page: Page, text: string) {
   return page.getByRole("status").filter({ hasText: text });
@@ -60,9 +61,20 @@ test("an admin edits many bounties at once on /admin/chores, all or none", async
   await effort.press("ArrowLeft");
   await expect(row(oven)).not.toHaveAttribute("data-changed", "true");
 
-  await slideTo(points(bins), "25 pts");
-  // The value is written beside the slider, and a tap at the track's end
-  // goes there.
+  await slideTo(points(bins), "24 pts");
+  // − and + step the points by one (SPEC §12 decision 33).
+  await row(bins)
+    .getByRole("button", { name: `One point more for ${bins}` })
+    .click();
+  await row(bins)
+    .getByRole("button", { name: `One point more for ${bins}` })
+    .click();
+  await row(bins)
+    .getByRole("button", { name: `One point less for ${bins}` })
+    .click();
+  await expect(points(bins)).toHaveAttribute("aria-valuetext", "25 pts");
+  // The value is written beside the slider, and a click at the track's end
+  // goes there (Chromium; iPad Safari does not jump to a tap on the track).
   await expect(row(bins)).toContainText("25 pts");
   await expect(cooldown(bins)).toHaveAttribute(
     "aria-valuetext",

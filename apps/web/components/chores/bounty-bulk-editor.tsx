@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { CHORE_NAME_MAX } from "@baumy/types";
+import { BASE_POINTS_MAX, BASE_POINTS_MIN, CHORE_NAME_MAX } from "@baumy/types";
 import {
   BountyGlyph,
   Button,
@@ -131,7 +131,8 @@ export function BountyBulkEditor({
     setTouched((all) => ({ ...all, [b.id]: { ...all[b.id], ...patch } }));
   };
 
-  // A slider of a bounty with no points yet, back to "not set": untouched.
+  // A field no longer touched: a slider back at the bounty's own value, or
+  // Clear on one of a bounty with no points yet ("Not set" again).
   const clear = (b: BulkBounty, field: keyof Touched) => {
     setResult(null);
     setTouched((all) => {
@@ -208,11 +209,14 @@ export function BountyBulkEditor({
           // above its buttons, so the admin never scrolls to the end to
           // save or to read why not. It spans the Card's padding, and its
           // right end stays clear of Baumy, who stands over the footer's
-          // corner.
+          // corner. It sits flush on the footer: the kiosk page's scroll
+          // box keeps 56px of padding under its content (pb-14, KioskFrame),
+          // and a sticky box stops that far above the bottom, so a bottom
+          // of -56px takes it down to the edge, with no rows showing under it.
           bar={{
             testId: "bulk-save-bar",
             className:
-              "sticky bottom-0 z-20 -mx-4 grid grid-cols-2 gap-3 border-t-4 border-bm-line bg-bm-bg py-3 pr-32 pl-4 sm:-mx-6 sm:pl-6",
+              "sticky -bottom-14 z-20 -mx-4 grid grid-cols-2 gap-3 border-t-4 border-bm-line bg-bm-bg py-3 pr-32 pl-4 sm:-mx-6 sm:pl-6",
             extra: (
               <>
                 <Button
@@ -317,11 +321,11 @@ type SliderField = "points" | "cooldownHours" | "effortFactorPct";
  * One bounty's row: every setting. Its title names the bounty, and each
  * control's description points at it, so "Points" is heard as Trash's (a
  * slider's own name says it too: "Points for Trash"). The kiosk's six
- * columns: name and status; kind and photo proof; points and effort; the
- * cooldown, the slider with the most stops, the whole width. The admin
- * page: four at `lg`, three at `sm`, and on a phone the lists and the
- * cooldown take the whole width, so each pair left side by side has
- * one-line labels.
+ * columns: name and status; kind, photo proof and effort; then the points
+ * (with their − and +) and the cooldown, each the whole width. The admin
+ * page: at `lg` six columns, in rows of three, two and two (so the
+ * cooldown's value fits beside its track); at `sm` three, with the points
+ * and the cooldown the whole width; on a phone every field the whole width.
  */
 function BulkRow({
   bounty: b,
@@ -340,6 +344,7 @@ function BulkRow({
   errors: Errors;
   kiosk: boolean;
   onChange: (patch: Touched) => void;
+  /** Forget a touched field: the row shows the bounty's own value again. */
   onClear: (field: SliderField) => void;
 }) {
   const id = (f: string) => `bulk-${b.id}-${f}`;
@@ -349,12 +354,20 @@ function BulkRow({
   const control = kiosk ? "min-h-14 text-xl" : undefined;
   // Grid spans: [kiosk, admin page].
   const span = (k: string, hub: string) => (kiosk ? k : hub);
-  const wide = "col-span-2 sm:col-span-1";
+  const list = "col-span-2 sm:col-span-1 lg:col-span-2";
+  const half = "col-span-2 sm:col-span-1 lg:col-span-3";
+  const whole = "col-span-2 sm:col-span-3";
+  const size = kiosk ? "kiosk" : "default";
 
   /**
-   * A number as a slider over `stops`, with the bounty's own value among
-   * them. A bounty with no points yet has no value to show: its slider says
-   * "Not set" until touched, and Clear (once touched) puts it back to that.
+   * A number as a slider over `stops`, with the bounty's own value and the
+   * row's value among them, so the thumb always stands where the text says.
+   * Back at the bounty's own value the field is no longer touched, so a
+   * later refresh shows what another admin saved meanwhile. A bounty with
+   * no points yet has no value to show: its slider says "Not set" until
+   * touched, and Clear (once touched) puts it back to that (§12 decision
+   * 33). The points alone have − and + beside the slider, one point each
+   * (decision 33).
    */
   const slider = (
     field: SliderField,
@@ -362,38 +375,73 @@ function BulkRow({
     stops: readonly number[],
     was: number | null,
     text: (n: number) => string,
-  ) => (
-    <Field id={id(field)} label={label} errors={errors[field]}>
-      {(c) => (
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <Slider
-              form={DETACHED}
-              {...c}
-              aria-label={`${label} for ${b.name}`}
-              aria-describedby={describe(c)}
-              kiosk={kiosk}
-              stops={withStop(stops, was)}
-              value={sliderValue(d[field])}
-              valueText={text}
-              onValueChange={(n) => onChange({ [field]: String(n) })}
-            />
+  ) => {
+    const value = sliderValue(d[field]);
+    const set = (n: number) =>
+      n === was ? onClear(field) : onChange({ [field]: String(n) });
+    const step = (delta: 1 | -1) =>
+      set(
+        value === null
+          ? BASE_POINTS_MIN
+          : Math.min(BASE_POINTS_MAX, Math.max(BASE_POINTS_MIN, value + delta)),
+      );
+    return (
+      <Field id={id(field)} label={label} errors={errors[field]}>
+        {(c) => (
+          <div className="flex items-center gap-3">
+            {field === "points" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size={size}
+                aria-label={`One point less for ${b.name}`}
+                disabled={value !== null && value <= BASE_POINTS_MIN}
+                onClick={() => step(-1)}
+              >
+                −
+              </Button>
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <Slider
+                form={DETACHED}
+                {...c}
+                aria-label={`${label} for ${b.name}`}
+                aria-describedby={describe(c)}
+                kiosk={kiosk}
+                stops={withStop(withStop(stops, was), value)}
+                value={value}
+                valueText={text}
+                onValueChange={set}
+              />
+            </div>
+            {field === "points" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size={size}
+                aria-label={`One point more for ${b.name}`}
+                disabled={value !== null && value >= BASE_POINTS_MAX}
+                onClick={() => step(1)}
+              >
+                +
+              </Button>
+            ) : null}
+            {was === null && t?.[field] !== undefined ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size={size}
+                aria-label={`Clear ${label} for ${b.name}`}
+                onClick={() => onClear(field)}
+              >
+                Clear
+              </Button>
+            ) : null}
           </div>
-          {was === null && t?.[field] !== undefined ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size={kiosk ? "kiosk" : "default"}
-              aria-label={`Clear ${label} for ${b.name}`}
-              onClick={() => onClear(field)}
-            >
-              Clear
-            </Button>
-          ) : null}
-        </div>
-      )}
-    </Field>
-  );
+        )}
+      </Field>
+    );
+  };
 
   return (
     <li
@@ -428,7 +476,7 @@ function BulkRow({
           // items-start: an error under one field never moves its
           // neighbours (every pair side by side has one-line labels).
           "grid items-start gap-3",
-          kiosk ? "grid-cols-6" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+          kiosk ? "grid-cols-6" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
         )}
       >
         <div className={span("col-span-4", "col-span-2")}>
@@ -446,7 +494,7 @@ function BulkRow({
             )}
           </Field>
         </div>
-        <div className={span("col-span-2", wide)}>
+        <div className={span("col-span-2", list)}>
           <Field id={id("status")} label="Status" errors={errors.archived}>
             {(c) => (
               <Select
@@ -465,7 +513,7 @@ function BulkRow({
             )}
           </Field>
         </div>
-        <div className={span("col-span-3", wide)}>
+        <div className={span("col-span-2", list)}>
           <Field id={id("kind")} label="Kind" errors={errors.kind}>
             {(c) => (
               <Select
@@ -486,7 +534,7 @@ function BulkRow({
             )}
           </Field>
         </div>
-        <div className={span("col-span-3", wide)}>
+        <div className={span("col-span-2", half)}>
           <Field id={id("proof")} label="Photo proof" errors={errors.proofMode}>
             {(c) => (
               <Select
@@ -509,10 +557,7 @@ function BulkRow({
             )}
           </Field>
         </div>
-        <div className={span("col-span-3", "")}>
-          {slider("points", "Points", POINT_STOPS, b.basePoints, pointsText)}
-        </div>
-        <div className={span("col-span-3", "")}>
+        <div className={span("col-span-2", half)}>
           {slider(
             "effortFactorPct",
             "Effort (%)",
@@ -521,7 +566,10 @@ function BulkRow({
             effortText,
           )}
         </div>
-        <div className={span("col-span-6", "col-span-2 lg:col-span-1")}>
+        <div className={span("col-span-6", whole)}>
+          {slider("points", "Points", POINT_STOPS, b.basePoints, pointsText)}
+        </div>
+        <div className={span("col-span-6", whole)}>
           {slider(
             "cooldownHours",
             "Cooldown (h)",
