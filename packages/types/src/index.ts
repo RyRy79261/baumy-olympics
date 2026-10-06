@@ -47,6 +47,7 @@ export {
 export {
   BASE_POINTS_MAX,
   BASE_POINTS_MIN,
+  BOUNTY_EDITS_MAX,
   BasePoints,
   CHORE_ICONS,
   CHORE_KINDS,
