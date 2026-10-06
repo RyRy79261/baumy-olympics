@@ -270,6 +270,29 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
   const log = kiosk.getByRole("dialog", { name: `Log ${bins}` });
   await expect(log).toBeVisible();
+  // Changed your mind (issue #174): Cancel, the corner's ×, or a tap on the
+  // dimmed page put it down, and nothing is logged (the streak below is
+  // still the founder's second). A tap inside the sheet keeps it open.
+  const cancel = log.getByRole("button", { name: "Cancel", exact: true });
+  const close = log.getByRole("button", { name: "Close", exact: true });
+  for (const target of [cancel, close]) {
+    const box = (await target.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(56);
+    expect(box.width).toBeGreaterThanOrEqual(56);
+  }
+  await cancel.click();
+  await expect(log).toBeHidden();
+  await openChore(kiosk, bins);
+  await close.click();
+  await expect(log).toBeHidden();
+  await openChore(kiosk, bins);
+  await log.getByRole("heading", { name: `Log ${bins}` }).click();
+  await expect(log).toBeVisible();
+  const sheetBox = (await log.boundingBox())!;
+  expect(sheetBox.y).toBeGreaterThan(20);
+  await kiosk.mouse.click(10, 10);
+  await expect(log).toBeHidden();
+  await openChore(kiosk, bins);
   await log.getByRole("button", { name: "Log it" }).click();
   await expect(log).toBeHidden();
   // The founder's second in a row: a streak of 2.
