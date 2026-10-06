@@ -220,7 +220,7 @@ export function BaumySheet({
     const said = text.trim();
     if (!said || asking || transcribing) return;
     setHeard(null);
-    if (await send(said)) setText("");
+    if (await send(said, sheetCurrent())) setText("");
   }
 
   function micUnavailable(message: string) {
@@ -231,10 +231,12 @@ export function BaumySheet({
   }
 
   async function heardClip(clip: Blob, mime: string) {
+    const current = sheetCurrent();
     feel({ type: "record_stop" });
     setTranscribing(true);
     const result = await transcribeClip(clip, mime, surface);
     setTranscribing(false);
+    if (!current()) return;
     if (!result.ok) {
       setReply({ text: result.message, error: true });
       feel({ type: "error" });
@@ -243,7 +245,7 @@ export function BaumySheet({
       return;
     }
     setHeard(result.data.text);
-    await send(result.data.text);
+    await send(result.data.text, current);
   }
 
   /** Approve one row: null when it saved, else the failure's code. */
@@ -360,7 +362,17 @@ export function BaumySheet({
     earned.current = 0;
   }
 
+  // Which opening of the sheet an answer in flight belongs to: closing it
+  // (its ×, Cancel, the kiosk going home) moves on, so a late answer never
+  // brings back the last person's cards (issue #174).
+  const sheetGeneration = useRef(0);
+  const sheetCurrent = () => {
+    const mine = sheetGeneration.current;
+    return () => sheetGeneration.current === mine;
+  };
+
   function close() {
+    sheetGeneration.current += 1;
     // A recording in progress is dropped when the recorder unmounts.
     feel({ type: "record_cancel" });
     setMicHint(null);

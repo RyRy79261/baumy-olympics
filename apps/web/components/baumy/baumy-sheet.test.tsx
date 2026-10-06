@@ -1423,6 +1423,51 @@ describe("BaumySheet editing a card", () => {
     await act(async () => buttonNamed("Check it")!.click());
   }
 
+  it("drops an answer that comes back after the sheet was closed (#174)", async () => {
+    let answer: () => void = () => undefined;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/actions/run") return json({ ok: true, data: {} });
+      return new Promise<Response>((resolve) => {
+        answer = () =>
+          resolve(
+            json({
+              ok: true,
+              data: {
+                reply: "Pot it is.",
+                proposals: [pot("p1", "20")],
+                choices: { members: [], chores: [] },
+              },
+            }),
+          );
+      });
+    });
+    mount(false);
+    await typeAndSend("put 20 in the pot");
+    const sheet = document.querySelector<HTMLDialogElement>(
+      'dialog[aria-label="Ask Baumy"]',
+    )!;
+    expect(sheet.open).toBe(true);
+    await act(async () =>
+      sheet
+        .querySelector<HTMLButtonElement>(
+          ':scope > div > button[aria-label="Close"]',
+        )!
+        .click(),
+    );
+    expect(sheet.open).toBe(false);
+    await act(async () => answer());
+    await settle();
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('button[aria-label="Ask Baumy"]')!
+        .click(),
+    );
+    expect(sheet.open).toBe(true);
+    expect(document.body.textContent).not.toContain("Pot it is.");
+    expect(buttonNamed("Confirm all")).toBeUndefined();
+    expect(runs()).toEqual([]);
+  });
+
   // Issue #174: the sheet's ×, Escape and a tap outside are its Cancel, so
   // the next person to open it never sees, or confirms, someone's card.
   for (const way of ["×", "Escape"] as const) {
