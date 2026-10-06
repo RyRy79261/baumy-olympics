@@ -289,7 +289,8 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await log.getByRole("heading", { name: `Log ${bins}` }).click();
   await expect(log).toBeVisible();
   const sheetBox = (await log.boundingBox())!;
-  expect(sheetBox.y).toBeGreaterThan(20);
+  // (10, 10) is on the dimmed page: left of the centred sheet.
+  expect(sheetBox.x).toBeGreaterThan(20);
   await kiosk.mouse.click(10, 10);
   await expect(log).toBeHidden();
   await openChore(kiosk, bins);
