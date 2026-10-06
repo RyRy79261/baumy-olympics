@@ -133,13 +133,30 @@ export function ChoreTile({
  * The floating "+N" after a completion is scored (SPEC §7 "Juice"). It is a
  * status message, so screen readers hear it; the float honours
  * prefers-reduced-motion. The caller removes it after a moment.
+ *
+ * `placement="screen"` floats it a third of the way down the screen;
+ * `placement="row"` floats it over the middle of its nearest positioned
+ * parent, the bounty row that was logged (issue #181), so it never sits over
+ * some other row.
  */
-export function ScorePop({ points }: { points: number }) {
+export function ScorePop({
+  points,
+  placement = "screen",
+}: {
+  points: number;
+  placement?: "screen" | "row";
+}) {
   return (
     <p
       role="status"
       data-testid="score-pop"
-      className="pointer-events-none fixed inset-x-0 top-1/3 z-50 text-center font-display text-5xl text-bm-yellow [text-shadow:4px_4px_0_var(--color-bm-ink)] motion-safe:animate-pixel-hop"
+      data-placement={placement}
+      className={cx(
+        "pointer-events-none z-50 font-display text-5xl text-bm-yellow [text-shadow:4px_4px_0_var(--color-bm-ink)] motion-safe:animate-pixel-hop",
+        placement === "row"
+          ? "absolute inset-0 flex items-center justify-center"
+          : "fixed inset-x-0 top-1/3 text-center",
+      )}
     >
       +{points}
     </p>

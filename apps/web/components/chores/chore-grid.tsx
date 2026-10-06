@@ -44,7 +44,7 @@ import { toast } from "@/lib/ui/toast";
 // still an AttestedForm, so a PIN would be asked if the gate ever wanted
 // one.
 //
-// Outcomes: a floating "+N", a "STREAK BROKEN" banner when a streak ended,
+// Outcomes: a floating "+N" over the row that was logged (issue #181), a "STREAK BROKEN" banner when a streak ended,
 // and a toast for a refusal (a cooldown says when to try again, in Berlin
 // time). The page re-renders from the server action's revalidatePath.
 
@@ -110,7 +110,11 @@ export function ChoreGrid({
       : null,
   );
   const [doneBy, setDoneBy] = useState(actorId);
-  const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
+  const [pop, setPop] = useState<{
+    key: number;
+    points: number;
+    choreId: string;
+  } | null>(null);
   const [broken, setBroken] = useState<LogCompletionData | null>(null);
   const router = useRouter();
   const photo = useRef<Blob | null>(null);
@@ -163,7 +167,7 @@ export function ChoreGrid({
     }
     const d = result.data;
     if (d.totalPts !== null) {
-      setPop({ key: Date.now(), points: d.totalPts });
+      setPop({ key: Date.now(), points: d.totalPts, choreId: d.choreId });
       announceScore(d.totalPts);
       toast.success(
         `Logged ${d.choreName} for ${d.doneByName}: +${d.totalPts}.`,
@@ -197,6 +201,18 @@ export function ChoreGrid({
 
   const counts = bountyCounts(chores);
   const shown = filterBounties(sortBounties(chores), filter);
+  // The "+N" floats over the row that was logged. If the tab no longer shows
+  // that row, it floats over the screen instead.
+  const popRow = pop ? shown.findIndex((c) => c.id === pop.choreId) : -1;
+  const popOnRow = popRow !== -1;
+  // A row below the fold (logged from the dashboard's "I'll do it"), or one
+  // that moved when the board re-sorted, is brought into view with its "+N".
+  useEffect(() => {
+    if (!pop || popRow === -1) return;
+    document
+      .querySelector('[data-testid="score-pop"][data-placement="row"]')
+      ?.scrollIntoView?.({ block: "nearest" });
+  }, [pop, popRow]);
 
   if (chores.length === 0) {
     return (
@@ -217,7 +233,7 @@ export function ChoreGrid({
           />
         </div>
       ) : null}
-      {pop ? <ScorePop key={pop.key} points={pop.points} /> : null}
+      {pop && !popOnRow ? <ScorePop key={pop.key} points={pop.points} /> : null}
 
       <div
         role="group"
@@ -256,10 +272,13 @@ export function ChoreGrid({
             data-testid={`chore-${c.name}`}
             className={
               rowAction
-                ? "flex flex-col gap-2 sm:flex-row sm:items-center"
-                : undefined
+                ? "relative flex flex-col gap-2 sm:flex-row sm:items-center"
+                : "relative"
             }
           >
+            {pop && popOnRow && pop.choreId === c.id ? (
+              <ScorePop key={pop.key} points={pop.points} placement="row" />
+            ) : null}
             <BountyRow
               name={c.name}
               sprite={c.sprite}

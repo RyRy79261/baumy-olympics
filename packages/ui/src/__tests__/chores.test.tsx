@@ -54,6 +54,13 @@ describe("ScorePop and StreakBrokenBanner", () => {
     expect(pop).toContain('role="status"');
     expect(pop).toContain("+25");
     expect(pop).toContain("motion-safe:");
+    // On the screen by default; over its row when asked (issue #181).
+    expect(pop).toContain('data-placement="screen"');
+    expect(pop).toContain("fixed");
+    const onRow = html(<ScorePop points={25} placement="row" />);
+    expect(onRow).toContain('data-placement="row"');
+    expect(onRow).toContain("absolute inset-0");
+    expect(onRow).not.toContain("fixed");
     const banner = html(
       <StreakBrokenBanner holderName="Ryan" length={3} bonus={12} />,
     );
