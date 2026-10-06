@@ -411,4 +411,81 @@ describe("BountyBulkEditor", () => {
     expect(second!.get("pin")).toBe("2580");
     expect(toastSuccess).toHaveBeenCalledWith("Saved 3 bounties.");
   });
+
+  it("clears a failed save's notes as soon as a field is edited again", async () => {
+    const message = "There is already a chore called Trash. Pick another name.";
+    const { el } = await mount({
+      ok: false,
+      code: "CHORE_NAME_TAKEN",
+      message,
+      issues: [{ path: ["changes", 0, "name"], message }],
+    });
+    await set(control<HTMLInputElement>(el, "Dishes", "Name"), "Trash");
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(row(el, "Dishes").textContent).toContain(message);
+    expect(el.querySelector('[role="alert"]')).not.toBeNull();
+    await set(control<HTMLInputElement>(el, "Dishes", "Name"), "Dishes");
+    expect(row(el, "Dishes").textContent).not.toContain(message);
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.textContent).toContain("No changes yet.");
+  });
+
+  it("on the kitchen screen, says what is wrong in the bar by Save", async () => {
+    const message = "There is already a chore called Trash. Pick another name.";
+    const { el } = await mount(
+      { ok: false, code: "CHORE_NAME_TAKEN", message },
+      { pinLabel: "Ryan's PIN" },
+    );
+    const bar = () =>
+      el.querySelector<HTMLElement>('[data-testid="bulk-save-bar"]')!;
+    expect(bar().textContent).toContain("No changes yet.");
+    await set(control<HTMLInputElement>(el, "Trash", "Points"), "");
+    expect(bar().textContent).toContain("Fill in the fields marked Required.");
+    await set(control<HTMLInputElement>(el, "Trash", "Points"), "20");
+    await set(control<HTMLInputElement>(el, "Dishes", "Name"), "Trash");
+    expect(bar().textContent).toContain("1 bounty changed, not saved yet.");
+    await act(async () => button(bar(), "Save 1 change").click());
+    expect(bar().querySelector('[role="alert"]')!.textContent).toBe(message);
+  });
+
+  it("fills every row of the grid, at every width", async () => {
+    for (const opts of [{}, { pinLabel: "Ryan's PIN" }]) {
+      const { el } = await mount(OK, opts);
+      const grid = row(el, "Trash").querySelector<HTMLElement>(
+        ":scope > .grid",
+      )!;
+      const cells = [...grid.children];
+      expect(cells.length).toBe(7);
+      for (const bp of ["", "sm:", "lg:"]) {
+        const cols = widest(grid, "grid-cols-", bp);
+        const used = cells.reduce((n, c) => n + widest(c, "col-span-", bp), 0);
+        expect(
+          used % cols,
+          `${"pinLabel" in opts ? "kiosk" : "hub"} ${bp || "base"} in ${cols} columns`,
+        ).toBe(0);
+      }
+      await act(async () => root?.unmount());
+      root = null;
+      document.body.innerHTML = "";
+    }
+  });
 });
+
+/**
+ * The value of a Tailwind `prefix-N` class in effect at a breakpoint: the
+ * breakpoint's own, else a smaller one's, else 1.
+ */
+function widest(el: Element, prefix: string, bp: string): number {
+  const order = ["", "sm:", "lg:"];
+  const classes = [...el.classList];
+  for (const b of order.slice(0, order.indexOf(bp) + 1).reverse()) {
+    const hit = classes.find(
+      (c) =>
+        c.startsWith(b + prefix) &&
+        /\d+$/.test(c) &&
+        c.slice(b.length).startsWith(prefix),
+    );
+    if (hit) return Number(hit.slice((b + prefix).length));
+  }
+  return 1;
+}
