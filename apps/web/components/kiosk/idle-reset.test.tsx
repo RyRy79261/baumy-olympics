@@ -75,3 +75,40 @@ describe("IdleReset", () => {
     expect(clearPickAction).toHaveBeenCalledOnce();
   });
 });
+
+describe("closeOpenDialogs", () => {
+  it("closes even a sheet that is waiting on an answer (#174)", async () => {
+    // jsdom has <dialog> without the modal methods: these act as a browser.
+    HTMLDialogElement.prototype.showModal ??= function (
+      this: HTMLDialogElement,
+    ) {
+      this.setAttribute("open", "");
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.removeAttribute("open");
+      this.dispatchEvent(new Event("close"));
+    };
+    const { Dialog } = await import("@baumy/ui");
+    const { closeOpenDialogs } = await import("./idle-reset");
+    const onClose = vi.fn();
+    const el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    act(() =>
+      root!.render(
+        <Dialog open busy onClose={onClose} title="Log Bins">
+          <p>Sending</p>
+        </Dialog>,
+      ),
+    );
+    const sheet = el.querySelector("dialog")!;
+    expect(sheet.open).toBe(true);
+    // The browser closing it is undone while it waits …
+    act(() => sheet.close());
+    expect(sheet.open).toBe(true);
+    // … but the kiosk taking the screen closes it, and the page hears so.
+    act(() => closeOpenDialogs(document));
+    expect(sheet.open).toBe(false);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
