@@ -38,7 +38,8 @@ import {
 // - `chore`: a completion logged (`completions`), with its status at `now`;
 // - `dispute`: a dispute raised (`disputes`), with how it ended, if it has;
 // - `bounty`: a bounty added or edited (the `audit_events` rows of
-//   `create_bounty`, `update_bounty` and `manage_chore`'s create and update);
+//   `create_bounty`, `update_bounty` and `manage_chore`'s create and update,
+//   and each bounty a mass edit (`update_bounties`, issue #175) changed);
 // - `points`: a points change scheduled, applied or vetoed
 //   (`weight_suggestions`).
 //
@@ -140,6 +141,8 @@ export type ActivityEntry =
 
 /** The audit rows that add or edit a bounty. */
 const BOUNTY_ACTIONS = ["create_bounty", "update_bounty"];
+/** The mass edit's one audit row (issue #175): its `edited` ids. */
+const MASS_EDIT = "update_bounties";
 
 /** A stable order for entries at the same moment. */
 function entryKey(e: ActivityEntry): string {
@@ -149,7 +152,7 @@ function entryKey(e: ActivityEntry): string {
     case "dispute":
       return `d:${e.disputeId}`;
     case "bounty":
-      return `b:${String(e.auditId).padStart(12, "0")}`;
+      return `b:${String(e.auditId).padStart(12, "0")}:${e.choreId}`;
     case "points":
       return `p:${e.suggestionId}:${e.event}`;
   }
@@ -224,14 +227,18 @@ export async function listActivity(
         choreName: chores.name,
       })
       .from(auditEvents)
-      // The household is the chore's: audit rows carry no household.
-      .innerJoin(chores, sql`${chores.id}::text = ${auditEvents.entityId}`)
+      // The household is the chore's: audit rows carry no household. A
+      // mass edit is one row naming each bounty it changed in `edited`.
+      .innerJoin(
+        chores,
+        sql`(${chores.id}::text = ${auditEvents.entityId} or (${auditEvents.action} = ${MASS_EDIT} and ${auditEvents.payload}->'edited' @> to_jsonb(${chores.id}::text)))`,
+      )
       .where(
         and(
           eq(auditEvents.entity, "chore"),
           eq(chores.householdId, householdId),
           or(
-            inArray(auditEvents.action, BOUNTY_ACTIONS),
+            inArray(auditEvents.action, [...BOUNTY_ACTIONS, MASS_EDIT]),
             and(
               eq(auditEvents.action, "manage_chore"),
               sql`${auditEvents.payload}->>'op' in ('create', 'update')`,

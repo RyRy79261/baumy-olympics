@@ -58,6 +58,7 @@ export const ACTION_NAMES = [
   "manage_chore",
   "create_bounty",
   "update_bounty",
+  "update_bounties",
   "get_activity",
   "dispute_completion",
   "undo_completion",

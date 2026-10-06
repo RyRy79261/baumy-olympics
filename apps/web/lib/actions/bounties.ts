@@ -4,6 +4,7 @@ import {
   findChoreWithWeight,
   lockChoreRow,
   updateChore,
+  type ChoreRow,
 } from "@baumy/db/chores";
 import {
   BasePoints,
@@ -14,9 +15,9 @@ import {
   ProofMode,
   cooldownMinutesFromHours,
 } from "@baumy/types";
-import { defineAction } from "./define";
+import { defineAction, type ActionCtx } from "./define";
 import { createChoreBy, nameTaken, type ManageChoreData } from "./manage-chore";
-import { fail } from "./result";
+import { fail, type ActionFailure } from "./result";
 
 // Baumy's bounty writes (issue #107, SPEC §12 decision 10 as amended
 // 2026-09-29): add a bounty or edit one, from the AI command (a proposal an
@@ -125,6 +126,70 @@ const updateInput = z
     error: "Say what to change about the bounty.",
   });
 
+/** What an edit to a bounty may change; a field left out is kept. */
+export interface BountyEdit {
+  name?: string;
+  kind?: ChoreKind;
+  points?: number;
+  cooldownHours?: number;
+  proofMode?: ProofMode;
+  effortFactorPct?: number;
+}
+
+/**
+ * Apply an edit to a chore row the caller has locked (FOR UPDATE): its
+ * settings, and a new weight from now when the points or the cooldown are
+ * given (half a weight keeps the other half as it is now). The caller checks
+ * that it is not archived and that its new name is free. Shared by
+ * update_bounty and update_bounties (issue #175).
+ */
+export async function applyBountyEdit(
+  ctx: ActionCtx,
+  chore: ChoreRow,
+  edit: BountyEdit,
+): Promise<
+  { ok: true; chore: ChoreRow; weightChanged: boolean } | ActionFailure
+> {
+  let weight: { basePoints: number; cooldownMinutes: number } | undefined;
+  if (edit.points !== undefined || edit.cooldownHours !== undefined) {
+    const current = await findChoreWithWeight(ctx.db, {
+      householdId: ctx.householdId,
+      choreId: chore.id,
+      now: ctx.now,
+    });
+    const was = current?.weight;
+    const basePoints = edit.points ?? was?.basePoints;
+    const cooldownMinutes =
+      edit.cooldownHours !== undefined
+        ? cooldownMinutesFromHours(edit.cooldownHours)
+        : was?.cooldownMinutes;
+    if (basePoints === undefined || cooldownMinutes === undefined) {
+      return fail(
+        "NO_RULE_VERSION",
+        `${chore.name} has no points yet. Give both its points and its cooldown.`,
+      );
+    }
+    weight = { basePoints, cooldownMinutes };
+  }
+
+  const r = await updateChore(ctx.db, {
+    householdId: ctx.householdId,
+    chore,
+    settings: {
+      ...(edit.name !== undefined ? { name: edit.name } : {}),
+      ...(edit.kind !== undefined ? { kind: edit.kind } : {}),
+      ...(edit.proofMode !== undefined ? { proofMode: edit.proofMode } : {}),
+      ...(edit.effortFactorPct !== undefined
+        ? { effortFactorPct: edit.effortFactorPct }
+        : {}),
+    },
+    ...(weight ? { weight } : {}),
+    createdBy: ctx.actor.memberId!,
+    now: ctx.now,
+  });
+  return { ok: true, chore: r.chore, weightChanged: r.weightChanged };
+}
+
 const NOT_FOUND = fail("NOT_FOUND", "That bounty was not found.");
 const archived = (name: string) =>
   fail(
@@ -178,44 +243,8 @@ export const updateBounty = defineAction({
       return nameTaken(i.name);
     }
 
-    // Half a weight keeps the other half as it is now.
-    let weight: { basePoints: number; cooldownMinutes: number } | undefined;
-    if (i.points !== undefined || i.cooldownHours !== undefined) {
-      const current = await findChoreWithWeight(ctx.db, {
-        householdId: ctx.householdId,
-        choreId: chore.id,
-        now: ctx.now,
-      });
-      const was = current?.weight;
-      const basePoints = i.points ?? was?.basePoints;
-      const cooldownMinutes =
-        i.cooldownHours !== undefined
-          ? cooldownMinutesFromHours(i.cooldownHours)
-          : was?.cooldownMinutes;
-      if (basePoints === undefined || cooldownMinutes === undefined) {
-        return fail(
-          "NO_RULE_VERSION",
-          `${chore.name} has no points yet. Give both its points and its cooldown.`,
-        );
-      }
-      weight = { basePoints, cooldownMinutes };
-    }
-
-    const r = await updateChore(ctx.db, {
-      householdId: ctx.householdId,
-      chore,
-      settings: {
-        ...(i.name !== undefined ? { name: i.name } : {}),
-        ...(i.kind !== undefined ? { kind: i.kind } : {}),
-        ...(i.proofMode !== undefined ? { proofMode: i.proofMode } : {}),
-        ...(i.effortFactorPct !== undefined
-          ? { effortFactorPct: i.effortFactorPct }
-          : {}),
-      },
-      ...(weight ? { weight } : {}),
-      createdBy: ctx.actor.memberId!,
-      now: ctx.now,
-    });
+    const r = await applyBountyEdit(ctx, chore, i);
+    if (!r.ok) return r;
     const data: ManageChoreData = {
       choreId: r.chore.id,
       name: r.chore.name,
