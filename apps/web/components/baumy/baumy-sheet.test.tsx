@@ -37,6 +37,8 @@ beforeAll(() => {
   };
   HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
     this.removeAttribute("open");
+    // As a browser does: the dialog says it closed.
+    this.dispatchEvent(new Event("close"));
   };
 });
 

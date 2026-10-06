@@ -21,6 +21,8 @@ beforeAll(() => {
   };
   HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
     this.open = false;
+    // As a browser does: the dialog says it closed.
+    this.dispatchEvent(new Event("close"));
   };
 });
 
@@ -155,7 +157,10 @@ describe("AttestedForm", () => {
     const close = el.querySelector<HTMLButtonElement>(
       "dialog[open] button[aria-label=\"Close\"]",
     )!;
+    expect(close).not.toBeNull();
     await act(async () => close.click());
+    // The corner's Close puts the notice away and keeps what was typed.
+    expect(el.querySelector("dialog[open]")).toBeNull();
     expect(el.querySelector("textarea")!.value).toBe("Still dirty");
   });
 
