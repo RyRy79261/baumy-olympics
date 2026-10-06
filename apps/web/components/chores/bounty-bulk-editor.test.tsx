@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { BASE_POINTS_MAX } from "@baumy/types";
 import type { ActionResult } from "@/lib/actions/result";
 import type { UpdateBountiesData } from "@/lib/actions/update-bounties";
-import { CHANGES_FIELD } from "@/lib/chores/bulk-edit";
+import { CHANGES_FIELD, EFFORT_STOPS } from "@/lib/chores/bulk-edit";
 import { BountyBulkEditor, type BulkEditorBounty } from "./bounty-bulk-editor";
 
 // The mass bounty editor (issue #175): one row per bounty, changed rows
@@ -384,6 +384,81 @@ describe("BountyBulkEditor", () => {
     ]);
   });
 
+  it("steps the points one at a time with − and +, held to their limits (§12 decision 33)", async () => {
+    const action = vi.fn(async (_p: Result | null, _f: FormData) => OK);
+    const { el } = await mountWith(action, {}, [...BOUNTIES, SHELF]);
+    const less = (name: string) =>
+      el.querySelector<HTMLButtonElement>(
+        `button[aria-label="One point less for ${name}"]`,
+      )!;
+    const more = (name: string) =>
+      el.querySelector<HTMLButtonElement>(
+        `button[aria-label="One point more for ${name}"]`,
+      )!;
+    const points = control<HTMLInputElement>(el, "Trash", "Points");
+    expect(more("Trash").textContent).toBe("+");
+    expect(less("Trash").textContent).toBe("−");
+    await act(async () => more("Trash").click());
+    expect(said(points)).toBe("21 pts");
+    expect(row(el, "Trash").dataset.changed).toBe("true");
+    await act(async () => less("Trash").click());
+    await act(async () => less("Trash").click());
+    expect(said(points)).toBe("19 pts");
+    // Points only: effort and cooldown have no − or +.
+    expect(row(el, "Trash").querySelectorAll("button")).toHaveLength(2);
+    // At the top, + is off.
+    await press(points, "End");
+    expect(said(points)).toBe(`${BASE_POINTS_MAX} pts`);
+    expect(more("Trash").disabled).toBe(true);
+    expect(less("Trash").disabled).toBe(false);
+    // From Not set, either gives the least; at the bottom, − is off.
+    expect(more("Shelf").disabled).toBe(false);
+    expect(less("Shelf").disabled).toBe(false);
+    await act(async () => less("Shelf").click());
+    const shelf = control<HTMLInputElement>(el, "Shelf", "Points");
+    expect(said(shelf)).toBe("1 pt");
+    expect(less("Shelf").disabled).toBe(true);
+    await act(async () => more("Shelf").click());
+    expect(said(shelf)).toBe("2 pts");
+    await slideTo(
+      control<HTMLInputElement>(el, "Shelf", "Cooldown (h)"),
+      "0 h",
+    );
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(sentChanges(action)).toEqual([
+      { choreId: BOUNTIES[0]!.id, points: BASE_POINTS_MAX },
+      { choreId: SHELF.id, points: 2, cooldownHours: 0 },
+    ]);
+  });
+
+  it("on the kitchen screen, − and + are touch-sized", async () => {
+    const { el } = await mount(OK, { pinLabel: "Ryan's PIN" });
+    for (const name of [
+      "One point less for Trash",
+      "One point more for Trash",
+    ]) {
+      expect(
+        el.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!
+          .className,
+      ).toContain("min-h-14");
+    }
+  });
+
+  it("forgets a slider moved back to the bounty's own value, so a refresh shows another admin's edit", async () => {
+    const action = vi.fn(async (_p: Result | null, _f: FormData) => OK);
+    const { el, rerender } = await mountWith(action, {}, [SHELF]);
+    const effort = control<HTMLInputElement>(el, "Shelf", "Effort (%)");
+    await press(effort, "ArrowRight");
+    await press(effort, "ArrowLeft");
+    expect(said(effort)).toBe("123%");
+    // Another admin sets the effort to 100%; the page refreshes.
+    await rerender([{ ...SHELF, effortFactorPct: 100 }]);
+    expect(said(effort)).toBe("100%");
+    // The thumb stands where the text says.
+    expect(effort.value).toBe(String(EFFORT_STOPS.indexOf(100)));
+    expect(row(el, "Shelf").dataset.changed).toBeUndefined();
+  });
+
   it("names each slider for its bounty", async () => {
     const { el } = await mount(OK);
     expect(
@@ -582,6 +657,19 @@ describe("BountyBulkEditor", () => {
           used % cols,
           `${"pinLabel" in opts ? "kiosk" : "hub"} ${bp || "base"} in ${cols} columns`,
         ).toBe(0);
+        // The points (with − and +) and the cooldown (with "720 h · 30
+        // days" beside its track) get at least half a row each.
+        for (const label of ["Points", "Cooldown (h)"]) {
+          const cell = cells.find((c) =>
+            [...c.querySelectorAll("label")].some(
+              (l) => l.textContent === label,
+            ),
+          )!;
+          expect(
+            widest(cell, "col-span-", bp) / cols,
+            `${label} at ${bp || "base"}`,
+          ).toBeGreaterThanOrEqual(0.5);
+        }
       }
       await act(async () => root?.unmount());
       root = null;
