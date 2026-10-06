@@ -154,7 +154,11 @@ describe("KioskModal", () => {
     // A tap inside the panel does not close it.
     await act(async () => out.querySelector("h2")!.click());
     expect(onClose).not.toHaveBeenCalled();
-    await act(async () => dialog.click());
+    // A tap is a press and a click both on the margin (issue #174).
+    await act(async () => {
+      dialog.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+      dialog.click();
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
     // Closed from outside (a reminder coming up closes every open dialog):
     // it reports the close, so the page's state follows and it stays shut.

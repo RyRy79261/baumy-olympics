@@ -220,7 +220,7 @@ export function BaumySheet({
     const said = text.trim();
     if (!said || asking || transcribing) return;
     setHeard(null);
-    if (await send(said)) setText("");
+    if (await send(said, sheetCurrent())) setText("");
   }
 
   function micUnavailable(message: string) {
@@ -231,10 +231,12 @@ export function BaumySheet({
   }
 
   async function heardClip(clip: Blob, mime: string) {
+    const current = sheetCurrent();
     feel({ type: "record_stop" });
     setTranscribing(true);
     const result = await transcribeClip(clip, mime, surface);
     setTranscribing(false);
+    if (!current()) return;
     if (!result.ok) {
       setReply({ text: result.message, error: true });
       feel({ type: "error" });
@@ -243,7 +245,7 @@ export function BaumySheet({
       return;
     }
     setHeard(result.data.text);
-    await send(result.data.text);
+    await send(result.data.text, current);
   }
 
   /** Approve one row: null when it saved, else the failure's code. */
@@ -360,7 +362,21 @@ export function BaumySheet({
     earned.current = 0;
   }
 
+  // Which opening of the sheet an answer in flight belongs to: closing it
+  // (its ×, Cancel, the kiosk going home) moves on, so a late answer never
+  // brings back the last person's cards (issue #174).
+  const sheetGeneration = useRef(0);
+  const sheetCurrent = () => {
+    const mine = sheetGeneration.current;
+    return () => sheetGeneration.current === mine;
+  };
+
   function close() {
+    sheetGeneration.current += 1;
+    // A question or a clip still on its way belongs to this opening: the
+    // next one starts ready, not "thinking" (#174).
+    setAsking(false);
+    setTranscribing(false);
     // A recording in progress is dropped when the recorder unmounts.
     feel({ type: "record_cancel" });
     setMicHint(null);
@@ -815,7 +831,9 @@ export function BaumySheet({
           className={docked ? "max-[89rem]:hidden" : undefined}
         />
       )}
-      <Dialog open={open} onClose={close} title="Ask Baumy">
+      {/* Its ×, Escape and a tap outside are its Cancel: any card still
+          open is dropped, so the next person never confirms it (#174). */}
+      <Dialog open={open} onClose={sheetCancel} busy={bulk} title="Ask Baumy">
         <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">
           {pop ? <ScorePop key={pop.key} points={pop.points} /> : null}
           {who ? (
@@ -906,11 +924,7 @@ export function BaumySheet({
               onDrop={drop}
               onEdit={edit}
             />
-          ) : (
-            <Button variant="secondary" size={size} onClick={close}>
-              Close
-            </Button>
-          )}
+          ) : null}
         </div>
       </Dialog>
     </>

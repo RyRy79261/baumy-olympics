@@ -21,6 +21,8 @@ beforeAll(() => {
   };
   HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
     this.open = false;
+    // As a browser does: the dialog says it closed.
+    this.dispatchEvent(new Event("close"));
   };
 });
 
@@ -73,6 +75,76 @@ describe("AttestedForm", () => {
     expect(action).toHaveBeenCalledTimes(1);
     expect(pad(el)).not.toBeNull();
     expect(el.querySelector('[data-testid="no-pin-notice"]')).toBeNull();
+  });
+
+  it("holds the PIN dialog open while the PIN is being checked (#174)", async () => {
+    let answer!: (r: ActionResult<unknown>) => void;
+    const action = vi
+      .fn<() => Promise<ActionResult<unknown>>>()
+      .mockResolvedValueOnce(NEEDS_PIN)
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            answer = r;
+          }),
+      );
+    const el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    await act(async () =>
+      root!.render(
+        <ActingPinProvider value={{ name: "Felix", hasPin: true }}>
+          <AttestedForm
+            action={action}
+            label="Confirm"
+            pinLabel="Felix's PIN"
+          />
+        </ActingPinProvider>,
+      ),
+    );
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    const dialog = el.querySelector<HTMLDialogElement>("dialog")!;
+    expect(dialog.open).toBe(true);
+    expect(pad(el)).not.toBeNull();
+    const close = dialog.querySelector<HTMLButtonElement>(
+      ':scope > div > button[aria-label="Close"]',
+    )!;
+    expect(close.disabled).toBe(false);
+    // OK sends the same form again, with the PIN; it is being checked.
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(action).toHaveBeenCalledTimes(2);
+    let answered = false;
+    try {
+      expect(close.disabled).toBe(true);
+      await act(async () => {
+        dialog.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(dialog.open).toBe(true);
+      // The pad's own Cancel waits too: a tap on it while checking does
+      // nothing, so a wrong PIN's answer still finds the pad.
+      const cancel = [...dialog.querySelectorAll("button")].find(
+        (b) => b.textContent === "Cancel",
+      )!;
+      expect(cancel).toBeDefined();
+      expect(cancel.disabled).toBe(true);
+      await act(async () => cancel.click());
+      expect(dialog.open).toBe(true);
+      await act(async () =>
+        answer({
+          ok: false,
+          code: "ATTESTATION_FAILED",
+          message: "That PIN is not right.",
+        }),
+      );
+      answered = true;
+      expect(dialog.open).toBe(true);
+      expect(dialog.textContent).toContain("That PIN is not right.");
+      expect(close.disabled).toBe(false);
+    } finally {
+      // Never leave the request hanging for the tests after this one.
+      if (!answered) await act(async () => answer({ ok: true, data: null }));
+    }
   });
 
   it("shows who has no PIN, what it is for and the QR code, never the PinPad", async () => {
@@ -152,11 +224,44 @@ describe("AttestedForm", () => {
     await act(async () => el.querySelector("form")!.requestSubmit());
     expect(el.querySelector('[data-testid="no-pin-notice"]')).not.toBeNull();
     expect(el.querySelector("textarea")!.value).toBe("Still dirty");
-    const close = [...el.querySelectorAll("button")].find(
-      (b) => b.textContent === "Close",
+    const close = el.querySelector<HTMLButtonElement>(
+      'dialog[open] button[aria-label="Close"]',
     )!;
+    expect(close).not.toBeNull();
     await act(async () => close.click());
+    // The corner's Close puts the notice away and keeps what was typed.
+    expect(el.querySelector("dialog[open]")).toBeNull();
     expect(el.querySelector("textarea")!.value).toBe("Still dirty");
+  });
+
+  it("says when its request is on its way and when the answer is in (#174)", async () => {
+    let answer!: (r: ActionResult<unknown>) => void;
+    const action = vi.fn(
+      () =>
+        new Promise<ActionResult<unknown>>((r) => {
+          answer = r;
+        }),
+    );
+    const onPending = vi.fn();
+    const el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    await act(async () =>
+      root!.render(
+        <AttestedForm
+          action={action}
+          label="Log it"
+          pinLabel="Felix's PIN"
+          onResult={() => {}}
+          onPending={onPending}
+        />,
+      ),
+    );
+    expect(onPending).toHaveBeenLastCalledWith(false);
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(onPending).toHaveBeenLastCalledWith(true);
+    await act(async () => answer({ ok: true, data: null }));
+    expect(onPending).toHaveBeenLastCalledWith(false);
   });
 
   it("asks nothing for an action that needs no PIN", async () => {

@@ -37,6 +37,8 @@ beforeAll(() => {
   };
   HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
     this.removeAttribute("open");
+    // As a browser does: the dialog says it closed.
+    this.dispatchEvent(new Event("close"));
   };
 });
 
@@ -235,8 +237,8 @@ describe("BaumySheet voice", () => {
     const started = vi.spyOn(FakeRecorder.prototype, "start");
     mount(true);
     await act(async () => mic()!.click());
-    const close = [...document.querySelectorAll("button")].find(
-      (b) => b.textContent === "Close",
+    const close = document.querySelector<HTMLButtonElement>(
+      'dialog[aria-label="Ask Baumy"] button[aria-label="Close"]',
     )!;
     await act(async () => close.click());
     await act(async () => grant({ getTracks: () => [{ stop }] }));
@@ -1419,6 +1421,137 @@ describe("BaumySheet editing a card", () => {
       amount,
     );
     await act(async () => buttonNamed("Check it")!.click());
+  }
+
+  it("opens ready again, not thinking, when closed mid-question (#174)", async () => {
+    let answer: () => void = () => undefined;
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = () =>
+            resolve(
+              json({ ok: true, data: { reply: "Late.", proposals: [] } }),
+            );
+        }),
+    );
+    mount(false);
+    await typeAndSend("who is winning");
+    const says = () =>
+      document.querySelector('[data-testid="baumy-says"]')!.textContent ?? "";
+    expect(says()).toContain("Hmm, let me think");
+    const sheet = document.querySelector<HTMLDialogElement>(
+      'dialog[aria-label="Ask Baumy"]',
+    )!;
+    try {
+      await act(async () =>
+        sheet
+          .querySelector<HTMLButtonElement>(
+            ':scope > div > button[aria-label="Close"]',
+          )!
+          .click(),
+      );
+      await act(async () =>
+        document
+          .querySelector<HTMLButtonElement>('button[aria-label="Ask Baumy"]')!
+          .click(),
+      );
+      expect(sheet.open).toBe(true);
+      expect(says()).not.toContain("Hmm, let me think");
+      expect(
+        document.querySelector<HTMLInputElement>("#baumy-text")!.disabled,
+      ).toBe(false);
+    } finally {
+      await act(async () => answer());
+      await settle();
+    }
+    expect(says()).not.toContain("Late.");
+  });
+
+  it("drops an answer that comes back after the sheet was closed (#174)", async () => {
+    let answer: () => void = () => undefined;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/actions/run") return json({ ok: true, data: {} });
+      return new Promise<Response>((resolve) => {
+        answer = () =>
+          resolve(
+            json({
+              ok: true,
+              data: {
+                reply: "Pot it is.",
+                proposals: [pot("p1", "20")],
+                choices: { members: [], chores: [] },
+              },
+            }),
+          );
+      });
+    });
+    mount(false);
+    await typeAndSend("put 20 in the pot");
+    const sheet = document.querySelector<HTMLDialogElement>(
+      'dialog[aria-label="Ask Baumy"]',
+    )!;
+    expect(sheet.open).toBe(true);
+    await act(async () =>
+      sheet
+        .querySelector<HTMLButtonElement>(
+          ':scope > div > button[aria-label="Close"]',
+        )!
+        .click(),
+    );
+    expect(sheet.open).toBe(false);
+    await act(async () => answer());
+    await settle();
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('button[aria-label="Ask Baumy"]')!
+        .click(),
+    );
+    expect(sheet.open).toBe(true);
+    expect(document.body.textContent).not.toContain("Pot it is.");
+    expect(buttonNamed("Confirm all")).toBeUndefined();
+    expect(runs()).toEqual([]);
+  });
+
+  // Issue #174: the sheet's ×, Escape and a tap outside are its Cancel, so
+  // the next person to open it never sees, or confirms, someone's card.
+  for (const way of ["×", "Escape"] as const) {
+    it(`drops the open cards when closed by ${way}`, async () => {
+      answering();
+      mount(false);
+      await typeAndSend("put 20 in the pot");
+      expect(confirmAll().disabled).toBe(false);
+      const sheet = document.querySelector<HTMLDialogElement>(
+        'dialog[aria-label="Ask Baumy"]',
+      )!;
+      // Something was typed in it, so a tap outside does nothing (owner
+      // ruling 2026-10-06): the cards stay, for its Cancel or ×.
+      await act(async () => {
+        sheet.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+        sheet.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(sheet.open).toBe(true);
+      if (way === "×") {
+        const close = sheet.querySelector<HTMLButtonElement>(
+          ':scope > div > button[aria-label="Close"]',
+        )!;
+        await act(async () => close.click());
+      } else {
+        // What a browser does on Escape: `cancel`, then the dialog closes.
+        await act(async () => {
+          sheet.dispatchEvent(new Event("cancel", { cancelable: true }));
+          sheet.close();
+        });
+      }
+      expect(sheet.open).toBe(false);
+      await act(async () =>
+        document
+          .querySelector<HTMLButtonElement>('button[aria-label="Ask Baumy"]')!
+          .click(),
+      );
+      expect(sheet.open).toBe(true);
+      expect(confirmAll().disabled).toBe(true);
+      expect(runs()).toEqual([]);
+    });
   }
 
   it("holds Confirm all while a card's edit is open", async () => {

@@ -24,6 +24,7 @@ import {
   useReporting,
   type FormAction,
 } from "@/components/use-action-form";
+import { useReportPending } from "@/components/use-report-pending";
 import type { CalendarWriteData } from "@/lib/actions/calendar";
 import { FOR_EVERYONE, type CalendarEventView } from "@/lib/calendar/view";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
@@ -51,6 +52,7 @@ export function EventForm({
   action,
   onDone,
   onCancel,
+  onPending,
 }: {
   /** The event to change, or null to add one. */
   event: CalendarEventView | null;
@@ -64,11 +66,14 @@ export function EventForm({
   action: FormAction<CalendarWriteData>;
   onDone: (data: CalendarWriteData) => void;
   onCancel: () => void;
+  /** Told while a save is on its way (the sheet stays open, #174). */
+  onPending?: (pending: boolean) => void;
 }) {
   const e = event;
   const { state, formAction, pending, requestId, errors } = useActionForm(
     useReporting(action, onDone),
   );
+  useReportPending(pending, onPending);
   const [attempt, setAttempt] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const [title, setTitle] = useState(e?.title ?? "");
@@ -254,13 +259,19 @@ export function EventForm({
         <Button type="submit" size={size} disabled={pending}>
           {pending ? "Saving..." : e ? "Save" : "Add event"}
         </Button>
-        <Button variant="secondary" size={size} onClick={onCancel}>
+        <Button
+          variant="secondary"
+          size={size}
+          disabled={pending}
+          onClick={onCancel}
+        >
           Cancel
         </Button>
       </div>
       <Dialog
         open={pinOpen}
         onClose={() => setDismissed(true)}
+        busy={pending}
         title={pinLabel}
       >
         <div className="flex flex-col gap-4">

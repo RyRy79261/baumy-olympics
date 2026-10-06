@@ -9,6 +9,7 @@ import {
   type ButtonVariant,
 } from "@baumy/ui";
 import { useActionForm, type FormAction } from "@/components/use-action-form";
+import { useReportPending } from "@/components/use-report-pending";
 import type { ActionResult } from "@/lib/actions/result";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
 import { useActingPin } from "./acting-pin";
@@ -38,6 +39,7 @@ export function AttestedForm<T>({
   fields,
   success,
   onResult,
+  onPending,
   disabled = false,
   variant = "primary",
   bar,
@@ -53,6 +55,11 @@ export function AttestedForm<T>({
   success?: (data: T) => ReactNode;
   /** Called once per answer that does not ask for a PIN. */
   onResult?: (result: ActionResult<T>) => void;
+  /**
+   * Told when a request starts and when its answer is in, so a sheet
+   * around the form stays open until then (issue #174).
+   */
+  onPending?: (pending: boolean) => void;
   disabled?: boolean;
   /** The start button's look; primary unless given. */
   variant?: ButtonVariant;
@@ -81,6 +88,8 @@ export function AttestedForm<T>({
     // Once per answer: `state` is a new object for every submission, while
     // `onResult` may be a new function on every render.
   }, [state]);
+
+  useReportPending(pending, onPending);
 
   return (
     <form
@@ -124,22 +133,11 @@ export function AttestedForm<T>({
       <Dialog
         open={pinOpen}
         onClose={() => setDismissed(true)}
+        busy={pending}
         title={noPin ? "Personal PIN needed" : pinLabel}
       >
         <div className="flex flex-col gap-4">
-          {noPin ? (
-            <>
-              <NoPinNotice name={acting.name} />
-              <Button
-                type="button"
-                size="kiosk"
-                variant="secondary"
-                onClick={() => setDismissed(true)}
-              >
-                Close
-              </Button>
-            </>
-          ) : null}
+          {noPin ? <NoPinNotice name={acting.name} /> : null}
           {!noPin &&
           failed &&
           !failed.ok &&
