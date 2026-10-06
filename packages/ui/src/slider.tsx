@@ -144,7 +144,7 @@ export function Slider({
         aria-hidden="true"
         data-slider-value=""
         className={cx(
-          "shrink-0 text-right tabular-nums",
+          "shrink-0 tabular-nums",
           kiosk ? "text-xl" : "text-lg",
           value === null ? "text-bm-muted" : "text-bm-text",
         )}
