@@ -70,7 +70,7 @@ const LOGGED: ActionResult<LogCompletionData> = {
     doneBy: "m-1",
     doneByName: "Ryan",
     loggedBy: "m-1",
-    status: "approved",
+    status: "pending",
     occurredAt: "2026-10-06T10:00:00.000Z",
     hasPhoto: false,
     totalPts: 40,
