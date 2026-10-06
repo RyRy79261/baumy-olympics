@@ -1423,6 +1423,48 @@ describe("BaumySheet editing a card", () => {
     await act(async () => buttonNamed("Check it")!.click());
   }
 
+  // Issue #174: the sheet's ×, Escape and a tap outside are its Cancel, so
+  // the next person to open it never sees, or confirms, someone's card.
+  for (const way of ["×", "Escape"] as const) {
+    it(`drops the open cards when closed by ${way}`, async () => {
+      answering();
+      mount(false);
+      await typeAndSend("put 20 in the pot");
+      expect(confirmAll().disabled).toBe(false);
+      const sheet = document.querySelector<HTMLDialogElement>(
+        'dialog[aria-label="Ask Baumy"]',
+      )!;
+      // Something was typed in it, so a tap outside does nothing (owner
+      // ruling 2026-10-06): the cards stay, for its Cancel or ×.
+      await act(async () => {
+        sheet.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+        sheet.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(sheet.open).toBe(true);
+      if (way === "×") {
+        const close = sheet.querySelector<HTMLButtonElement>(
+          ':scope > div > button[aria-label="Close"]',
+        )!;
+        await act(async () => close.click());
+      } else {
+        // What a browser does on Escape: `cancel`, then the dialog closes.
+        await act(async () => {
+          sheet.dispatchEvent(new Event("cancel", { cancelable: true }));
+          sheet.close();
+        });
+      }
+      expect(sheet.open).toBe(false);
+      await act(async () =>
+        document
+          .querySelector<HTMLButtonElement>('button[aria-label="Ask Baumy"]')!
+          .click(),
+      );
+      expect(sheet.open).toBe(true);
+      expect(confirmAll().disabled).toBe(true);
+      expect(runs()).toEqual([]);
+    });
+  }
+
   it("holds Confirm all while a card's edit is open", async () => {
     answering();
     mount(false);
