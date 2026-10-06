@@ -90,12 +90,9 @@ export function useModalDialog({
     onClose: (e: SyntheticEvent<HTMLDialogElement>) => {
       // The caller shut it (`open` went false): it already knows.
       if (!own(e) || !wanted.current) return;
-      // A browser may close it anyway after a second Escape: while busy and
-      // still wanted, it comes straight back.
-      if (busyNow.current && wanted.current) {
-        e.currentTarget.showModal();
-        return;
-      }
+      // Closed from outside (the kiosk going home, a reminder coming up
+      // closes every open dialog): reported even while busy, so the page's
+      // state follows; that takeover wins over waiting for an answer.
       onClose();
     },
     onCancel: (e: SyntheticEvent<HTMLDialogElement>) => {
