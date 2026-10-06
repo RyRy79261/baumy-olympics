@@ -238,6 +238,9 @@ describe("BountyBulkEditor", () => {
     await editTwo(el);
     expect(row(el, "Trash").dataset.changed).toBe("true");
     expect(row(el, "Trash").textContent).toContain("Changed");
+    // Framed in soft violet, not loud amber (owner, PR #180).
+    expect(row(el, "Trash").className).toContain("--color-bm-violet");
+    expect(row(el, "Trash").className).not.toContain("amber");
     expect(row(el, "Dishes").dataset.changed).toBe("true");
     expect(row(el, "Fridge").dataset.changed).toBe("true");
     expect(el.textContent).toContain("3 bounties changed, not saved yet.");

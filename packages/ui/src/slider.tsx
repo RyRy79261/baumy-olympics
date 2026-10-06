@@ -10,8 +10,8 @@ import { cx } from "./cx";
 // evenly spaced (a cooldown steps by the hour, then by 6 hours, then by the
 // day). The value it stands at is always written next to it, and read out
 // as `aria-valuetext`. Its look is the `pixel-slider` utility in
-// apps/web/app/globals.css: a sunk track, filled teal up to the value, and a
-// square yellow thumb, 56px on the kiosk.
+// apps/web/app/globals.css: a sunk track, filled violet up to the value, and a
+// square lavender thumb, 56px on the kiosk.
 
 /** The stops from `min` to `max`, `step` apart: (0, 6, 2) is 0, 2, 4, 6. */
 export function stepStops(min: number, max: number, step: number): number[] {

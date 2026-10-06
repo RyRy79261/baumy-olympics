@@ -44,7 +44,7 @@ import { toast } from "@/lib/ui/toast";
 // Mass editing of bounties (issue #175, SPEC §12 decision 31): one editable
 // row per bounty, change as many as you like, then one Save that sends them
 // all to `update_bounties`, which saves all of them or none. Changed rows are
-// framed in amber and say "Changed". The admin page sends it with its
+// framed in violet and say "Changed". The admin page sends it with its
 // session; the kitchen screen (`pinLabel`) wraps it in AttestedForm, so the
 // picked admin's PIN goes with the one save.
 
@@ -462,7 +462,7 @@ function BulkRow({
         // bar (with its status and any error), never resting under it.
         kiosk && "[&_input]:scroll-mb-60 [&_select]:scroll-mb-60",
         changed
-          ? "bg-bm-amber/10 [--pf:var(--color-bm-amber)]"
+          ? "bg-bm-violet/10 [--pf:var(--color-bm-violet)]"
           : "bg-bm-ink/40",
       )}
     >
@@ -475,7 +475,7 @@ function BulkRow({
           <span className="text-sm text-bm-muted">Archived</span>
         ) : null}
         {changed ? (
-          <span className="ml-auto font-label text-sm font-bold tracking-wide text-bm-amber uppercase">
+          <span className="ml-auto font-label text-sm font-bold tracking-wide text-bm-violet uppercase">
             Changed
           </span>
         ) : null}
