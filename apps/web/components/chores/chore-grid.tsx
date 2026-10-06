@@ -115,6 +115,8 @@ export function ChoreGrid({
   const router = useRouter();
   const photo = useRef<Blob | null>(null);
   const [hasPhoto, setHasPhoto] = useState(false);
+  // "Log it" is on its way: the sheet stays open for the answer (#174).
+  const [sending, setSending] = useState(false);
   // One form action for the sheet: the upload route when a photo is picked,
   // else the page's server action. Read through refs, so it never goes stale.
   const serverAction = useRef(action);
@@ -289,6 +291,7 @@ export function ChoreGrid({
       <Dialog
         open={open !== null}
         onClose={() => setOpenId(null)}
+        busy={sending}
         title={open ? `Log ${open.name}` : "Log a chore"}
       >
         {open ? (
@@ -352,11 +355,13 @@ export function ChoreGrid({
                 </>
               }
               onResult={onResult}
+              onPending={setSending}
             />
             {/* A way out that says so, as well as the corner's × (#174). */}
             <Button
               variant="secondary"
               size="kiosk"
+              disabled={sending}
               onClick={() => setOpenId(null)}
             >
               Cancel

@@ -815,7 +815,9 @@ export function BaumySheet({
           className={docked ? "max-[89rem]:hidden" : undefined}
         />
       )}
-      <Dialog open={open} onClose={close} title="Ask Baumy">
+      {/* Its ×, Escape and a tap outside are its Cancel: any card still
+          open is dropped, so the next person never confirms it (#174). */}
+      <Dialog open={open} onClose={sheetCancel} busy={bulk} title="Ask Baumy">
         <div className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto">
           {pop ? <ScorePop key={pop.key} points={pop.points} /> : null}
           {who ? (
