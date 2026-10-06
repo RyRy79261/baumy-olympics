@@ -795,7 +795,7 @@ Every variable goes into both `.env.example` and turbo `globalEnv`.
   - Baumy has 7 states (section 3.6). Each chore has an icon, and each member has an avatar.
   - **Source art:** AI-generated pixel art based on the reference picture `design/baumy-reference.png` (a black fluffy cat with heterochromia, one green eye and one blue-violet eye, a pastel party hat with stars, purple and teal fairy lights and trinkets around the neck, in a cosy cluttered maker den), cleaned up by hand and approved by the owner before it ships.
   - Honour `prefers-reduced-motion`, using camp-404's global kill switch.
-- **Juice:** a "+25" floating score and a streak flame counter. Breaking a streak shows a "STREAK BROKEN" banner with the broken length.
+- **Juice:** a "+25" floating score and a streak flame counter. Breaking a streak shows a "STREAK BROKEN" banner with the broken length. [CORRECTION 2026-10-06, issue #181] On the bounty board (`/chores`, `/kiosk/chores`) the "+25" floats over the row that was logged, which is scrolled into view; it was fixed a third of the way down the screen, over whichever row sat there. If the tab no longer shows that row, it floats over the screen as before. It says the same points as the toast.
 - **Base:** components start from shadcn/ui (Radix) in `packages/ui` with a restyled cva, as in camp-404 `packages/ui/components.json`.
 
 ## 8. Kiosk mode
