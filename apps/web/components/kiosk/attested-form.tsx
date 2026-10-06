@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Button,
   Dialog,
@@ -9,6 +9,7 @@ import {
   type ButtonVariant,
 } from "@baumy/ui";
 import { useActionForm, type FormAction } from "@/components/use-action-form";
+import { useReportPending } from "@/components/use-report-pending";
 import type { ActionResult } from "@/lib/actions/result";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
 import { useActingPin } from "./acting-pin";
@@ -88,13 +89,7 @@ export function AttestedForm<T>({
     // `onResult` may be a new function on every render.
   }, [state]);
 
-  const pendingLatest = useRef(onPending);
-  pendingLatest.current = onPending;
-  useEffect(() => {
-    pendingLatest.current?.(pending);
-  }, [pending]);
-  // Gone mid-request (it cannot be while a sheet waits on it): not sending.
-  useEffect(() => () => pendingLatest.current?.(false), []);
+  useReportPending(pending, onPending);
 
   return (
     <form
@@ -138,6 +133,7 @@ export function AttestedForm<T>({
       <Dialog
         open={pinOpen}
         onClose={() => setDismissed(true)}
+        busy={pending}
         title={noPin ? "Personal PIN needed" : pinLabel}
       >
         <div className="flex flex-col gap-4">

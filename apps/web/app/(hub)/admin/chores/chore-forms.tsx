@@ -22,6 +22,7 @@ import {
   Select,
 } from "@baumy/ui";
 import { useActionForm } from "@/components/use-action-form";
+import { useReportPending } from "@/components/use-report-pending";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import { toast } from "@/lib/ui/toast";
 import { manageChoreAction } from "./actions";
@@ -191,13 +192,17 @@ function CreateChoreBody({
   prefix,
   label,
   onAdded,
+  onPending,
 }: {
   prefix: string;
   label: string;
   onAdded?: () => void;
+  /** Told while the add is on its way (its dialog stays open, #174). */
+  onPending?: (pending: boolean) => void;
 }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(manageChoreAction);
+  useReportPending(pending, onPending);
   const [round, setRound] = useState(0);
   useEffect(() => {
     if (state?.ok) {
@@ -231,15 +236,22 @@ export function CreateChoreForm() {
 /** The Bounties page's "New bounty": the same create form, in a dialog. */
 export function NewBountyButton() {
   const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   return (
     <>
       <Button onClick={() => setOpen(true)}>New bounty</Button>
-      <Dialog open={open} onClose={() => setOpen(false)} title="New bounty">
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        busy={adding}
+        title="New bounty"
+      >
         {open ? (
           <CreateChoreBody
             prefix="new-bounty"
             label="Add bounty"
             onAdded={() => setOpen(false)}
+            onPending={setAdding}
           />
         ) : null}
       </Dialog>
@@ -275,7 +287,7 @@ export function EditChoreDialog({
     // `onClose` is a new function on every render.
   }, [state]);
   return (
-    <Dialog open onClose={onClose} title={`Edit ${chore.name}`}>
+    <Dialog open onClose={onClose} busy={pending} title={`Edit ${chore.name}`}>
       {points}
       {/* No browser validation: a cleared field gets the action's inline
           error (both points and cooldown blank is "Required", issue #115). */}
@@ -314,7 +326,7 @@ export function EditChoreDialog({
           <Button type="submit" disabled={pending}>
             {pending ? "Saving..." : "Save"}
           </Button>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" disabled={pending} onClick={onClose}>
             Cancel
           </Button>
         </div>
