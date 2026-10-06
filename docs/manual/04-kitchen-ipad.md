@@ -22,6 +22,8 @@ The **Messages** number on the iPad counts the notes that not everyone in the ho
 
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
 
+Changed your mind? Anything that opens over the screen closes with the **×** in its corner, or with a tap on the dimmed screen around it. A bounty's **Log** sheet also has **Cancel**, and either way nothing is logged.
+
 After {{KIOSK_IDLE_DEFAULT_MIN}} minutes untouched, the screen forgets who was acting and goes back home by itself; the last few seconds show a countdown, and any touch cancels it. To change how long it waits, tap your avatar, open **Bounties → Kitchen screen settings** and pick {{KIOSK_IDLE_CHOICES_MIN}} minutes; it is saved for this screen.
 
 ## Your personal PIN
