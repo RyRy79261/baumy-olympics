@@ -31,6 +31,10 @@ test("on the kiosk: the idle minutes, and an admin's points and bounty with a PI
   test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
   const tag = Math.random().toString(36).slice(2, 8);
   const chore = `Fridge ${tag}`;
+  // Sorts before the Fridge, so the Fridge is not the list's first option:
+  // a form reset that falls back to the first option changed this one
+  // instead (issue #177).
+  const decoy = `Aardvark ${tag}`;
   const bounty = `Gutters ${tag}`;
   const founder = `Founder ${project}`;
   const partner = `Partner ${tag}`;
@@ -42,6 +46,7 @@ test("on the kiosk: the idle minutes, and an admin's points and bounty with a PI
   await redeem(member.page, invite, partner);
   await expect(member.page).toHaveURL(/\/$/);
   await member.context.close();
+  await addChore(page, { name: decoy, basePoints: 10, cooldownHours: 24 });
   await addChore(page, { name: chore, basePoints: 10, cooldownHours: 24 });
 
   const ipad = await pairedKiosk(browser, page, `iPad ${tag}`);
@@ -82,7 +87,10 @@ test("on the kiosk: the idle minutes, and an admin's points and bounty with a PI
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
   const points = kiosk.getByTestId("kiosk-points-form");
   await expect(points).toBeVisible();
-  await points.getByLabel("Bounty").selectOption({ label: chore });
+  const picker = points.getByLabel("Bounty");
+  await expect(picker.locator("option").first()).not.toHaveText(chore);
+  await expect(picker.locator("option", { hasText: decoy })).toHaveCount(1);
+  await picker.selectOption({ label: chore });
   await points.getByLabel("Points").fill("42");
   await points.getByLabel("Reason (optional)").fill("Takes ages");
   await expectKioskTargets(points);
@@ -90,15 +98,24 @@ test("on the kiosk: the idle minutes, and an admin's points and bounty with a PI
   const pad = kiosk.getByRole("dialog", { name: `${founder}'s PIN` });
   await expect(pad).toBeVisible();
   // The fields are kept for the PIN's second send.
+  await expect(picker.locator("option:checked")).toHaveText(chore);
   await expect(points.getByLabel("Points")).toHaveValue("42");
   await typePin(pad, PIN);
   await expect(pad).toBeHidden();
+  // The toast names the bounty the server changed.
   await expect(
     kiosk.getByRole("status").filter({ hasText: `${chore}: Applies` }),
   ).toBeVisible();
-  // The phone's points history shows it scheduled.
-  await page.goto("/chores");
-  await expect(page.getByTestId(`chore-${chore}`)).toBeVisible();
+  // The phone's Activity shows the change scheduled on the picked bounty,
+  // and none on the list's first one.
+  const scheduledOn = (name: string) =>
+    page.locator(
+      `[data-testid="activity-points-${name}"][data-event="scheduled"]`,
+    );
+  await page.goto("/activity");
+  await expect(scheduledOn(chore)).toContainText("10 → 42 pts");
+  await expect(scheduledOn(chore)).toContainText("Takes ages");
+  await expect(scheduledOn(decoy)).toHaveCount(0);
 
   // A bounty through Baumy: the card needs the admin's PIN.
   const sheet = await openBaumySheet(kiosk);
