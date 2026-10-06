@@ -9,7 +9,7 @@ import {
 } from "@baumy/types";
 import { Field, FormMessage, Input, Select, Textarea } from "@baumy/ui";
 import type { FormAction } from "@/components/use-action-form";
-import type { ActionResult } from "@/lib/actions/result";
+import { fieldErrors, type ActionResult } from "@/lib/actions/result";
 import type { WeightDecisionData } from "@/lib/actions/weights";
 import { toast } from "@/lib/ui/toast";
 import { appliesLabel, hoursField } from "@/lib/weights/view";
@@ -54,8 +54,19 @@ export function KioskPointsForm({
   );
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // The last answer's input issues, per field (the browser's own min/max
+  // check is off: the controls are outside the form). Editing a field
+  // drops its own.
+  const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const clear = (...names: string[]) =>
+    setErrors((all) => {
+      const next = { ...all };
+      for (const n of names) delete next[n];
+      return next;
+    });
 
   const pick = (id: string) => {
+    clear("choreId", "basePoints", "cooldownHours");
     setChoreId(id);
     const b = bounties.find((x) => x.id === id);
     setPoints(String(b?.basePoints ?? ""));
@@ -65,6 +76,7 @@ export function KioskPointsForm({
   const onResult = (result: ActionResult<WeightDecisionData>) => {
     if (result.ok) {
       setError(null);
+      setErrors({});
       setReason("");
       // The bounty the server changed, not what the screen shows.
       const changed = bounties.find((b) => b.id === result.data.choreId);
@@ -73,6 +85,7 @@ export function KioskPointsForm({
       );
     } else {
       setError(result.message);
+      setErrors(fieldErrors(result));
     }
   };
 
@@ -90,7 +103,11 @@ export function KioskPointsForm({
             <input type="hidden" name="basePoints" value={points} />
             <input type="hidden" name="cooldownHours" value={hours} />
             <input type="hidden" name="reason" value={reason} />
-            <Field id="kiosk-points-bounty" label="Bounty">
+            <Field
+              id="kiosk-points-bounty"
+              label="Bounty"
+              errors={errors.choreId}
+            >
               {(control) => (
                 <Select
                   form={DETACHED}
@@ -109,7 +126,11 @@ export function KioskPointsForm({
             </Field>
             <div className="flex flex-wrap gap-3">
               <div className="w-40">
-                <Field id="kiosk-points-points" label="Points">
+                <Field
+                  id="kiosk-points-points"
+                  label="Points"
+                  errors={errors.basePoints}
+                >
                   {(control) => (
                     <Input
                       form={DETACHED}
@@ -120,13 +141,20 @@ export function KioskPointsForm({
                       min={BASE_POINTS_MIN}
                       max={BASE_POINTS_MAX}
                       value={points}
-                      onChange={(e) => setPoints(e.currentTarget.value)}
+                      onChange={(e) => {
+                        clear("basePoints");
+                        setPoints(e.currentTarget.value);
+                      }}
                     />
                   )}
                 </Field>
               </div>
               <div className="w-48">
-                <Field id="kiosk-points-cooldown" label="Cooldown (hours)">
+                <Field
+                  id="kiosk-points-cooldown"
+                  label="Cooldown (hours)"
+                  errors={errors.cooldownHours}
+                >
                   {(control) => (
                     <Input
                       form={DETACHED}
@@ -138,13 +166,20 @@ export function KioskPointsForm({
                       max={COOLDOWN_HOURS_MAX}
                       step="any"
                       value={hours}
-                      onChange={(e) => setHours(e.currentTarget.value)}
+                      onChange={(e) => {
+                        clear("cooldownHours");
+                        setHours(e.currentTarget.value);
+                      }}
                     />
                   )}
                 </Field>
               </div>
             </div>
-            <Field id="kiosk-points-reason" label="Reason (optional)">
+            <Field
+              id="kiosk-points-reason"
+              label="Reason (optional)"
+              errors={errors.reason}
+            >
               {(control) => (
                 <Textarea
                   form={DETACHED}
@@ -153,7 +188,10 @@ export function KioskPointsForm({
                   maxLength={WEIGHT_CHANGE_REASON_MAX}
                   rows={2}
                   value={reason}
-                  onChange={(e) => setReason(e.currentTarget.value)}
+                  onChange={(e) => {
+                    clear("reason");
+                    setReason(e.currentTarget.value);
+                  }}
                 />
               )}
             </Field>

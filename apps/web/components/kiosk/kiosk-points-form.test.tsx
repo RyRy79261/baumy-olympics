@@ -185,6 +185,32 @@ describe("KioskPointsForm", () => {
     expect(toastSuccess.mock.calls[0]![0]).toMatch(/^Gutters: /);
   });
 
+  it("shows an input issue under its field, and clears it when edited", async () => {
+    const message = "Points must be at most 100.";
+    const el = await mount(async () => ({
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "Some of that did not look right.",
+      issues: [
+        { path: ["basePoints"], message },
+        { path: ["cooldownHours"], message: "Too long." },
+      ],
+    }));
+    const points = control<HTMLInputElement>(el, "Points");
+    await set(points, "1000");
+    await act(async () => button(el, "Schedule change").click());
+    const note = el.querySelector(`#${CSS.escape(points.id)}-error`);
+    expect(note?.textContent).toBe(message);
+    expect(points.getAttribute("aria-invalid")).toBe("true");
+    const cooldown = control<HTMLInputElement>(el, "Cooldown (hours)");
+    expect(cooldown.getAttribute("aria-invalid")).toBe("true");
+    // Editing Points clears its note, and only its note.
+    await set(points, "42");
+    expect(el.textContent).toContain("Too long.");
+    expect(el.textContent).not.toContain(message);
+    expect(points.getAttribute("aria-invalid")).toBeNull();
+  });
+
   it("fills the numbers from the picked bounty", async () => {
     const el = await mount(async () => NEEDS_PIN);
     expect(control<HTMLInputElement>(el, "Points").value).toBe("20");
