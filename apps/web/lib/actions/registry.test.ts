@@ -106,7 +106,7 @@ describe("the registry", () => {
     }
   });
 
-  it("keeps admin actions to the ui, except the bounty and pot writes Baumy may propose (issue #107) and the kiosk's (issue #147)", () => {
+  it("keeps admin actions to the ui, except the bounty and pot writes Baumy may propose (issue #107) and the kiosk's (issues #147, #175)", () => {
     const admin = entries.filter(([, d]) => d.requires === "admin");
     expect(admin.map(([n]) => n)).toContain("manage_chore");
     const expected: Record<string, string[]> = {
@@ -116,10 +116,13 @@ describe("the registry", () => {
       add_pot_contribution: ["ui", "ai", "brain"],
       // ...and change a bounty's points.
       schedule_points_change: ["ui", "kiosk"],
+      // ...and edit many bounties at once (issue #175), never via Baumy.
+      update_bounties: ["ui", "kiosk"],
     };
     for (const [name, def] of admin) {
       expect(def.surfaces, name).toEqual(expected[name] ?? ["ui"]);
-      if (name in expected && name !== "schedule_points_change") {
+      const kioskOnly = ["schedule_points_change", "update_bounties"];
+      if (name in expected && !kioskOnly.includes(name)) {
         expect(def.ownWordOnly, name).toBe(true);
         expect(def.risk, name).toBe("confirm");
       }
