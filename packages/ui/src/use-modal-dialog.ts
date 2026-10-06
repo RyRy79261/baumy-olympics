@@ -62,8 +62,7 @@ export function isTypedInput(target: EventTarget | null): boolean {
   // jsdom and older engines lack isContentEditable: read the attribute.
   const editable = target.closest("[contenteditable]");
   return (
-    editable !== null &&
-    editable.getAttribute("contenteditable") !== "false"
+    editable !== null && editable.getAttribute("contenteditable") !== "false"
   );
 }
 

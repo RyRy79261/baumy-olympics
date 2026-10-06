@@ -4,6 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Dialog } from "../dialog";
 import { KioskModal } from "../kiosk-modal";
+import { PinPad } from "../pin-pad";
+import {
+  DIALOG_TYPED_EVENT,
+  forceCloseDialog,
+  isTypedInput,
+} from "../use-modal-dialog";
 
 // jsdom has <dialog> but not showModal/close, so they are stubbed to flip
 // `open` and fire `close` the way a browser does.
@@ -242,11 +248,33 @@ describe("Dialog's ways out (issue #174)", () => {
       expect(onClose).not.toHaveBeenCalled();
     });
 
-    it("still closes, and says so, when the kiosk closes every dialog", async () => {
-      // Going home or a reminder coming up wins over waiting for an answer.
+    it("comes straight back when the browser closes it anyway (a second Escape)", async () => {
       const { dialog, onClose } = await mount({ busy: true });
-      await act(async () => dialog.close());
+      // Chromium's second Escape: a cancel it may not refuse, then close.
+      await act(async () => {
+        dialog.dispatchEvent(new Event("cancel", { cancelable: false }));
+        dialog.close();
+      });
+      expect(dialog.open).toBe(true);
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("still closes, and says so, when the kiosk takes the screen", async () => {
+      // Going home, a reminder or the screensaver wins over waiting.
+      const { dialog, onClose } = await mount({ busy: true });
+      await act(async () => forceCloseDialog(dialog));
       expect(dialog.open).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("forgets a forced close once it is done", async () => {
+      const { dialog, onClose, reopen } = await mount({ busy: true });
+      await act(async () => forceCloseDialog(dialog));
+      await reopen();
+      expect(dialog.open).toBe(true);
+      // The next close the browser forces is not the kiosk's: it comes back.
+      await act(async () => dialog.close());
+      expect(dialog.open).toBe(true);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
@@ -276,10 +304,102 @@ describe("Dialog's ways out (issue #174)", () => {
     expect(innerClose).toHaveBeenCalledTimes(1);
     expect(outer!.open).toBe(true);
     expect(outerClose).not.toHaveBeenCalled();
-    // Typing in the inner one does not count as typing in the outer one.
+  });
+
+  it("typing in a dialog opened inside another leaves the outer one untyped", async () => {
+    const outerClose = vi.fn();
+    await render(
+      <Dialog open onClose={outerClose} title="Log Bins">
+        <p>Bins</p>
+        <Dialog open onClose={() => {}} title="Ryan's PIN">
+          <input aria-label="PIN" />
+          <div data-testid="pad" />
+        </Dialog>
+      </Dialog>,
+    );
+    const [outer, inner] = [...document.querySelectorAll("dialog")];
     await type(inner!.querySelector("input")!);
+    await act(async () =>
+      inner!
+        .querySelector('[data-testid="pad"]')!
+        .dispatchEvent(new Event(DIALOG_TYPED_EVENT, { bubbles: true })),
+    );
+    // The inner one is typed in: a tap outside it keeps it.
+    await tap(inner!);
+    expect(inner!.open).toBe(true);
+    // The outer one is not: a tap outside it closes it.
     await tap(outer!);
+    expect(outer!.open).toBe(false);
     expect(outerClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts typing in a contenteditable as typed text", async () => {
+    const onClose = vi.fn();
+    await render(
+      <Dialog open onClose={onClose} title="Note">
+        <div contentEditable suppressContentEditableWarning aria-label="Body">
+          <span>Hi</span>
+        </div>
+      </Dialog>,
+    );
+    const dialog = document.querySelector("dialog")!;
+    await act(async () =>
+      dialog
+        .querySelector("span")!
+        .dispatchEvent(new Event("input", { bubbles: true })),
+    );
+    await tap(dialog);
+    expect(dialog.open).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("keeps a half-typed PIN: a tap outside does nothing once a digit is in", async () => {
+    const onClose = vi.fn();
+    await render(
+      <Dialog open onClose={onClose} title="Ryan's PIN">
+        <PinPad label="Ryan's PIN" />
+      </Dialog>,
+    );
+    const dialog = document.querySelector("dialog")!;
+    const one = [...dialog.querySelectorAll("button")].find(
+      (b) => b.textContent === "1",
+    )!;
+    expect(one).toBeDefined();
+    await act(async () => one.click());
+    await tap(dialog);
+    expect(dialog.open).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes an untouched PIN dialog on a tap outside", async () => {
+    const onClose = vi.fn();
+    await render(
+      <Dialog open onClose={onClose} title="Ryan's PIN">
+        <PinPad label="Ryan's PIN" />
+      </Dialog>,
+    );
+    const dialog = document.querySelector("dialog")!;
+    await tap(dialog);
+    expect(dialog.open).toBe(false);
+  });
+
+  it("treats only text fields as typing", () => {
+    const field = (type: string) => {
+      const el = document.createElement("input");
+      el.type = type;
+      return el;
+    };
+    expect(isTypedInput(field("text"))).toBe(true);
+    expect(isTypedInput(field("email"))).toBe(true);
+    expect(isTypedInput(document.createElement("textarea"))).toBe(true);
+    expect(isTypedInput(field("radio"))).toBe(false);
+    expect(isTypedInput(field("checkbox"))).toBe(false);
+    expect(isTypedInput(field("file"))).toBe(false);
+    const off = document.createElement("div");
+    off.setAttribute("contenteditable", "false");
+    expect(isTypedInput(off)).toBe(false);
+    expect(isTypedInput(document.createElement("div"))).toBe(false);
+    expect(isTypedInput(null)).toBe(false);
   });
 });
 
