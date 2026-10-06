@@ -102,3 +102,64 @@ test("on the kiosk, break the partner's streak and log for someone else", async 
   await ipad.context.close();
   await member.context.close();
 });
+
+// Issue #181: the floating "+N" sits over the row that was logged, not a
+// third of the way down the screen over whichever row is there, and says
+// the toast's points. The logged bounty is not the first row, and the board
+// is scrolled to the top first, so it starts below the fold.
+test("on the kiosk, the floating score sits on the logged row", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const first = `Aaa first ${suffix}`;
+  const chore = `Take the bins out ${suffix}`;
+  const founder = `Founder ${project}`;
+
+  await founderAdmin(page, project);
+  await addChore(page, { name: first, basePoints: 26, cooldownHours: 0 });
+  await addChore(page, { name: chore, basePoints: 5, cooldownHours: 0 });
+  const ipad = await pairedKiosk(browser, page, `iPad ${suffix}`);
+  const kiosk = ipad.page;
+  await openKioskChores(kiosk);
+  await kiosk.getByRole("button", { name: founder, exact: true }).click();
+  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+
+  const rows = kiosk.getByRole("list", { name: "Bounties" }).locator("li");
+  await expect(rows.first()).toBeVisible();
+  const names = await rows.evaluateAll((lis) =>
+    lis.map((li) => li.getAttribute("data-testid")),
+  );
+  expect(names).toContain(`chore-${first}`);
+  expect(names.indexOf(`chore-${chore}`)).toBeGreaterThan(0);
+
+  const sheet = await openChore(kiosk, chore);
+  await expect(sheet.getByTestId("log-preview")).toContainText("+5, streak 1");
+  // Start from the top of the board, the logged row out of sight.
+  await rows.first().scrollIntoViewIfNeeded();
+  await sheet.getByRole("button", { name: "Log it" }).click();
+  await expect(sheet).toBeHidden();
+
+  const toast = kiosk
+    .getByRole("status")
+    .filter({ hasText: `Logged ${chore} for ${founder}:` });
+  await expect(toast).toContainText(`Logged ${chore} for ${founder}: +5.`);
+  const pop = kiosk.getByTestId("score-pop");
+  await expect(pop).toHaveText("+5");
+  // On the logged row, in view, and not on any other row.
+  const row = kiosk.getByTestId(`chore-${chore}`);
+  await expect(row.getByTestId("score-pop")).toHaveText("+5");
+  await expect(pop).toBeInViewport();
+  const popBox = (await pop.boundingBox())!;
+  const rowBox = (await row.boundingBox())!;
+  const middle = popBox.y + popBox.height / 2;
+  expect(middle).toBeGreaterThanOrEqual(rowBox.y);
+  expect(middle).toBeLessThanOrEqual(rowBox.y + rowBox.height);
+  await expect(
+    kiosk.getByTestId(`chore-${first}`).getByTestId("score-pop"),
+  ).toHaveCount(0);
+
+  await ipad.context.close();
+});

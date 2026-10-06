@@ -86,6 +86,8 @@ async function openSheet(
   opts: {
     members?: { id: string; displayName: string }[];
     chore?: ChoreView;
+    /** Rows besides the one whose sheet opens. */
+    others?: ChoreView[];
   } = {},
 ) {
   let answer!: (r: ActionResult<LogCompletionData>) => void;
@@ -98,18 +100,20 @@ async function openSheet(
   const el = document.createElement("div");
   document.body.append(el);
   root = createRoot(el);
-  await act(async () =>
-    root!.render(
-      <ChoreGrid
-        chores={[opts.chore ?? chore]}
-        members={opts.members ?? [{ id: "m-1", displayName: "Ryan" }]}
-        actorId="m-1"
-        kiosk
-        action={action}
-        initialOpenId={chore.id}
-      />,
-    ),
-  );
+  const render = (chores: ChoreView[]) =>
+    act(async () =>
+      root!.render(
+        <ChoreGrid
+          chores={chores}
+          members={opts.members ?? [{ id: "m-1", displayName: "Ryan" }]}
+          actorId="m-1"
+          kiosk
+          action={action}
+          initialOpenId={chore.id}
+        />,
+      ),
+    );
+  await render([...(opts.others ?? []), opts.chore ?? chore]);
   const sheet = el.querySelector<HTMLDialogElement>(
     'dialog[aria-label="Log Trash"]',
   )!;
@@ -123,7 +127,13 @@ async function openSheet(
       : [...sheet.querySelectorAll("button")].find(
           (b) => b.textContent === name,
         )!;
-  return { sheet, button, action, answer: (r = LOGGED) => answer(r) };
+  return {
+    sheet,
+    button,
+    action,
+    render,
+    answer: (r = LOGGED) => answer(r),
+  };
 }
 
 async function tapOutside(sheet: HTMLDialogElement) {
@@ -206,5 +216,59 @@ describe("ChoreGrid's log sheet", () => {
     } finally {
       await act(async () => answer());
     }
+  });
+});
+
+describe("ChoreGrid's floating score (issue #181)", () => {
+  // A row above the logged one, as the Bathroom row was in the report.
+  const bathroom: ChoreView = {
+    ...chore,
+    id: "c-0",
+    name: "Bathroom",
+    basePoints: 26,
+  };
+  const scrolled = vi.fn();
+  beforeAll(() => {
+    // jsdom does not scroll; record the call instead.
+    Element.prototype.scrollIntoView = scrolled;
+  });
+
+  it("floats the toast's points over the row that was logged", async () => {
+    const { sheet, answer } = await openSheet({ others: [bathroom] });
+    const rows = [...document.querySelectorAll("li[data-testid^='chore-']")];
+    expect(rows.map((r) => r.getAttribute("data-testid"))).toEqual([
+      "chore-Bathroom",
+      "chore-Trash",
+    ]);
+    scrolled.mockClear();
+    await act(async () => sheet.querySelector("form")!.requestSubmit());
+    await act(async () => answer());
+
+    const pops = document.querySelectorAll('[data-testid="score-pop"]');
+    expect(pops).toHaveLength(1);
+    const pop = pops[0]!;
+    expect(getToasts().map((t) => t.title)).toContain(
+      "Logged Trash for Ryan: +40.",
+    );
+    expect(pop.textContent).toBe("+40");
+    expect(pop.closest("li")?.getAttribute("data-testid")).toBe("chore-Trash");
+    expect(pop.getAttribute("data-placement")).toBe("row");
+    expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
+    expect(scrolled.mock.contexts[0]).toBe(pop);
+  });
+
+  it("floats over the screen when the logged row is no longer shown", async () => {
+    const { sheet, answer, render } = await openSheet({ others: [bathroom] });
+    await act(async () => sheet.querySelector("form")!.requestSubmit());
+    await act(async () => answer());
+    expect(
+      document.querySelector('[data-testid="score-pop"]')?.closest("li"),
+    ).not.toBeNull();
+
+    await render([bathroom]);
+    const pop = document.querySelector('[data-testid="score-pop"]')!;
+    expect(pop.textContent).toBe("+40");
+    expect(pop.getAttribute("data-placement")).toBe("screen");
+    expect(pop.closest("li")).toBeNull();
   });
 });
