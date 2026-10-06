@@ -325,9 +325,10 @@ type SliderField = "points" | "cooldownHours" | "effortFactorPct";
  * slider's own name says it too: "Points for Trash"). The kiosk's six
  * columns: name and status; kind, photo proof and effort; then the points
  * (with their − and +) and the cooldown, each the whole width. The admin
- * page: at `lg` six columns, in rows of three, two and two (so the
- * cooldown's value fits beside its track); at `sm` three, with the points
- * and the cooldown the whole width; on a phone every field the whole width.
+ * page: at `lg` six columns, in rows of three and two, then the points and
+ * the cooldown a row each (so the points' + is never read as the
+ * cooldown's); at `sm` three, the points and the cooldown again the whole
+ * width; on a phone every field the whole width.
  */
 function BulkRow({
   bounty: b,
@@ -358,7 +359,7 @@ function BulkRow({
   const span = (k: string, hub: string) => (kiosk ? k : hub);
   const list = "col-span-2 sm:col-span-1 lg:col-span-2";
   const half = "col-span-2 sm:col-span-1 lg:col-span-3";
-  const whole = "col-span-2 sm:col-span-3";
+  const whole = "col-span-2 sm:col-span-3 lg:col-span-6";
   const size = kiosk ? "kiosk" : "default";
 
   /**
@@ -381,12 +382,18 @@ function BulkRow({
     const value = sliderValue(d[field]);
     const set = (n: number) =>
       n === was ? onClear(field) : onChange({ [field]: String(n) });
-    const step = (delta: 1 | -1) =>
-      set(
+    const step = (delta: 1 | -1) => {
+      const next =
         value === null
           ? BASE_POINTS_MIN
-          : Math.min(BASE_POINTS_MAX, Math.max(BASE_POINTS_MIN, value + delta)),
-      );
+          : Math.min(BASE_POINTS_MAX, Math.max(BASE_POINTS_MIN, value + delta));
+      set(next);
+      // At a limit the button turns itself off, and a disabled button
+      // drops the focus to the page: hand it to the slider instead.
+      if (next === (delta < 0 ? BASE_POINTS_MIN : BASE_POINTS_MAX)) {
+        document.getElementById(id(field))?.focus();
+      }
+    };
     return (
       <Field id={id(field)} label={label} errors={errors[field]}>
         {(c) => (

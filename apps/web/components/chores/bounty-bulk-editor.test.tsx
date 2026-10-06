@@ -431,6 +431,55 @@ describe("BountyBulkEditor", () => {
     ]);
   });
 
+  it("unmarks the row when + then − bring the points back to the bounty's own", async () => {
+    const action = vi.fn(async (_p: Result | null, _f: FormData) => OK);
+    const { el } = await mountWith(action);
+    const button = (name: string) =>
+      el.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!;
+    await act(async () => button("One point more for Trash").click());
+    expect(row(el, "Trash").dataset.changed).toBe("true");
+    await act(async () => button("One point less for Trash").click());
+    expect(said(control<HTMLInputElement>(el, "Trash", "Points"))).toBe(
+      "20 pts",
+    );
+    expect(row(el, "Trash").dataset.changed).toBeUndefined();
+    expect(el.textContent).toContain("No changes yet.");
+  });
+
+  it("hands the focus to the slider when − or + turns itself off at a limit", async () => {
+    const { el } = await mountWith(
+      vi.fn(async () => OK),
+      {},
+      [
+        { ...BOUNTIES[0]!, basePoints: 2 },
+        { ...BOUNTIES[1]!, basePoints: BASE_POINTS_MAX - 1 },
+      ],
+    );
+    const button = (name: string) =>
+      el.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)!;
+    // One step from the limit: the button keeps the focus.
+    const less = button("One point less for Trash");
+    less.focus();
+    await act(async () => less.click());
+    expect(said(control<HTMLInputElement>(el, "Trash", "Points"))).toBe("1 pt");
+    expect(less.disabled).toBe(true);
+    expect(document.activeElement).toBe(
+      control<HTMLInputElement>(el, "Trash", "Points"),
+    );
+    const more = button("One point more for Dishes");
+    more.focus();
+    await act(async () => more.click());
+    expect(more.disabled).toBe(true);
+    expect(document.activeElement).toBe(
+      control<HTMLInputElement>(el, "Dishes", "Points"),
+    );
+    // Short of a limit the focus stays on the button.
+    const again = button("One point more for Trash");
+    again.focus();
+    await act(async () => again.click());
+    expect(document.activeElement).toBe(again);
+  });
+
   it("on the kitchen screen, − and + are touch-sized", async () => {
     const { el } = await mount(OK, { pinLabel: "Ryan's PIN" });
     for (const name of [
@@ -658,7 +707,8 @@ describe("BountyBulkEditor", () => {
           `${"pinLabel" in opts ? "kiosk" : "hub"} ${bp || "base"} in ${cols} columns`,
         ).toBe(0);
         // The points (with − and +) and the cooldown (with "720 h · 30
-        // days" beside its track) get at least half a row each.
+        // days" beside its track) get a whole row each, so the points' +
+        // never sits by the cooldown.
         for (const label of ["Points", "Cooldown (h)"]) {
           const cell = cells.find((c) =>
             [...c.querySelectorAll("label")].some(
@@ -666,9 +716,9 @@ describe("BountyBulkEditor", () => {
             ),
           )!;
           expect(
-            widest(cell, "col-span-", bp) / cols,
+            widest(cell, "col-span-", bp),
             `${label} at ${bp || "base"}`,
-          ).toBeGreaterThanOrEqual(0.5);
+          ).toBe(cols);
         }
       }
       await act(async () => root?.unmount());
