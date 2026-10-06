@@ -213,10 +213,12 @@ export function BountyBulkEditor({
           // box keeps 56px of padding under its content (pb-14, KioskFrame),
           // and a sticky box stops that far above the bottom, so a bottom
           // of -56px takes it down to the edge, with no rows showing under it.
+          // There Baumy's head rises into the bar's right end, so the
+          // buttons keep 176px (pr-44) clear of it.
           bar={{
             testId: "bulk-save-bar",
             className:
-              "sticky -bottom-14 z-20 -mx-4 grid grid-cols-2 gap-3 border-t-4 border-bm-line bg-bm-bg py-3 pr-32 pl-4 sm:-mx-6 sm:pl-6",
+              "sticky -bottom-14 z-20 -mx-4 grid grid-cols-2 gap-3 border-t-4 border-bm-line bg-bm-bg py-3 pr-44 pl-4 sm:-mx-6 sm:pl-6",
             extra: (
               <>
                 <Button
