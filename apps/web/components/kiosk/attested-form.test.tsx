@@ -77,6 +77,59 @@ describe("AttestedForm", () => {
     expect(el.querySelector('[data-testid="no-pin-notice"]')).toBeNull();
   });
 
+  it("holds the PIN dialog open while the PIN is being checked (#174)", async () => {
+    let answer!: (r: ActionResult<unknown>) => void;
+    const action = vi
+      .fn<() => Promise<ActionResult<unknown>>>()
+      .mockResolvedValueOnce(NEEDS_PIN)
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            answer = r;
+          }),
+      );
+    const el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    await act(async () =>
+      root!.render(
+        <ActingPinProvider value={{ name: "Charl", hasPin: true }}>
+          <AttestedForm
+            action={action}
+            label="Confirm"
+            pinLabel="Charl's PIN"
+          />
+        </ActingPinProvider>,
+      ),
+    );
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    const dialog = el.querySelector<HTMLDialogElement>("dialog")!;
+    expect(dialog.open).toBe(true);
+    expect(pad(el)).not.toBeNull();
+    const close = dialog.querySelector<HTMLButtonElement>(
+      ':scope > div > button[aria-label="Close"]',
+    )!;
+    expect(close.disabled).toBe(false);
+    // OK sends the same form again, with the PIN; it is being checked.
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(action).toHaveBeenCalledTimes(2);
+    let answered = false;
+    try {
+      expect(close.disabled).toBe(true);
+      await act(async () => {
+        dialog.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(dialog.open).toBe(true);
+      await act(async () => answer({ ok: true, data: null }));
+      answered = true;
+      expect(close.disabled).toBe(false);
+    } finally {
+      // Never leave the request hanging for the tests after this one.
+      if (!answered) await act(async () => answer({ ok: true, data: null }));
+    }
+  });
+
   it("shows who has no PIN, what it is for and the QR code, never the PinPad", async () => {
     const { el } = await tap(NEEDS_PIN, { name: "Charl", hasPin: false });
     const notice = el.querySelector('[data-testid="no-pin-notice"]');
