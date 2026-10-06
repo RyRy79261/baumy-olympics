@@ -120,7 +120,7 @@ So doing a chore over and over pays more and more, and leaving a chore to one pe
 
 Baumy watches how often each bounty is really done. Each week it may suggest new points for one that is done much more or less often than its points expect; a suggestion lands between 5 and 60 points.
 
-An admin can schedule a suggestion, or set any bounty's points with a reason. A scheduled change lands on a Monday at least 48 hours away, and until then any other member can **veto** it in **Activity**. An admin can also change points at once when they edit a bounty. A change never touches points already scored.
+An admin can schedule a suggestion, or set any bounty's points with a reason. A scheduled change lands on a Monday at least 48 hours away, and until then any other member can **veto** it in **Activity**. An admin can also change points at once when they edit a bounty, or edit many bounties together under **Admin → Edit chores → Edit many at once**: one row per bounty, one **Save**, and either every change is saved or none is. A change never touches points already scored.
 
 Every change, who made it and why, is in **Points history** under the bounties board.
 
@@ -199,8 +199,9 @@ An admin can do a few admin things on the kitchen iPad, after tapping their own 
 
 - **Add or edit a bounty**: ask Baumy ("add a bounty for the recycling, 15 points"); **Confirm all** asks for your PIN.
 - **Change a bounty's points**: **Bounties → Kitchen screen settings → Change a bounty's points**. Like on your phone, the change waits for the next Monday at least 48 hours ahead, so the others can veto it.
+- **Edit many bounties at once**: **Bounties → Kitchen screen settings → Edit bounties**. Each bounty has its own row: its name, kind, points, cooldown, photo proof, effort, and whether it is on the board or archived. Change as many rows as you like (changed rows are marked **Changed**), then tap **Save** once and type your PIN. Either every change is saved or none is, and it says why. **Discard** throws the changes away. New points count from now on.
 
-Everything else an admin does (members, the pot, archiving a bounty, pairing) stays on your phone.
+Everything else an admin does (members, the pot, pairing) stays on your phone.
 
 ### Pairing the iPad
 
@@ -357,7 +358,7 @@ Ask Baumy (the cat on the hub and the kitchen screen) in your own words, typed o
 
 ### Only in the app's own pages
 
-Baumy in the app cannot do these; use the app's own pages: Update my profile; Pick my character from the gallery; Clean an uploaded character set; Add a character to the gallery; Take a character out of the gallery; Put a character back in the gallery; Join with an invite code; Join as a founder; Create an invite code; Cancel an invite code; Manage members; Set my kiosk PIN; Create a Telegram link code; See my Telegram link; Connect an app to Baumy; List connected apps; Disconnect an app; See my sign-in security; Sign out a device; Sign out every other device; Rename a passkey; Remove a passkey; Unlink Google; Add a password; See how I can confirm it's me; Confirm it's me; Confirm it's me in Telegram; See my Telegram confirmation; Make an iPad the kitchen screen; Rename a kitchen screen; Revoke a kiosk; Create a service token; Rotate a service token; Revoke a service token; Manage chores; Rule on a dispute; Add a photo to a chore; Adjust points; Set the prize mode; Weights; Schedule a weight change; Change a bounty's points; Dismiss a weight suggestion; Veto a weight change; Points history; Mark notes seen; Report a bug.
+Baumy in the app cannot do these; use the app's own pages: Update my profile; Pick my character from the gallery; Clean an uploaded character set; Add a character to the gallery; Take a character out of the gallery; Put a character back in the gallery; Join with an invite code; Join as a founder; Create an invite code; Cancel an invite code; Manage members; Set my kiosk PIN; Create a Telegram link code; See my Telegram link; Connect an app to Baumy; List connected apps; Disconnect an app; See my sign-in security; Sign out a device; Sign out every other device; Rename a passkey; Remove a passkey; Unlink Google; Add a password; See how I can confirm it's me; Confirm it's me; Confirm it's me in Telegram; See my Telegram confirmation; Make an iPad the kitchen screen; Rename a kitchen screen; Revoke a kiosk; Create a service token; Rotate a service token; Revoke a service token; Manage chores; Edit many bounties; Rule on a dispute; Add a photo to a chore; Adjust points; Set the prize mode; Weights; Schedule a weight change; Change a bounty's points; Dismiss a weight suggestion; Veto a weight change; Points history; Mark notes seen; Report a bug.
 
 ## Privacy: Who runs this
 

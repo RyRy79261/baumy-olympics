@@ -2191,6 +2191,7 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `check_kiosk_pin`: Checks a PIN typed on the kitchen screen; only the kiosk has one.
 - `set_kiosk_idle_minutes`: A setting of the kitchen screen itself (how long it waits before it forgets who is acting); only the kiosk has one. Tell the person to change it on the kitchen screen.
 - `manage_chore`: An admin action: UI only (SPEC §12 decision 10).
+- `update_bounties`: An admin action: UI only (SPEC §12 decision 10).
 - `resolve_dispute`: An admin action: UI only (SPEC §12 decision 10).
 - `attach_completion_photo`: A proof photo arrives only through the app's upload route, which stores the file first; brain cannot send one. Tell the person to attach it in the app.
 - `adjust_points`: An admin action: UI only (SPEC §12 decision 10).
