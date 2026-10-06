@@ -55,7 +55,7 @@ An admin can do a few admin things on the kitchen iPad, after tapping their own 
 
 - **Add or edit a bounty**: ask Baumy ("add a bounty for the recycling, 15 points"); **Confirm all** asks for your PIN.
 - **Change a bounty's points**: **Bounties → Kitchen screen settings → Change a bounty's points**. Like on your phone, the change waits for the next Monday at least {{WEIGHT_VETO_LEAD_H}} hours ahead, so the others can veto it.
-- **Edit many bounties at once**: **Bounties → Kitchen screen settings → Edit bounties**. Each bounty has its own row: its name, kind, points, cooldown, photo proof, effort, and whether it is on the board or archived. Change as many rows as you like (changed rows are marked **Changed**), then tap **Save** once and type your PIN. Either every change is saved or none is, and it says why. **Discard** throws the changes away. New points count from now on.
+- **Edit many bounties at once**: **Bounties → Kitchen screen settings → Edit bounties**. Each bounty has its own row: its name, kind, points, cooldown, photo proof, effort, and whether it is on the board or archived. Change as many rows as you like (changed rows are marked **Changed**), then tap **Save** once (it stays at the bottom of the screen) and type your PIN. A number left empty says **Required** until you fill it in. Either every change is saved or none is, and it says why. **Discard** throws the changes away. New points count from now on.
 
 Everything else an admin does (members, the pot, pairing) stays on your phone.
 

@@ -40,6 +40,7 @@ export function AttestedForm<T>({
   onResult,
   disabled = false,
   variant = "primary",
+  bar,
 }: {
   action: FormAction<T>;
   /** The button that starts the request. */
@@ -55,6 +56,11 @@ export function AttestedForm<T>({
   disabled?: boolean;
   /** The start button's look; primary unless given. */
   variant?: ButtonVariant;
+  /**
+   * Puts the start button in a bar of its own, with `extra` beside it (a
+   * Discard), e.g. one that sticks to the bottom of a long form.
+   */
+  bar?: { className: string; testId?: string; extra?: ReactNode };
 }) {
   const { state, formAction, pending, requestId } = useActionForm(action);
   const [attempt, setAttempt] = useState(0);
@@ -87,14 +93,28 @@ export function AttestedForm<T>({
     >
       <input type="hidden" name="requestId" value={requestId} />
       {fields}
-      <Button
-        type="submit"
-        size="kiosk"
-        variant={variant}
-        disabled={pending || disabled}
-      >
-        {label}
-      </Button>
+      {bar ? (
+        <div className={bar.className} data-testid={bar.testId}>
+          <Button
+            type="submit"
+            size="kiosk"
+            variant={variant}
+            disabled={pending || disabled}
+          >
+            {label}
+          </Button>
+          {bar.extra}
+        </div>
+      ) : (
+        <Button
+          type="submit"
+          size="kiosk"
+          variant={variant}
+          disabled={pending || disabled}
+        >
+          {label}
+        </Button>
+      )}
       {state?.ok && success && !onResult ? (
         <FormMessage tone="success">{success(state.data)}</FormMessage>
       ) : null}

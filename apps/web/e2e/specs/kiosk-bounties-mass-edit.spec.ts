@@ -61,7 +61,25 @@ test("on the kiosk, an admin edits many bounties in one save with their PIN", as
     expect(box.height, field).toBeGreaterThanOrEqual(56);
   }
 
-  await editor.getByRole("button", { name: "Save 2 changes" }).click();
+  // The Save bar sticks to the bottom of the screen, in view while the rows
+  // scroll, and Baumy covers neither button.
+  await row(kettle).scrollIntoViewIfNeeded();
+  const bar = editor.getByTestId("bulk-save-bar");
+  const save = bar.getByRole("button", { name: "Save 2 changes" });
+  await expect(save).toBeInViewport();
+  const cat = (await kiosk
+    .getByRole("button", { name: "Ask Baumy" })
+    .boundingBox())!;
+  for (const b of [save, bar.getByRole("button", { name: "Discard" })]) {
+    const box = (await b.boundingBox())!;
+    const overlaps =
+      box.x < cat.x + cat.width &&
+      cat.x < box.x + box.width &&
+      box.y < cat.y + cat.height &&
+      cat.y < box.y + box.height;
+    expect(overlaps, await b.textContent()).toBe(false);
+  }
+  await save.click();
   const pad = kiosk.getByRole("dialog", { name: `${founder}'s PIN` });
   await expect(pad).toBeVisible();
   // The rows are kept for the PIN's second send.
