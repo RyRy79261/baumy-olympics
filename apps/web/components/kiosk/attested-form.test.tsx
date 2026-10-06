@@ -164,6 +164,36 @@ describe("AttestedForm", () => {
     expect(el.querySelector("textarea")!.value).toBe("Still dirty");
   });
 
+  it("says when its request is on its way and when the answer is in (#174)", async () => {
+    let answer!: (r: ActionResult<unknown>) => void;
+    const action = vi.fn(
+      () =>
+        new Promise<ActionResult<unknown>>((r) => {
+          answer = r;
+        }),
+    );
+    const onPending = vi.fn();
+    const el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    await act(async () =>
+      root!.render(
+        <AttestedForm
+          action={action}
+          label="Log it"
+          pinLabel="Charl's PIN"
+          onResult={() => {}}
+          onPending={onPending}
+        />,
+      ),
+    );
+    expect(onPending).toHaveBeenLastCalledWith(false);
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(onPending).toHaveBeenLastCalledWith(true);
+    await act(async () => answer({ ok: true, data: null }));
+    expect(onPending).toHaveBeenLastCalledWith(false);
+  });
+
   it("asks nothing for an action that needs no PIN", async () => {
     const { el } = await tap({ ok: true, data: null }, { hasPin: false });
     expect(el.querySelector('[data-testid="no-pin-notice"]')).toBeNull();
