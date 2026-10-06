@@ -17,8 +17,18 @@ import { AttestedForm } from "./attested-form";
 
 // An admin changes a bounty's points on the kitchen screen (issue #147):
 // schedule_points_change, which the admin gate lets through for a picked
-// admin with their PIN. The PinPad opens inside the form (AttestedForm); the
-// fields are controlled, so the PIN's second send still carries them.
+// admin with their PIN. The PinPad opens inside the form (AttestedForm), and
+// its OK sends the same form again with the PIN.
+
+/**
+ * The visible controls name no form (no element has this id), so they
+ * belong to none (issue #177). React resets a form once its action answers
+ * (the first, PIN-less send does), and a reset puts a controlled list back
+ * on its first option while the state still holds the pick, so the PIN's
+ * send posted the first bounty. The values travel in hidden fields instead,
+ * which a reset leaves alone (the mass editor's pattern).
+ */
+const DETACHED = "kiosk-points-form-fields";
 
 export interface PointsBounty {
   id: string;
@@ -38,7 +48,6 @@ export function KioskPointsForm({
 }) {
   const first = bounties[0];
   const [choreId, setChoreId] = useState(first?.id ?? "");
-  const picked = bounties.find((b) => b.id === choreId);
   const [points, setPoints] = useState(String(first?.basePoints ?? ""));
   const [hours, setHours] = useState(
     first?.cooldownMinutes != null ? hoursField(first.cooldownMinutes) : "",
@@ -57,8 +66,10 @@ export function KioskPointsForm({
     if (result.ok) {
       setError(null);
       setReason("");
+      // The bounty the server changed, not what the screen shows.
+      const changed = bounties.find((b) => b.id === result.data.choreId);
       toast.success(
-        `${picked?.name ?? "The bounty"}: ${appliesLabel(result.data.appliesAt!)}`,
+        `${changed?.name ?? "The bounty"}: ${appliesLabel(result.data.appliesAt!)}`,
       );
     } else {
       setError(result.message);
@@ -75,11 +86,15 @@ export function KioskPointsForm({
         onResult={onResult}
         fields={
           <>
+            <input type="hidden" name="choreId" value={choreId} />
+            <input type="hidden" name="basePoints" value={points} />
+            <input type="hidden" name="cooldownHours" value={hours} />
+            <input type="hidden" name="reason" value={reason} />
             <Field id="kiosk-points-bounty" label="Bounty">
               {(control) => (
                 <Select
+                  form={DETACHED}
                   {...control}
-                  name="choreId"
                   value={choreId}
                   onChange={(e) => pick(e.currentTarget.value)}
                   className="min-h-14 text-xl"
@@ -97,9 +112,9 @@ export function KioskPointsForm({
                 <Field id="kiosk-points-points" label="Points">
                   {(control) => (
                     <Input
+                      form={DETACHED}
                       {...control}
                       kiosk
-                      name="basePoints"
                       type="number"
                       inputMode="numeric"
                       min={BASE_POINTS_MIN}
@@ -114,9 +129,9 @@ export function KioskPointsForm({
                 <Field id="kiosk-points-cooldown" label="Cooldown (hours)">
                   {(control) => (
                     <Input
+                      form={DETACHED}
                       {...control}
                       kiosk
-                      name="cooldownHours"
                       type="number"
                       inputMode="decimal"
                       min={0}
@@ -132,9 +147,9 @@ export function KioskPointsForm({
             <Field id="kiosk-points-reason" label="Reason (optional)">
               {(control) => (
                 <Textarea
+                  form={DETACHED}
                   {...control}
                   kiosk
-                  name="reason"
                   maxLength={WEIGHT_CHANGE_REASON_MAX}
                   rows={2}
                   value={reason}
