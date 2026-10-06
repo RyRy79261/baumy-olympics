@@ -121,8 +121,25 @@ describe("AttestedForm", () => {
         dialog.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       });
       expect(dialog.open).toBe(true);
-      await act(async () => answer({ ok: true, data: null }));
+      // The pad's own Cancel waits too: a tap on it while checking does
+      // nothing, so a wrong PIN's answer still finds the pad.
+      const cancel = [...dialog.querySelectorAll("button")].find(
+        (b) => b.textContent === "Cancel",
+      )!;
+      expect(cancel).toBeDefined();
+      expect(cancel.disabled).toBe(true);
+      await act(async () => cancel.click());
+      expect(dialog.open).toBe(true);
+      await act(async () =>
+        answer({
+          ok: false,
+          code: "ATTESTATION_FAILED",
+          message: "That PIN is not right.",
+        }),
+      );
       answered = true;
+      expect(dialog.open).toBe(true);
+      expect(dialog.textContent).toContain("That PIN is not right.");
       expect(close.disabled).toBe(false);
     } finally {
       // Never leave the request hanging for the tests after this one.
