@@ -266,6 +266,7 @@ export function MemberControls(props: MemberRowProps) {
       <Dialog
         open={confirming}
         onClose={() => setConfirming(false)}
+        busy={status.pending}
         title={`Deactivate ${props.displayName}?`}
       >
         <p className="mb-4 text-sm">
@@ -274,7 +275,11 @@ export function MemberControls(props: MemberRowProps) {
         </p>
         <div className="flex gap-2">
           {statusForm}
-          <Button variant="secondary" onClick={() => setConfirming(false)}>
+          <Button
+            variant="secondary"
+            disabled={status.pending}
+            onClick={() => setConfirming(false)}
+          >
             Keep them
           </Button>
         </div>

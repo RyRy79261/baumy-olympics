@@ -18,6 +18,7 @@ import {
   useReporting,
   type FormAction,
 } from "@/components/use-action-form";
+import { useReportPending } from "@/components/use-report-pending";
 import type {
   CalendarWriteData,
   DeleteEventData,
@@ -90,6 +91,9 @@ export function CalendarBoard({
 }) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [deleting, setDeleting] = useState<CalendarEventView | null>(null);
+  // A save or a delete on its way: its sheet stays open for the answer.
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const phoneAgenda = range.view === "month";
   const newDate =
     range.view === "day"
@@ -234,6 +238,7 @@ export function CalendarBoard({
       <Dialog
         open={sheet !== null}
         onClose={() => setSheet(null)}
+        busy={saving}
         title={
           sheet?.mode === "edit" ? `Edit ${sheet.event.title}` : "New event"
         }
@@ -260,10 +265,12 @@ export function CalendarBoard({
                 );
               }}
               onCancel={() => setSheet(null)}
+              onPending={setSaving}
             />
             {sheet.mode === "edit" ? (
               <Button
                 variant="danger"
+                disabled={saving}
                 onClick={() => {
                   setDeleting(sheet.event);
                   setSheet(null);
@@ -279,6 +286,7 @@ export function CalendarBoard({
       <Dialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
+        busy={removing}
         title={deleting ? `Delete ${deleting.title}?` : "Delete the event?"}
       >
         {deleting ? (
@@ -291,6 +299,7 @@ export function CalendarBoard({
               toast.success(`Deleted ${data.title}.`);
             }}
             onCancel={() => setDeleting(null)}
+            onPending={setRemoving}
           />
         ) : null}
       </Dialog>
@@ -303,15 +312,18 @@ function DeleteForm({
   action,
   onDone,
   onCancel,
+  onPending,
 }: {
   event: CalendarEventView;
   action: FormAction<DeleteEventData>;
   onDone: (data: DeleteEventData) => void;
   onCancel: () => void;
+  onPending?: (pending: boolean) => void;
 }) {
   const { state, formAction, pending, requestId } = useActionForm(
     useReporting(action, onDone),
   );
+  useReportPending(pending, onPending);
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="requestId" value={requestId} />
@@ -327,7 +339,7 @@ function DeleteForm({
         <Button type="submit" variant="danger" disabled={pending}>
           {pending ? "Deleting..." : "Delete event"}
         </Button>
-        <Button variant="secondary" onClick={onCancel}>
+        <Button variant="secondary" disabled={pending} onClick={onCancel}>
           Keep it
         </Button>
       </div>

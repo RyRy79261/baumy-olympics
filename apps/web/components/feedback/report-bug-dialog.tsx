@@ -157,6 +157,7 @@ export function ReportBugDialog({
     <Dialog
       open={open}
       onClose={onClose}
+      busy={pending}
       title={kind === "bug" ? "Report a bug" : "Request a feature"}
     >
       <form

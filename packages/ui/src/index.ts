@@ -61,6 +61,11 @@ export {
 } from "./chores";
 export { cx } from "./cx";
 export { Dialog } from "./dialog";
+export {
+  DIALOG_TYPED_EVENT,
+  forceCloseDialog,
+  isTypedInput,
+} from "./use-modal-dialog";
 export { Checkbox, Field, FormMessage, Input, Select, Textarea } from "./field";
 export { AvatarGallery, type GalleryOption } from "./avatar-gallery";
 export {
