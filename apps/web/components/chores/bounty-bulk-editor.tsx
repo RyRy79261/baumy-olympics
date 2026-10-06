@@ -348,9 +348,9 @@ function BulkRow({
       </div>
       <div
         className={cx(
-          // items-end: a label that wraps never pushes its control out of
-          // line with its neighbours'.
-          "grid items-end gap-3",
+          // items-start: an error under one field never moves its
+          // neighbours (every pair side by side has one-line labels).
+          "grid items-start gap-3",
           kiosk ? "grid-cols-6" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
         )}
       >
