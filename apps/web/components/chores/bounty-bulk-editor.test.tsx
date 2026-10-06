@@ -276,4 +276,24 @@ describe("BountyBulkEditor", () => {
     expect(el.querySelector('[role="alert"]')).toBeNull();
     expect(row(el, "Trash").dataset.changed).toBe("true");
   });
+
+  it("keeps showing the edits after the form's answer resets it (a list too)", async () => {
+    const { el } = await mount(
+      {
+        ok: false,
+        code: "ATTESTATION_REQUIRED",
+        message: "Enter your PIN to do this.",
+      },
+      { pinLabel: "Ryan's PIN" },
+    );
+    await set(control<HTMLSelectElement>(el, "Trash", "Kind"), "consumable");
+    await set(control<HTMLInputElement>(el, "Trash", "Points"), "7");
+    await act(async () => button(el, "Save 1 change").click());
+    // React resets a form after its action answers; the rows are not part
+    // of it, so what they show is still what will be sent.
+    expect(control<HTMLSelectElement>(el, "Trash", "Kind").value).toBe(
+      "consumable",
+    );
+    expect(control<HTMLInputElement>(el, "Trash", "Points").value).toBe("7");
+  });
 });
