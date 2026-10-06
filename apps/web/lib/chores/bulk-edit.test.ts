@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { BASE_POINTS_MAX } from "@baumy/types";
 import {
   CHANGES_FIELD,
+  REQUIRED,
+  blankErrors,
   changeOf,
   changesFromForm,
   changesOf,
@@ -90,6 +92,17 @@ describe("changeOf", () => {
     });
   });
 
+  it("looks only at the fields the admin touched, never reverting another's change", () => {
+    expect(changeOf(trash, {})).toBeNull();
+    // Another admin made Trash a consumable after this page loaded; this
+    // admin touched only its points, so only the points are sent.
+    const refreshed: BulkBounty = { ...trash, kind: "consumable" };
+    expect(changeOf(refreshed, { points: "5" })).toEqual({
+      choreId: "t",
+      points: 5,
+    });
+  });
+
   it("sends a cleared or non-number field as text, for the action to name", () => {
     expect(changeOf(trash, { ...draftOf(trash), points: "  " })).toEqual({
       choreId: "t",
@@ -98,6 +111,30 @@ describe("changeOf", () => {
     expect(
       changeOf(trash, { ...draftOf(trash), effortFactorPct: "lots" }),
     ).toEqual({ choreId: "t", effortFactorPct: "lots" });
+  });
+});
+
+describe("blankErrors", () => {
+  it("says Required for a blank number the bounty must have", () => {
+    expect(blankErrors(trash, { points: " ", effortFactorPct: "" })).toEqual({
+      points: [REQUIRED],
+      effortFactorPct: [REQUIRED],
+    });
+    expect(blankErrors(trash, { cooldownHours: "" })).toEqual({
+      cooldownHours: [REQUIRED],
+    });
+    expect(blankErrors(trash, { points: "4" })).toEqual({});
+    expect(blankErrors(trash, {})).toEqual({});
+  });
+
+  it("lets a bounty with no points stay without, unless half is given", () => {
+    expect(blankErrors(bare, { points: "", cooldownHours: "" })).toEqual({});
+    expect(blankErrors(bare, { points: "5" })).toEqual({
+      cooldownHours: [REQUIRED],
+    });
+    expect(blankErrors(bare, { cooldownHours: "2", points: " " })).toEqual({
+      points: [REQUIRED],
+    });
   });
 });
 

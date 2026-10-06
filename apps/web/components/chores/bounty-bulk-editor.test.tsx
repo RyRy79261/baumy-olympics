@@ -90,6 +90,25 @@ async function mount(
   return { el, action };
 }
 
+/** Mount with a given action and list; `rerender` gives a new list. */
+async function mountWith(
+  action: (prev: Result | null, form: FormData) => Promise<Result>,
+  opts: { pinLabel?: string } = {},
+  bounties: BulkEditorBounty[] = BOUNTIES,
+) {
+  const el = document.createElement("div");
+  document.body.append(el);
+  root = createRoot(el);
+  const render = (list: BulkEditorBounty[]) =>
+    act(async () =>
+      root!.render(
+        <BountyBulkEditor bounties={list} action={action} {...opts} />,
+      ),
+    );
+  await render(bounties);
+  return { el, rerender: render };
+}
+
 const row = (el: HTMLElement, name: string) =>
   el.querySelector<HTMLElement>(`[data-testid="bulk-bounty-${name}"]`)!;
 const control = <T extends HTMLElement>(
@@ -295,5 +314,101 @@ describe("BountyBulkEditor", () => {
       "consumable",
     );
     expect(control<HTMLInputElement>(el, "Trash", "Points").value).toBe("7");
+  });
+
+  it("says Required under a cleared number, and saves nothing until it is filled", async () => {
+    const { el, action } = await mount(OK);
+    await set(control<HTMLInputElement>(el, "Trash", "Cooldown (h)"), "");
+    expect(row(el, "Trash").textContent).toContain("Required.");
+    expect(
+      control<HTMLInputElement>(el, "Trash", "Cooldown (h)").getAttribute(
+        "aria-invalid",
+      ),
+    ).toBe("true");
+    expect(button(el, "Save 1 change").disabled).toBe(true);
+    expect(el.textContent).toContain("Fill in the fields marked Required.");
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(action).not.toHaveBeenCalled();
+    await set(control<HTMLInputElement>(el, "Trash", "Cooldown (h)"), "6");
+    expect(row(el, "Trash").textContent).not.toContain("Required.");
+    expect(button(el, "Save 1 change").disabled).toBe(false);
+  });
+
+  it("never sends back a field the admin did not touch", async () => {
+    const action = vi.fn(async (_p: Result | null, _f: FormData) => OK);
+    const { el, rerender } = await mountWith(action);
+    await set(control<HTMLInputElement>(el, "Trash", "Points"), "7");
+    // Another admin makes Trash a consumable; the page refreshes.
+    await rerender([
+      { ...BOUNTIES[0]!, kind: "consumable" },
+      ...BOUNTIES.slice(1),
+    ]);
+    expect(control<HTMLSelectElement>(el, "Trash", "Kind").value).toBe(
+      "consumable",
+    );
+    expect(control<HTMLInputElement>(el, "Trash", "Points").value).toBe("7");
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(sentChanges(action)).toEqual([
+      { choreId: BOUNTIES[0]!.id, points: 7 },
+    ]);
+  });
+
+  it("shows a clash on its row, and says it above Save too", async () => {
+    const message = "There is already a chore called Trash. Pick another name.";
+    const { el } = await mount({
+      ok: false,
+      code: "CHORE_NAME_TAKEN",
+      message,
+      issues: [{ path: ["changes", 0, "name"], message }],
+    });
+    await set(control<HTMLInputElement>(el, "Dishes", "Name"), "Trash");
+    await act(async () => el.querySelector("form")!.requestSubmit());
+    expect(row(el, "Dishes").textContent).toContain(message);
+    expect(row(el, "Trash").textContent).not.toContain(message);
+    expect(el.querySelector('[role="alert"]')!.textContent).toBe(message);
+  });
+
+  it("names the bounty in each control's description", async () => {
+    const { el } = await mount(OK);
+    const points = control<HTMLInputElement>(el, "Dishes", "Points");
+    const ids = points.getAttribute("aria-describedby")!.split(" ");
+    const described = ids
+      .map((id) => document.getElementById(id)?.textContent)
+      .join(" ");
+    expect(described).toContain("Dishes");
+    expect(described).not.toContain("Trash");
+  });
+
+  it("on the kitchen screen, sends the same changes again with the PIN, from a bar that stays in view", async () => {
+    const action = vi
+      .fn<(p: Result | null, f: FormData) => Promise<Result>>()
+      .mockResolvedValueOnce({
+        ok: false,
+        code: "ATTESTATION_REQUIRED",
+        message: "Enter your PIN to do this.",
+      })
+      .mockResolvedValueOnce(OK);
+    const { el } = await mountWith(action, { pinLabel: "Ryan's PIN" });
+    const bar = el.querySelector<HTMLElement>('[data-testid="bulk-save-bar"]')!;
+    expect(bar.className).toContain("sticky");
+    expect(bar.textContent).toContain("Discard");
+    await editTwo(el);
+    await act(async () => button(bar, "Save 3 changes").click());
+    const pad = el.querySelector<HTMLElement>(
+      '[role="group"][aria-label="Ryan\'s PIN"]',
+    )!;
+    for (const digit of "2580") {
+      await act(async () => button(pad, digit).click());
+    }
+    await act(async () => button(pad, "OK").click());
+    expect(action).toHaveBeenCalledTimes(2);
+    const [first, second] = action.mock.calls.map(
+      ([, form]) => form as FormData,
+    );
+    expect(second!.get(CHANGES_FIELD)).toBe(first!.get(CHANGES_FIELD));
+    expect(JSON.parse(second!.get(CHANGES_FIELD) as string)).toHaveLength(3);
+    expect(first!.get("pin")).toBeNull();
+    expect(second!.get("pin")).toBe("2580");
+    expect(toastSuccess).toHaveBeenCalledWith("Saved 3 bounties.");
   });
 });

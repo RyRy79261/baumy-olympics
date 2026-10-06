@@ -6,18 +6,20 @@ import {
   type ChoreRow,
 } from "@baumy/db/chores";
 import {
+  BASE_POINTS_MAX,
+  BASE_POINTS_MIN,
   BOUNTY_EDITS_MAX,
-  BasePoints,
+  COOLDOWN_HOURS_MAX,
   ChoreKind,
   ChoreName,
-  CooldownHours,
-  EffortFactorPct,
+  EFFORT_FACTOR_MAX,
+  EFFORT_FACTOR_MIN,
   ProofMode,
 } from "@baumy/types";
 import { applyBountyEdit, type BountyEdit } from "./bounties";
 import { defineAction } from "./define";
 import { nameTaken, type ManageChoreData } from "./manage-chore";
-import { fail } from "./result";
+import { fail, type ActionFailure } from "./result";
 
 // Mass editing of bounties (issue #175, SPEC §12 decision 31): one editable
 // row per bounty, many rows changed, one Save. Owner: "All save in one
@@ -31,16 +33,40 @@ import { fail } from "./result";
 // with their PIN (the kiosk admin gate, decision 28). Not on the AI command,
 // MCP or brain: not ruled.
 
+/**
+ * A number, never coerced: the editor sends numbers in JSON, so a blank
+ * field ("" or null) is "Required." rather than the 0 `z.coerce` would make
+ * of it (a cooldown of 0 hours is valid, and would be saved).
+ */
+const number = (what: string) =>
+  z.number({
+    error: (issue) =>
+      issue.input === "" || issue.input === null
+        ? "Required."
+        : `Enter a number of ${what}.`,
+  });
+
 /** Which bounty a change is for, and what to change about it. */
 const change = z
   .strictObject({
     choreId: z.uuid("Pick a bounty."),
     name: ChoreName.optional(),
     kind: ChoreKind.optional(),
-    points: BasePoints.optional(),
-    cooldownHours: CooldownHours.optional(),
+    points: number("points")
+      .int("Use a whole number.")
+      .min(BASE_POINTS_MIN, `At least ${BASE_POINTS_MIN}.`)
+      .max(BASE_POINTS_MAX, `At most ${BASE_POINTS_MAX}.`)
+      .optional(),
+    cooldownHours: number("hours")
+      .min(0, "Zero or more hours.")
+      .max(COOLDOWN_HOURS_MAX, `At most ${COOLDOWN_HOURS_MAX} hours (30 days).`)
+      .optional(),
     proofMode: ProofMode.optional(),
-    effortFactorPct: EffortFactorPct.optional(),
+    effortFactorPct: number("percent")
+      .int("Use a whole number.")
+      .min(EFFORT_FACTOR_MIN, `At least ${EFFORT_FACTOR_MIN}%.`)
+      .max(EFFORT_FACTOR_MAX, `At most ${EFFORT_FACTOR_MAX}%.`)
+      .optional(),
     /** True archives it, false restores it. */
     archived: z.boolean({ error: "Archived is yes or no." }).optional(),
   })
@@ -81,6 +107,18 @@ function editOf(c: BountyChange): BountyEdit | null {
   return Object.keys(edit).length > 0 ? edit : null;
 }
 
+/** A failure about one row's field, so the editor shows it on that row. */
+function onRow(
+  failure: ActionFailure,
+  index: number,
+  field: string,
+): ActionFailure {
+  return {
+    ...failure,
+    issues: [{ path: ["changes", index, field], message: failure.message }],
+  };
+}
+
 const NOT_FOUND = fail(
   "NOT_FOUND",
   "One of those bounties was not found. Reload the page and try again.",
@@ -109,18 +147,29 @@ export const updateBounties = defineAction({
 
     const changed: ManageChoreData[] = [];
     const edited: string[] = [];
-    for (const c of changes) {
+    for (const [index, c] of changes.entries()) {
       let chore = rows.get(c.choreId)!;
       const edit = editOf(c);
       if (edit) {
         if (chore.archivedAt !== null && c.archived !== false) {
-          return fail(
-            "ARCHIVED_CHORE",
-            `${chore.name} is archived. Restore it to edit it.`,
+          return onRow(
+            fail(
+              "ARCHIVED_CHORE",
+              `${chore.name} is archived. Restore it to edit it.`,
+            ),
+            index,
+            "archived",
           );
         }
         const r = await applyBountyEdit(ctx, chore, edit);
-        if (!r.ok) return r;
+        // Only NO_RULE_VERSION: the half of the weight that is missing.
+        if (!r.ok) {
+          return onRow(
+            r,
+            index,
+            c.points === undefined ? "points" : "cooldownHours",
+          );
+        }
         chore = r.chore;
         edited.push(chore.id);
         changed.push({
@@ -149,7 +198,7 @@ export const updateBounties = defineAction({
     }
 
     // The names, on the end state: no two active bounties share one.
-    for (const c of changes) {
+    for (const [index, c] of changes.entries()) {
       const chore = rows.get(c.choreId)!;
       if (chore.archivedAt !== null) continue;
       if (c.name === undefined && c.archived !== false) continue;
@@ -160,7 +209,12 @@ export const updateBounties = defineAction({
           exceptId: chore.id,
         })
       ) {
-        return nameTaken(chore.name);
+        // On the name, or on the Status of a restore that clashes.
+        return onRow(
+          nameTaken(chore.name),
+          index,
+          c.name !== undefined ? "name" : "archived",
+        );
       }
     }
 

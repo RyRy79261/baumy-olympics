@@ -72,39 +72,99 @@ function numberChange(
   return was !== null && same(n) ? undefined : n;
 }
 
-/** The change a row's draft makes, or null when it makes none. */
-export function changeOf(
-  b: BulkBounty,
-  d: BountyDraft,
-): BountyChangeInput | null {
+/**
+ * What the admin touched on a row: only those fields. Everything else shows
+ * the bounty as it is now, so a save never sends back (and so reverts) a
+ * field another admin changed after this page loaded.
+ */
+export type Touched = Partial<BountyDraft>;
+
+/** What a row's controls show: the bounty, with the touched fields over it. */
+export function viewOf(b: BulkBounty, t: Touched | undefined): BountyDraft {
+  return { ...draftOf(b), ...t };
+}
+
+/** The change the touched fields make, or null when they make none. */
+export function changeOf(b: BulkBounty, t: Touched): BountyChangeInput | null {
   const change: BountyChangeInput = { choreId: b.id };
-  if (d.name.trim() !== b.name) change.name = d.name;
-  if (d.kind !== b.kind) change.kind = d.kind;
-  const points = numberChange(d.points, b.basePoints);
-  if (points !== undefined) change.points = points;
-  const hours = numberChange(
-    d.cooldownHours,
-    b.cooldownMinutes,
-    // The minutes it would store, so 1.5 and 1.50 are the same 90.
-    (h) => Math.round(h * 60) === b.cooldownMinutes,
-  );
-  if (hours !== undefined) change.cooldownHours = hours;
-  if (d.proofMode !== b.proofMode) change.proofMode = d.proofMode;
-  const effort = numberChange(d.effortFactorPct, b.effortFactorPct);
-  if (effort !== undefined) change.effortFactorPct = effort;
-  if (d.archived !== b.archived) change.archived = d.archived;
+  if (t.name !== undefined && t.name.trim() !== b.name) change.name = t.name;
+  if (t.kind !== undefined && t.kind !== b.kind) change.kind = t.kind;
+  if (t.points !== undefined) {
+    const points = numberChange(t.points, b.basePoints);
+    if (points !== undefined) change.points = points;
+  }
+  if (t.cooldownHours !== undefined) {
+    const hours = numberChange(
+      t.cooldownHours,
+      b.cooldownMinutes,
+      // The minutes it would store, so 1.5 and 1.50 are the same 90.
+      (h) => Math.round(h * 60) === b.cooldownMinutes,
+    );
+    if (hours !== undefined) change.cooldownHours = hours;
+  }
+  if (t.proofMode !== undefined && t.proofMode !== b.proofMode) {
+    change.proofMode = t.proofMode;
+  }
+  if (t.effortFactorPct !== undefined) {
+    const effort = numberChange(t.effortFactorPct, b.effortFactorPct);
+    if (effort !== undefined) change.effortFactorPct = effort;
+  }
+  if (t.archived !== undefined && t.archived !== b.archived) {
+    change.archived = t.archived;
+  }
   return Object.keys(change).length > 1 ? change : null;
+}
+
+/** What a blank number field that must be filled in says. */
+export const REQUIRED = "Required.";
+
+/**
+ * The touched number fields left blank that must not be: the effort always,
+ * and the points and the cooldown once the bounty has them, or once the
+ * other half is given (a bounty with no points may stay without).
+ */
+export function blankErrors(
+  b: BulkBounty,
+  t: Touched,
+): Partial<Record<BountyField, string[]>> {
+  const view = viewOf(b, t);
+  const blank = (v: string) => v.trim() === "";
+  const out: Partial<Record<BountyField, string[]>> = {};
+  // A bounty with points needs both halves kept; one without needs both
+  // once either is given.
+  const needs = (touched: boolean, other: string, had: boolean) =>
+    had ? touched : !blank(other);
+  if (
+    blank(view.points) &&
+    needs(t.points !== undefined, view.cooldownHours, b.basePoints !== null)
+  ) {
+    out.points = [REQUIRED];
+  }
+  if (
+    blank(view.cooldownHours) &&
+    needs(
+      t.cooldownHours !== undefined,
+      view.points,
+      b.cooldownMinutes !== null,
+    )
+  ) {
+    out.cooldownHours = [REQUIRED];
+  }
+  if (t.effortFactorPct !== undefined && blank(view.effortFactorPct)) {
+    out.effortFactorPct = [REQUIRED];
+  }
+  return out;
 }
 
 /** Every row's change, in the bounties' order; untouched rows are left out. */
 export function changesOf(
   bounties: readonly BulkBounty[],
-  drafts: Readonly<Record<string, BountyDraft>>,
+  touched: Readonly<Record<string, Touched>>,
 ): BountyChangeInput[] {
   const out: BountyChangeInput[] = [];
   for (const b of bounties) {
-    const d = drafts[b.id];
-    const c = d ? changeOf(b, d) : null;
+    const t = touched[b.id];
+    const c = t ? changeOf(b, t) : null;
     if (c) out.push(c);
   }
   return out;
