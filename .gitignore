@@ -43,3 +43,6 @@ test-results/
 # repo-root AGENTS.md for anything working inside apps/web.
 apps/web/AGENTS.md
 apps/web/CLAUDE.md
+
+# local agent state (worktrees, screenshots)
+.claude/
