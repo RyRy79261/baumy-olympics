@@ -173,9 +173,8 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   bathroom). It has base points and a cooldown. A chore has no due date and
   is never urgent or overdue: its `state` is `ready` (it can be logged now)
   or `cooldown` (done recently; it can be logged again from `availableAt`),
-  or `unavailable` (no points set, or archived). `isNew` means added in the
-  last 3 days. Logging a chore inside its cooldown is refused (`COOLDOWN`,
-  with `retryAt`).
+  or `unavailable` (no points set, or archived). Logging a chore inside its
+  cooldown is refused (`COOLDOWN`, with `retryAt`).
 - **Streaks and break bonuses.** Each chore has one streak holder. Doing a
   chore again while you hold it grows the streak (+25% of base per step, no
   cap). Doing a chore someone else holds **breaks** their streak: you get a
@@ -451,7 +450,7 @@ Lists the bounties (chores): which are ready to log, which are cooling down and 
 
 **When to use it.** To answer "what needs doing?", and to turn a chore someone names into its `choreId` before log_completion. Match the words to exactly one chore; if none or several match, list them and ask.
 
-**Tool description** (the registry's, verbatim): Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.
+**Tool description** (the registry's, verbatim): Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.
 
 **Examples.**
 
@@ -473,7 +472,7 @@ Lists the bounties (chores): which are ready to log, which are cooling down and 
 }
 ```
 
-**Returns** (`data`): `chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (`ready`; `cooldown`, with `availableAt`, when it can be logged again; or `unavailable`), `isNew`, `streak` (holder and length) and `next` (what logging it now would score the asker). There is no due date, `dueAt` or `urgent`: never call a chore due, late or overdue.
+**Returns** (`data`): `chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (`ready`; `cooldown`, with `availableAt`, when it can be logged again; or `unavailable`), `createdAt`, `streak` (holder and length) and `next` (what logging it now would score the asker). There is no due date, `dueAt` or `urgent`: never call a chore due, late or overdue.
 
 **Its errors:** none of its own. Every call can also get the endpoint's codes (above).
 

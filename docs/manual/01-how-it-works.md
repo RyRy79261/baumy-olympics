@@ -24,7 +24,7 @@ Only people who live in the house are members. You join with an invite code from
 
 On your phone or laptop, the menu has:
 
-- **Hub**: the home page. The New and Messages tiles at the top, today's calendar, the scores, the pinned notes and the shopping list.
+- **Hub**: the home page. The Messages tile at the top, today's calendar, the scores, the pinned notes and the shopping list.
 - **Bounties**: every chore, with its points, whose streak it is, and whether it is ready or when it can be done again.
 - **Calendar**: the house calendar (the house's Google Calendar).
 - **Board**: the notes everyone can read and change. The **Messages** tile on the hub counts the notes you have not read yet; opening the Board marks them read. A note someone edits after you read it counts again, and a note you write or edit yourself never counts for you.

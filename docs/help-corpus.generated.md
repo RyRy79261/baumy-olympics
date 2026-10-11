@@ -48,7 +48,7 @@ Only people who live in the house are members. You join with an invite code from
 
 On your phone or laptop, the menu has:
 
-- **Hub**: the home page. The New and Messages tiles at the top, today's calendar, the scores, the pinned notes and the shopping list.
+- **Hub**: the home page. The Messages tile at the top, today's calendar, the scores, the pinned notes and the shopping list.
 - **Bounties**: every chore, with its points, whose streak it is, and whether it is ready or when it can be done again.
 - **Calendar**: the house calendar (the house's Google Calendar).
 - **Board**: the notes everyone can read and change. The **Messages** tile on the hub counts the notes you have not read yet; opening the Board marks them read. A note someone edits after you read it counts again, and a note you write or edit yourself never counts for you.
@@ -86,7 +86,7 @@ Every chore is a bounty. Each one has:
 - its **points**, the base it pays;
 - a **cooldown**: once anyone has done it, nobody can log it again until the cooldown has passed, so the same bin cannot be taken out twice in an hour.
 
-A bounty has no due date. Either anyone can log it now (**Log it**), or it is cooling down after someone did it: then it says **Again from** the time it can be logged again, and **Not yet** instead of Log it. Bounties you can log come first on the board. A bounty is **new** for its first 3 days.
+A bounty has no due date. Either anyone can log it now (**Log it**), or it is cooling down after someone did it: then it says **Again from** the time it can be logged again, and **Not yet** instead of Log it. Bounties you can log come first on the board. The tabs at the top show every bounty (**All**), or only **Consumables** or **Maintenance**.
 
 ### Logging a chore
 
@@ -160,7 +160,7 @@ Section `kitchen-ipad` · link `/kiosk` · for members
 
 ### What it shows
 
-The iPad on the kitchen wall is the house's shared screen. Its home shows the date and the clock, the **New** and **Messages** icons (tap one to see the new bounties or the notes), the month's calendar, and Baumy at the bottom. The bar along the bottom goes to Bounties, Calendar, Board, Activity, Shop and Scores. **Activity** is what happened in the house, newest first; a chore is disputed from there.
+The iPad on the kitchen wall is the house's shared screen. Its home shows the date and the clock, then three icons: the star opens **Bounties**, the basket opens **Shop** (its number is how many things are on the shopping list), and **Messages** shows the notes not everyone has read yet. Under them are the month's calendar, and Baumy at the bottom. The bar along the bottom goes to Bounties, Calendar, Board, Activity, Shop and Scores. **Activity** is what happened in the house, newest first; a chore is disputed from there.
 
 The **Messages** number on the iPad counts the notes that not everyone in the house has read yet, so it stays until every member has read them. Tap your avatar first, then open **Messages** or the **Board**: that marks those notes read for you only. With nobody picked, looking marks nothing. Reading them on your phone counts too.
 
@@ -325,7 +325,7 @@ Ask Baumy (the cat on the hub and the kitchen screen) in your own words, typed o
 
 - **Who am I** (`whoami`): Returns the household member making this request: their member id, display name, role (admin or member), colour and avatar sprite. Use it to learn who 'me' is before acting for them. _Baumy looks it up and answers._
 - **What Baumy keeps about me** (`get_my_data`): What the app stores about the member asking, as counts, dates and names: how they sign in, their signed-in devices, their profile, their completions, notes (deleted ones are kept), proof photos and when each is deleted, audit-log entries naming them, their AI usage and connected apps, plus the retention rules. Only ever about the asker; it never shows IP addresses or anyone else's data. Use it for 'what do you keep about me?'. _Baumy looks it up and answers. Only in the app, signed in to your own account._
-- **List chores** (`list_chores`): Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true. _Baumy looks it up and answers._
+- **List chores** (`list_chores`): Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true. _Baumy looks it up and answers._
 - **Activity log** (`get_activity`): Lists what happened in the house in the last 30 days, newest first: chores logged (who did and logged each, its status, points, any open dispute and when its dispute window ends), disputes raised and how they ended, bounties added or edited, and points changes scheduled, applied or vetoed. A chore entry's `can` says which of dispute, withdraw, concede, undo and attach a photo you may do to it now; a scheduled points change's `canVeto` says whether you may veto it. Times are ISO 8601 in UTC. _Baumy looks it up and answers._
 - **Get the standings** (`get_standings`): Returns the season scoreboard: each member's rank and points (scored completions plus approved adjustments), the part of those points that is still provisional (claims that can still be disputed), how far each member is behind the leader, the leader (who would take the pot now, or null on a tie), the prize mode, dispute counts this month, the latest scored completions with their breakdown (base, streak bonus, break bonus) and the point adjustments. Times are ISO 8601 in UTC; the household lives in Europe/Berlin. _Baumy looks it up and answers._
 - **Get the streaks** (`get_streaks`): Returns the season's streak board: who holds each chore's streak now and how long it is, and the season's best runs (current or already broken), longest first, each with its chore, member, length, weight (base points added up) and dates. Times are ISO 8601 in UTC. _Baumy looks it up and answers._

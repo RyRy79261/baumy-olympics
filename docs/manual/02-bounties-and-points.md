@@ -8,7 +8,6 @@ covers:
   - packages/core/src/scoring/points.ts
   - packages/core/src/scoring/verification.ts
   - packages/core/src/scoring/frequency.ts
-  - apps/web/lib/chores/new-bounty.ts
   - apps/web/lib/chores/view.ts
   - apps/web/components/chores/chore-grid.tsx
   - apps/web/components/activity/activity-log.tsx
@@ -23,7 +22,7 @@ Every chore is a bounty. Each one has:
 - its **points**, the base it pays;
 - a **cooldown**: once anyone has done it, nobody can log it again until the cooldown has passed, so the same bin cannot be taken out twice in an hour.
 
-A bounty has no due date. Either anyone can log it now (**Log it**), or it is cooling down after someone did it: then it says **Again from** the time it can be logged again, and **Not yet** instead of Log it. Bounties you can log come first on the board. A bounty is **new** for its first {{NEW_BOUNTY_DAYS}} days.
+A bounty has no due date. Either anyone can log it now (**Log it**), or it is cooling down after someone did it: then it says **Again from** the time it can be logged again, and **Not yet** instead of Log it. Bounties you can log come first on the board. The tabs at the top show every bounty (**All**), or only **Consumables** or **Maintenance**.
 
 ## Logging a chore
 
