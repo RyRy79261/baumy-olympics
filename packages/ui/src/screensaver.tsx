@@ -9,8 +9,8 @@ import { Raccoon } from "./raccoon";
 // (proto/kiosk-home-pixel, shared-overlays.tsx `Screensaver`): a dim night
 // room with a moonlit window, fairy lights, a big dim clock, Baumy asleep on
 // a shelf, and four raccoons (raccoon.tsx, issue #191): one sits by the
-// bin it has been through, one stands under the shelf reaching up for
-// Baumy, one walks off on its hind legs with a jar, and one pushes a box.
+// bin, one stands under the shelf reaching up for Baumy, one walks off on
+// its hind legs with a jar, and one pushes a box.
 // It replaces the old night screen; the app decides when it shows (at
 // night, and after 5 minutes untouched).
 //
@@ -47,10 +47,9 @@ const BIN: Sprite = [
   ".KgKgKKgKgK.",
   "..KKKKKKKK..",
 ];
-const TRASH: Sprite = ["..KK.K", ".KYKKW", "KPK.KK"];
 
 /** The props the screensaver's floor clutter is drawn from, for tests. */
-export const SCREENSAVER_ART = { BOX, BIN, TRASH } as const;
+export const SCREENSAVER_ART = { BOX, BIN } as const;
 
 const INK = "#07040c";
 /** The dim clock's colour: readable across a dark kitchen, never bright. */
@@ -231,20 +230,12 @@ export function Screensaver({
             aria-hidden
             className="absolute -inset-x-8 top-[71%] -bottom-8 block bg-[repeating-linear-gradient(90deg,#1d1020_0_80px,#180c1a_80px_160px)] shadow-[inset_0_4px_0_#2a1628]"
           >
-            {/* The bin, and what has already come out of it. */}
+            {/* The bin. */}
             <span className="absolute -top-[72px] left-[calc(18vw+32px)] block">
               <PixelArt
                 grid={BIN}
                 scale={8}
                 palette={{ K: INK, G: "#3d4a5c", g: "#2c3645" }}
-                className="block"
-              />
-            </span>
-            <span className="absolute -top-[15px] left-[calc(18vw-24px)] block">
-              <PixelArt
-                grid={TRASH}
-                scale={5}
-                palette={{ K: INK, Y: "#8a7a2c", W: "#6f6a80", P: "#7a3a5c" }}
                 className="block"
               />
             </span>
@@ -285,7 +276,7 @@ export function Screensaver({
             >
               <span className="flex items-end">
                 <Raccoon pose="walk" scale={4} />
-                <span className="-ml-1 block">
+                <span className="-ml-4 block">
                   <PixelArt
                     grid={BOX}
                     scale={6}
