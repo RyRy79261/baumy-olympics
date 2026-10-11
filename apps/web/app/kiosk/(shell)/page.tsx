@@ -18,7 +18,7 @@ import {
   unseenMessages,
 } from "@/lib/kiosk/dashboard";
 import { loadDashboard, shoppingCount } from "@/lib/kiosk/dashboard-load";
-import { clearPickAction } from "../actions";
+import { clearPickAction, kioskDeleteNoteAction } from "../actions";
 import { kioskSeeNotesAction } from "../note-actions";
 
 // The kitchen screen's home (ADR 0005, issue #65): the portrait dashboard,
@@ -76,6 +76,7 @@ export default async function KioskHomePage({
         members={data.members}
         actingId={kiosk.memberId ?? null}
         seeNotes={kioskSeeNotesAction}
+        removeNote={kioskDeleteNoteAction}
       />
       <MonthCalendar
         key={month}

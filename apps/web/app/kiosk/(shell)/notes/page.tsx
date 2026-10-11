@@ -16,8 +16,9 @@ import {
 import { kioskSeeNotesAction } from "../../note-actions";
 
 // The household's notes on the kitchen iPad (SPEC §3.5, §8): anyone can read
-// them; the member whose avatar was tapped can add, change, pin or delete
-// one, and every change asks for their PIN in that request (SPEC §6.2).
+// them; the member whose avatar was tapped can add, change, pin or remove
+// one, with no PIN (owner ruling 2026-10-02, issue #145; Remove, issue
+// #194).
 // Opened with someone picked, the notes on it are seen by that member only
 // (issue #153); with nobody picked, by nobody.
 
@@ -37,8 +38,8 @@ export default async function KioskNotesPage() {
         title="Board"
         description={
           acting
-            ? "Changing a note asks for your PIN."
-            : "Tap your avatar at the top to add or change a note."
+            ? `Hi ${kiosk.displayName}. Add a note, or tap Remove on one that is done with.`
+            : "Tap your avatar at the top to add, change or remove a note."
         }
         actions={
           <Link href="/kiosk" className={buttonClass("secondary", "kiosk")}>
