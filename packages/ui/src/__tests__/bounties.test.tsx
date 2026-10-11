@@ -156,6 +156,18 @@ describe("BountySummary", () => {
     );
     expect(calm).toMatch(/text-bm-dim">Again from/);
     expect(calm).not.toContain(">New<");
+    // Without a status (the hub's "Ready bounties"), no empty line.
+    const bare = html(
+      <BountySummary
+        name="Mop"
+        sprite="mop"
+        kind="consumable"
+        points={null}
+        streak="No streak yet"
+      />,
+    );
+    expect(bare).toContain("No streak yet");
+    expect(bare).not.toContain("data-bounty-status");
   });
 });
 

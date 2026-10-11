@@ -152,8 +152,8 @@ describe("loadHub", () => {
     expect(hub.chores).toMatchObject({
       status: "ready",
       data: [
-        { name: SEED_CHORES.dishes.name, status: "Ready", isNew: true },
-        { name: SEED_CHORES.trash.name, status: "Ready", isNew: false },
+        { name: SEED_CHORES.dishes.name, isNew: true },
+        { name: SEED_CHORES.trash.name, isNew: false },
       ],
     });
     expect(hub.chores.status === "ready" && hub.chores.data).toHaveLength(2);

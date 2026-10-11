@@ -150,7 +150,7 @@ function chore(over: Partial<ChoreView>): ChoreView {
 }
 
 describe("readyChores", () => {
-  it("lists the bounties ready to log, by name, each saying Ready", () => {
+  it("lists the bounties ready to log, by name", () => {
     const list = readyChores([
       chore({ name: "Mop", lastDoneAt: iso(-24 * 40) }),
       chore({ name: "Cooling", state: "cooldown", availableAt: iso(2) }),
@@ -161,16 +161,10 @@ describe("readyChores", () => {
       }),
     ]);
     expect(list.map((c) => c.name)).toEqual(["Bins", "Mop"]);
-    expect(list[0]).toMatchObject({
-      status: "Ready",
-      streak: "Ryan · streak 3",
-    });
-    // Done 40 days ago is still only Ready: there is no due date or
+    expect(list[0]).toMatchObject({ streak: "Ryan · streak 3" });
+    // Done 40 days ago is still only ready: there is no due date or
     // overdue any more (issue #189).
-    expect(list[1]).toMatchObject({
-      status: "Ready",
-      streak: "No streak yet",
-    });
+    expect(list[1]).toMatchObject({ streak: "No streak yet" });
     expect(list[1]).not.toHaveProperty("overdue");
     expect(list[1]).not.toHaveProperty("when");
   });

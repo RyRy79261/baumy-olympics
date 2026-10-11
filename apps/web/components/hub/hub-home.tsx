@@ -269,7 +269,6 @@ export function HubHome({
                     kind={c.kind}
                     points={c.points}
                     streak={c.streak}
-                    status={c.status}
                     isNew={c.isNew}
                   />
                 ))}

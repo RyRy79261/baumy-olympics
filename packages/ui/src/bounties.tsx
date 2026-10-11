@@ -77,8 +77,11 @@ export interface BountyFields {
   points: number | null;
   /** E.g. "Ryan · streak 3", or "No streak yet". */
   streak: ReactNode;
-  /** "Ready", or "Again from Wed 30 Sep, 08:00". */
-  status: ReactNode;
+  /**
+   * "Ready", or "Again from Wed 30 Sep, 08:00". Left out where the list
+   * already says it (the hub's "Ready bounties").
+   */
+  status?: ReactNode;
   /** Added in the last 3 days. */
   isNew?: boolean;
 }
@@ -129,16 +132,18 @@ function BountyFace({
             {streak}
           </span>
         </span>
-        <span
-          data-bounty-status
-          className={cx(
-            "leading-snug",
-            kiosk ? "text-lg" : "text-base",
-            "text-bm-dim",
-          )}
-        >
-          {status}
-        </span>
+        {status ? (
+          <span
+            data-bounty-status
+            className={cx(
+              "leading-snug",
+              kiosk ? "text-lg" : "text-base",
+              "text-bm-dim",
+            )}
+          >
+            {status}
+          </span>
+        ) : null}
       </span>
       {points !== null ? (
         <span
