@@ -196,6 +196,57 @@ describe("Screensaver", () => {
     expect(shelf.className).toContain("w-[240px]");
   });
 
+  // Issue #199: the shelf scene moved up under the clock, so Baumy's z's
+  // must never reach the clock, even at its lowest hop, on the 820 × 1180
+  // kitchen screen. Both are inside the drift, which moves them together.
+  it("keeps the z's under the clock's lowest hop", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    root = createRoot(div);
+    act(() =>
+      root!.render(<Screensaver time="02:10" date="d" onWake={() => {}} />),
+    );
+    const SCREEN_H = 1180;
+    const num = (re: RegExp, s: string) => Number(re.exec(s)![1]);
+    const css = div.querySelector("style")!.textContent!;
+    const clock = div.querySelector<HTMLElement>("[data-clock]")!;
+    // The clock's box: the 84px time (leading none), mt-6, and the date
+    // line (30px measured in Chromium at 820 × 1180).
+    const time = clock.querySelector('[data-testid="screensaver-time"]')!;
+    expect(time.className).toContain("text-[84px] leading-none");
+    expect(clock.lastElementChild!.className).toContain("mt-6");
+    const clockTop = num(/(?:^| )top-\[(\d+)px\]/, clock.className);
+    const hop = css.match(
+      /@keyframes bm-ss-clock \{[^}]*(?:\}[^}]*)*?\n\}/,
+    )![0];
+    const lowest = Math.max(
+      ...[...hop.matchAll(/translate\(-?\d+px, (-?\d+)px\)/g)].map((m) =>
+        Number(m[1]),
+      ),
+    );
+    const clockBottom = clockTop + lowest + 84 + 24 + 30;
+    // The z's: the floor's line, the shelf group, the z's in it, and how
+    // far they rise.
+    const floor = div.querySelector<HTMLElement>(
+      '[data-raccoon="reach"]',
+    )!.parentElement!;
+    expect(floor.className).toContain("-bottom-8");
+    const floorLine = SCREEN_H + 32 - num(/ h-\[(\d+)px\]/, floor.className);
+    const group = div.querySelector<HTMLElement>("[data-baumy-shelf]")!;
+    const groupTop = floorLine - num(/-top-\[(\d+)px\]/, group.className);
+    const zs = group.firstElementChild as HTMLElement;
+    expect(zs.textContent).toBe("zz");
+    const zTop = groupTop + num(/(?:^| )top-\[(\d+)px\]/, zs.className);
+    const rise = -num(
+      /100% \{ transform: translate\(-?\d+px, (-?\d+)px\)/,
+      css.match(/@keyframes bm-ss-zzz[^\n]*/)![0],
+    );
+    // Each z sits at or below the first (the teal one is lower still).
+    for (const z of zs.children)
+      expect((z as HTMLElement).className).not.toMatch(/-top-/);
+    expect(zTop - rise).toBeGreaterThan(clockBottom);
+  });
+
   it("parks the walkers apart and wholly on screen when motion is reduced", () => {
     const div = document.createElement("div");
     document.body.append(div);
