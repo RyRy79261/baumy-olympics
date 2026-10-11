@@ -48,7 +48,7 @@ Something everyone must read (a plumber coming, the water off) can be posted as 
 
 ## When it rests
 
-- After {{SCREENSAVER_IDLE_MIN}} minutes untouched in the day, and every night from {{NIGHT_START}} to {{NIGHT_END}}, it shows the raccoon screensaver with a big clock. A tap wakes it; the tap never presses anything underneath.
+- After {{SCREENSAVER_IDLE_MIN}} minutes untouched in the day, and every night from {{NIGHT_START}} to {{NIGHT_END}}, it shows the raccoon screensaver with a big clock: four raccoons around the bin, under Baumy's shelf, off with a jar and pushing a box. A tap wakes it; the tap never presses anything underneath.
 - With no internet it says "No connection" and comes back by itself.
 
 ## Admin things on the iPad
