@@ -6,7 +6,14 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { KioskShell } from "../kiosk-shell";
 import { KioskNotice } from "../kiosk-night";
 import { RACCOON_POSES } from "../raccoon";
-import { PARKED, SCREENSAVER_ART, Screensaver } from "../screensaver";
+import { BAUMY_FRAMES } from "../pixel/baumy-cat";
+import {
+  BAUMY_LIFT,
+  BAUMY_SCALE,
+  PARKED,
+  SCREENSAVER_ART,
+  Screensaver,
+} from "../screensaver";
 
 // The kiosk's always-on pieces (SPEC §8, issue #29; ADR 0005 §6): the
 // screensaver wakes on a touch anywhere, the notice is a polite live region, and the shell
@@ -128,6 +135,65 @@ describe("Screensaver", () => {
       top("jar") + (Math.max(...drawn(RACCOON_POSES.carry[0]!)) + 1) * 4;
     const ears = top("box") + Math.min(...drawn(RACCOON_POSES.walk[0]!)) * 4;
     expect(ears - feet).toBeGreaterThanOrEqual(32);
+  });
+
+  // Issue #199 (2026-10-11): the shelf scene moved up into the empty band,
+  // and Baumy is bigger and easy to see, just over the reacher's paws.
+  it("sets Baumy big and bright on a shelf just over the reacher's paws", () => {
+    const div = document.createElement("div");
+    document.body.append(div);
+    root = createRoot(div);
+    act(() =>
+      root!.render(<Screensaver time="02:10" date="d" onWake={() => {}} />),
+    );
+    const px = (el: Element, prop: string) =>
+      Number(
+        new RegExp(`(?:^| )(-?)${prop}-\\[(\\d+)px\\]`)
+          .exec(el.className)!
+          .slice(1, 3)
+          .join(""),
+      );
+    const shelf = div.querySelector<HTMLElement>("[data-shelf]")!;
+    const group = div.querySelector<HTMLElement>("[data-baumy-shelf]")!;
+    const reach = div.querySelector<HTMLElement>('[data-raccoon="reach"]')!;
+    // All three stand on the floor line, at whole pixels from it.
+    const floor = reach.parentElement!;
+    expect(shelf.parentElement).toBe(floor);
+    expect(group.parentElement).toBe(floor);
+    expect(floor.className).toMatch(/ h-\[\d+px\]/);
+    expect(floor.className).not.toMatch(/top-\[\d+%\]/);
+    // Baumy: the approved sprite at a whole-number scale bigger than the
+    // old 3, at full opacity, lifted in brightness as a whole.
+    expect(Number.isInteger(BAUMY_SCALE)).toBe(true);
+    expect(BAUMY_SCALE).toBeGreaterThan(3);
+    const cat = group.querySelector<HTMLElement>('[data-state="sleeping"]')!;
+    expect(cat).not.toBeNull();
+    expect(cat.parentElement!.style.filter).toBe(BAUMY_LIFT);
+    expect(group.innerHTML).not.toMatch(/opacity-\d/);
+    // The cat's frame stands on the shelf's top.
+    const [w, h] = [
+      BAUMY_FRAMES.idle[0]![0]!.length,
+      BAUMY_FRAMES.idle[0]!.length,
+    ];
+    // Drawn at that scale: the frame is w × h art pixels, each BAUMY_SCALE.
+    const frame = cat.querySelector<HTMLElement>("[data-frames]")!;
+    expect(frame.style.width).toBe(`${w * BAUMY_SCALE}px`);
+    expect(frame.style.height).toBe(`${h * BAUMY_SCALE}px`);
+    expect(px(group, "top") + h * BAUMY_SCALE).toBe(px(shelf, "top"));
+    // Baumy sits over the reacher: the middle of its frame is within the
+    // reacher's 30 art pixels (× 4).
+    const middle = px(group, "left") + (w * BAUMY_SCALE) / 2;
+    expect(middle).toBeGreaterThan(px(reach, "left"));
+    expect(middle).toBeLessThan(px(reach, "left") + 30 * 4);
+    // The shelf (12px and a 4px shadow) ends 8px over the reacher's paws
+    // (its first art row is drawn): 4px at the top of its 4px hop.
+    expect(RACCOON_POSES.reach[0]![0]).toMatch(/[^.]/);
+    const shelfBottom = px(shelf, "top") + 12 + 4;
+    expect(px(reach, "top") - shelfBottom).toBe(8);
+    // The shelf spans the reacher.
+    expect(px(shelf, "left")).toBeLessThan(px(reach, "left"));
+    expect(px(shelf, "left") + 240).toBeGreaterThan(px(reach, "left") + 120);
+    expect(shelf.className).toContain("w-[240px]");
   });
 
   it("parks the walkers apart and wholly on screen when motion is reduced", () => {
