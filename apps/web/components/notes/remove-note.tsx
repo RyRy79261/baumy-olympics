@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@baumy/ui";
 import { AttestedForm } from "@/components/kiosk/attested-form";
 import type { FormAction } from "@/components/use-action-form";
@@ -29,6 +29,22 @@ export function RemoveNote({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
+  const removed = useRef(onRemoved);
+  removed.current = onRemoved;
+  // The success is reported from the action itself: once the note is gone
+  // the page re-renders without it, and this form unmounts before it could
+  // see its own answer.
+  const [remove] = useState(() => {
+    const send: FormAction<DeleteNoteData> = async (prev, form) => {
+      const r = await action(prev, form);
+      if (r.ok) {
+        toast.success(`Removed ${r.data.title}.`);
+        removed.current?.(note.id);
+      }
+      return r;
+    };
+    return send;
+  });
   if (!confirming) {
     return (
       <Button
@@ -52,7 +68,7 @@ export function RemoveNote({
         Remove this note? It goes for everyone.
       </p>
       <AttestedForm
-        action={action}
+        action={remove}
         label="Remove"
         variant="danger"
         pinLabel={pinLabel}
@@ -60,10 +76,6 @@ export function RemoveNote({
         onPending={setPending}
         onResult={(r) => {
           if (toastActionError(r)) return;
-          if (r.ok) {
-            toast.success(`Removed ${r.data.title}.`);
-            onRemoved?.(note.id);
-          }
           setConfirming(false);
         }}
         bar={{
