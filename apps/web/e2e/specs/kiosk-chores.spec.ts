@@ -103,6 +103,78 @@ test("on the kiosk, break the partner's streak and log for someone else", async 
   await member.context.close();
 });
 
+// Issue #200, owner choice 2026-10-11 (SPEC §12 decision 38): the Bounties
+// page always shows the list; tapping your face is only needed to log one.
+// With nobody picked every bounty is there to read, with its points and,
+// while cooling down, "Again from …", and nothing in the list to tap.
+test("on the kiosk, the bounties show before anyone is picked, to read only", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const daily = `Wipe the hob ${suffix}`;
+  const founder = `Founder ${project}`;
+
+  await founderAdmin(page, project);
+  await addChore(page, { name: daily, basePoints: 15, cooldownHours: 24 });
+  const ipad = await pairedKiosk(browser, page, `iPad ${suffix}`);
+  const kiosk = ipad.page;
+  await openKioskChores(kiosk);
+
+  // Nobody picked: the line says how to log one, and the bounty is listed.
+  await expect(kiosk.getByTestId("acting-as")).toHaveCount(0);
+  await expect(
+    kiosk.getByText("Tap your avatar at the top to log one."),
+  ).toBeVisible();
+  const list = kiosk.getByRole("list", { name: "Bounties" });
+  const row = kiosk.getByTestId(`chore-${daily}`);
+  await expect(row).toBeVisible();
+  await expect(row).toContainText(daily);
+  await expect(row).toContainText("Maintenance");
+  await expect(row).toContainText("15 pts");
+  // Ready says nothing; nothing in the list is a button; no Check my PIN.
+  await expect(row.locator("[data-bounty-status]")).toHaveCount(0);
+  // Ready reads as ready by being bright: not dimmed.
+  await expect(row.locator("[data-kind]")).toHaveCSS("opacity", "1");
+  await expect(list.locator("li").first()).toBeVisible();
+  await expect(list.getByRole("button")).toHaveCount(0);
+  await expect(list).not.toContainText("Log it");
+  await expect(kiosk.getByRole("button", { name: "Check my PIN" })).toHaveCount(
+    0,
+  );
+  // The tabs still narrow it, and are kiosk-sized.
+  await expectKioskTargets(kiosk.getByTestId("bounty-tabs"));
+  await kiosk
+    .getByTestId("bounty-tabs")
+    .locator('[data-tab="consumable"]')
+    .click();
+  await expect(row).toHaveCount(0);
+  await kiosk.getByTestId("bounty-tabs").locator('[data-tab="all"]').click();
+  await expect(row).toBeVisible();
+
+  // Picked: the bounties are buttons again, and one is logged.
+  await kiosk.getByRole("button", { name: founder, exact: true }).click();
+  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+  await expect(tile(kiosk, daily)).toContainText("Log it");
+  const sheet = await openChore(kiosk, daily);
+  await sheet.getByRole("button", { name: "Log it" }).click();
+  await expect(sheet).toBeHidden();
+  await expect(kiosk.getByTestId("score-pop")).toHaveText("+15");
+
+  // Done: nobody again. The logged bounty says when it is ready again.
+  await kiosk.getByRole("button", { name: "Done" }).click();
+  await expect(kiosk.getByTestId("acting-as")).toHaveCount(0);
+  await expect(row.locator("[data-bounty-status]")).toHaveText(/^Again from /);
+  // Dimmed while it cools down, as a disabled row on the picked board.
+  await expect(row.locator("[data-kind]")).toHaveCSS("opacity", "0.5");
+  await expect(row).toContainText(`${founder} · streak 1`);
+  await expect(list.getByRole("button")).toHaveCount(0);
+
+  await ipad.context.close();
+});
+
 // Issue #181, owner ruling 2026-10-06: the floating "+N" says the toast's
 // points and floats where the bounty was when it was tapped, though logging
 // re-sorts the board (its cooldown sends it to the end); the page never
