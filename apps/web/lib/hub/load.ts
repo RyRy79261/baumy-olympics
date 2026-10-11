@@ -7,7 +7,7 @@ import type { ActionResult } from "@/lib/actions/result";
 import type { ShoppingEntry } from "@/lib/integrations/brain";
 import { formatEuros, gapLabel } from "@/lib/scores/view";
 import {
-  dueChores,
+  readyChores,
   upcomingEvents,
   widgetState,
   type HubChore,
@@ -45,7 +45,7 @@ export interface HubData {
   /** The pot's total, "€80.50", or why it cannot be shown. */
   pot: { ok: true; total: string } | { ok: false; message: string };
   notes: WidgetState<NoteView[]>;
-  /** The Urgent, New and Messages counts (ADR 0005 §1). */
+  /** The New and Messages counts (ADR 0005 §1). */
   counts: HubCounts;
   /**
    * brain's shopping list. Ready even when empty: the widget's quick-add
@@ -125,8 +125,8 @@ async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
     now: ctx.now.toISOString(),
     chores: widgetState(
       chores,
-      (d) => dueChores(d.chores, ctx.now),
-      "Nothing is due. Nice.",
+      (d) => readyChores(d.chores),
+      "Every bounty has been done recently. Nice.",
     ),
     standings: widgetState(
       standings,
@@ -149,9 +149,6 @@ async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
       "Nothing is pinned. Pin a note on the Board.",
     ),
     counts: {
-      urgent: chores.ok
-        ? chores.data.chores.filter((c) => c.urgent).length
-        : null,
       new: chores.ok ? chores.data.chores.filter((c) => c.isNew).length : null,
       messages: notes.ok ? notes.data.unseenCount : null,
     },

@@ -7,11 +7,12 @@ import type { PixelIconName } from "./pixel/icons";
 // Chores presented as bounties (ADR 0005 §2), in the approved prototype's
 // calm rows (proto/kiosk-home-pixel, calm-kit.tsx `BountyRows`): the kind's
 // glyph in its colour, the name with its New mark, the kind and the streak,
-// then when it is due (red when urgent: that is the one urgent signal) and
-// its points. Also the filter tabs above
-// a list and the status tiles (Urgent, New, Messages) of the hub's top row.
-// One accent, one meaning (ADR 0005 §8): amber is consumable, teal is
-// maintenance, red is urgent, yellow is new or points, pink is messages.
+// then whether it is ready or when it can be done again, and its points.
+// Also the filter tabs above a list and the status tiles (New, Messages) of
+// the hub's top row. One accent, one meaning (ADR 0005 §8): amber is
+// consumable, teal is maintenance, yellow is new or points, pink is
+// messages. A chore has no due date, so nothing is urgent (SPEC §12
+// decision 35).
 
 export type BountyKind = "consumable" | "maintenance";
 
@@ -76,13 +77,8 @@ export interface BountyFields {
   points: number | null;
   /** E.g. "Ryan · streak 3", or "No streak yet". */
   streak: ReactNode;
-  /** E.g. "Due since Wed 30 Sep, 08:00", or "Again from …". */
+  /** "Ready", or "Again from Wed 30 Sep, 08:00". */
   status: ReactNode;
-  /**
-   * Due now or before Berlin midnight: the status line reads red, the one
-   * urgent signal (no separate mark, ADR 0005 §8).
-   */
-  urgent?: boolean;
   /** Added in the last 3 days. */
   isNew?: boolean;
 }
@@ -95,7 +91,6 @@ function BountyFace({
   points,
   streak,
   status,
-  urgent = false,
   isNew = false,
   kiosk,
 }: BountyFields & { kiosk: boolean }) {
@@ -139,7 +134,7 @@ function BountyFace({
           className={cx(
             "leading-snug",
             kiosk ? "text-lg" : "text-base",
-            urgent ? "text-bm-red" : "text-bm-dim",
+            "text-bm-dim",
           )}
         >
           {status}
@@ -178,7 +173,6 @@ export function BountyRow({
   points,
   streak,
   status,
-  urgent = false,
   isNew = false,
   cta = "Log it",
   kiosk = false,
@@ -190,7 +184,6 @@ export function BountyRow({
     <button
       type={type}
       data-kind={kind}
-      data-urgent={urgent ? "true" : "false"}
       className={cx(
         "flex w-full items-center gap-3 py-3 text-left text-bm-text sm:gap-4",
         "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50",
@@ -200,7 +193,7 @@ export function BountyRow({
       {...props}
     >
       <BountyFace
-        {...{ name, sprite, kind, points, streak, status, urgent, isNew }}
+        {...{ name, sprite, kind, points, streak, status, isNew }}
         kiosk={kiosk}
       />
       {/* Only for the eye: the row itself is the button. */}
@@ -219,10 +212,7 @@ export function BountyRow({
   );
 }
 
-/**
- * One bounty as a line in a widget, not a button: the hub's urgent list,
- * where `urgent` reddens the status line as it does on the board.
- */
+/** One bounty as a line in a widget, not a button: the hub's list. */
 export function BountySummary({
   name,
   sprite,
@@ -230,7 +220,6 @@ export function BountySummary({
   points,
   streak,
   status,
-  urgent = false,
   isNew = false,
   className,
   ...props
@@ -238,12 +227,11 @@ export function BountySummary({
   return (
     <li
       data-kind={kind}
-      data-urgent={urgent ? "true" : "false"}
       className={cx("flex items-center gap-3 py-3 text-bm-text", className)}
       {...props}
     >
       <BountyFace
-        {...{ name, sprite, kind, points, streak, status, urgent, isNew }}
+        {...{ name, sprite, kind, points, streak, status, isNew }}
         kiosk={false}
       />
     </li>

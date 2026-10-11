@@ -23,15 +23,13 @@ describe("BountyRow", () => {
         kind="consumable"
         points={15}
         streak="Ryan · streak 3"
-        status="Due since Wed 30 Sep, 08:00"
-        urgent
+        status="Ready"
         isNew
       />,
     );
     expect(out.match(/<button/g)).toHaveLength(1);
     expect(out).toContain('type="button"');
     expect(out).toContain('data-kind="consumable"');
-    expect(out).toContain('data-urgent="true"');
     expect(out).toContain('data-sprite="tp"');
     expect(out).toContain('data-glyph="tp"');
     expect(out).toContain("Toilet paper");
@@ -39,10 +37,11 @@ describe("BountyRow", () => {
     expect(out).toContain("text-bm-amber");
     expect(out).toContain("Ryan · streak 3");
     expect(out).toContain("15 pts");
-    // New in yellow; urgent is said once, by the status line in red.
+    // New in yellow; the status line is calm, never red (issue #189).
     expect(out).toMatch(/text-bm-yellow uppercase">New</);
-    expect(out).toMatch(/text-bm-red">Due since/);
-    expect(out).not.toContain(">Urgent<");
+    expect(out).toMatch(/text-bm-dim">Ready</);
+    expect(out).not.toContain("text-bm-red");
+    expect(out).not.toContain("data-urgent");
     // The kind and the streak are two phrases that each stay whole.
     expect(out).toMatch(/whitespace-nowrap text-bm-amber">Consumable</);
     // The "Log it" at the end is only for the eye.
@@ -62,11 +61,9 @@ describe("BountyRow", () => {
         cta="Open"
       />,
     );
-    expect(out).toContain('data-urgent="false"');
     expect(out).toContain("Maintenance");
     expect(out).toContain("text-bm-teal");
     expect(out).not.toContain(">New<");
-    expect(out).not.toContain(">Urgent<");
     expect(out).not.toContain("pts");
     expect(out).toMatch(/text-bm-dim">Again from/);
     expect(out).toContain("Open");
@@ -81,7 +78,7 @@ describe("BountyRow", () => {
         kind="maintenance"
         points={20}
         streak="No streak yet"
-        status="Due"
+        status="Ready"
         kiosk
       />,
     );
@@ -135,20 +132,18 @@ describe("BountySummary", () => {
         kind="maintenance"
         points={20}
         streak="No streak yet"
-        status="Never done"
-        urgent
+        status="Ready"
         isNew
       />,
     );
     expect(out.startsWith("<li")).toBe(true);
     expect(out).not.toContain("<button");
     expect(out).toContain('data-testid="hub-chore-Bins"');
-    expect(out).toContain('data-urgent="true"');
     expect(out).toContain("Maintenance");
     expect(out).toContain("20 pts");
     expect(out).toContain(">New<");
-    expect(out).toMatch(/text-bm-red">Never done/);
-    expect(out).not.toContain(">Urgent<");
+    expect(out).toMatch(/text-bm-dim">Ready</);
+    expect(out).not.toContain("text-bm-red");
     const calm = html(
       <BountySummary
         name="Mop"
@@ -156,10 +151,10 @@ describe("BountySummary", () => {
         kind="consumable"
         points={null}
         streak="No streak yet"
-        status="Due at 18:00"
+        status="Again from Thu 1 Oct, 08:00"
       />,
     );
-    expect(calm).toContain('data-urgent="false"');
+    expect(calm).toMatch(/text-bm-dim">Again from/);
     expect(calm).not.toContain(">New<");
   });
 });

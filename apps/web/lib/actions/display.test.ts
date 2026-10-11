@@ -41,7 +41,7 @@ describe("the idle kiosk", () => {
     expect(r).toMatchObject({ ok: true });
     const chores = r.ok ? r.data.chores : [];
     const trash = chores.find((c) => c.id === choreId);
-    expect(trash).toMatchObject({ state: "due", basePoints: 20 });
+    expect(trash).toMatchObject({ state: "ready", basePoints: 20 });
     expect(trash!.next).toBeNull();
     // The same read as a member does preview the score.
     const asMember = await runAction(

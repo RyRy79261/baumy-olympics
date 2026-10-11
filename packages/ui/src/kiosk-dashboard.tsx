@@ -16,8 +16,9 @@ import { PixelScroll } from "./pixel-scroll";
 // open (tabs, bounty rows, message rows), the month grid's day cells and
 // chips, the day sheet's rows, and the footer nav. They take plain props and
 // know nothing about chores, Google or the actions. One accent has one
-// meaning (§8): red urgent, yellow new or points, pink messages, amber
-// consumable, teal maintenance, violet today.
+// meaning (§8): yellow new or points, pink messages, amber consumable, teal
+// maintenance, violet today. (Red was urgent; there is no urgent any more,
+// SPEC §12 decision 35.)
 
 /** The accents a dashboard part can take. */
 export type DashboardTone =
@@ -227,17 +228,14 @@ const KINDS = {
   maintenance: { label: "Maintenance", tone: "teal" },
 } as const;
 
-/** How loudly a deadline is said: late is red, soon amber, later muted. */
-const DUE_TONES = { late: "red", soon: "amber", later: "muted" } as const;
-
 /** The class of a bounty row's action ("I'll do it"), a link or a button. */
 export const bountyActionClass =
   "pixel-frame grid h-[60px] w-[132px] shrink-0 place-items-center bg-bm-raised font-label text-[15px] font-bold text-bm-text uppercase [--pf-w:3px] [--pf:var(--color-bm-text)]";
 
 /**
  * One bounty: its glyph in its kind's colour, its name (and "new"), its kind
- * and whose streak you would steal, when it is due, its points, and the
- * action (a link to log it).
+ * and whose streak you would steal, whether it is ready or when it can be
+ * done again, its points, and the action (a link to log it).
  */
 export function ModuleBountyRow({
   glyph,
@@ -245,7 +243,7 @@ export function ModuleBountyRow({
   kind,
   isNew = false,
   streak,
-  due,
+  status,
   points,
   action,
   ...props
@@ -256,7 +254,8 @@ export function ModuleBountyRow({
   isNew?: boolean;
   /** Who holds this chore's streak (in their colour), if anyone. */
   streak: { name: string; length: number; colour: string } | null;
-  due: { text: string; tone: keyof typeof DUE_TONES };
+  /** "Ready", or "Again from 18:00" while it cools down; said calmly. */
+  status: string;
   points: number | null;
   action: ReactNode;
 }) {
@@ -312,11 +311,10 @@ export function ModuleBountyRow({
       </div>
       <div className="w-[136px] shrink-0 text-right">
         <div
-          data-due={due.tone}
-          className="font-body text-[24px] leading-none"
-          style={{ color: toneColour(DUE_TONES[due.tone]) }}
+          data-bounty-status
+          className="font-body text-[22px] leading-tight text-bm-muted"
         >
-          {due.text}
+          {status}
         </div>
         {points !== null ? (
           <div className="mt-2 font-display text-[14px] text-bm-yellow">

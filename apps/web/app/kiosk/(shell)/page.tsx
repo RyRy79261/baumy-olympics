@@ -15,7 +15,6 @@ import { householdMembers } from "@/lib/members/household";
 import {
   bountyRows,
   isNewBounty,
-  isUrgentBounty,
   monthCells,
   parseMonthParams,
   unseenMessages,
@@ -26,7 +25,7 @@ import { kioskSeeNotesAction } from "../note-actions";
 
 // The kitchen screen's home (ADR 0005, issue #65): the portrait dashboard,
 // glanceable across the room with no taps. The header has the date, a big
-// clock and the Urgent, New and Messages icons; under it, the month
+// clock and the New and Messages icons; under it, the month
 // calendar, the only home view. It is read as the paired device whether or
 // not anyone has tapped in (the `display` gate), never scrolls, and re-reads
 // itself every 60 seconds and when it comes back into view.
@@ -53,21 +52,19 @@ export default async function KioskHomePage({
   const data = await loadDashboard(ctx, month, () =>
     householdMembers(ctx.householdId),
   );
-  const bounties = (pick: typeof isUrgentBounty) =>
-    data.chores.ok
-      ? {
-          ok: true as const,
-          rows: bountyRows(data.chores.data, pick, data.members, ctx.now),
-        }
-      : data.chores;
+  const fresh = data.chores.ok
+    ? {
+        ok: true as const,
+        rows: bountyRows(data.chores.data, isNewBounty, data.members, ctx.now),
+      }
+    : data.chores;
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="kiosk-home">
       {/* The dashboard is its own heading; this names the page for readers. */}
       <h1 className="sr-only">Kitchen</h1>
       <DashboardHeader
         serverNow={data.now}
-        urgent={bounties(isUrgentBounty)}
-        fresh={bounties(isNewBounty)}
+        fresh={fresh}
         messages={
           data.notes.ok
             ? {

@@ -57,13 +57,10 @@ const chore: ChoreView = {
   archived: false,
   basePoints: 40,
   cooldownMinutes: 24 * 60,
-  intervalMinutes: 3 * 24 * 60,
   streak: null,
   lastDoneAt: null,
-  state: "due",
+  state: "ready",
   availableAt: null,
-  dueAt: null,
-  urgent: false,
   isNew: false,
   createdAt: "2026-09-01T10:00:00.000Z",
   next: null,
@@ -322,12 +319,27 @@ describe("ChoreGrid's floating score (issue #181)", () => {
   it("stays where the row was tapped when it re-sorts to the end, and nothing scrolls", async () => {
     const { render, answer } = await board([bathroom, chore, zebra]);
     await tapAndLog("Trash", answer);
-    // The re-render after logging: Trash is in its cooldown now, last.
-    await render([bathroom, zebra, { ...chore, state: "unavailable" }]);
+    // The re-render after logging: Trash is in its cooldown now, last,
+    // and says when it can be done again; the others are Ready.
+    await render([
+      bathroom,
+      zebra,
+      {
+        ...chore,
+        state: "cooldown",
+        availableAt: "2026-09-30T06:00:00.000Z",
+      },
+    ]);
     const order = [
       ...document.querySelectorAll("li[data-testid^='chore-']"),
     ].map((li) => li.getAttribute("data-testid"));
     expect(order).toEqual(["chore-Bathroom", "chore-Zebra", "chore-Trash"]);
+    const status = (name: string) =>
+      document.querySelector(
+        `[data-testid="chore-${name}"] [data-bounty-status]`,
+      )?.textContent;
+    expect(status("Zebra")).toBe("Ready");
+    expect(status("Trash")).toBe("Again from Wed 30 Sep, 08:00");
 
     const pop = theFloat();
     expect(getToasts().map((t) => t.title)).toContain(
@@ -338,15 +350,22 @@ describe("ChoreGrid's floating score (issue #181)", () => {
     expect(scrolls).not.toHaveBeenCalled();
   });
 
-  it("stays where the row was tapped when the Urgent tab drops it", async () => {
-    const urgent = { ...chore, urgent: true };
-    const { render, answer } = await board([bathroom, urgent]);
+  it("has a New tab and no Urgent tab (issue #189)", async () => {
+    await board([bathroom, chore]);
+    expect(document.querySelector('[data-tab="new"]')).not.toBeNull();
+    expect(document.querySelector('[data-tab="urgent"]')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/urgent|overdue|due /i);
+  });
+
+  it("stays where the row was tapped when the tab drops it", async () => {
+    const fresh = { ...chore, isNew: true };
+    const { render, answer } = await board([bathroom, fresh]);
     await act(async () =>
-      document.querySelector<HTMLButtonElement>('[data-tab="urgent"]')!.click(),
+      document.querySelector<HTMLButtonElement>('[data-tab="new"]')!.click(),
     );
     expect(document.querySelector('[data-testid="chore-Bathroom"]')).toBeNull();
     await tapAndLog("Trash", answer);
-    await render([bathroom, { ...urgent, urgent: false }]);
+    await render([bathroom, { ...fresh, isNew: false }]);
     expect(document.querySelector('[data-testid="chore-Trash"]')).toBeNull();
 
     const pop = theFloat();

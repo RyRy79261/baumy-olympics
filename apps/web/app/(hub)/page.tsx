@@ -18,8 +18,8 @@ import { landingMetadata } from "@/lib/seo";
 import { createReminderAction } from "./reminder-actions";
 import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
 
-// The hub home (SPEC §3.1, issue #20; ADR 0005): the clock and the Urgent,
-// New and Messages tiles, the urgent bounties, today's events, the
+// The hub home (SPEC §3.1, issue #20; ADR 0005): the clock and the New and
+// Messages tiles, the bounties ready to log, today's events, the
 // standings and the pot, the pinned notes, brain's shopping list and the
 // Baumy button (mounted by the frame, components/hub/hub-baumy.tsx), in the
 // kitchen screen's calm look on a scrolling page. The

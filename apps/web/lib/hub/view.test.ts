@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ChoreView } from "@/lib/actions/list-chores";
-import { isUrgent } from "@/lib/chores/urgency";
 import { eventView } from "@/lib/calendar/view";
 import {
   HUB_EVENTS,
   agendaTime,
-  OVERDUE_AFTER_MS,
   clockLines,
-  dueChores,
+  readyChores,
   upcomingEvents,
   widgetState,
 } from "./view";
@@ -128,9 +126,9 @@ describe("upcomingEvents", () => {
   });
 });
 
-/** A chore as list_chores returns it: `urgent` is computed the same way. */
+/** A chore as list_chores returns it. */
 function chore(over: Partial<ChoreView>): ChoreView {
-  const c: ChoreView = {
+  return {
     id: over.name ?? "c",
     name: "c",
     sprite: "broom",
@@ -140,93 +138,59 @@ function chore(over: Partial<ChoreView>): ChoreView {
     archived: false,
     basePoints: 10,
     cooldownMinutes: 60,
-    intervalMinutes: 1440,
     streak: null,
     lastDoneAt: null,
-    state: "due",
+    state: "ready",
     availableAt: null,
-    dueAt: null,
-    urgent: false,
     isNew: false,
     createdAt: "2026-09-01T10:00:00.000Z",
     next: null,
     ...over,
   };
-  return { ...c, urgent: over.urgent ?? isUrgent(c, NOW) };
 }
 
-describe("dueChores", () => {
-  it("lists the longest due first, then later today; never a chore never done", () => {
-    const list = dueChores(
-      [
-        chore({ name: "Soon", state: "done", dueAt: iso(3) }),
-        chore({ name: "Tomorrow", state: "done", dueAt: iso(20) }),
-        chore({ name: "Cooling", state: "cooldown", dueAt: iso(2) }),
-        chore({ name: "Recent", dueAt: iso(-1) }),
-        chore({ name: "Ancient", dueAt: iso(-48) }),
-        chore({ name: "Never" }),
-        chore({ name: "Archived", state: "unavailable", dueAt: iso(1) }),
-        chore({
-          name: "Streaky",
-          dueAt: iso(-1),
-          streak: { holderId: "m", holderName: "Ryan", length: 3 },
-        }),
-      ],
-      NOW,
-    );
-    expect(list.map((c) => c.name)).toEqual([
-      "Ancient",
-      "Recent",
-      "Streaky",
-      "Cooling",
-      "Soon",
+describe("readyChores", () => {
+  it("lists the bounties ready to log, by name, each saying Ready", () => {
+    const list = readyChores([
+      chore({ name: "Mop", lastDoneAt: iso(-24 * 40) }),
+      chore({ name: "Cooling", state: "cooldown", availableAt: iso(2) }),
+      chore({ name: "Archived", state: "unavailable", archived: true }),
+      chore({
+        name: "Bins",
+        streak: { holderId: "m", holderName: "Ryan", length: 3 },
+      }),
     ]);
+    expect(list.map((c) => c.name)).toEqual(["Bins", "Mop"]);
     expect(list[0]).toMatchObject({
-      when: "Due since Fri 25 Sep, 12:00",
-      overdue: true,
+      status: "Ready",
+      streak: "Ryan · streak 3",
     });
-    expect(list[1]).toMatchObject({ overdue: false, streak: "No streak yet" });
-    expect(list[2]!.streak).toBe("Ryan · streak 3");
-    expect(list[3]).toMatchObject({ when: "Due at 14:00", overdue: false });
-    expect(list[4]!.when).toBe("Due at 15:00");
-  });
-
-  it("lists a chore that is not due yet exactly when list_chores calls it urgent", () => {
-    const soon = { name: "Soon", state: "done", dueAt: iso(3) } as const;
-    expect(dueChores([chore(soon)], NOW).map((c) => c.name)).toEqual(["Soon"]);
-    expect(dueChores([chore({ ...soon, urgent: false })], NOW)).toEqual([]);
+    // Done 40 days ago is still only Ready: there is no due date or
+    // overdue any more (issue #189).
+    expect(list[1]).toMatchObject({
+      status: "Ready",
+      streak: "No streak yet",
+    });
+    expect(list[1]).not.toHaveProperty("overdue");
+    expect(list[1]).not.toHaveProperty("when");
   });
 
   it("carries each bounty's glyph, kind, New mark and points", () => {
-    const [cat] = dueChores(
-      [
-        chore({
-          name: "Cat food",
-          sprite: "catfood",
-          kind: "consumable",
-          isNew: true,
-          basePoints: 20,
-          dueAt: iso(-1),
-        }),
-      ],
-      NOW,
-    );
+    const [cat] = readyChores([
+      chore({
+        name: "Cat food",
+        sprite: "catfood",
+        kind: "consumable",
+        isNew: true,
+        basePoints: 20,
+      }),
+    ]);
     expect(cat).toMatchObject({
       sprite: "catfood",
       kind: "consumable",
       isNew: true,
       points: 20,
     });
-  });
-
-  it("calls a chore overdue after a day of being due", () => {
-    const at = (ms: number) =>
-      dueChores(
-        [chore({ dueAt: new Date(NOW.getTime() - ms).toISOString() })],
-        NOW,
-      )[0]!.overdue;
-    expect(at(OVERDUE_AFTER_MS - 1)).toBe(false);
-    expect(at(OVERDUE_AFTER_MS)).toBe(true);
   });
 });
 

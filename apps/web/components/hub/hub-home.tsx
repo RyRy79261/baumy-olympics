@@ -28,8 +28,9 @@ import { LiveClock } from "./live-clock";
 
 // The hub home on a phone or a laptop (SPEC §3.1; ADR 0005 Consequences):
 // the kitchen screen's calm look in a normal scrolling page. On top, the
-// clock and the three status tiles (Urgent, New, Messages), each dim at
-// zero and a link to its slice. Then the urgent bounties and today's agenda
+// clock and the two status tiles (New, Messages), each dim at zero and a
+// link to its slice (no Urgent: a chore has no due date, SPEC §12 decision
+// 35). Then the bounties ready to log and today's agenda
 // in the wide column, the scores with the pot, the pinned notes (the
 // Board) and the shopping list in the narrow one. Each widget keeps its own
 // empty and unavailable state (lib/hub/load.ts). The page's own card (Post a
@@ -38,19 +39,12 @@ import { LiveClock } from "./live-clock";
 // seen and what is read or tabbed through keep one order.
 
 const TILES: {
-  key: "urgent" | "new" | "messages";
+  key: "new" | "messages";
   label: string;
   icon: PixelIconName;
   accent: TabAccent;
   href: Route;
 }[] = [
-  {
-    key: "urgent",
-    label: "Urgent",
-    icon: "siren",
-    accent: "red",
-    href: "/chores?show=urgent" as Route,
-  },
   {
     key: "new",
     label: "New",
@@ -190,7 +184,7 @@ function ShoppingWidget(
   );
 }
 
-/** How many urgent bounties the hub lists before "N more". */
+/** How many ready bounties the hub lists before "N more". */
 export const HUB_BOUNTIES = 6;
 
 function More({ href, label }: { href: Route; label: string }) {
@@ -259,7 +253,7 @@ export function HubHome({
           <Widget
             id="widget-chores"
             data-testid="widget-chores"
-            title="Urgent bounties"
+            title="Ready bounties"
             status={chores.status}
             message={chores.status === "ready" ? undefined : chores.message}
             action={<More href="/chores" label="All bounties" />}
@@ -275,18 +269,17 @@ export function HubHome({
                     kind={c.kind}
                     points={c.points}
                     streak={c.streak}
-                    status={c.overdue ? `${c.when} (overdue)` : c.when}
-                    urgent={c.overdue}
+                    status={c.status}
                     isNew={c.isNew}
                   />
                 ))}
                 {chores.data.length > HUB_BOUNTIES ? (
                   <li className="pt-3">
                     <Link
-                      href={"/chores?show=urgent" as Route}
+                      href="/chores"
                       className="font-label text-sm font-bold text-bm-muted uppercase hover:text-bm-text"
                     >
-                      +{chores.data.length - HUB_BOUNTIES} more urgent
+                      +{chores.data.length - HUB_BOUNTIES} more ready
                     </Link>
                   </li>
                 ) : null}

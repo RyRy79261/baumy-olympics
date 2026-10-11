@@ -1,13 +1,8 @@
-import {
-  berlinDateKey,
-  berlinTimeKey,
-  formatBerlinDateTime,
-  formatDateKey,
-} from "@baumy/core";
+import { berlinDateKey, berlinTimeKey, formatDateKey } from "@baumy/core";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import type { ActionResult } from "@/lib/actions/result";
 import type { CalendarEventView } from "@/lib/calendar/view";
-import { streakLabel } from "@/lib/chores/view";
+import { sortBounties, statusLabel, streakLabel } from "@/lib/chores/view";
 
 // What the hub's widgets show (SPEC §3.1, issue #20). Pure and client-safe:
 // the hub and the kiosk home read the same actions every other surface
@@ -100,10 +95,7 @@ export function agendaTime(time: string): { time: string; until?: string } {
   return { time };
 }
 
-/** How long a chore is due before the hub calls it overdue. */
-export const OVERDUE_AFTER_MS = 24 * 60 * 60_000;
-
-/** A chore on the hub: due now (or overdue), or falling due later today. */
+/** A bounty on the hub: one that is ready to log now. */
 export interface HubChore {
   id: string;
   name: string;
@@ -115,51 +107,30 @@ export interface HubChore {
   isNew: boolean;
   /** Base points, or null while it has none. */
   points: number | null;
-  /** "Due since Wed 30 Sep, 08:00" or "Due at 18:00". */
-  when: string;
-  overdue: boolean;
+  /** "Ready" (`statusLabel`). */
+  status: string;
   /** "Ryan · streak 3", or "No streak yet". */
   streak: string;
 }
 
-function bountyOf(c: ChoreView) {
-  return {
-    id: c.id,
-    name: c.name,
-    sprite: c.sprite,
-    kind: c.kind,
-    isNew: c.isNew,
-    points: c.basePoints,
-  };
-}
-
 /**
- * The urgent chores (list_chores' `urgent`, the same split the kitchen
- * screen's Urgent icon counts: overdue on their own rhythm, never a chore
- * never done), the longest-waiting first, then those that fall due before
- * Berlin midnight. A chore is overdue once it has been due for a day.
+ * The bounties ready to log now, in the board's order (`sortBounties`: by
+ * name). A chore has no due date, so nothing is urgent or overdue (SPEC §12
+ * decision 35, issue #189); one cooling down waits on the board.
  */
-export function dueChores(chores: ChoreView[], now: Date): HubChore[] {
-  return chores
-    .filter((c) => c.urgent && c.dueAt !== null)
-    .sort(
-      (a, b) =>
-        Date.parse(a.dueAt!) - Date.parse(b.dueAt!) ||
-        a.name.localeCompare(b.name),
-    )
-    .map((c): HubChore => {
-      const at = Date.parse(c.dueAt!);
-      const late = now.getTime() - at;
-      return {
-        ...bountyOf(c),
-        when:
-          late >= 0
-            ? `Due since ${formatBerlinDateTime(new Date(at))}`
-            : `Due at ${berlinTimeKey(new Date(at))}`,
-        overdue: late >= OVERDUE_AFTER_MS,
-        streak: streakLabel(c),
-      };
-    });
+export function readyChores(chores: ChoreView[]): HubChore[] {
+  return sortBounties(chores.filter((c) => c.state === "ready")).map(
+    (c): HubChore => ({
+      id: c.id,
+      name: c.name,
+      sprite: c.sprite,
+      kind: c.kind,
+      isNew: c.isNew,
+      points: c.basePoints,
+      status: statusLabel(c),
+      streak: streakLabel(c),
+    }),
+  )
 }
 
 /** The clock's two lines, in Berlin time. */
@@ -171,13 +142,12 @@ export function clockLines(now: Date): { time: string; date: string } {
 }
 
 /**
- * The hub's three counts (ADR 0005 §1): urgent bounties, new bounties, and
- * messages, the notes this member has not seen since their words last
+ * The hub's two counts (ADR 0005 §1; no Urgent since SPEC §12 decision 35):
+ * new bounties, and messages, the notes this member has not seen since their words last
  * changed (list_notes' `unseenCount`, issue #153). Null when the read behind it failed: the tile then says
  * so instead of showing a zero.
  */
 export interface HubCounts {
-  urgent: number | null;
   new: number | null;
   messages: number | null;
 }

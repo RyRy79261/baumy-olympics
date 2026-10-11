@@ -11,6 +11,7 @@ import {
 } from "@baumy/types";
 import { HOUSE_COLOUR } from "@baumy/ui";
 import type { ChoreView } from "@/lib/actions/list-chores";
+import { sortBounties } from "@/lib/chores/view";
 import type { NoteView } from "@/lib/actions/notes";
 import {
   eventsOnDay,
@@ -20,8 +21,9 @@ import {
 
 // What the portrait kitchen dashboard shows (ADR 0005, issue #65). Pure and
 // client-safe: the kiosk home reads list_chores, list_events and list_notes
-// like every other surface, and these pick out the header's three counts,
-// the bounty and message modules, and the month grid with its day sheet.
+// like every other surface, and these pick out the header's two counts
+// (New and Messages; there is no Urgent, SPEC §12 decision 35), the bounty
+// and message modules, and the month grid with its day sheet.
 // Days and times are Berlin's (packages/core time.ts).
 
 /** A member as the dashboard shows them: their character and colour. */
@@ -87,48 +89,31 @@ export function headerClock(now: Date): { date: string; time: string } {
 
 // ---------------------------------------------------------------- bounties
 
-/** How soon a bounty is due, in words, and how loudly to say it. */
-export interface DueLabel {
-  text: string;
-  /** late: red; soon (within 12 hours): amber; later: muted. */
-  tone: "late" | "soon" | "later";
-}
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-
-export function dueLabel(
-  c: Pick<ChoreView, "state" | "dueAt">,
+/**
+ * A bounty's status on the kitchen screen, short enough for its row: "Ready",
+ * or "Again from 18:00" while it cools down ("Again from Wed 18:00" on
+ * another day this week, "Again from 30 Sep" further off). A chore has no
+ * due date (SPEC §12 decision 35, issue #189).
+ */
+export function bountyStatus(
+  c: Pick<ChoreView, "state" | "availableAt">,
   now: Date,
-): DueLabel {
-  // No weight yet: it cannot be logged, so it is not due either.
-  if (c.state === "unavailable")
-    return { text: "No points yet", tone: "later" };
-  // Never done: available, but it has no rhythm to be late on yet, so it
-  // is never urgent (SPEC §12 decision 22).
-  if (c.dueAt === null) return { text: "Never done", tone: "later" };
-  const left = Date.parse(c.dueAt) - now.getTime();
-  if (c.state === "due" || left <= 0) {
-    const late = -left;
-    if (late < HOUR) return { text: "Due now", tone: "late" };
-    const hours = Math.floor(late / HOUR);
-    return hours < 48
-      ? { text: `${hours}h late`, tone: "late" }
-      : { text: `${Math.floor(hours / 24)}d late`, tone: "late" };
+): string {
+  if (c.state === "unavailable") return "No points yet";
+  if (c.state === "ready" || c.availableAt === null) return "Ready";
+  const at = new Date(c.availableAt);
+  const day = berlinDateKey(at);
+  const today = berlinDateKey(now);
+  const time = berlinTimeKey(at);
+  if (day === today) return `Again from ${time}`;
+  if (day < addDaysToDateKey(today, 7)) {
+    return `Again from ${WEEKDAYS_LONG[dateKeyWeekday(day) - 1]!.slice(0, 3)} ${time}`;
   }
-  if (left < HOUR) {
-    return {
-      text: `in ${Math.max(1, Math.ceil(left / MINUTE))}m`,
-      tone: "soon",
-    };
-  }
-  const hours = Math.round(left / HOUR);
-  if (hours <= 12) return { text: `in ${hours}h`, tone: "soon" };
-  if (hours < 36) return { text: `in ${hours}h`, tone: "later" };
-  return { text: `in ${Math.round(hours / 24)} days`, tone: "later" };
+  const month = MONTHS_LONG[Number(day.slice(5, 7)) - 1]!.slice(0, 3);
+  return `Again from ${Number(day.slice(8, 10))} ${month}`;
 }
 
-/** One bounty in the Urgent or New module. */
+/** One bounty in the New module. */
 export interface BountyRowView {
   id: string;
   name: string;
@@ -137,7 +122,8 @@ export interface BountyRowView {
   isNew: boolean;
   /** What logging it scores: yours once you tap in, else its base points. */
   points: number | null;
-  due: DueLabel;
+  /** "Ready", or "Again from 18:00" (`bountyStatus`). */
+  status: string;
   /** The streak you would steal by doing it, if anyone holds one. */
   streak: {
     holderId: string;
@@ -145,26 +131,14 @@ export interface BountyRowView {
     length: number;
     colour: string;
   } | null;
-  /** It cannot be logged now: cooling down, or no weight yet. */
+  /** It can be logged now; false while cooling down or with no weight yet. */
   loggable: boolean;
 }
 
 /**
- * When a bounty fell or falls due, for sorting. A chore never done has no
- * due time and is never urgent (SPEC §12 decision 22), so it is listed only
- * in the New module, where it sorts by when it was added. No weight yet
- * sorts last.
- */
-export function dueAtMs(
-  c: Pick<ChoreView, "state" | "dueAt" | "createdAt">,
-): number {
-  if (c.state === "unavailable") return Number.POSITIVE_INFINITY;
-  return Date.parse(c.dueAt ?? c.createdAt);
-}
-
-/**
- * The chores a module lists as bounties, soonest due first. Archived chores
- * are never listed (list_chores leaves them out anyway).
+ * The chores a module lists as bounties, in the board's order (ready first,
+ * then the soonest ready again; `sortBounties`). Archived chores are never
+ * listed (list_chores leaves them out anyway).
  */
 export function bountyRows(
   chores: readonly ChoreView[],
@@ -172,28 +146,26 @@ export function bountyRows(
   members: readonly DashboardMember[],
   now: Date,
 ): BountyRowView[] {
-  return chores
-    .filter((c) => !c.archived && pick(c))
-    .sort((a, b) => dueAtMs(a) - dueAtMs(b) || a.name.localeCompare(b.name))
-    .map((c) => ({
+  return sortBounties(chores.filter((c) => !c.archived && pick(c))).map(
+    (c) => ({
       id: c.id,
       name: c.name,
       sprite: c.sprite,
       kind: c.kind,
       isNew: c.isNew,
       points: c.next?.totalPts ?? c.basePoints,
-      due: dueLabel(c, now),
+      status: bountyStatus(c, now),
       streak: c.streak
         ? {
             ...c.streak,
             colour: whoOf(c.streak.holderId, members).colour,
           }
         : null,
-      loggable: c.state === "due" || c.state === "done",
-    }));
+      loggable: c.state === "ready",
+    }),
+  );
 }
 
-export const isUrgentBounty = (c: ChoreView) => c.urgent;
 export const isNewBounty = (c: ChoreView) => c.isNew;
 
 /** The module's tabs: every bounty, or one kind. */
@@ -219,6 +191,9 @@ export function kindLabel(kind: ChoreKind): string {
 }
 
 // ---------------------------------------------------------------- messages
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
 
 /** "now", "12m", "3h", "2d": how long ago, for a message's byline. */
 export function agoLabel(at: string, now: Date): string {

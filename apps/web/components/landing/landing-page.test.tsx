@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { RULESET_V1 } from "@baumy/core";
-import { NEW_BOUNTY_MS } from "@/lib/chores/urgency";
+import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import { LANDING_DESCRIPTION, LandingPage } from "./landing-page";
 

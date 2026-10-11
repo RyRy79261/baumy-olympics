@@ -11,19 +11,18 @@ export function streakLabel(c: Pick<ChoreView, "streak">): string {
     : "No streak yet";
 }
 
-/** The tile's status line, in Berlin time. */
+/**
+ * The tile's status line, in Berlin time: "Ready", or "Again from <time>"
+ * while it cools down. A chore has no due date (SPEC §12 decision 35).
+ */
 export function statusLabel(
-  c: Pick<ChoreView, "state" | "availableAt" | "dueAt" | "archived">,
+  c: Pick<ChoreView, "state" | "availableAt" | "archived">,
 ): string {
   switch (c.state) {
-    case "due":
-      return c.dueAt
-        ? `Due since ${formatBerlinDateTime(new Date(c.dueAt))}`
-        : "Never done";
+    case "ready":
+      return "Ready";
     case "cooldown":
       return `Again from ${formatBerlinDateTime(new Date(c.availableAt!))}`;
-    case "done":
-      return `Due ${formatBerlinDateTime(new Date(c.dueAt!))}`;
     case "unavailable":
       return c.archived ? "Archived" : "No points set yet";
   }
@@ -59,13 +58,12 @@ export function previewFor(
 }
 
 // Bounties (ADR 0005 §2): the board shows every chore as a bounty, and one
-// row of tabs narrows it to the urgent ones, the new ones, or one kind. The
-// hub's Urgent and New tiles link straight to their tab (`?show=`).
+// row of tabs narrows it to the new ones or one kind. The hub's New tile
+// links straight to its tab (`?show=`).
 
 /** What the bounty board can narrow itself to. */
 export const BOUNTY_FILTERS = [
   "all",
-  "urgent",
   "new",
   "consumable",
   "maintenance",
@@ -79,14 +77,12 @@ export function parseBountyFilter(value: unknown): BountyFilter {
     : "all";
 }
 
-type BountyFields = Pick<ChoreView, "kind" | "urgent" | "isNew">;
+type BountyFields = Pick<ChoreView, "kind" | "isNew">;
 
 function matches(c: BountyFields, filter: BountyFilter): boolean {
   switch (filter) {
     case "all":
       return true;
-    case "urgent":
-      return c.urgent;
     case "new":
       return c.isNew;
     default:
@@ -112,20 +108,21 @@ export function bountyCounts(
 }
 
 /**
- * The board's order: urgent first, the longest-overdue at the top; then the
- * rest, chores never done (available, never urgent) before those with a
- * date, which go by when they fall due; chores that cannot be scored last;
- * ties by name.
+ * The board's order: the bounties ready to log first, then those cooling
+ * down, the soonest ready again first, then those that cannot be scored;
+ * ties by name. There is no due date to sort by (SPEC §12 decision 35).
  */
 export function sortBounties<
-  C extends Pick<ChoreView, "urgent" | "state" | "dueAt" | "name">,
+  C extends Pick<ChoreView, "state" | "availableAt" | "name">,
 >(chores: readonly C[]): C[] {
-  const rank = (c: C) => (c.urgent ? 0 : c.state === "unavailable" ? 2 : 1);
-  const due = (c: C) => (c.dueAt === null ? -Infinity : Date.parse(c.dueAt));
+  const rank = (c: C) =>
+    c.state === "ready" ? 0 : c.state === "cooldown" ? 1 : 2;
+  const again = (c: C) =>
+    c.state === "cooldown" && c.availableAt ? Date.parse(c.availableAt) : 0;
   return [...chores].sort(
     (a, b) =>
       rank(a) - rank(b) ||
-      (due(a) === due(b) ? 0 : due(a) < due(b) ? -1 : 1) ||
+      again(a) - again(b) ||
       a.name.localeCompare(b.name),
   );
 }

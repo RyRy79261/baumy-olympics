@@ -170,12 +170,12 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   Nobody is hard-coded: always read names from Olympics.
 - **Bounties are chores.** Each chore has a `kind`: `consumable` (buy or
   refill: toilet paper, dish soap) or `maintenance` (clean or fix: trash,
-  bathroom). It has base points and a cooldown. `urgent` means overdue on
-  its own rhythm: its last completion plus the larger of its interval and
-  its cooldown has passed, or falls before midnight in Berlin. A chore never
-  done is never urgent, only available (and new, if recent). `isNew` means
-  added in the last 3 days. Logging a chore inside its cooldown is refused
-  (`COOLDOWN`, with `retryAt`).
+  bathroom). It has base points and a cooldown. A chore has no due date and
+  is never urgent or overdue: its `state` is `ready` (it can be logged now)
+  or `cooldown` (done recently; it can be logged again from `availableAt`),
+  or `unavailable` (no points set, or archived). `isNew` means added in the
+  last 3 days. Logging a chore inside its cooldown is refused (`COOLDOWN`,
+  with `retryAt`).
 - **Streaks and break bonuses.** Each chore has one streak holder. Doing a
   chore again while you hold it grows the streak (+25% of base per step, no
   cap). Doing a chore someone else holds **breaks** their streak: you get a
@@ -438,7 +438,7 @@ Denies a 'Sign in with Baumy' request: the member tapped Deny.
 
 ### `list_chores`: List chores
 
-Lists the bounties (chores): what is due, urgent or new, and what each would score now.
+Lists the bounties (chores): which are ready to log, which are cooling down and until when, which are new, and what each would score now.
 
 | | |
 | --- | --- |
@@ -451,12 +451,12 @@ Lists the bounties (chores): what is due, urgent or new, and what each would sco
 
 **When to use it.** To answer "what needs doing?", and to turn a chore someone names into its `choreId` before log_completion. Match the words to exactly one chore; if none or several match, list them and ask.
 
-**Tool description** (the registry's, verbatim): Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, whether each is due, cooling down (with availableAt) or done for now, `urgent` (overdue on its own rhythm: its last completion plus the larger of its interval and its cooldown has passed, or falls before midnight in Berlin; a chore never done is never urgent), `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.
+**Tool description** (the registry's, verbatim): Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.
 
 **Examples.**
 
 - "what needs doing?" → `list_chores {}`
-- "what's urgent?" → `list_chores {} (keep `urgent: true`)`
+- "what can I do right now?" → `list_chores {} (keep `state: "ready"`)`
 
 **Input** (JSON Schema of the body):
 
@@ -473,11 +473,11 @@ Lists the bounties (chores): what is due, urgent or new, and what each would sco
 }
 ```
 
-**Returns** (`data`): `chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (due, cooling down with `availableAt`, or done for now; a chore never done is `due` with no `dueAt`), `urgent` (overdue on its own rhythm; never for a chore never done), `isNew`, `streak` (holder and length) and `next` (what logging it now would score the asker).
+**Returns** (`data`): `chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (`ready`; `cooldown`, with `availableAt`, when it can be logged again; or `unavailable`), `isNew`, `streak` (holder and length) and `next` (what logging it now would score the asker). There is no due date, `dueAt` or `urgent`: never call a chore due, late or overdue.
 
 **Its errors:** none of its own. Every call can also get the endpoint's codes (above).
 
-**Say back:** Urgent ones first, then due, then the rest; say points as "+N". Times in Berlin time.
+**Say back:** Ready ones first, then those cooling down ("again from <time>"); say points as "+N". Times in Berlin time.
 
 ### `log_completion`: Log a chore
 

@@ -11,7 +11,7 @@ import {
   linkClass,
 } from "@baumy/ui";
 import { LegalLinks } from "@/components/legal/legal-page";
-import { NEW_BOUNTY_MS } from "@/lib/chores/urgency";
+import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 
 // The public landing page at `/` (issue #96): what a signed-out visitor, and
@@ -141,9 +141,9 @@ function HowItWorks() {
             cleaning and fixing.
           </p>
           <p>
-            <span className="text-bm-red">Urgent</span> ones are due now or
-            before midnight; <span className="text-bm-yellow">new</span> ones
-            were added in the last {NEW_DAYS} days.
+            A bounty is ready, or resting after someone did it, and says when
+            it can be done again. <span className="text-bm-yellow">New</span>{" "}
+            ones were added in the last {NEW_DAYS} days.
           </p>
         </Step>
         <Step
