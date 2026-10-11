@@ -163,6 +163,13 @@ describe("HubHome's extra card", () => {
     expect(extra).toBeLessThan(
       html.indexOf('data-testid="widget-leaderboard"'),
     );
+    // The Board follows it in the wide column, so the columns end together
+    // (issue #193's review); the scores start the narrow one.
+    const board = html.indexOf('data-testid="widget-notes"');
+    expect(board).toBeGreaterThan(extra);
+    expect(board).toBeLessThan(
+      html.indexOf('data-testid="widget-leaderboard"'),
+    );
     // No reordering by CSS: what is seen is what is read and tabbed through.
     expect(html).toContain('data-testid="widget-events"');
     expect(html).not.toMatch(/\border-(last|first|none|\d)/);
