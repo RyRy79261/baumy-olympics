@@ -465,3 +465,68 @@ describe("ChoreGrid's floating score (issue #181)", () => {
     expect(document.querySelector('[data-testid="score-pop"]')).toBeNull();
   });
 });
+
+// Issue #200 (SPEC §12 decision 38): on the kitchen screen with nobody
+// picked, every bounty shows to read, with nothing to log it with.
+describe("ChoreGrid with nobody picked", () => {
+  async function renderBoard(actorId: string | null) {
+    const cooling: ChoreView = {
+      ...chore,
+      id: "c-2",
+      name: "Mop",
+      state: "cooldown",
+      lastDoneAt: "2026-10-10T06:00:00.000Z",
+      availableAt: "2026-10-11T06:00:00.000Z",
+    };
+    const el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    await act(async () =>
+      root!.render(
+        <ChoreGrid
+          chores={[chore, cooling]}
+          members={actorId ? [{ id: actorId, displayName: "Ryan" }] : []}
+          actorId={actorId}
+          kiosk
+          action={vi.fn()}
+        />,
+      ),
+    );
+    return el;
+  }
+
+  it("lists every bounty with its points and when it is ready again, and no button", async () => {
+    const el = await renderBoard(null);
+    const trash = el.querySelector('[data-testid="chore-Trash"]')!;
+    const mop = el.querySelector('[data-testid="chore-Mop"]')!;
+    expect(trash.textContent).toContain("Trash");
+    expect(trash.textContent).toContain("Maintenance");
+    expect(trash.textContent).toContain("40 pts");
+    // Ready says nothing, as on the board.
+    expect(trash.querySelector("[data-bounty-status]")).toBeNull();
+    expect(mop.querySelector("[data-bounty-status]")!.textContent).toMatch(
+      /^Again from /,
+    );
+    // Nothing in the list is a button, and there is no log sheet.
+    expect(
+      el.querySelector('[aria-label="Bounties"]')!.querySelectorAll("button"),
+    ).toHaveLength(0);
+    expect(el.textContent).not.toContain("Log it");
+    expect(el.textContent).not.toContain("Not yet");
+    expect(el.querySelector("dialog")).toBeNull();
+    // The tabs still narrow it.
+    expect(
+      el.querySelectorAll('[data-testid="bounty-tabs"] button'),
+    ).toHaveLength(3);
+  });
+
+  it("has a log button on each bounty once someone is picked", async () => {
+    const el = await renderBoard("m-1");
+    const list = el.querySelector('[aria-label="Bounties"]')!;
+    expect(list.querySelectorAll("button")).toHaveLength(2);
+    expect(
+      el.querySelector('[data-testid="chore-Trash"] button')!.textContent,
+    ).toContain("Log it");
+    expect(el.querySelector("dialog")).not.toBeNull();
+  });
+});

@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   AgendaItem,
+  BountyEntry,
   BountyGlyph,
   BountyList,
   BountyRow,
@@ -12,6 +13,45 @@ import {
 } from "../bounties";
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
+
+describe("BountyEntry", () => {
+  it("shows a bounty with no button and nothing to tap (issue #200)", () => {
+    const out = html(
+      <BountyEntry
+        name="Bins"
+        sprite="trash"
+        kind="maintenance"
+        points={20}
+        streak="No streak yet"
+        status="Again from Thu 1 Oct, 08:00"
+        kiosk
+      />,
+    );
+    expect(out).toContain("Bins");
+    expect(out).toContain("Maintenance");
+    expect(out).toContain("20 pts");
+    expect(out).toMatch(/text-bm-dim">Again from Thu 1 Oct, 08:00</);
+    expect(out).toContain('data-kind="maintenance"');
+    expect(out).toContain("text-3xl");
+    expect(out).not.toContain("<button");
+    expect(out).not.toContain("Log it");
+  });
+
+  it("has no status line when none is given", () => {
+    const out = html(
+      <BountyEntry
+        name="Mop"
+        sprite="mop"
+        kind="maintenance"
+        points={null}
+        streak="No streak yet"
+      />,
+    );
+    expect(out).toContain("Mop");
+    expect(out).not.toContain("data-bounty-status");
+    expect(out).not.toContain("pts");
+  });
+});
 
 describe("BountyRow", () => {
   it("is one button with the glyph, name, kind, streak, status and points", () => {

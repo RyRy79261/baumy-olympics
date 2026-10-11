@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  BountyEntry,
   BountyList,
   BountyRow,
   Button,
@@ -99,8 +100,12 @@ export function ChoreGrid({
 }: {
   chores: ChoreView[];
   members: GridMember[];
-  /** The member acting: the signed-in one, or the kiosk's picked avatar. */
-  actorId: string;
+  /**
+   * The member acting: the signed-in one, or the kiosk's picked avatar.
+   * Null on the kiosk while nobody is picked: the board is only to read,
+   * with nothing to tap but the tabs (issue #200).
+   */
+  actorId: string | null;
   kiosk?: boolean;
   action: FormAction<LogCompletionData>;
   /** A control beside each row: an admin's Edit on /chores (issue #109). */
@@ -113,7 +118,7 @@ export function ChoreGrid({
   const [filter, setFilter] = useState<BountyFilter>(shownInUrl);
   useEffect(() => setFilter(shownInUrl), [shownInUrl]);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [doneBy, setDoneBy] = useState(actorId);
+  const [doneBy, setDoneBy] = useState(actorId ?? "");
   const [pop, setPop] = useState<{
     key: number;
     points: number;
@@ -281,32 +286,45 @@ export function ChoreGrid({
                 : undefined
             }
           >
-            <BountyRow
-              name={c.name}
-              sprite={c.sprite}
-              kind={c.kind}
-              points={c.basePoints}
-              streak={streakLabel(c)}
-              status={statusLabel(c)}
-              cta={c.state === "ready" ? "Log it" : "Not yet"}
-              kiosk={kiosk}
-              // Only a ready bounty can be logged: one cooling down says
-              // "Not yet", as on the kitchen screen's home.
-              disabled={c.state !== "ready"}
-              className={rowAction ? "min-w-0 sm:flex-1" : undefined}
-              onClick={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                tappedAt.current = {
-                  top: r.top,
-                  left: r.left,
-                  width: r.width,
-                  height: r.height,
-                };
-                setDoneBy(actorId);
-                choosePhoto(null);
-                setOpenId(c.id);
-              }}
-            />
+            {actorId === null ? (
+              // Nobody picked (issue #200): the bounty to read, no button.
+              <BountyEntry
+                name={c.name}
+                sprite={c.sprite}
+                kind={c.kind}
+                points={c.basePoints}
+                streak={streakLabel(c)}
+                status={statusLabel(c)}
+                kiosk={kiosk}
+              />
+            ) : (
+              <BountyRow
+                name={c.name}
+                sprite={c.sprite}
+                kind={c.kind}
+                points={c.basePoints}
+                streak={streakLabel(c)}
+                status={statusLabel(c)}
+                cta={c.state === "ready" ? "Log it" : "Not yet"}
+                kiosk={kiosk}
+                // Only a ready bounty can be logged: one cooling down says
+                // "Not yet", as on the kitchen screen's home.
+                disabled={c.state !== "ready"}
+                className={rowAction ? "min-w-0 sm:flex-1" : undefined}
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  tappedAt.current = {
+                    top: r.top,
+                    left: r.left,
+                    width: r.width,
+                    height: r.height,
+                  };
+                  setDoneBy(actorId);
+                  choosePhoto(null);
+                  setOpenId(c.id);
+                }}
+              />
+            )}
             {rowAction?.(c)}
           </li>
         ))}
@@ -317,91 +335,96 @@ export function ChoreGrid({
         </p>
       ) : null}
 
-      <Dialog
-        open={open !== null}
-        onClose={closeSheet}
-        busy={sending}
-        title={open ? `Log ${open.name}` : "Log a chore"}
-      >
-        {open ? (
-          <div className="flex flex-col gap-4">
-            {members.length > 1 ? (
-              <ChoiceGroup
-                legend="Who did it?"
-                name="doneByChoice"
-                kiosk={kiosk}
-                value={doneBy}
-                onChange={setDoneBy}
-                // The form is keyed by who: a new pick mid-send would lose
-                // the answer and allow a second log (#174).
-                disabled={sending}
-                options={members.map((m) => ({
-                  value: m.id,
-                  label:
-                    m.id === actorId ? `${m.displayName} (me)` : m.displayName,
-                }))}
-              />
-            ) : null}
-            {preview ? (
-              <div data-testid="log-preview" className="flex flex-col gap-1">
-                <p className="text-3xl font-bold">{preview.headline}</p>
-                {preview.breaks ? <p>{preview.breaks}</p> : null}
-              </div>
-            ) : null}
-            {doneBy !== actorId ? (
-              <p className="text-sm text-bm-muted">
-                {`You are vouching that ${nameOf(doneBy)} did it.`}
-              </p>
-            ) : null}
-            {open.proofMode !== "none" ? (
-              <div className="flex flex-col gap-1">
-                <PhotoPicker
-                  key={open.id}
+      {/* Nobody picked: no row opens, so there is no sheet (issue #200). */}
+      {actorId === null ? null : (
+        <Dialog
+          open={open !== null}
+          onClose={closeSheet}
+          busy={sending}
+          title={open ? `Log ${open.name}` : "Log a chore"}
+        >
+          {open ? (
+            <div className="flex flex-col gap-4">
+              {members.length > 1 ? (
+                <ChoiceGroup
+                  legend="Who did it?"
+                  name="doneByChoice"
                   kiosk={kiosk}
+                  value={doneBy}
+                  onChange={setDoneBy}
+                  // The form is keyed by who: a new pick mid-send would lose
+                  // the answer and allow a second log (#174).
                   disabled={sending}
-                  label={
-                    open.proofMode === "required"
-                      ? "Add a photo (required)"
-                      : "Add a photo (optional)"
-                  }
-                  onPhoto={choosePhoto}
+                  options={members.map((m) => ({
+                    value: m.id,
+                    label:
+                      m.id === actorId
+                        ? `${m.displayName} (me)`
+                        : m.displayName,
+                  }))}
                 />
-                {open.proofMode === "required" && !hasPhoto ? (
-                  <p className="text-sm text-bm-muted">
-                    {open.name} needs a photo as proof.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-            <AttestedForm
-              key={`${open.id}:${doneBy}`}
-              action={logAction}
-              disabled={open.proofMode === "required" && !hasPhoto}
-              label="Log it"
-              pinLabel={`${nameOf(actorId)}'s PIN`}
-              fields={
-                <>
-                  <input type="hidden" name="choreId" value={open.id} />
-                  {doneBy !== actorId ? (
-                    <input type="hidden" name="doneBy" value={doneBy} />
+              ) : null}
+              {preview ? (
+                <div data-testid="log-preview" className="flex flex-col gap-1">
+                  <p className="text-3xl font-bold">{preview.headline}</p>
+                  {preview.breaks ? <p>{preview.breaks}</p> : null}
+                </div>
+              ) : null}
+              {doneBy !== actorId ? (
+                <p className="text-sm text-bm-muted">
+                  {`You are vouching that ${nameOf(doneBy)} did it.`}
+                </p>
+              ) : null}
+              {open.proofMode !== "none" ? (
+                <div className="flex flex-col gap-1">
+                  <PhotoPicker
+                    key={open.id}
+                    kiosk={kiosk}
+                    disabled={sending}
+                    label={
+                      open.proofMode === "required"
+                        ? "Add a photo (required)"
+                        : "Add a photo (optional)"
+                    }
+                    onPhoto={choosePhoto}
+                  />
+                  {open.proofMode === "required" && !hasPhoto ? (
+                    <p className="text-sm text-bm-muted">
+                      {open.name} needs a photo as proof.
+                    </p>
                   ) : null}
-                </>
-              }
-              onResult={onResult}
-              onPending={setSending}
-            />
-            {/* A way out that says so, as well as the corner's × (#174). */}
-            <Button
-              variant="secondary"
-              size="kiosk"
-              disabled={sending}
-              onClick={closeSheet}
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : null}
-      </Dialog>
+                </div>
+              ) : null}
+              <AttestedForm
+                key={`${open.id}:${doneBy}`}
+                action={logAction}
+                disabled={open.proofMode === "required" && !hasPhoto}
+                label="Log it"
+                pinLabel={`${nameOf(actorId)}'s PIN`}
+                fields={
+                  <>
+                    <input type="hidden" name="choreId" value={open.id} />
+                    {doneBy !== actorId ? (
+                      <input type="hidden" name="doneBy" value={doneBy} />
+                    ) : null}
+                  </>
+                }
+                onResult={onResult}
+                onPending={setSending}
+              />
+              {/* A way out that says so, as well as the corner's × (#174). */}
+              <Button
+                variant="secondary"
+                size="kiosk"
+                disabled={sending}
+                onClick={closeSheet}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : null}
+        </Dialog>
+      )}
     </>
   );
 }

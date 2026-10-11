@@ -203,6 +203,44 @@ export function BountyRow({
   );
 }
 
+/**
+ * One bounty to read, not to tap: the same glyph, lines and points as a
+ * BountyRow, with no button and nothing at the end. The kitchen screen's
+ * Bounties page shows these while nobody is picked (issue #200).
+ */
+export function BountyEntry({
+  name,
+  sprite,
+  kind,
+  points,
+  streak,
+  status,
+  kiosk = false,
+  className,
+  ...props
+}: BountyFields &
+  Omit<HTMLAttributes<HTMLDivElement>, keyof BountyFields> & {
+    /** The kiosk's larger text, as a kiosk BountyRow has. */
+    kiosk?: boolean;
+  }) {
+  return (
+    <div
+      data-kind={kind}
+      className={cx(
+        "flex w-full items-center gap-3 py-3 text-bm-text sm:gap-4",
+        kiosk ? "min-h-24 py-4" : "min-h-16",
+        className,
+      )}
+      {...props}
+    >
+      <BountyFace
+        {...{ name, sprite, kind, points, streak, status }}
+        kiosk={kiosk}
+      />
+    </div>
+  );
+}
+
 /** Bounty rows, one under the other with a line between. */
 export function BountyList({
   children,

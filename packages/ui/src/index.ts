@@ -34,6 +34,7 @@ export {
 export {
   AgendaItem,
   BOUNTY_KIND_LABEL,
+  BountyEntry,
   BountyGlyph,
   BountyList,
   BountyRow,
