@@ -207,8 +207,8 @@ export function BountyRow({
         className={cx(
           "pixel-frame shrink-0 items-center justify-center bg-bm-raised font-label font-bold text-bm-text uppercase [--pf:var(--color-bm-text)]",
           kiosk
-            ? "inline-flex min-h-14 px-5 text-base"
-            : "hidden min-h-11 px-4 text-sm sm:inline-flex",
+            ? "inline-flex min-h-14 min-w-40 px-5 text-base"
+            : "hidden min-h-11 min-w-32 px-4 text-sm sm:inline-flex",
         )}
       >
         {cta}
