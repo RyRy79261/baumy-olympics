@@ -20,6 +20,7 @@ import {
   type RaccoonPose,
 } from "../raccoon";
 import { ToastItem, ToastList } from "../toast";
+import APPROVED from "./fixtures/raccoon-sprites.approved.json";
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 
@@ -150,6 +151,17 @@ describe("Raccoon", () => {
     reach: { w: 30, h: 36, frames: 1 },
     sit: { w: 30, h: 30, frames: 1 },
   } as const;
+
+  it("is the owner's approved art, pixel for pixel (2026-10-11)", () => {
+    // fixtures/raccoon-sprites.approved.json is the approved file's grids,
+    // copied by script, never edited: any retouched pixel fails here.
+    expect(RACCOON_POSES).toEqual({
+      walk: [APPROVED.walk0, APPROVED.walk1],
+      carry: [APPROVED.upright0, APPROVED.upright1],
+      reach: [APPROVED.reach],
+      sit: [APPROVED.sit],
+    });
+  });
 
   it("draws each pose at its approved size, in the approved colours only", () => {
     expect(Object.keys(RACCOON_POSES).sort()).toEqual(

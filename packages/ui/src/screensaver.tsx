@@ -48,6 +48,13 @@ const BIN: Sprite = [
   "..KKKKKKKK..",
 ];
 
+/**
+ * Where the two walkers stand when motion is reduced, in px from the floor's
+ * left edge (32px off screen): the carrier (168px wide) right of centre, the
+ * walker and its box (224px) on the left, apart and wholly on an 820px screen.
+ */
+export const PARKED = { jar: 520, box: 100 } as const;
+
 /** The props the screensaver's floor clutter is drawn from, for tests. */
 export const SCREENSAVER_ART = { BOX, BIN } as const;
 
@@ -69,7 +76,7 @@ const SCENE_CSS = `
 @keyframes bm-ss-run-back { from { transform: translateX(calc(100vw + 60px)); } to { transform: translateX(-300px); } }
 @keyframes bm-ss-bulb { 0%, 100% { opacity: 1; filter: brightness(1.2); } 50% { opacity: 0.35; filter: brightness(0.7); } }
 @keyframes bm-ss-zzz { 0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(24px, -60px); opacity: 0; } }
-@keyframes bm-ss-hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes bm-ss-hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 @keyframes bm-ss-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
 @keyframes bm-ss-drift-x { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(24px); } 75% { transform: translateX(-24px); } }
 @keyframes bm-ss-drift-y { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(-20px); } 75% { transform: translateY(20px); } }
@@ -231,7 +238,7 @@ export function Screensaver({
             className="absolute -inset-x-8 top-[71%] -bottom-8 block bg-[repeating-linear-gradient(90deg,#1d1020_0_80px,#180c1a_80px_160px)] shadow-[inset_0_4px_0_#2a1628]"
           >
             {/* The bin. */}
-            <span className="absolute -top-[72px] left-[calc(18vw+32px)] block">
+            <span className="absolute -top-[72px] left-[180px] block">
               <PixelArt
                 grid={BIN}
                 scale={8}
@@ -242,23 +249,29 @@ export function Screensaver({
             {/* Raccoon 1 sits by the bin. */}
             <span
               data-raccoon="sit"
-              className="absolute -top-[120px] left-[calc(18vw+136px)] block"
+              className="absolute -top-[120px] left-[284px] block"
             >
               <Raccoon pose="sit" scale={4} />
             </span>
-            {/* Raccoon 2 stands under Baumy's shelf, reaching up. */}
+            {/* Raccoon 2 stands under Baumy's shelf, reaching up. Its last
+                art row is clear, so it sits one art pixel (4px) lower to put
+                its feet on the floor. */}
             <span
               data-raccoon="reach"
-              className="absolute -top-[144px] left-[calc(57vw+36px)] block"
+              className="absolute -top-[140px] left-[504px] block"
               style={{ animation: "bm-ss-hop 1.6s steps(2) infinite" }}
             >
               <Raccoon pose="reach" scale={4} />
             </span>
-            {/* Raccoon 3 walks off on its hind legs with a jar. */}
+            {/* Raccoon 3 walks off on its hind legs with a jar. The walkers'
+                own transform is where they stand when motion is reduced (the
+                animation then ends at once and lets go of them): apart, and
+                both wholly on screen. */}
             <span
               data-raccoon="jar"
-              className="absolute top-[10px] left-0 block"
+              className="absolute top-0 left-0 block"
               style={{
+                transform: `translateX(${PARKED.jar}px)`,
                 animation: "bm-ss-run-back 18s linear infinite",
                 animationDelay: "-5s",
               }}
@@ -268,8 +281,9 @@ export function Screensaver({
             {/* Raccoon 4 pushes a box. */}
             <span
               data-raccoon="box"
-              className="absolute top-[160px] left-0 block"
+              className="absolute top-[172px] left-0 block"
               style={{
+                transform: `translateX(${PARKED.box}px)`,
                 animation: "bm-ss-run 14s linear infinite",
                 animationDelay: "-6s",
               }}
