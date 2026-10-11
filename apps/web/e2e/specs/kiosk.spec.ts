@@ -93,7 +93,7 @@ test("pair a kiosk, pick an avatar, and attest with a PIN per request", async ({
   await expectKioskTargets(kiosk.locator("main"));
   await openKioskChores(kiosk);
   await expect(
-    kiosk.getByText("Tap your avatar at the top to start."),
+    kiosk.getByText("Tap your avatar at the top to log one."),
   ).toBeVisible();
 
   // Tap the member's avatar.
