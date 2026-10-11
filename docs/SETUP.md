@@ -225,8 +225,9 @@ too; the lines are in brain's SETUP.md and the PR bodies).
 - [ ] `INVITE_CODES` (SPEC §6.8): drop it, or say what it should seed.
 - [ ] Whether the December pot stays open until the season closes
       (about 2 January; SPEC §4.5).
-- [ ] Whether a chore's "due" follows the measured interval (SPEC,
-      UNRESOLVED, issue #17).
+- [x] Whether a chore's "due" follows the measured interval (SPEC,
+      UNRESOLVED, issue #17). [CORRECTION 2026-10-11] Moot: chores have no
+      due date any more (SPEC §12 decision 35, issue #189).
 - [ ] Confirm: admins cannot rule on their own claims; a completion logged
       for someone else (confirmed on creation) cannot be undone (issue #12).
 - [ ] Review the `display` gate that lets an idle paired kiosk read five hub

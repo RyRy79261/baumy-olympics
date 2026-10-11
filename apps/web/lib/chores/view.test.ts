@@ -85,8 +85,8 @@ describe("streakLabel", () => {
 
 describe("statusLabel", () => {
   const base = { archived: false, availableAt: null };
-  it("says Ready, or Again from a time in Berlin; never a due date", () => {
-    expect(statusLabel({ ...base, state: "ready" })).toBe("Ready");
+  it("says Again from a time in Berlin, and nothing when ready; never a due date", () => {
+    expect(statusLabel({ ...base, state: "ready" })).toBeNull();
     expect(
       statusLabel({
         ...base,

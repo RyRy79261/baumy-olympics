@@ -141,9 +141,10 @@ function HowItWorks() {
             cleaning and fixing.
           </p>
           <p>
-            A bounty is ready, or resting after someone did it, and says when it
-            can be done again. <span className="text-bm-yellow">New</span> ones
-            were added in the last {NEW_DAYS} days.
+            A bounty is ready, or cooling down after someone did it, and says
+            when it can be done again.{" "}
+            <span className="text-bm-yellow">New</span> ones were added in the
+            last {NEW_DAYS} days.
           </p>
         </Step>
         <Step

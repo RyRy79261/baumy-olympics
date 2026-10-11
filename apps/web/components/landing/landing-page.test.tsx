@@ -62,6 +62,9 @@ describe("LandingPage", () => {
     expect(out).toContain(`For ${r.challengeWindowH} hours`);
     expect(out).toContain(`within ${r.undoWindowMin} minutes`);
     expect(out).toContain(`last ${NEW_BOUNTY_MS / 86_400_000} days`);
+    // A bounty is ready or cooling down; nothing is due or urgent (#189).
+    expect(out).toContain("A bounty is ready, or cooling down after someone");
+    expect(out).not.toMatch(/\burgent\b|\bdue\b|\boverdue\b/i);
     expect(out).toContain(`after ${SCREENSAVER_IDLE_MS / 60_000} minutes`);
   });
 

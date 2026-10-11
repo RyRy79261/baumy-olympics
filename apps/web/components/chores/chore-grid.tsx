@@ -122,7 +122,7 @@ export function ChoreGrid({
   const [filter, setFilter] = useState<BountyFilter>(shownInUrl);
   useEffect(() => setFilter(shownInUrl), [shownInUrl]);
   const [openId, setOpenId] = useState<string | null>(() =>
-    chores.some((c) => c.id === initialOpenId && c.state !== "unavailable")
+    chores.some((c) => c.id === initialOpenId && c.state === "ready")
       ? initialOpenId!
       : null,
   );
@@ -302,9 +302,12 @@ export function ChoreGrid({
               points={c.basePoints}
               streak={streakLabel(c)}
               status={statusLabel(c)}
+              cta={c.state === "ready" ? "Log it" : "Not yet"}
               isNew={c.isNew}
               kiosk={kiosk}
-              disabled={c.state === "unavailable"}
+              // Only a ready bounty can be logged: one cooling down says
+              // "Not yet", as on the kitchen screen's home.
+              disabled={c.state !== "ready"}
               className={rowAction ? "min-w-0 sm:flex-1" : undefined}
               onClick={(e) => {
                 const r = e.currentTarget.getBoundingClientRect();

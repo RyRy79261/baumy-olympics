@@ -139,6 +139,39 @@ async function tapOutside(sheet: HTMLDialogElement) {
 }
 
 describe("ChoreGrid's log sheet", () => {
+  it("opens from I'll do it for a ready bounty, never one cooling down", async () => {
+    const render = async (c: ChoreView) => {
+      const el = document.createElement("div");
+      document.body.append(el);
+      root = createRoot(el);
+      await act(async () =>
+        root!.render(
+          <ChoreGrid
+            chores={[c]}
+            members={[{ id: "m-1", displayName: "Ryan" }]}
+            actorId="m-1"
+            kiosk
+            action={vi.fn()}
+            initialOpenId={c.id}
+          />,
+        ),
+      );
+      return el.querySelector<HTMLDialogElement>(
+        'dialog[aria-label="Log Trash"]',
+      );
+    };
+    expect((await render(chore))?.open).toBe(true);
+    await act(async () => root?.unmount());
+    document.body.innerHTML = "";
+    const cooling = await render({
+      ...chore,
+      state: "cooldown",
+      availableAt: "2026-09-30T06:00:00.000Z",
+    });
+    expect(document.body.textContent).toContain("Again from");
+    expect(cooling?.open ?? false).toBe(false);
+  });
+
   it("closes from Cancel, logging nothing", async () => {
     const { sheet, button, action } = await openSheet();
     expect(button("Cancel")).toBeDefined();
@@ -319,8 +352,9 @@ describe("ChoreGrid's floating score (issue #181)", () => {
   it("stays where the row was tapped when it re-sorts to the end, and nothing scrolls", async () => {
     const { render, answer } = await board([bathroom, chore, zebra]);
     await tapAndLog("Trash", answer);
-    // The re-render after logging: Trash is in its cooldown now, last,
-    // and says when it can be done again; the others are Ready.
+    // The re-render after logging: Trash is in its cooldown now, last, says
+    // when it can be done again and "Not yet", and cannot be opened; the
+    // ready ones have no status line and say "Log it".
     await render([
       bathroom,
       zebra,
@@ -334,12 +368,19 @@ describe("ChoreGrid's floating score (issue #181)", () => {
       ...document.querySelectorAll("li[data-testid^='chore-']"),
     ].map((li) => li.getAttribute("data-testid"));
     expect(order).toEqual(["chore-Bathroom", "chore-Zebra", "chore-Trash"]);
+    const row = (name: string) =>
+      document.querySelector<HTMLButtonElement>(
+        `[data-testid="chore-${name}"] button`,
+      )!;
     const status = (name: string) =>
-      document.querySelector(
-        `[data-testid="chore-${name}"] [data-bounty-status]`,
-      )?.textContent;
-    expect(status("Zebra")).toBe("Ready");
+      row(name).querySelector("[data-bounty-status]")?.textContent ?? null;
     expect(status("Trash")).toBe("Again from Wed 30 Sep, 08:00");
+    expect(row("Trash").textContent).toContain("Not yet");
+    expect(row("Trash").disabled).toBe(true);
+    expect(row("Zebra").textContent).toContain("Log it");
+    expect(row("Zebra").disabled).toBe(false);
+    expect(status("Zebra")).toBeNull();
+    expect(row("Zebra").textContent).not.toMatch(/\bReady\b/);
 
     const pop = theFloat();
     expect(getToasts().map((t) => t.title)).toContain(

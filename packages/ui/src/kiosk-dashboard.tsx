@@ -309,10 +309,12 @@ export function ModuleBountyRow({
           )}
         </div>
       </div>
-      <div className="w-[136px] shrink-0 text-right">
+      {/* One line each, so every row is the same height: "Again from Mon
+          10:28" never wraps and pushes the points down. */}
+      <div className="min-w-[96px] shrink-0 text-right whitespace-nowrap">
         <div
           data-bounty-status
-          className="font-body text-[22px] leading-tight text-bm-muted"
+          className="font-body text-[19px] leading-none text-bm-muted"
         >
           {status}
         </div>

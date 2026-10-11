@@ -208,6 +208,10 @@ describe("ModuleBountyRow", () => {
     expect(out).toContain("no streak yet");
     expect(out).toContain("Consumable");
     expect(out).toContain("Again from 18:00");
+    // Status and points each on one line: rows stay the same height.
+    expect(out).toMatch(
+      /text-right whitespace-nowrap"><div data-bounty-status/,
+    );
     expect(out).not.toContain("color:var(--color-bm-red)");
     expect(out).not.toContain('text-bm-yellow">+');
   });

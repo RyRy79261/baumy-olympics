@@ -47,8 +47,12 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
     "true",
   );
   await expect(tile(page, name)).toContainText("New");
-  await expect(tile(page, name)).toContainText("Ready");
-  await expect(tile(page, name)).not.toContainText(/never done|due/i);
+  // Ready: "Log it", and no status line at all (nearly every bounty is
+  // ready, so saying so on each row would be noise).
+  await expect(tile(page, name)).toContainText("Log it");
+  await expect(tile(page, name)).toBeEnabled();
+  await expect(tile(page, name).locator("[data-bounty-status]")).toHaveCount(0);
+  await expect(tile(page, name)).not.toContainText(/\b(never done|due)\b/i);
   await expect(tile(page, name)).toContainText("Maintenance");
   await expect(tabs.getByRole("button", { name: /^All/ })).toBeVisible();
   await expect(tabs.getByRole("button", { name: /^Urgent/ })).toHaveCount(0);
@@ -72,8 +76,14 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
   // it is still open once the page has settled.
   await page.goto("/chores");
   await expect(tile(page, name)).toContainText("No streak yet");
+  // A second tab opens the same bounty while it is still ready, to meet
+  // the cooldown once the first log lands: the board itself never opens a
+  // bounty that is cooling down.
+  const other = await page.context().newPage();
+  await other.goto("/chores");
+  const stale = await openChore(other, name);
   await tabs.getByRole("button", { name: /^Maintenance/ }).click();
-  let sheet = await openChore(page, name);
+  const sheet = await openChore(page, name);
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(1500);
   await expect(sheet).toBeVisible();
@@ -88,11 +98,14 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
       .filter({ hasText: `Logged ${name} for ${me}: +20.` }),
   ).toBeVisible();
   await expect(tile(page, name)).toContainText(`${me} · streak 1`);
-  // Cooling down: when it can be logged again, and never a due date.
-  await expect(tile(page, name)).toContainText(
-    /Again from (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}, \d\d:\d\d/,
+  // Cooling down: when it can be logged again, "Not yet" and disabled, as
+  // on the kitchen screen; never a due date.
+  await expect(tile(page, name).locator("[data-bounty-status]")).toHaveText(
+    /^Again from (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}, \d\d:\d\d$/,
   );
-  await expect(tile(page, name)).not.toContainText(/Ready|due/i);
+  await expect(tile(page, name)).toContainText("Not yet");
+  await expect(tile(page, name)).toBeDisabled();
+  await expect(tile(page, name)).not.toContainText(/\b(Log it|due)\b/i);
   await expect(page).toHaveURL(/\/chores\?show=maintenance$/);
   await page.reload();
   await expect(
@@ -100,17 +113,17 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
   ).toHaveAttribute("aria-pressed", "true");
   await expect(tile(page, name)).toBeVisible();
 
-  // The second, inside the 48h cooldown: a toast, and nothing stored.
-  sheet = await openChore(page, name);
-  await expect(sheet.getByTestId("log-preview")).toContainText("+25, streak 2");
-  await sheet.getByRole("button", { name: "Log it" }).click();
-  const refused = page
+  // The second, from the tab opened before, inside the 48h cooldown: a
+  // toast, and nothing stored.
+  await stale.getByRole("button", { name: "Log it" }).click();
+  const refused = other
     .getByRole("alert")
     .filter({ hasText: `${name} was done recently.` });
   await expect(refused).toBeVisible();
   await expect(refused).toContainText(
     /You can log it again from (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}, \d\d:\d\d \(Berlin time\)\./,
   );
+  await other.close();
   await page.reload();
   await expect(tile(page, name)).toContainText(`${me} · streak 1`);
 

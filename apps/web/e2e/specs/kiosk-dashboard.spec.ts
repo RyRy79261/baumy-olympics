@@ -149,7 +149,7 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const newBefore = kiosk.getByRole("dialog", { name: "New bounties" });
   await expect(newBefore.getByTestId(`bounty-${bins}`)).toContainText("Ready");
   await expect(newBefore.getByTestId(`bounty-${mop}`)).toContainText("Ready");
-  await expect(newBefore).not.toContainText(/never done|late|overdue/i);
+  await expect(newBefore).not.toContainText(/\b(never done|late|overdue)\b/i);
   await kiosk.keyboard.press("Escape");
   await expect(newBefore).toBeHidden();
 
@@ -205,7 +205,7 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   const mopRow = module.getByTestId(`bounty-${mop}`);
   await expect(binsRow).toContainText("Maintenance");
   await expect(binsRow).toContainText(`steal ${founder}'s 1× streak`);
-  await expect(binsRow).toContainText("Ready");
+  await expect(binsRow.locator("[data-bounty-status]")).toHaveText("Ready");
   await expect(binsRow).toContainText(`+${QUICK_POINTS}`);
   await expect(binsRow).toContainText("new");
   await expect(
@@ -213,10 +213,12 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   ).toBeVisible();
   // Cooling down: when it can be done again, and "Not yet" instead of
   // "I'll do it"; never a due date.
-  await expect(mopRow).toContainText(/Again from (\w{3} )?\d\d:\d\d/);
+  await expect(mopRow.locator("[data-bounty-status]")).toHaveText(
+    /^Again from (Mon |Tue |Wed |Thu |Fri |Sat |Sun )?\d\d:\d\d$/,
+  );
   await expect(mopRow).toContainText("Not yet");
   await expect(mopRow.getByRole("link")).toHaveCount(0);
-  await expect(module).not.toContainText(/due|late|overdue/i);
+  await expect(module).not.toContainText(/\b(due|late|overdue)\b/i);
   await expect(milkRow).toContainText("Consumable");
   await module.getByRole("button", { name: /^Consumables/ }).click();
   await expect(milkRow).toBeVisible();

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { choreTiming } from "@baumy/core";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import { eventView } from "@/lib/calendar/view";
 import {
@@ -150,10 +151,26 @@ function chore(over: Partial<ChoreView>): ChoreView {
 }
 
 describe("readyChores", () => {
+  /** A chore last done `hours` ago, its state from choreTiming at NOW. */
+  function doneAgo(name: string, hours: number, cooldownMinutes = 60) {
+    const lastDoneAt = new Date(NOW.getTime() - hours * HOUR);
+    const t = choreTiming({ lastDoneAt, cooldownMinutes, now: NOW });
+    return chore({
+      name,
+      cooldownMinutes,
+      lastDoneAt: lastDoneAt.toISOString(),
+      state: t.state,
+      availableAt: t.availableAt?.toISOString() ?? null,
+    });
+  }
+
   it("lists the bounties ready to log, by name", () => {
     const list = readyChores([
-      chore({ name: "Mop", lastDoneAt: iso(-24 * 40) }),
-      chore({ name: "Cooling", state: "cooldown", availableAt: iso(2) }),
+      // Done 40 days ago: past its cooldown, so only ready; there is no
+      // due date for it to be overdue on (issue #189).
+      doneAgo("Mop", 40 * 24),
+      // Done half an hour ago with an hour's cooldown: not listed.
+      doneAgo("Cooling", 0.5),
       chore({ name: "Archived", state: "unavailable", archived: true }),
       chore({
         name: "Bins",
@@ -162,11 +179,17 @@ describe("readyChores", () => {
     ]);
     expect(list.map((c) => c.name)).toEqual(["Bins", "Mop"]);
     expect(list[0]).toMatchObject({ streak: "Ryan · streak 3" });
-    // Done 40 days ago is still only ready: there is no due date or
-    // overdue any more (issue #189).
-    expect(list[1]).toMatchObject({ streak: "No streak yet" });
-    expect(list[1]).not.toHaveProperty("overdue");
-    expect(list[1]).not.toHaveProperty("when");
+    // Exactly these fields: no due time, "when" or "overdue" flag.
+    expect(Object.keys(list[1]!).sort()).toEqual([
+      "id",
+      "isNew",
+      "kind",
+      "name",
+      "points",
+      "sprite",
+      "streak",
+    ]);
+    expect(list[1]).toMatchObject({ name: "Mop", streak: "No streak yet" });
   });
 
   it("carries each bounty's glyph, kind, New mark and points", () => {

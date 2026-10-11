@@ -12,15 +12,17 @@ export function streakLabel(c: Pick<ChoreView, "streak">): string {
 }
 
 /**
- * The tile's status line, in Berlin time: "Ready", or "Again from <time>"
- * while it cools down. A chore has no due date (SPEC §12 decision 35).
+ * The board row's status line, in Berlin time: "Again from <time>" while it
+ * cools down, and nothing when it is ready (nearly every bounty is, so a
+ * "Ready" on each row would be noise). A chore has no due date (SPEC §12
+ * decision 35).
  */
 export function statusLabel(
   c: Pick<ChoreView, "state" | "availableAt" | "archived">,
-): string {
+): string | null {
   switch (c.state) {
     case "ready":
-      return "Ready";
+      return null;
     case "cooldown":
       return `Again from ${formatBerlinDateTime(new Date(c.availableAt!))}`;
     case "unavailable":
