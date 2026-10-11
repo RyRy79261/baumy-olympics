@@ -28,7 +28,7 @@ import {
   memoryBrain,
 } from "@/lib/integrations/brain-memory";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
-import { NEW_BOUNTY_MS } from "@/lib/chores/urgency";
+import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { HUB_NOTES, loadHub, startHub } from "./load";
 
 // The hub's reads through the real runAction on PGlite (issue #20): each
@@ -49,10 +49,10 @@ function calendarWith(list: CalendarClient["list"]): CalendarClient {
 let ryan: string;
 
 /**
- * Trash, added long ago and last done by Ryan 5 days ago: a day past its
- * 4-day rhythm, so urgent. A chore never done is not (SPEC §12 decision 22).
+ * Trash, added long ago and last done by Ryan 5 days ago: past its cooldown,
+ * so ready. There is no due date to be overdue on (SPEC §12 decision 35).
  */
-async function seedOverdueTrash() {
+async function seedReadyTrash() {
   const { choreId } = await seedChore(db(), {
     ...SEED_CHORES.trash,
     createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS - 6 * 24 * HOUR),
@@ -99,14 +99,28 @@ afterEach(() => {
 
 describe("loadHub", () => {
   it("fills every widget from its action", async () => {
-    // Trash was added long ago and last done 5 days ago, a day past its
-    // 4-day rhythm: urgent. Dishes was added an hour ago and never done:
-    // new, not urgent (SPEC §12 decision 22).
-    await seedOverdueTrash();
+    // Trash was added long ago and last done 5 days ago. Dishes was added
+    // an hour ago and never done: new. Bathroom was done an hour ago. The
+    // hub lists no bounties (owner, 2026-10-11); only the New count reads
+    // them.
+    await seedReadyTrash();
     await seedChore(db(), {
       ...SEED_CHORES.dishes,
       createdAt: new Date(FIXED_NOW.getTime() - HOUR),
     });
+    const { choreId: bathroom } = await seedChore(db(), {
+      ...SEED_CHORES.bathroom,
+      createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS - HOUR),
+    });
+    expect(
+      (
+        await runAction(
+          "log_completion",
+          { choreId: bathroom, occurredAt: iso(-1) },
+          ctxFor(sessionActor(ryan)),
+        )
+      ).ok,
+    ).toBe(true);
     const pinned = await runAction(
       "create_note",
       { title: "Wifi", bodyMd: "guest", pinned: true },
@@ -136,17 +150,16 @@ describe("loadHub", () => {
         },
       ],
     });
-    expect(hub.chores).toMatchObject({
-      status: "ready",
-      data: [
-        {
-          name: SEED_CHORES.trash.name,
-          when: "Due since Sat 26 Sep, 12:00",
-          overdue: true,
-          isNew: false,
-        },
-      ],
-    });
+    // No bounty card: the hub's widgets are these, and nothing else.
+    expect(Object.keys(hub).sort()).toEqual([
+      "counts",
+      "events",
+      "notes",
+      "now",
+      "pot",
+      "shopping",
+      "standings",
+    ]);
     expect(hub.standings).toEqual({
       status: "ready",
       data: [
@@ -154,7 +167,8 @@ describe("loadHub", () => {
           memberId: ryan,
           displayName: "Ryan",
           rank: 1,
-          points: SEED_CHORES.trash.basePoints,
+          points:
+            SEED_CHORES.trash.basePoints + SEED_CHORES.bathroom.basePoints,
           gap: "Leader",
         },
       ],
@@ -164,9 +178,9 @@ describe("loadHub", () => {
       status: "ready",
       data: [{ id: pinned.ok && pinned.data.note.id, title: "Wifi" }],
     });
-    // Only Trash is urgent (Dishes was never done); only Dishes is new; of
-    // the notes, Ryan has seen only the one he wrote through create_note.
-    expect(hub.counts).toEqual({ urgent: 1, new: 1, messages: 1 });
+    // Only Dishes is new; of the notes, Ryan has seen only the one he wrote
+    // through create_note. There is no urgent count (issue #189).
+    expect(hub.counts).toEqual({ new: 1, messages: 1 });
   });
 
   it("counts nothing for a tile whose read failed", async () => {
@@ -182,7 +196,7 @@ describe("loadHub", () => {
         ? Promise.reject(new Error("boom"))
         : real(name, input, ctx)) as never);
     const hub = await loadHub(ctxFor(sessionActor(ryan)));
-    expect(hub.counts).toEqual({ urgent: null, new: null, messages: null });
+    expect(hub.counts).toEqual({ new: null, messages: null });
     expect(hub.standings.status).toBe("ready");
   });
 
@@ -200,7 +214,7 @@ describe("loadHub", () => {
   });
 
   it("says the shopping list is unavailable when brain is down, and shows everything else", async () => {
-    await seedOverdueTrash();
+    await seedReadyTrash();
     setBrainClientForTests({
       ...unconfiguredBrain,
       listShopping: async () => ({ ok: false, reason: "unavailable" }),
@@ -211,7 +225,6 @@ describe("loadHub", () => {
       message: expect.stringContaining("The shopping list is unavailable"),
     });
     expect(hub.events.status).toBe("ready");
-    expect(hub.chores.status).toBe("ready");
     expect(hub.standings.status).toBe("ready");
     expect(hub.pot.ok).toBe(true);
     // Not set up at all: it says so instead.
@@ -231,10 +244,6 @@ describe("loadHub", () => {
       status: "empty",
       message: "Nothing else on the calendar today.",
     });
-    expect(hub.chores).toEqual({
-      status: "empty",
-      message: "Nothing is due. Nice.",
-    });
     expect(hub.notes).toEqual({
       status: "empty",
       message: "Nothing is pinned. Pin a note on the Board.",
@@ -242,14 +251,13 @@ describe("loadHub", () => {
   });
 
   it("says the calendar is not connected, and shows everything else", async () => {
-    await seedOverdueTrash();
+    await seedReadyTrash();
     setCalendarClientForTests(unconfiguredCalendar);
     const hub = await loadHub(ctxFor(sessionActor(ryan)));
     expect(hub.events).toMatchObject({
       status: "unavailable",
       message: expect.stringContaining("not connected yet"),
     });
-    expect(hub.chores.status).toBe("ready");
     expect(hub.standings.status).toBe("ready");
     expect(hub.pot.ok).toBe(true);
   });
@@ -327,8 +335,7 @@ describe("startHub", () => {
 
     const hub = startHub(ctxFor(sessionActor(ryan)));
     const local = await hub.local;
-    expect(local.chores.status).not.toBe("unavailable");
-    expect(local.counts.urgent).toEqual(expect.any(Number));
+    expect(local.counts.new).toEqual(expect.any(Number));
     expect(local.standings.status).not.toBe("unavailable");
     expect(local).not.toHaveProperty("events");
     expect(local).not.toHaveProperty("shopping");

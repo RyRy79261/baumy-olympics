@@ -12,7 +12,7 @@ import {
   KIOSK_PIN_MIN_DIGITS,
 } from "@baumy/types";
 import { MAX_RECORDING_MS } from "@/lib/ai/voice";
-import { NEW_BOUNTY_MS } from "@/lib/chores/urgency";
+import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import { DEFAULT_NIGHT_WINDOW } from "@/lib/kiosk/night";
 import { DEFAULT_TELEGRAM_BOT_USERNAME } from "@/lib/telegram/deep-link";

@@ -17,12 +17,12 @@ describe("ChoreTile", () => {
         sprite="trash"
         points={20}
         streak="Ryan · streak 3"
-        status="Due"
-        state="due"
+        status="Ready"
+        state="ready"
       />,
     );
     expect(out).toContain('type="button"');
-    expect(out).toContain('data-state="due"');
+    expect(out).toContain('data-state="ready"');
     expect(out).toContain('data-sprite="trash"');
     expect(out).toContain("Trash");
     expect(out).toContain("20 pts");

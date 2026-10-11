@@ -8,8 +8,9 @@
    approved prototype's (proto/kiosk-home-pixel), taken from
    design/baumy-reference.png: a near-black plum, violet, teal, pink, amber
    and yellow accents, and the green of Baumy's eye. On the kitchen screen
-   one accent has one meaning (ADR 0005 §8): red is urgent, yellow is new or
-   points, pink is messages, amber is consumable, teal is maintenance.
+   one accent has one meaning (ADR 0005 §8): yellow is new or points, pink is
+   messages, amber is consumable, teal is maintenance. (Red was urgent until
+   SPEC §12 decision 35 removed due dates.)
    Components use these through `bg-bm-*`, `text-bm-*`, `border-bm-*`. */
 @theme {
   --color-bm-bg: #140c1f;

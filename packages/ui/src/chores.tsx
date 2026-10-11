@@ -32,7 +32,8 @@ export function choreGlyph(sprite: string): GlyphName {
   return CHORE_GLYPHS[sprite] ?? "wrench";
 }
 
-export type ChoreTileState = "due" | "cooldown" | "done" | "unavailable";
+/** Ready to log, cooling down, or not scorable; never "due" (issue #189). */
+export type ChoreTileState = "ready" | "cooldown" | "unavailable";
 
 export interface ChoreTileProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   name: string;
@@ -42,7 +43,7 @@ export interface ChoreTileProps extends ButtonHTMLAttributes<HTMLButtonElement> 
   points: number | null;
   /** E.g. "Ryan · streak 3", or "No streak yet". */
   streak: ReactNode;
-  /** E.g. "Due", or "Again from Wed 30 Sep, 08:00". */
+  /** "Ready", or "Again from Wed 30 Sep, 08:00". */
   status: ReactNode;
   state: ChoreTileState;
   /** 56px targets and larger text on the kiosk. */
@@ -62,14 +63,12 @@ export function ChoreTile({
   type = "button",
   ...props
 }: ChoreTileProps) {
-  const due = state === "due";
   return (
     <button
       type={type}
       data-state={state}
       className={cx(
-        // Calm (ADR 0005 §8): every tile keeps the dim line frame; "due" is
-        // said once, by the status line in red.
+        // Calm (ADR 0005 §8): every tile keeps the dim line frame.
         "pixel-frame flex w-full items-center gap-3 bg-bm-surface p-3 text-left text-bm-text",
         "active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50",
         kiosk ? "min-h-24 gap-4 p-4 text-lg" : "min-h-16 text-base",
@@ -118,10 +117,7 @@ export function ChoreTile({
         <span className="truncate font-label text-sm text-bm-muted uppercase">
           {streak}
         </span>
-        <span
-          data-tile-status
-          className={cx("truncate", due ? "text-bm-red" : "text-bm-dim")}
-        >
+        <span data-tile-status className="truncate text-bm-dim">
           {status}
         </span>
       </span>

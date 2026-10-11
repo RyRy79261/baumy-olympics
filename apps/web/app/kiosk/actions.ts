@@ -72,8 +72,8 @@ export async function checkPinAction(
 }
 
 /**
- * The chores page, the home whose widgets show the due chores, and the
- * activity log.
+ * The chores page and the activity log. (The home re-reads itself, ADR
+ * 0005.)
  */
 function revalidateKioskChores(): void {
   revalidatePath("/kiosk/chores");

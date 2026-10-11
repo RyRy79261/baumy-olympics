@@ -37,7 +37,6 @@ const WIDTHS = [
 
 /** The hub's cards, in reading order on one column. */
 const CARDS = [
-  "widget-chores",
   "widget-events",
   "post-reminder",
   "widget-leaderboard",

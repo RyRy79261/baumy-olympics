@@ -7,10 +7,8 @@ import type { ActionResult } from "@/lib/actions/result";
 import type { ShoppingEntry } from "@/lib/integrations/brain";
 import { formatEuros, gapLabel } from "@/lib/scores/view";
 import {
-  dueChores,
   upcomingEvents,
   widgetState,
-  type HubChore,
   type HubCounts,
   type HubEvent,
   type WidgetState,
@@ -40,12 +38,11 @@ export interface HubData {
   /** The instant the page was read at, ISO 8601. */
   now: string;
   events: WidgetState<HubEvent[]>;
-  chores: WidgetState<HubChore[]>;
   standings: WidgetState<HubStanding[]>;
   /** The pot's total, "€80.50", or why it cannot be shown. */
   pot: { ok: true; total: string } | { ok: false; message: string };
   notes: WidgetState<NoteView[]>;
-  /** The Urgent, New and Messages counts (ADR 0005 §1). */
+  /** The New and Messages counts (ADR 0005 §1). */
   counts: HubCounts;
   /**
    * brain's shopping list. Ready even when empty: the widget's quick-add
@@ -112,6 +109,8 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
 
 async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
   const [chores, standings, pot, notes] = await Promise.all([
+    // Only for the New count: the hub lists no bounties (owner, 2026-10-11,
+    // issue #189); the board does.
     read(() => runAction("list_chores", {}, ctx)),
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
     read(() => runAction("get_pot", {}, ctx)),
@@ -123,11 +122,6 @@ async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
   ]);
   return {
     now: ctx.now.toISOString(),
-    chores: widgetState(
-      chores,
-      (d) => dueChores(d.chores, ctx.now),
-      "Nothing is due. Nice.",
-    ),
     standings: widgetState(
       standings,
       (d) =>
@@ -149,9 +143,6 @@ async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
       "Nothing is pinned. Pin a note on the Board.",
     ),
     counts: {
-      urgent: chores.ok
-        ? chores.data.chores.filter((c) => c.urgent).length
-        : null,
       new: chores.ok ? chores.data.chores.filter((c) => c.isNew).length : null,
       messages: notes.ok ? notes.data.unseenCount : null,
     },

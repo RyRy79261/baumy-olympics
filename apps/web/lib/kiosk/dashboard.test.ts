@@ -14,15 +14,14 @@ import {
   addMonths,
   agoLabel,
   bountyRows,
+  bountyStatus,
   bountyTabCounts,
   chipsFor,
   chipsThatFit,
   dayHeading,
-  dueLabel,
   headerClock,
   inTab,
   isNewBounty,
-  isUrgentBounty,
   kindLabel,
   longDay,
   monthCells,
@@ -67,13 +66,10 @@ function chore(over: Partial<ChoreView>): ChoreView {
     archived: false,
     basePoints: 10,
     cooldownMinutes: 60,
-    intervalMinutes: 1440,
     streak: null,
     lastDoneAt: null,
-    state: "due",
+    state: "ready",
     availableAt: null,
-    dueAt: null,
-    urgent: false,
     isNew: false,
     createdAt: at(-200),
     next: null,
@@ -124,62 +120,43 @@ describe("the header", () => {
   });
 });
 
-describe("dueLabel", () => {
-  it("says never done, and no points yet for a chore without a weight", () => {
-    expect(dueLabel(chore({ state: "due", dueAt: null }), NOW)).toEqual({
-      text: "Never done",
-      tone: "later",
-    });
-    expect(dueLabel(chore({ state: "unavailable", dueAt: null }), NOW)).toEqual(
-      { text: "No points yet", tone: "later" },
+describe("bountyStatus", () => {
+  it("says Ready, and no points yet for a chore without a weight", () => {
+    expect(bountyStatus(chore({ state: "ready" }), NOW)).toBe("Ready");
+    expect(bountyStatus(chore({ state: "unavailable" }), NOW)).toBe(
+      "No points yet",
     );
   });
 
-  it("says how late a due bounty is, in hours then days", () => {
-    expect(dueLabel(chore({ state: "due", dueAt: at(-0.5) }), NOW)).toEqual({
-      text: "Due now",
-      tone: "late",
-    });
-    expect(dueLabel(chore({ state: "due", dueAt: at(-20) }), NOW)).toEqual({
-      text: "20h late",
-      tone: "late",
-    });
-    expect(dueLabel(chore({ state: "due", dueAt: at(-50) }), NOW)).toEqual({
-      text: "2d late",
-      tone: "late",
-    });
-  });
-
-  it("says how soon the rest fall due, amber within 12 hours", () => {
-    const due = (h: number) =>
-      dueLabel(chore({ state: "done", dueAt: at(h) }), NOW);
-    expect(due(0.25)).toEqual({ text: "in 15m", tone: "soon" });
-    expect(due(0.001)).toEqual({ text: "in 1m", tone: "soon" });
-    expect(due(5)).toEqual({ text: "in 5h", tone: "soon" });
-    expect(due(12)).toEqual({ text: "in 12h", tone: "soon" });
-    expect(due(30)).toEqual({ text: "in 30h", tone: "later" });
-    expect(due(72)).toEqual({ text: "in 3 days", tone: "later" });
-    // A deadline that has just passed counts as late whatever the state.
-    expect(due(-2)).toEqual({ text: "2h late", tone: "late" });
+  it("says when a cooling-down bounty can be done again, never a due date", () => {
+    const again = (h: number) =>
+      bountyStatus(chore({ state: "cooldown", availableAt: at(h) }), NOW);
+    // 17:42 Berlin now: later today is the time alone…
+    expect(again(2)).toBe("Again from 19:42");
+    // …another day this week its weekday (Tue 29 Sep, Sun 4 Oct)…
+    expect(again(10)).toBe("Again from Tue 03:42");
+    expect(again(6 * 24)).toBe("Again from Sun 17:42");
+    // …and a week or more away, the date (Mon 5 Oct).
+    expect(again(7 * 24)).toBe("Again from 5 Oct");
+    for (const h of [2, 10, 6 * 24, 7 * 24]) {
+      expect(again(h)).not.toMatch(/due|late|overdue/i);
+    }
   });
 });
 
 describe("bountyRows", () => {
   const chores = [
-    chore({ name: "Later", state: "done", dueAt: at(30) }),
+    chore({ name: "Later", state: "ready" }),
     chore({
       name: "Bins",
-      state: "due",
-      dueAt: at(-3),
-      urgent: true,
+      state: "ready",
       streak: { holderId: "m-ryan", holderName: "Ryan", length: 6 },
     }),
     chore({
       name: "Cat food",
       kind: "consumable",
       state: "cooldown",
-      dueAt: at(5),
-      urgent: true,
+      availableAt: at(5),
       isNew: true,
       streak: { holderId: "m-gone", holderName: "Kim", length: 2 },
       next: {
@@ -191,22 +168,26 @@ describe("bountyRows", () => {
         brokenLen: 2,
       },
     }),
-    chore({ name: "Never", state: "due", urgent: true }),
-    chore({ name: "Archived", archived: true, urgent: true }),
+    chore({ name: "Archived", archived: true, isNew: true }),
     chore({ name: "Unweighted", state: "unavailable", isNew: true }),
   ];
 
-  it("lists the loggable ones picked, soonest due first", () => {
-    const rows = bountyRows(chores, isUrgentBounty, MEMBERS, NOW);
-    expect(rows.map((r) => r.name)).toEqual(["Never", "Bins", "Cat food"]);
-    expect(rows[1]).toEqual({
+  it("lists the bounties picked: ready by name, then cooling down, then unscorable", () => {
+    const rows = bountyRows(chores, () => true, MEMBERS, NOW);
+    expect(rows.map((r) => r.name)).toEqual([
+      "Bins",
+      "Later",
+      "Cat food",
+      "Unweighted",
+    ]);
+    expect(rows[0]).toEqual({
       id: "Bins",
       name: "Bins",
       sprite: "bin",
       kind: "maintenance",
       isNew: false,
       points: 10,
-      due: { text: "3h late", tone: "late" },
+      status: "Ready",
       streak: {
         holderId: "m-ryan",
         holderName: "Ryan",
@@ -216,10 +197,12 @@ describe("bountyRows", () => {
       loggable: true,
     });
     // What you would score, once someone is asking; the holder's colour
-    // falls back to the house's for someone who left.
+    // falls back to the house's for someone who left. Cooling down: not
+    // loggable, and says when it can be done again.
     expect(rows[2]).toMatchObject({
       points: 23,
       loggable: false,
+      status: "Again from 22:42",
       streak: { holderName: "Kim", colour: HOUSE_COLOUR },
     });
   });
@@ -227,49 +210,35 @@ describe("bountyRows", () => {
   it("picks every new one, one without a weight last and not loggable", () => {
     const rows = bountyRows(chores, isNewBounty, MEMBERS, NOW);
     expect(rows.map((r) => r.name)).toEqual(["Cat food", "Unweighted"]);
-    // Exactly list_chores' isNew, so the icon's count is the list's.
-    expect(rows).toHaveLength(chores.filter((c) => c.isNew).length);
+    // Exactly list_chores' isNew (archived left out), so the icon's count
+    // is the list's.
+    expect(rows).toHaveLength(
+      chores.filter((c) => c.isNew && !c.archived).length,
+    );
     expect(rows[1]).toMatchObject({
       loggable: false,
-      due: { text: "No points yet" },
+      status: "No points yet",
     });
   });
 
-  it("sorts a never-done chore by when it was added, under real lateness", () => {
-    const rows = bountyRows(
-      [
-        chore({ name: "Fresh", state: "due", createdAt: at(-1) }),
-        chore({ name: "Bins", state: "due", dueAt: at(-3) }),
-        chore({ name: "Ancient", state: "due", createdAt: at(-72) }),
-      ],
-      () => true,
-      MEMBERS,
-      NOW,
-    );
-    expect(rows.map((r) => r.name)).toEqual(["Ancient", "Bins", "Fresh"]);
-  });
-
-  it("breaks a tie on the deadline by name", () => {
-    const same = [
-      chore({ name: "B", dueAt: at(-1) }),
-      chore({ name: "A", dueAt: at(-1) }),
-    ];
+  it("breaks a tie by name", () => {
+    const same = [chore({ name: "B" }), chore({ name: "A" })];
     expect(
       bountyRows(same, () => true, MEMBERS, NOW).map((r) => r.name),
     ).toEqual(["A", "B"]);
   });
 
   it("counts and filters the tabs by kind", () => {
-    const rows = bountyRows(chores, isUrgentBounty, MEMBERS, NOW);
+    const rows = bountyRows(chores, () => true, MEMBERS, NOW);
     expect(bountyTabCounts(rows)).toEqual({
-      all: 3,
+      all: 4,
       consumable: 1,
-      maintenance: 2,
+      maintenance: 3,
     });
     expect(
       rows.filter((r) => inTab(r, "consumable")).map((r) => r.name),
     ).toEqual(["Cat food"]);
-    expect(rows.filter((r) => inTab(r, "all"))).toHaveLength(3);
+    expect(rows.filter((r) => inTab(r, "all"))).toHaveLength(4);
     expect(kindLabel("consumable")).toBe("Consumable");
     expect(kindLabel("maintenance")).toBe("Maintenance");
   });

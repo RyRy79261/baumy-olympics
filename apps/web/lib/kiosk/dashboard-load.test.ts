@@ -112,7 +112,7 @@ describe("loadDashboard", () => {
     expect(data.events.ok && data.events.data).toHaveLength(1);
     expect(data.chores).toMatchObject({
       ok: true,
-      data: [{ name: SEED_CHORES.trash.name, state: "due", next: null }],
+      data: [{ name: SEED_CHORES.trash.name, state: "ready", next: null }],
     });
     expect(data.notes).toMatchObject({
       ok: true,

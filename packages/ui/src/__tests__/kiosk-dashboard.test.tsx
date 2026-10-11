@@ -164,14 +164,14 @@ describe("ModulePanel and SheetTabs", () => {
 });
 
 describe("ModuleBountyRow", () => {
-  it("shows the kind, whose streak you steal, the deadline and the points", () => {
+  it("shows the kind, whose streak you steal, its status and the points", () => {
     const out = html(
       <ModuleBountyRow
         glyph="bin"
         name="Bins out"
         kind="maintenance"
         streak={{ name: "Ryan", length: 6, colour: "#4ff5e6" }}
-        due={{ text: "in 2h", tone: "soon" }}
+        status="Ready"
         points={20}
         action={<a href="/x">I&apos;ll do it</a>}
       />,
@@ -182,9 +182,9 @@ describe("ModuleBountyRow", () => {
     expect(out).toMatch(
       /data-streak[^>]*whitespace-nowrap[^>]*color:#4ff5e6[^>]*>steal Ryan&#x27;s 6× streak/,
     );
-    expect(out).toMatch(
-      /data-due="soon"[^>]*color:var\(--color-bm-amber\)[^>]*>in 2h/,
-    );
+    // Calm: the status is muted, never a late red or a soon amber.
+    expect(out).toMatch(/data-bounty-status[^>]*text-bm-muted[^>]*>Ready</);
+    expect(out).not.toContain("data-due");
     expect(out).toContain("+20");
     expect(out).toContain('data-glyph="bin"');
     expect(out).toContain('href="/x"');
@@ -199,7 +199,7 @@ describe("ModuleBountyRow", () => {
         kind="consumable"
         isNew
         streak={null}
-        due={{ text: "3h late", tone: "late" }}
+        status="Again from 18:00"
         points={null}
         action={null}
       />,
@@ -207,7 +207,12 @@ describe("ModuleBountyRow", () => {
     expect(out).toContain(">new<");
     expect(out).toContain("no streak yet");
     expect(out).toContain("Consumable");
-    expect(out).toContain("color:var(--color-bm-red)");
+    expect(out).toContain("Again from 18:00");
+    // Status and points each on one line: rows stay the same height.
+    expect(out).toMatch(
+      /text-right whitespace-nowrap"><div data-bounty-status/,
+    );
+    expect(out).not.toContain("color:var(--color-bm-red)");
     expect(out).not.toContain('text-bm-yellow">+');
   });
 

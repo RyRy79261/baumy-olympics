@@ -175,8 +175,8 @@ describe("choreGlyph", () => {
         sprite="trash"
         points={20}
         streak="No streak yet"
-        status="Due"
-        state="due"
+        status="Ready"
+        state="ready"
       />,
     );
     expect(out).toContain('data-sprite="trash"');

@@ -30,8 +30,8 @@ const tile = (props: Partial<React.ComponentProps<typeof ChoreTile>> = {}) =>
       sprite="dishwasher"
       points={25}
       streak="Josephine · streak 3"
-      status="Due since Sun 27 Sep"
-      state="due"
+      status="Ready"
+      state="ready"
       {...props}
     />,
   );
@@ -51,12 +51,13 @@ describe("ChoreTile", () => {
     expect(tile()).toMatch(/data-tile-points="true" class="[^"]*text-xs/);
   });
 
-  it("says due once, in red text, with the same dim frame as any tile", () => {
-    const due = tile();
+  it("says ready or again-from calmly, with the same dim frame as any tile", () => {
+    const ready = tile();
     const later = tile({ state: "cooldown", status: "Again from Thu" });
-    expect(due).toMatch(/data-tile-status="true" class="[^"]*text-bm-red/);
+    expect(ready).toMatch(/data-tile-status="true" class="[^"]*text-bm-dim/);
     expect(later).toMatch(/data-tile-status="true" class="[^"]*text-bm-dim/);
-    for (const out of [due, later]) {
+    for (const out of [ready, later]) {
+      expect(out).not.toContain("text-bm-red");
       expect(out).toContain("pixel-frame");
       expect(out).not.toContain("--pf:var(--color-bm-text)");
     }

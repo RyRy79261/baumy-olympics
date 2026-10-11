@@ -119,17 +119,20 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
   },
   list_chores: {
     purpose:
-      "Lists the bounties (chores): what is due, urgent or new, and what each would score now.",
+      "Lists the bounties (chores): which are ready to log, which are cooling down and until when, which are new, and what each would score now.",
     when: 'To answer "what needs doing?", and to turn a chore someone names into its `choreId` before log_completion. Match the words to exactly one chore; if none or several match, list them and ask.',
     examples: [
       { say: "what needs doing?", call: "list_chores {}" },
-      { say: "what's urgent?", call: "list_chores {} (keep `urgent: true`)" },
+      {
+        say: "what can I do right now?",
+        call: 'list_chores {} (keep `state: "ready"`)',
+      },
     ],
     returns:
-      "`chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (due, cooling down with `availableAt`, or done for now; a chore never done is `due` with no `dueAt`), `urgent` (overdue on its own rhythm; never for a chore never done), `isNew`, `streak` (holder and length) and `next` (what logging it now would score the asker).",
+      "`chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (`ready`; `cooldown`, with `availableAt`, when it can be logged again; or `unavailable`), `isNew`, `streak` (holder and length) and `next` (what logging it now would score the asker). There is no due date, `dueAt` or `urgent`: never call a chore due, late or overdue.",
     errors: [],
     reply:
-      'Urgent ones first, then due, then the rest; say points as "+N". Times in Berlin time.',
+      'Ready ones first, then those cooling down ("again from <time>"); say points as "+N". Times in Berlin time.',
   },
   log_completion: {
     purpose: "Logs that someone did a chore, and scores it.",

@@ -1,6 +1,7 @@
 // The 16×16 multi-colour icons from the approved prototype (branch
-// proto/kiosk-home-pixel, calm-icons.ts): the header's Urgent siren, New star
-// and Messages envelope, and the basket, wrench and board. One character per
+// proto/kiosk-home-pixel, calm-icons.ts): the header's New star and Messages
+// envelope, the siren (the Urgent icon's until issue #189 removed it; kept
+// with the set as drawn), and the basket, wrench and board. One character per
 // pixel through each icon's own palette ("." is clear). Copied as drawn.
 
 import type { Palette, Sprite } from "./pixel-grid";

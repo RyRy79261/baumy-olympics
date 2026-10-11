@@ -37,8 +37,10 @@ import { toast } from "@/lib/ui/toast";
 
 // The bounty board (SPEC §3.2; ADR 0005 §2): chores presented as bounties,
 // the same on the phone (/chores) and on the kiosk (acting as the member
-// whose avatar was tapped). The urgent ones come first; one row of tabs
-// narrows the board to the urgent, the new, or one kind. Tapping a row opens
+// whose avatar was tapped). The ones ready to log come first, by name, then
+// those cooling down ("Again from …"), the soonest first; a chore has no due
+// date (SPEC §12 decision 35, issue #189). One row of tabs narrows the board
+// to the new or one kind. Tapping a row opens
 // a sheet with the preview ("+25, streak 2") and a confirm button. Logging
 // for someone else is a choice in the sheet, and vouches for them; it needs
 // no PIN on the kiosk (owner ruling 2026-10-02, issue #145). The form is
@@ -64,7 +66,6 @@ const POP_MS = 2500;
 /** The board's tabs, in order, each with its accent (ADR 0005 §8). */
 const TABS: { filter: BountyFilter; label: string; accent: TabAccent }[] = [
   { filter: "all", label: "All", accent: "violet" },
-  { filter: "urgent", label: "Urgent", accent: "red" },
   { filter: "new", label: "New", accent: "yellow" },
   { filter: "consumable", label: "Consumables", accent: "amber" },
   { filter: "maintenance", label: "Maintenance", accent: "teal" },
@@ -73,7 +74,6 @@ const TABS: { filter: BountyFilter; label: string; accent: TabAccent }[] = [
 /** What the board says when a tab keeps nothing. */
 const EMPTY: Record<BountyFilter, string> = {
   all: "",
-  urgent: "Nothing is urgent. Baumy approves.",
   new: "No bounties added in the last 3 days.",
   consumable: "No consumables to buy or refill.",
   maintenance: "No maintenance bounties.",
@@ -114,15 +114,15 @@ export function ChoreGrid({
   /** A control beside each row: an admin's Edit on /chores (issue #109). */
   rowAction?: (chore: ChoreView) => ReactNode;
 }) {
-  // The tab lives in the address (`?show=`): the hub's Urgent and New tiles
-  // link to theirs, and a refresh keeps it. A tap shows the tab at once and
+  // The tab lives in the address (`?show=`): the hub's New tile links to
+  // its tab, and a refresh keeps it. A tap shows the tab at once and
   // writes the address without a server round trip; a navigation (a tile's
   // link, back) brings the address's tab in.
   const shownInUrl = parseBountyFilter(useSearchParams().get("show"));
   const [filter, setFilter] = useState<BountyFilter>(shownInUrl);
   useEffect(() => setFilter(shownInUrl), [shownInUrl]);
   const [openId, setOpenId] = useState<string | null>(() =>
-    chores.some((c) => c.id === initialOpenId && c.state !== "unavailable")
+    chores.some((c) => c.id === initialOpenId && c.state === "ready")
       ? initialOpenId!
       : null,
   );
@@ -302,10 +302,12 @@ export function ChoreGrid({
               points={c.basePoints}
               streak={streakLabel(c)}
               status={statusLabel(c)}
-              urgent={c.urgent}
+              cta={c.state === "ready" ? "Log it" : "Not yet"}
               isNew={c.isNew}
               kiosk={kiosk}
-              disabled={c.state === "unavailable"}
+              // Only a ready bounty can be logged: one cooling down says
+              // "Not yet", as on the kitchen screen's home.
+              disabled={c.state !== "ready"}
               className={rowAction ? "min-w-0 sm:flex-1" : undefined}
               onClick={(e) => {
                 const r = e.currentTarget.getBoundingClientRect();

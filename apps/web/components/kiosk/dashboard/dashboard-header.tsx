@@ -37,8 +37,9 @@ import {
 import { useIdle } from "../use-idle";
 
 // The dashboard's header (ADR 0005 §1, issue #65): the date, a big clock
-// in Berlin time and at most three notification icons, Urgent, New and
-// Messages. Each opens its calm module: the bounties (All, Consumables,
+// in Berlin time and two notification icons, New and Messages (there is no
+// Urgent: a chore has no due date, SPEC §12 decision 35, issue #189). Each
+// opens its calm module: the bounties (All, Consumables,
 // Maintenance) with "I'll do it" leading to the log flow, or the notes not
 // every member has seen yet (issue #153); opening those with someone picked
 // marks them seen by that member only.
@@ -47,7 +48,7 @@ import { useIdle } from "../use-idle";
 type Listed<T> =
   { ok: true; rows: T[]; count?: number } | { ok: false; message: string };
 
-type ModuleKey = "urgent" | "new" | "messages";
+type ModuleKey = "new" | "messages";
 
 function Clock({ serverNow }: { serverNow: string }) {
   // Starts from the server's `now` and keeps its offset from this device's
@@ -63,7 +64,7 @@ function Clock({ serverNow }: { serverNow: string }) {
   }, [serverNow]);
   // The clock takes the room the icons leave (issue #127): its text scales
   // with that room (`cqi`), so on a narrower iPad it shrinks instead of
-  // running into the Urgent icon. At 820px wide both are at full size.
+  // running into the icons. At 820px wide both are at full size.
   // "WEDNESDAY 30", the longest line the date wraps to, is about 10.6em of
   // the label font; "00:00" is about 4.9em of the display font.
   const { date, time } = headerClock(now);
@@ -118,7 +119,7 @@ function BountyList({ rows }: { rows: BountyRowView[] }) {
                 }
               : null
           }
-          due={b.due}
+          status={b.status}
           points={b.points}
           action={
             !b.loggable ? (
@@ -267,7 +268,6 @@ function MessagesModule({
 
 export function DashboardHeader({
   serverNow,
-  urgent,
   fresh,
   messages,
   members,
@@ -276,7 +276,6 @@ export function DashboardHeader({
 }: {
   /** The instant the page was read at, ISO 8601. */
   serverNow: string;
-  urgent: Listed<BountyRowView>;
   fresh: Listed<BountyRowView>;
   messages: Listed<MessageView>;
   members: DashboardMember[];
@@ -310,14 +309,6 @@ export function DashboardHeader({
       <Clock serverNow={serverNow} />
       <div className="flex shrink-0 gap-6 pt-2 pr-2">
         <NotificationIcon
-          icon="siren"
-          label="Urgent"
-          tone="red"
-          count={count(urgent)}
-          data-icon="urgent"
-          onClick={() => setOpen("urgent")}
-        />
-        <NotificationIcon
           icon="star"
           label="New"
           tone="yellow"
@@ -338,17 +329,7 @@ export function DashboardHeader({
         />
       </div>
       <KioskModal open={open !== null} onClose={close} labelledBy={titleId}>
-        {open === "urgent" ? (
-          <BountyModule
-            title="Urgent"
-            titleId={titleId}
-            icon="siren"
-            tone="red"
-            subtitle="Overdue or due before midnight"
-            listed={urgent}
-            onClose={close}
-          />
-        ) : open === "new" ? (
+        {open === "new" ? (
           <BountyModule
             title="New bounties"
             titleId={titleId}

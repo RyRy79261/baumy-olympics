@@ -19,7 +19,6 @@ function hub(counts: HubData["counts"]): HubData {
   return {
     now: "2026-09-28T10:00:00.000Z",
     events: empty,
-    chores: empty,
     standings: empty,
     pot: { ok: true, total: "€0.00" },
     notes: empty,
@@ -45,27 +44,41 @@ const render = (counts: HubData["counts"]) =>
 
 describe("HubHome's status tiles", () => {
   it("badges a count and links it to its slice; a zero is dim with no badge", () => {
-    const html = render({ urgent: 3, new: 0, messages: 1 });
-    const urgent = tile(html, "urgent");
-    expect(urgent).toContain('aria-label="Urgent: 3"');
-    expect(urgent).toContain('href="/chores?show=urgent"');
-    expect(urgent).toContain("data-count");
+    const html = render({ new: 3, messages: 0 });
     const fresh = tile(html, "new");
-    expect(fresh).toContain('aria-label="New: 0"');
-    expect(fresh).not.toContain("data-count");
-    expect(fresh).not.toContain("data-unavailable");
-    expect(tile(html, "messages")).toContain('href="/notes"');
+    expect(fresh).toContain('aria-label="New: 3"');
+    expect(fresh).toContain('href="/chores?show=new"');
+    expect(fresh).toContain("data-count");
+    const messages = tile(html, "messages");
+    expect(messages).toContain('aria-label="Messages: 0"');
+    expect(messages).toContain('href="/notes"');
+    expect(messages).not.toContain("data-count");
+    expect(messages).not.toContain("data-unavailable");
+  });
+
+  it("has New and Messages and no Urgent tile (issue #189)", () => {
+    const html = render({ new: 1, messages: 1 });
+    expect(html).toContain('data-testid="hub-tile-new"');
+    expect(html).toContain('data-testid="hub-tile-messages"');
+    expect(html).not.toContain('data-testid="hub-tile-urgent"');
+    expect(html).not.toContain("show=urgent");
+    expect(html).not.toMatch(/urgent|overdue/i);
+  });
+
+  it("lists no bounties: the board does (owner, 2026-10-11)", () => {
+    const html = render({ new: 1, messages: 1 });
+    expect(html).toContain('data-testid="widget-events"');
+    expect(html).toContain('data-testid="widget-leaderboard"');
+    expect(html).not.toContain('data-testid="widget-chores"');
+    expect(html).not.toMatch(/Ready bounties|more ready/);
   });
 
   it("says a count it could not read is unavailable, never zero", () => {
-    const html = render({ urgent: null, new: 2, messages: null });
-    const urgent = tile(html, "urgent");
-    expect(urgent).toContain('aria-label="Urgent: unavailable"');
-    expect(urgent).toContain("data-unavailable");
-    expect(urgent).not.toContain("data-count");
-    expect(tile(html, "messages")).toContain(
-      'aria-label="Messages: unavailable"',
-    );
+    const html = render({ new: 2, messages: null });
+    const messages = tile(html, "messages");
+    expect(messages).toContain('aria-label="Messages: unavailable"');
+    expect(messages).toContain("data-unavailable");
+    expect(messages).not.toContain("data-count");
     expect(tile(html, "new")).toContain("data-count");
   });
 });
@@ -86,7 +99,7 @@ describe("HubHome's streamed widgets", () => {
     shopping: Promise<HubData["shopping"]>,
   ) => (
     <HubHome
-      hub={{ ...hub({ urgent: 1, new: 0, messages: 0 }), events, shopping }}
+      hub={{ ...hub({ new: 1, messages: 0 }), events, shopping }}
       memberColors={{}}
       shopping={{ add: vi.fn(), checkOff: vi.fn() }}
     />
@@ -95,7 +108,7 @@ describe("HubHome's streamed widgets", () => {
   it("shows the rest of the page while the calendar and the list are on their way", () => {
     const never = new Promise<never>(() => {});
     const html = renderToStaticMarkup(streamed(never, never));
-    expect(tile(html, "urgent")).toContain('aria-label="Urgent: 1"');
+    expect(tile(html, "new")).toContain('aria-label="New: 1"');
     for (const id of ["widget-events", "widget-shopping"]) {
       const w = widget(html, id);
       expect(w).toContain('data-status="loading"');
@@ -140,7 +153,7 @@ describe("HubHome's extra card", () => {
   it("sits in the wide column right after Today", () => {
     const html = renderToStaticMarkup(
       <HubHome
-        hub={hub({ urgent: 0, new: 0, messages: 0 })}
+        hub={hub({ new: 0, messages: 0 })}
         memberColors={{}}
         shopping={{ add: vi.fn(), checkOff: vi.fn() }}
       >

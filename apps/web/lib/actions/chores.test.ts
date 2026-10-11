@@ -26,11 +26,7 @@ import {
   sessionActor,
 } from "@/test-utils/actions";
 import type { Actor } from "@/lib/auth";
-import {
-  NEW_BOUNTY_MS,
-  berlinMidnightAfter,
-  isUrgent,
-} from "@/lib/chores/urgency";
+import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { RequestCtx } from "./define";
 import { spriteFor } from "./manage-chore";
@@ -122,7 +118,7 @@ beforeEach(async () => {
 });
 
 describe("list_chores", () => {
-  it("lists each chore with its points, streak, due state and what logging it would score for me", async () => {
+  it("lists each chore with its points, streak, ready or cooldown state and what logging it would score for me", async () => {
     const { choreId: dishes } = await seedChore(db(), SEED_CHORES.dishes);
     ok(
       await runAction(
@@ -149,14 +145,10 @@ describe("list_chores", () => {
       archived: false,
       basePoints: TRASH.basePoints,
       cooldownMinutes: TRASH.cooldownMinutes,
-      // Base 20 at effort 100% implies 4 days.
-      intervalMinutes: 4 * 24 * 60,
       streak: { holderId: partner, holderName: "Partner", length: 1 },
       lastDoneAt: FIXED_NOW.toISOString(),
       state: "cooldown",
       availableAt: at(48).toISOString(),
-      dueAt: at(96).toISOString(),
-      urgent: false,
       isNew: false,
       createdAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
       // Ryan would break the partner's 1-streak: 20 + 20% of 20.
@@ -171,11 +163,9 @@ describe("list_chores", () => {
     });
     expect(data.chores[0]).toMatchObject({
       id: dishes,
-      state: "due",
-      // Never done: no rhythm to be overdue on yet, so not urgent
-      // (SPEC §12 decision 22).
-      urgent: false,
-      dueAt: null,
+      // Never done: ready, with nothing to wait for.
+      state: "ready",
+      availableAt: null,
       streak: null,
       lastDoneAt: null,
       next: { totalPts: SEED_CHORES.dishes.basePoints, streakLen: 1 },
@@ -202,10 +192,9 @@ describe("list_chores", () => {
     ]);
   });
 
-  it("calls a chore urgent when it falls due before Berlin midnight", async () => {
-    // Trash was done 73 hours ago: out of its 48h cooldown, due again at
-    // 4 days, which is 23 hours from now (11:00Z tomorrow). It is 12:00 in
-    // Berlin now, so the next midnight (22:00Z) comes first.
+  it("is ready or cooling down, never due: no due date, however long ago (issue #189)", async () => {
+    // Trash was done 73 hours ago, past its 48h cooldown; weeks later it is
+    // still only ready, with nothing overdue about it.
     await t.db().delete(completions);
     ok(
       await runAction(
@@ -222,48 +211,29 @@ describe("list_chores", () => {
           ctxFor(sessionActor(ryan), { now: at(hours) }),
         ),
       ).chores[0]!;
-    const noon = await list(0);
-    expect(noon).toMatchObject({
-      state: "done",
-      dueAt: at(23).toISOString(),
-      urgent: false,
+    for (const hours of [0, 24, 30 * 24]) {
+      const c = await list(hours);
+      expect(c).toMatchObject({ state: "ready", availableAt: null });
+      expect(c).not.toHaveProperty("dueAt");
+      expect(c).not.toHaveProperty("urgent");
+      expect(c).not.toHaveProperty("intervalMinutes");
+    }
+    // Logged again now: cooling down until now + its cooldown, then ready.
+    ok(
+      await runAction(
+        "log_completion",
+        { choreId: trash },
+        ctxFor(sessionActor(ryan), { now: at(1) }),
+      ),
+    );
+    expect(await list(2)).toMatchObject({
+      state: "cooldown",
+      availableAt: at(1 + TRASH.cooldownMinutes / 60).toISOString(),
     });
-    // Half an hour before midnight: still due tomorrow, not today.
-    expect(await list(11.5)).toMatchObject({ state: "done", urgent: false });
-    // Half an hour after midnight it falls due today: urgent.
-    expect(await list(12.5)).toMatchObject({ state: "done", urgent: true });
-    // And once it is due, it stays urgent.
-    expect(await list(24)).toMatchObject({ state: "due", urgent: true });
-  });
-
-  it("isUrgent: overdue, or due before midnight; never a chore never done or unavailable", () => {
-    const now = FIXED_NOW;
-    const midnight = berlinMidnightAfter(now);
-    // 12:00 in Berlin (CEST): midnight is 22:00Z.
-    expect(midnight.toISOString()).toBe("2026-09-27T22:00:00.000Z");
-    const due = (
-      state: "due" | "cooldown" | "done" | "unavailable",
-      t: Date | null,
-    ) =>
-      isUrgent(
-        {
-          state,
-          dueAt: t ? t.toISOString() : null,
-          intervalMinutes: 4 * 24 * 60,
-        },
-        now,
-      );
-    expect(due("due", at(-1))).toBe(true);
-    expect(due("due", null)).toBe(false);
-    expect(due("cooldown", new Date(midnight.getTime() - 1))).toBe(true);
-    expect(due("done", new Date(midnight.getTime() - 1))).toBe(true);
-    expect(due("cooldown", midnight)).toBe(false);
-    expect(due("done", null)).toBe(false);
-    expect(due("unavailable", new Date(midnight.getTime() - 1))).toBe(false);
-    // The day the clocks go back is 25 hours long: midnight is 23:00Z.
-    expect(
-      berlinMidnightAfter(new Date("2026-10-25T10:00:00Z")).toISOString(),
-    ).toBe("2026-10-25T23:00:00.000Z");
+    expect(await list(1 + TRASH.cooldownMinutes / 60)).toMatchObject({
+      state: "ready",
+      availableAt: null,
+    });
   });
 
   it("leaves archived chores out unless asked, and never offers to score one", async () => {
@@ -278,7 +248,7 @@ describe("list_chores", () => {
       all.chores.map((c) => [c.name, c.archived, c.state, c.next]),
     ).toEqual([
       ["Dishes", true, "unavailable", null],
-      ["Trash", false, "due", expect.objectContaining({ totalPts: 20 })],
+      ["Trash", false, "ready", expect.objectContaining({ totalPts: 20 })],
     ]);
   });
 
@@ -290,10 +260,8 @@ describe("list_chores", () => {
     expect(data.chores[0]).toMatchObject({
       name: "Dishes",
       basePoints: null,
-      intervalMinutes: null,
       state: "unavailable",
       availableAt: null,
-      dueAt: null,
       next: null,
     });
   });

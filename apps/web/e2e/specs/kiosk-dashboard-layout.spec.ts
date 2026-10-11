@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { founderAdmin } from "../lib/household";
 import { pairedKiosk } from "../lib/kiosk";
 
-// Issue #127: on the kitchen iPad the dashboard's clock touched the Urgent
+// Issue #127: on the kitchen iPad the dashboard's clock touched the first
 // icon. At each portrait iPad size the date and the time keep a clear gap
 // from the icons (and their badges), even with the widest date and time
 // the clock can show, and the icons stay on the screen.
@@ -41,7 +41,7 @@ async function headerBoxes(kiosk: Page) {
       const r = range.getBoundingClientRect();
       return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
     };
-    const icons = ["urgent", "new", "messages"].map((key) => {
+    const icons = ["new", "messages"].map((key) => {
       const el = document.querySelector(`[data-icon="${key}"]`)!;
       const r = el.getBoundingClientRect();
       const box: Box = {
@@ -79,7 +79,7 @@ async function expectClear(kiosk: Page, label: string) {
     expect
       .soft(
         first.left - box.right,
-        `${label}: room between the ${name} and the Urgent icon`,
+        `${label}: room between the ${name} and the first icon`,
       )
       .toBeGreaterThanOrEqual(MIN_GAP);
     expect(box.left, `${label}: the ${name} starts on screen`).toBeGreaterThan(
@@ -122,7 +122,7 @@ test("the dashboard clock never touches the icons on an iPad", async ({
     await kiosk.setViewportSize(size);
     await kiosk.goto("/kiosk");
     await expect(kiosk.getByTestId("clock-time")).toHaveText(/^\d\d:\d\d$/);
-    await expect(kiosk.locator('[data-icon="urgent"]')).toBeVisible();
+    await expect(kiosk.locator('[data-icon="new"]')).toBeVisible();
     // Today's date and time, as they are.
     await expectClear(kiosk, `${label}, today`);
 

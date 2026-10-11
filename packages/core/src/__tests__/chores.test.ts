@@ -24,19 +24,16 @@ describe("expectedIntervalMinutes", () => {
 });
 
 describe("choreTiming", () => {
-  const base = {
-    cooldownMinutes: 48 * 60,
-    intervalMinutes: 4 * DAY_MIN,
-  };
+  const base = { cooldownMinutes: 48 * 60 };
 
-  it("a chore never done is due, with nothing to wait for", () => {
+  it("a chore never done is ready, with nothing to wait for", () => {
     expect(
       choreTiming({
         ...base,
         lastDoneAt: null,
         now: at("2026-09-27T10:00:00Z"),
       }),
-    ).toEqual({ state: "due", availableAt: null, dueAt: null });
+    ).toEqual({ state: "ready", availableAt: null });
   });
 
   it("is cooling down until the cooldown ends", () => {
@@ -49,46 +46,26 @@ describe("choreTiming", () => {
     ).toEqual({
       state: "cooldown",
       availableAt: at("2026-09-29T10:00:00Z"),
-      dueAt: at("2026-10-01T10:00:00Z"),
     });
   });
 
-  it("is loggable but not due between the cooldown and the interval", () => {
-    // Exactly on the cooldown boundary it may be logged (SPEC §4.2).
+  it("is ready again exactly when the cooldown ends (SPEC §4.2)", () => {
     expect(
       choreTiming({
         ...base,
         lastDoneAt: at("2026-09-27T10:00:00Z"),
         now: at("2026-09-29T10:00:00Z"),
       }),
-    ).toEqual({
-      state: "done",
-      availableAt: null,
-      dueAt: at("2026-10-01T10:00:00Z"),
-    });
+    ).toEqual({ state: "ready", availableAt: null });
   });
 
-  it("is due once the interval has passed", () => {
-    expect(
-      choreTiming({
-        ...base,
-        lastDoneAt: at("2026-09-27T10:00:00Z"),
-        now: at("2026-10-01T10:00:00Z"),
-      }).state,
-    ).toBe("due");
-  });
-
-  it("is never due before it may be logged", () => {
+  it("has no due date, however long ago it was done (issue #189)", () => {
     const t = choreTiming({
-      cooldownMinutes: 7 * DAY_MIN,
-      intervalMinutes: DAY_MIN,
-      lastDoneAt: at("2026-09-01T00:00:00Z"),
-      now: at("2026-09-03T00:00:00Z"),
+      ...base,
+      lastDoneAt: at("2026-01-01T00:00:00Z"),
+      now: at("2026-09-29T10:00:00Z"),
     });
-    expect(t).toEqual({
-      state: "cooldown",
-      availableAt: at("2026-09-08T00:00:00Z"),
-      dueAt: at("2026-09-08T00:00:00Z"),
-    });
+    expect(t.state).toBe("ready");
+    expect(Object.keys(t).sort()).toEqual(["availableAt", "state"]);
   });
 });
