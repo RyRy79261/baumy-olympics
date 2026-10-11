@@ -152,7 +152,7 @@ test("with brain down the widget says so, and the rest of the hub works", async 
   await expect(widget.getByRole("alert")).toHaveText(
     /The shopping list is unavailable right now/,
   );
-  for (const id of ["widget-chores", "widget-leaderboard", "widget-notes"]) {
+  for (const id of ["widget-events", "widget-leaderboard", "widget-notes"]) {
     await expect(page.getByTestId(id)).toBeVisible();
     await expect(page.getByTestId(id)).not.toHaveAttribute(
       "data-status",
@@ -213,7 +213,7 @@ test("with brain slow the hub shows everything else first, then the list", async
   await expect(widget).toHaveAttribute("data-status", "loading");
   await expect(widget).toHaveAttribute("aria-busy", "true");
   await expect(widget).toContainText("Loading…");
-  for (const id of ["widget-chores", "widget-leaderboard", "widget-notes"]) {
+  for (const id of ["widget-events", "widget-leaderboard", "widget-notes"]) {
     await expect(page.getByTestId(id)).toBeVisible();
   }
   await expect(page.getByTestId("hub-pot")).toContainText("Pot: €");

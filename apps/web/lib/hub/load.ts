@@ -7,10 +7,8 @@ import type { ActionResult } from "@/lib/actions/result";
 import type { ShoppingEntry } from "@/lib/integrations/brain";
 import { formatEuros, gapLabel } from "@/lib/scores/view";
 import {
-  readyChores,
   upcomingEvents,
   widgetState,
-  type HubChore,
   type HubCounts,
   type HubEvent,
   type WidgetState,
@@ -40,7 +38,6 @@ export interface HubData {
   /** The instant the page was read at, ISO 8601. */
   now: string;
   events: WidgetState<HubEvent[]>;
-  chores: WidgetState<HubChore[]>;
   standings: WidgetState<HubStanding[]>;
   /** The pot's total, "€80.50", or why it cannot be shown. */
   pot: { ok: true; total: string } | { ok: false; message: string };
@@ -112,6 +109,8 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
 
 async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
   const [chores, standings, pot, notes] = await Promise.all([
+    // Only for the New count: the hub lists no bounties (owner, 2026-10-11,
+    // issue #189); the board does.
     read(() => runAction("list_chores", {}, ctx)),
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
     read(() => runAction("get_pot", {}, ctx)),
@@ -123,11 +122,6 @@ async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
   ]);
   return {
     now: ctx.now.toISOString(),
-    chores: widgetState(
-      chores,
-      (d) => readyChores(d.chores),
-      "Every bounty has been done recently. Nice.",
-    ),
     standings: widgetState(
       standings,
       (d) =>

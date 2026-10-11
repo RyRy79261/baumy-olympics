@@ -99,9 +99,10 @@ afterEach(() => {
 
 describe("loadHub", () => {
   it("fills every widget from its action", async () => {
-    // Trash was added long ago and last done 5 days ago: ready. Dishes was
-    // added an hour ago and never done: ready, and new. Bathroom was done an
-    // hour ago: cooling down, so not on the hub's list.
+    // Trash was added long ago and last done 5 days ago. Dishes was added
+    // an hour ago and never done: new. Bathroom was done an hour ago. The
+    // hub lists no bounties (owner, 2026-10-11); only the New count reads
+    // them.
     await seedReadyTrash();
     await seedChore(db(), {
       ...SEED_CHORES.dishes,
@@ -149,15 +150,16 @@ describe("loadHub", () => {
         },
       ],
     });
-    expect(hub.chores).toMatchObject({
-      status: "ready",
-      data: [
-        { name: SEED_CHORES.dishes.name, isNew: true },
-        { name: SEED_CHORES.trash.name, isNew: false },
-      ],
-    });
-    // Bathroom, done an hour ago, is cooling down, so it is not listed.
-    expect(hub.chores.status === "ready" && hub.chores.data).toHaveLength(2);
+    // No bounty card: the hub's widgets are these, and nothing else.
+    expect(Object.keys(hub).sort()).toEqual([
+      "counts",
+      "events",
+      "notes",
+      "now",
+      "pot",
+      "shopping",
+      "standings",
+    ]);
     expect(hub.standings).toEqual({
       status: "ready",
       data: [
@@ -223,7 +225,6 @@ describe("loadHub", () => {
       message: expect.stringContaining("The shopping list is unavailable"),
     });
     expect(hub.events.status).toBe("ready");
-    expect(hub.chores.status).toBe("ready");
     expect(hub.standings.status).toBe("ready");
     expect(hub.pot.ok).toBe(true);
     // Not set up at all: it says so instead.
@@ -243,10 +244,6 @@ describe("loadHub", () => {
       status: "empty",
       message: "Nothing else on the calendar today.",
     });
-    expect(hub.chores).toEqual({
-      status: "empty",
-      message: "Every bounty has been done recently. Nice.",
-    });
     expect(hub.notes).toEqual({
       status: "empty",
       message: "Nothing is pinned. Pin a note on the Board.",
@@ -261,7 +258,6 @@ describe("loadHub", () => {
       status: "unavailable",
       message: expect.stringContaining("not connected yet"),
     });
-    expect(hub.chores.status).toBe("ready");
     expect(hub.standings.status).toBe("ready");
     expect(hub.pot.ok).toBe(true);
   });
@@ -339,7 +335,6 @@ describe("startHub", () => {
 
     const hub = startHub(ctxFor(sessionActor(ryan)));
     const local = await hub.local;
-    expect(local.chores.status).not.toBe("unavailable");
     expect(local.counts.new).toEqual(expect.any(Number));
     expect(local.standings.status).not.toBe("unavailable");
     expect(local).not.toHaveProperty("events");

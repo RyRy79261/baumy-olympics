@@ -45,19 +45,16 @@ test("pin a note on the phone and see it on the kiosk home after a refresh", asy
   // The phone's hub has every widget, and the Baumy button.
   for (const id of [
     "widget-events",
-    "widget-chores",
     "widget-leaderboard",
     "widget-notes",
     "widget-shopping",
   ]) {
     await expect(page.getByTestId(id)).toBeVisible();
   }
-  // The bounties ready to log, and no Urgent tile: a chore has no due date
-  // (SPEC §12 decision 35, issue #189).
-  await expect(page.getByTestId("widget-chores")).toContainText(
-    "Ready bounties",
-  );
+  // No bounty card and no Urgent tile: a chore has no due date, and the
+  // board lists the bounties (SPEC §12 decision 35, issue #189).
   await expect(page.getByTestId("hub-tile-new")).toBeVisible();
+  await expect(page.getByTestId("widget-chores")).toHaveCount(0);
   await expect(page.getByTestId("hub-tile-urgent")).toHaveCount(0);
   await expect(page.getByTestId("hub-glance")).not.toContainText(/urgent/i);
   await expect(page.getByTestId("hub-pot")).toContainText("Pot: €");

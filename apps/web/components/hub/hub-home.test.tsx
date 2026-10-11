@@ -19,7 +19,6 @@ function hub(counts: HubData["counts"]): HubData {
   return {
     now: "2026-09-28T10:00:00.000Z",
     events: empty,
-    chores: empty,
     standings: empty,
     pot: { ok: true, total: "€0.00" },
     notes: empty,
@@ -64,6 +63,14 @@ describe("HubHome's status tiles", () => {
     expect(html).not.toContain('data-testid="hub-tile-urgent"');
     expect(html).not.toContain("show=urgent");
     expect(html).not.toMatch(/urgent|overdue/i);
+  });
+
+  it("lists no bounties: the board does (owner, 2026-10-11)", () => {
+    const html = render({ new: 1, messages: 1 });
+    expect(html).toContain('data-testid="widget-events"');
+    expect(html).toContain('data-testid="widget-leaderboard"');
+    expect(html).not.toContain('data-testid="widget-chores"');
+    expect(html).not.toMatch(/Ready bounties|more ready/);
   });
 
   it("says a count it could not read is unavailable, never zero", () => {

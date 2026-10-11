@@ -3,7 +3,6 @@ import { Suspense, use, type ReactNode } from "react";
 import type { Route } from "next";
 import {
   AgendaItem,
-  BountySummary,
   MarkdownBody,
   StatusTileFace,
   StickyNote,
@@ -30,8 +29,8 @@ import { LiveClock } from "./live-clock";
 // the kitchen screen's calm look in a normal scrolling page. On top, the
 // clock and the two status tiles (New, Messages), each dim at zero and a
 // link to its slice (no Urgent: a chore has no due date, SPEC §12 decision
-// 35). Then the bounties ready to log and today's agenda
-// in the wide column, the scores with the pot, the pinned notes (the
+// 35). Then today's agenda in the wide column (no bounty card: the board
+// lists them, owner 2026-10-11), the scores with the pot, the pinned notes (the
 // Board) and the shopping list in the narrow one. Each widget keeps its own
 // empty and unavailable state (lib/hub/load.ts). The page's own card (Post a
 // reminder) stacks under the wide column's, so the short column leaves no
@@ -184,9 +183,6 @@ function ShoppingWidget(
   );
 }
 
-/** How many ready bounties the hub lists before "N more". */
-export const HUB_BOUNTIES = 6;
-
 function More({ href, label }: { href: Route; label: string }) {
   return (
     <Link href={href} className={buttonClass("ghost", "default", "px-2")}>
@@ -211,7 +207,7 @@ export function HubHome({
   /** A card of the page's own, stacked under Today in the wide column. */
   children?: ReactNode;
 }) {
-  const { chores, standings, pot, notes, counts } = hub;
+  const { standings, pot, notes, counts } = hub;
   return (
     <div>
       <section
@@ -250,42 +246,6 @@ export function HubHome({
         className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
       >
         <div className="flex min-w-0 flex-col gap-4">
-          <Widget
-            id="widget-chores"
-            data-testid="widget-chores"
-            title="Ready bounties"
-            status={chores.status}
-            message={chores.status === "ready" ? undefined : chores.message}
-            action={<More href="/chores" label="All bounties" />}
-          >
-            {chores.status === "ready" ? (
-              <ul className="flex flex-col divide-y-2 divide-bm-line">
-                {chores.data.slice(0, HUB_BOUNTIES).map((c) => (
-                  <BountySummary
-                    key={c.id}
-                    data-testid={`hub-chore-${c.name}`}
-                    name={c.name}
-                    sprite={c.sprite}
-                    kind={c.kind}
-                    points={c.points}
-                    streak={c.streak}
-                    isNew={c.isNew}
-                  />
-                ))}
-                {chores.data.length > HUB_BOUNTIES ? (
-                  <li className="pt-3">
-                    <Link
-                      href="/chores"
-                      className="font-label text-sm font-bold text-bm-muted uppercase hover:text-bm-text"
-                    >
-                      +{chores.data.length - HUB_BOUNTIES} more ready
-                    </Link>
-                  </li>
-                ) : null}
-              </ul>
-            ) : null}
-          </Widget>
-
           <Deferred value={hub.events} loading={<EventsWidget loading />}>
             {(events) => (
               <EventsWidget events={events} memberColors={memberColors} />

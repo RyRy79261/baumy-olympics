@@ -1,8 +1,6 @@
 import { berlinDateKey, berlinTimeKey, formatDateKey } from "@baumy/core";
-import type { ChoreView } from "@/lib/actions/list-chores";
 import type { ActionResult } from "@/lib/actions/result";
 import type { CalendarEventView } from "@/lib/calendar/view";
-import { sortBounties, streakLabel } from "@/lib/chores/view";
 
 // What the hub's widgets show (SPEC §3.1, issue #20). Pure and client-safe:
 // the hub and the kiosk home read the same actions every other surface
@@ -93,41 +91,6 @@ export function agendaTime(time: string): { time: string; until?: string } {
   if (time.startsWith("From "))
     return { time: time.slice(5), until: "till late" };
   return { time };
-}
-
-/** A bounty on the hub: one that is ready to log now. */
-export interface HubChore {
-  id: string;
-  name: string;
-  /** What `chores.sprite` stores, for its glyph. */
-  sprite: string;
-  /** Consumable or maintenance (ADR 0005 §2). */
-  kind: ChoreView["kind"];
-  /** Added in the last 3 days. */
-  isNew: boolean;
-  /** Base points, or null while it has none. */
-  points: number | null;
-  /** "Ryan · streak 3", or "No streak yet". */
-  streak: string;
-}
-
-/**
- * The bounties ready to log now, in the board's order (`sortBounties`: by
- * name). Each needs no status line: the widget's title says they are ready. A chore has no due date, so nothing is urgent or overdue (SPEC §12
- * decision 35, issue #189); one cooling down waits on the board.
- */
-export function readyChores(chores: ChoreView[]): HubChore[] {
-  return sortBounties(chores.filter((c) => c.state === "ready")).map(
-    (c): HubChore => ({
-      id: c.id,
-      name: c.name,
-      sprite: c.sprite,
-      kind: c.kind,
-      isNew: c.isNew,
-      points: c.basePoints,
-      streak: streakLabel(c),
-    }),
-  );
 }
 
 /** The clock's two lines, in Berlin time. */
