@@ -117,10 +117,7 @@ export function ChoreTile({
         <span className="truncate font-label text-sm text-bm-muted uppercase">
           {streak}
         </span>
-        <span
-          data-tile-status
-          className="truncate text-bm-dim"
-        >
+        <span data-tile-status className="truncate text-bm-dim">
           {status}
         </span>
       </span>

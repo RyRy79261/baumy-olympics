@@ -157,9 +157,9 @@ describe("loadHub", () => {
       ],
     });
     expect(hub.chores.status === "ready" && hub.chores.data).toHaveLength(2);
-    expect(hub.chores.status === "ready" && hub.chores.data[1]).not.toHaveProperty(
-      "overdue",
-    );
+    expect(
+      hub.chores.status === "ready" && hub.chores.data[1],
+    ).not.toHaveProperty("overdue");
     expect(hub.standings).toEqual({
       status: "ready",
       data: [

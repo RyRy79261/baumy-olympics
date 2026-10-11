@@ -32,10 +32,10 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
 
   await addChore(page, { name, basePoints: 20, cooldownHours: 48 });
 
-  // Never done and just added: a new maintenance bounty, but not an urgent
-  // one, since it has no rhythm to be overdue on yet (SPEC §12 decision
-  // 22). The hub's New tile opens the board on its tab, and the other tabs
-  // narrow it.
+  // Never done and just added: a new maintenance bounty, ready to log.
+  // There is no due date and no Urgent tab (SPEC §12 decision 35, issue
+  // #189). The hub's New tile opens the board on its tab, and the other
+  // tabs narrow it.
   await page.goto("/");
   const newTile = page.getByTestId("hub-tile-new");
   await expect(newTile).toHaveAccessibleName(/^New: [1-9]\d*$/);
@@ -47,15 +47,11 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
     "true",
   );
   await expect(tile(page, name)).toContainText("New");
-  await expect(tile(page, name)).toContainText("Never done");
-  await expect(tile(page, name)).toHaveAttribute("data-urgent", "false");
+  await expect(tile(page, name)).toContainText("Ready");
+  await expect(tile(page, name)).not.toContainText(/never done|due/i);
   await expect(tile(page, name)).toContainText("Maintenance");
-  await tabs.getByRole("button", { name: /^Urgent/ }).click();
-  await expect(tabs.getByRole("button", { name: /^Urgent/ })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByTestId(`chore-${name}`)).toHaveCount(0);
+  await expect(tabs.getByRole("button", { name: /^All/ })).toBeVisible();
+  await expect(tabs.getByRole("button", { name: /^Urgent/ })).toHaveCount(0);
   await tabs.getByRole("button", { name: /^Consumables/ }).click();
   await expect(
     tabs.getByRole("button", { name: /^Consumables/ }),
@@ -92,7 +88,11 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
       .filter({ hasText: `Logged ${name} for ${me}: +20.` }),
   ).toBeVisible();
   await expect(tile(page, name)).toContainText(`${me} · streak 1`);
-  await expect(tile(page, name)).toContainText("Again from");
+  // Cooling down: when it can be logged again, and never a due date.
+  await expect(tile(page, name)).toContainText(
+    /Again from (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}, \d\d:\d\d/,
+  );
+  await expect(tile(page, name)).not.toContainText(/Ready|due/i);
   await expect(page).toHaveURL(/\/chores\?show=maintenance$/);
   await page.reload();
   await expect(

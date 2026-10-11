@@ -52,6 +52,14 @@ test("pin a note on the phone and see it on the kiosk home after a refresh", asy
   ]) {
     await expect(page.getByTestId(id)).toBeVisible();
   }
+  // The bounties ready to log, and no Urgent tile: a chore has no due date
+  // (SPEC §12 decision 35, issue #189).
+  await expect(page.getByTestId("widget-chores")).toContainText(
+    "Ready bounties",
+  );
+  await expect(page.getByTestId("hub-tile-new")).toBeVisible();
+  await expect(page.getByTestId("hub-tile-urgent")).toHaveCount(0);
+  await expect(page.getByTestId("hub-glance")).not.toContainText(/urgent/i);
   await expect(page.getByTestId("hub-pot")).toContainText("Pot: €");
   await page.getByRole("button", { name: "Ask Baumy" }).click();
   const baumy = page.getByRole("dialog", { name: "Ask Baumy" });

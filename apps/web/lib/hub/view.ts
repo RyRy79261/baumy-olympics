@@ -130,7 +130,7 @@ export function readyChores(chores: ChoreView[]): HubChore[] {
       status: statusLabel(c),
       streak: streakLabel(c),
     }),
-  )
+  );
 }
 
 /** The clock's two lines, in Berlin time. */

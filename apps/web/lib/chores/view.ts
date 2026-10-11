@@ -121,8 +121,6 @@ export function sortBounties<
     c.state === "cooldown" && c.availableAt ? Date.parse(c.availableAt) : 0;
   return [...chores].sort(
     (a, b) =>
-      rank(a) - rank(b) ||
-      again(a) - again(b) ||
-      a.name.localeCompare(b.name),
+      rank(a) - rank(b) || again(a) - again(b) || a.name.localeCompare(b.name),
   );
 }
