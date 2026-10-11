@@ -12,13 +12,13 @@ import { PixelScroll } from "./pixel-scroll";
 
 // The portrait kitchen dashboard in the pixel kit (ADR 0005; the approved
 // prototype's variant A on proto/kiosk-home-pixel, calm-kit.tsx and
-// variant-a-cal.tsx): the header's notification icons, the calm module they
-// open (tabs, bounty rows, message rows), the month grid's day cells and
+// variant-a-cal.tsx): the header's icons, the calm module Messages opens
+// (its message rows), the month grid's day cells and
 // chips, the day sheet's rows, and the footer nav. They take plain props and
 // know nothing about chores, Google or the actions. One accent has one
-// meaning (§8): yellow new or points, pink messages, amber consumable, teal
-// maintenance, violet today. (Red was urgent; there is no urgent any more,
-// SPEC §12 decision 35.)
+// meaning (§8): yellow bounties or points, pink messages, amber consumable
+// or shopping, teal maintenance, violet today. (Red was urgent; there is no
+// urgent any more, SPEC §12 decision 35, and no "new", decision 36.)
 
 /** The accents a dashboard part can take. */
 export type DashboardTone =
@@ -49,12 +49,79 @@ function frame(colour: string, width = 3): CSSProperties {
 
 // ---------------------------------------------------------------- header
 
+/** The box of a header icon, a button or a link (`NotificationIconFace`). */
+export const notificationIconClass =
+  "relative block h-[124px] w-[120px] shrink-0";
+
 /**
- * One of the header's (at most three) notification icons: a 16-bit icon
- * over its label, with a count badge. At zero it goes dim and loses the
- * badge, but still opens its module (which then says there is nothing).
- * A count of null means it could not be read: dim too, with no badge, and
- * says "unavailable" rather than a zero that is not true.
+ * What a header icon says to a screen reader: "Shopping: 3", "Shopping:
+ * unavailable", or only "Bounties" for an icon with no count.
+ */
+export function notificationIconLabel(
+  label: string,
+  count: number | null | undefined,
+): string {
+  return count === undefined ? label : `${label}: ${count ?? "unavailable"}`;
+}
+
+/**
+ * The inside of one of the header's three icons (ADR 0005 §1): a 16-bit
+ * icon over its label, with a count badge. At zero it goes dim and loses the
+ * badge. A count of null means it could not be read: dim too, with no badge,
+ * never a zero that is not true. With no count at all (`undefined`) it is a
+ * plain way in, lit, with no badge. Put it in a button or a link with
+ * `notificationIconClass` and `notificationIconLabel`.
+ */
+export function NotificationIconFace({
+  icon,
+  label,
+  count,
+  tone,
+}: {
+  icon: PixelIconName;
+  label: string;
+  count?: number | null;
+  tone: DashboardTone;
+}) {
+  const lit = count === undefined || (count !== null && count > 0);
+  const badge = count !== undefined && count !== null && count > 0;
+  return (
+    <>
+      <span
+        className={cx(
+          "pixel-frame flex h-full w-full flex-col items-center justify-center gap-[10px]",
+          lit ? "bg-bm-surface" : "bg-transparent",
+        )}
+        style={frame(lit ? "var(--color-bm-line)" : "#221832", 4)}
+      >
+        <PixelIcon name={icon} scale={4} dim={!lit} className="block" />
+        <span
+          className={cx(
+            "font-label text-[13px] font-bold tracking-wide uppercase",
+            lit ? "text-bm-muted" : "text-bm-dim",
+          )}
+        >
+          {label}
+        </span>
+      </span>
+      {badge ? (
+        <span
+          data-badge
+          aria-hidden
+          className="pixel-frame absolute -top-2 -right-3 grid h-[34px] min-w-[34px] place-items-center px-[6px] font-display text-[15px] leading-none text-bm-ink"
+          style={{ background: toneColour(tone), ...frame(toneColour(tone)) }}
+        >
+          {count}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * A header icon that opens its module (Messages): `NotificationIconFace` in
+ * a button. At zero it still opens the module, which then says there is
+ * nothing.
  */
 export function NotificationIcon({
   icon,
@@ -70,43 +137,21 @@ export function NotificationIcon({
   count: number | null;
   tone: DashboardTone;
 }) {
-  const live = count !== null && count > 0;
   return (
     <button
       type={type}
-      aria-label={`${label}: ${count ?? "unavailable"}`}
+      aria-label={notificationIconLabel(label, count)}
       data-count={count ?? undefined}
       data-status={count === null ? "unavailable" : "ready"}
-      className={cx("relative block h-[124px] w-[120px] shrink-0", className)}
+      className={cx(notificationIconClass, className)}
       {...props}
     >
-      <span
-        className={cx(
-          "pixel-frame flex h-full w-full flex-col items-center justify-center gap-[10px]",
-          live ? "bg-bm-surface" : "bg-transparent",
-        )}
-        style={frame(live ? "var(--color-bm-line)" : "#221832", 4)}
-      >
-        <PixelIcon name={icon} scale={4} dim={!live} className="block" />
-        <span
-          className={cx(
-            "font-label text-[13px] font-bold tracking-wide uppercase",
-            live ? "text-bm-muted" : "text-bm-dim",
-          )}
-        >
-          {label}
-        </span>
-      </span>
-      {live ? (
-        <span
-          data-badge
-          aria-hidden
-          className="pixel-frame absolute -top-2 -right-3 grid h-[34px] min-w-[34px] place-items-center px-[6px] font-display text-[15px] leading-none text-bm-ink"
-          style={{ background: toneColour(tone), ...frame(toneColour(tone)) }}
-        >
-          {count}
-        </span>
-      ) : null}
+      <NotificationIconFace
+        icon={icon}
+        label={label}
+        count={count}
+        tone={tone}
+      />
     </button>
   );
 }
@@ -114,9 +159,9 @@ export function NotificationIcon({
 // ---------------------------------------------------------------- module
 
 /**
- * The calm module a header icon opens (ADR 0005 §1): a sheet framed in the
- * icon's accent, its icon, title and one line of what it lists, a close
- * button, optional tabs, and the list, which scrolls on its own.
+ * The calm module a header icon opens (ADR 0005 §1; today only Messages): a
+ * sheet framed in the icon's accent, its icon, title and one line of what
+ * it lists, a close button, and the list, which scrolls on its own.
  */
 export function ModulePanel({
   title,
@@ -125,7 +170,6 @@ export function ModulePanel({
   tone,
   subtitle,
   onClose,
-  tabs,
   children,
 }: {
   title: string;
@@ -135,7 +179,6 @@ export function ModulePanel({
   tone: DashboardTone;
   subtitle: string;
   onClose: () => void;
-  tabs?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -163,169 +206,10 @@ export function ModulePanel({
           ×
         </button>
       </header>
-      {tabs ? <div className="px-7 pb-4">{tabs}</div> : null}
       <div className="flex min-h-0 flex-1 flex-col pr-4 pb-7 pl-7">
         <PixelScroll tone="#1a1127">{children}</PixelScroll>
       </div>
     </section>
-  );
-}
-
-/** The module's tabs (All, Consumables, Maintenance), each with a count. */
-export function SheetTabs<T extends string>({
-  items,
-  value,
-  onPick,
-}: {
-  items: readonly {
-    key: T;
-    label: string;
-    count: number;
-    tone: DashboardTone;
-  }[];
-  value: T;
-  onPick: (key: T) => void;
-}) {
-  return (
-    <div className="flex gap-3" role="group" aria-label="Show">
-      {items.map((it) => {
-        const on = it.key === value;
-        const c = toneColour(it.tone);
-        return (
-          <button
-            key={it.key}
-            type="button"
-            data-tab={it.key}
-            aria-pressed={on}
-            onClick={() => onPick(it.key)}
-            className={cx(
-              "pixel-frame flex h-14 flex-1 items-center justify-center gap-3 font-label text-[16px] font-bold uppercase",
-              on ? "text-bm-text" : "text-bm-muted",
-            )}
-            style={
-              on
-                ? { ...frame(c), background: tint(c, 13) }
-                : frame("var(--color-bm-line)")
-            }
-          >
-            {it.label}
-            <span
-              className="font-display text-[14px]"
-              style={{ color: on ? c : "var(--color-bm-dim)" }}
-            >
-              {it.count}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** The kind of a bounty: what it is and its accent. */
-const KINDS = {
-  consumable: { label: "Consumable", tone: "amber" },
-  maintenance: { label: "Maintenance", tone: "teal" },
-} as const;
-
-/** The class of a bounty row's action ("I'll do it"), a link or a button. */
-export const bountyActionClass =
-  "pixel-frame grid h-[60px] w-[132px] shrink-0 place-items-center bg-bm-raised font-label text-[15px] font-bold text-bm-text uppercase [--pf-w:3px] [--pf:var(--color-bm-text)]";
-
-/**
- * One bounty: its glyph in its kind's colour, its name (and "new"), its kind
- * and whose streak you would steal, whether it is ready or when it can be
- * done again, its points, and the action (a link to log it).
- */
-export function ModuleBountyRow({
-  glyph,
-  name,
-  kind,
-  isNew = false,
-  streak,
-  status,
-  points,
-  action,
-  ...props
-}: HTMLAttributes<HTMLLIElement> & {
-  glyph: GlyphName;
-  name: string;
-  kind: keyof typeof KINDS;
-  isNew?: boolean;
-  /** Who holds this chore's streak (in their colour), if anyone. */
-  streak: { name: string; length: number; colour: string } | null;
-  /** "Ready", or "Again from 18:00" while it cools down; said calmly. */
-  status: string;
-  points: number | null;
-  action: ReactNode;
-}) {
-  const k = KINDS[kind];
-  const kc = toneColour(k.tone);
-  return (
-    <li
-      className="flex items-center gap-4 border-t-2 border-bm-line py-4 first:border-t-0"
-      {...props}
-    >
-      <span
-        className="pixel-frame grid size-16 shrink-0 place-items-center"
-        style={{ ...frame(tint(kc, 33)), background: tint(kc, 8) }}
-      >
-        <Glyph
-          name={glyph}
-          size={40}
-          color={kc}
-          accent="var(--color-bm-text)"
-        />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-3">
-          <span className="truncate font-body text-[30px] leading-none font-semibold">
-            {name}
-          </span>
-          {isNew ? (
-            <span className="font-label text-[13px] font-bold text-bm-yellow uppercase">
-              new
-            </span>
-          ) : null}
-        </div>
-        {/* Two phrases that each stay whole: when the row is narrow (the
-            scrollbar beside it) the streak drops to its own line rather
-            than being cut off. */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 font-label text-[13px] uppercase">
-          <span className="whitespace-nowrap" style={{ color: kc }}>
-            {k.label}
-            <span className="text-bm-dim"> ·</span>
-          </span>
-          {streak ? (
-            <span
-              data-streak
-              className="whitespace-nowrap"
-              style={{ color: streak.colour }}
-            >
-              steal {streak.name}&apos;s {streak.length}× streak
-            </span>
-          ) : (
-            <span className="whitespace-nowrap text-bm-dim">no streak yet</span>
-          )}
-        </div>
-      </div>
-      {/* One line each, so every row is the same height: "Again from Mon
-          10:28" never wraps and pushes the points down. */}
-      <div className="min-w-[96px] shrink-0 text-right whitespace-nowrap">
-        <div
-          data-bounty-status
-          className="font-body text-[19px] leading-none text-bm-muted"
-        >
-          {status}
-        </div>
-        {points !== null ? (
-          <div className="mt-2 font-display text-[14px] text-bm-yellow">
-            +{points}
-          </div>
-        ) : null}
-      </div>
-      {action}
-    </li>
   );
 }
 

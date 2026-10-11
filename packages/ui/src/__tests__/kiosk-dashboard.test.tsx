@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   ActingChip,
   actingDoneClass,
-  ModuleBountyRow,
   DayEventRow,
   EventChip,
   KIOSK_FOOTER_H,
@@ -14,12 +13,13 @@ import {
   ModulePanel,
   MonthDayCell,
   NotificationIcon,
-  SheetTabs,
+  NotificationIconFace,
   WeekdayRow,
   WhoLine,
-  bountyActionClass,
   kioskArrowClass,
   kioskNavItemClass,
+  notificationIconClass,
+  notificationIconLabel,
   tint,
   todayButtonClass,
   toneColour,
@@ -43,24 +43,34 @@ describe("accents", () => {
 describe("NotificationIcon", () => {
   it("shows its count in a badge in its accent", () => {
     const out = html(
-      <NotificationIcon icon="siren" label="Urgent" tone="red" count={5} />,
+      <NotificationIcon
+        icon="envelope"
+        label="Messages"
+        tone="pink"
+        count={5}
+      />,
     );
-    expect(out).toContain('aria-label="Urgent: 5"');
+    expect(out).toContain('aria-label="Messages: 5"');
     expect(out).toContain('data-count="5"');
     expect(out).toContain('type="button"');
     expect(out).toContain("h-[124px] w-[120px]");
     expect(out).toMatch(
-      /data-badge[^>]*background:var\(--color-bm-red\)[^>]*>5</,
+      /data-badge[^>]*background:var\(--color-bm-pink\)[^>]*>5</,
     );
-    expect(out).toContain("Urgent</span>");
+    expect(out).toContain("Messages</span>");
     expect(out).not.toContain("grayscale");
   });
 
   it("goes dim at zero, with no badge", () => {
     const out = html(
-      <NotificationIcon icon="star" label="New" tone="yellow" count={0} />,
+      <NotificationIcon
+        icon="envelope"
+        label="Messages"
+        tone="pink"
+        count={0}
+      />,
     );
-    expect(out).toContain('aria-label="New: 0"');
+    expect(out).toContain('aria-label="Messages: 0"');
     expect(out).toContain("grayscale(1)");
     expect(out).toContain("text-bm-dim");
     expect(out).not.toContain("data-badge");
@@ -70,18 +80,75 @@ describe("NotificationIcon", () => {
 describe("NotificationIcon that could not be read", () => {
   it("says unavailable, dim and with no badge, never a false zero", () => {
     const out = html(
-      <NotificationIcon icon="siren" label="Urgent" tone="red" count={null} />,
+      <NotificationIcon
+        icon="basket"
+        label="Shopping"
+        tone="amber"
+        count={null}
+      />,
     );
-    expect(out).toContain('aria-label="Urgent: unavailable"');
+    expect(out).toContain('aria-label="Shopping: unavailable"');
     expect(out).toContain('data-status="unavailable"');
     expect(out).not.toContain("data-count");
     expect(out).toContain("grayscale(1)");
     expect(out).not.toContain("data-badge");
     expect(
       html(
-        <NotificationIcon icon="star" label="New" tone="yellow" count={0} />,
+        <NotificationIcon
+          icon="envelope"
+          label="Messages"
+          tone="pink"
+          count={0}
+        />,
       ),
     ).toContain('data-status="ready"');
+  });
+});
+
+describe("NotificationIconFace for a link", () => {
+  it("is lit with no badge when it has no count (the Bounties star)", () => {
+    const out = html(
+      <a className={notificationIconClass} href="/kiosk/chores">
+        <NotificationIconFace icon="star" label="Bounties" tone="yellow" />
+      </a>,
+    );
+    expect(out).toContain("h-[124px] w-[120px]");
+    expect(out).toContain("Bounties</span>");
+    expect(out).toContain("bg-bm-surface");
+    expect(out).not.toContain("grayscale");
+    expect(out).not.toContain("data-badge");
+  });
+
+  it("badges a count in its accent, and dims at zero", () => {
+    const three = html(
+      <NotificationIconFace
+        icon="basket"
+        label="Shopping"
+        tone="amber"
+        count={3}
+      />,
+    );
+    expect(three).toMatch(
+      /data-badge[^>]*background:var\(--color-bm-amber\)[^>]*>3</,
+    );
+    const none = html(
+      <NotificationIconFace
+        icon="basket"
+        label="Shopping"
+        tone="amber"
+        count={0}
+      />,
+    );
+    expect(none).toContain("grayscale(1)");
+    expect(none).not.toContain("data-badge");
+  });
+
+  it("names a count, an unreadable count, or none", () => {
+    expect(notificationIconLabel("Shopping", 3)).toBe("Shopping: 3");
+    expect(notificationIconLabel("Shopping", null)).toBe(
+      "Shopping: unavailable",
+    );
+    expect(notificationIconLabel("Bounties", undefined)).toBe("Bounties");
   });
 });
 
@@ -104,121 +171,29 @@ describe("ActingChip", () => {
   });
 });
 
-describe("ModulePanel and SheetTabs", () => {
-  it("frames the module in its accent, with a 64px close and the tabs", () => {
+describe("ModulePanel", () => {
+  it("frames the module in its accent, with a 64px close", () => {
     const out = html(
       <ModulePanel
-        title="Urgent"
+        title="Messages"
         titleId="m-title"
-        icon="siren"
-        tone="red"
-        subtitle="Overdue or due before midnight"
+        icon="envelope"
+        tone="pink"
+        subtitle="2 not read by everyone yet"
         onClose={noop}
-        tabs={<div>tabs</div>}
       >
         <p>rows</p>
       </ModulePanel>,
     );
-    expect(out).toContain("--pf:var(--color-bm-red)");
+    expect(out).toContain("--pf:var(--color-bm-pink)");
     expect(out).toContain('<h2 id="m-title"');
-    expect(out).toContain("Overdue or due before midnight");
+    expect(out).toContain("2 not read by everyone yet");
     expect(out).toContain('aria-label="Close"');
     expect(out).toContain("size-16");
-    expect(out).toContain("<div>tabs</div>");
     expect(out).toContain("<p>rows</p>");
     // The list scrolls in the pixel scrollbar, with "More below" when long.
     expect(out).toContain("data-scroll-list");
     expect(out).toContain("data-track");
-    expect(
-      html(
-        <ModulePanel
-          title="Messages"
-          icon="envelope"
-          tone="pink"
-          subtitle="x"
-          onClose={noop}
-        >
-          y
-        </ModulePanel>,
-      ),
-    ).not.toContain("px-7 pb-4");
-  });
-
-  it("presses the picked tab in its accent and counts each", () => {
-    const out = html(
-      <SheetTabs
-        value="all"
-        onPick={noop}
-        items={[
-          { key: "all", label: "All", count: 5, tone: "red" },
-          { key: "consumable", label: "Consumables", count: 2, tone: "amber" },
-        ]}
-      />,
-    );
-    expect(out).toMatch(/data-tab="all" aria-pressed="true"/);
-    expect(out).toMatch(/data-tab="consumable" aria-pressed="false"/);
-    expect(out).toContain("color-mix(in srgb, var(--color-bm-red) 13%");
-    expect(out).toContain("h-14");
-    expect(out).toContain("color:var(--color-bm-dim)");
-  });
-});
-
-describe("ModuleBountyRow", () => {
-  it("shows the kind, whose streak you steal, its status and the points", () => {
-    const out = html(
-      <ModuleBountyRow
-        glyph="bin"
-        name="Bins out"
-        kind="maintenance"
-        streak={{ name: "Ryan", length: 6, colour: "#4ff5e6" }}
-        status="Ready"
-        points={20}
-        action={<a href="/x">I&apos;ll do it</a>}
-      />,
-    );
-    expect(out).toContain("Bins out");
-    expect(out).toContain("Maintenance");
-    expect(out).toContain("color:var(--color-bm-teal)");
-    expect(out).toMatch(
-      /data-streak[^>]*whitespace-nowrap[^>]*color:#4ff5e6[^>]*>steal Ryan&#x27;s 6× streak/,
-    );
-    // Calm: the status is muted, never a late red or a soon amber.
-    expect(out).toMatch(/data-bounty-status[^>]*text-bm-muted[^>]*>Ready</);
-    expect(out).not.toContain("data-due");
-    expect(out).toContain("+20");
-    expect(out).toContain('data-glyph="bin"');
-    expect(out).toContain('href="/x"');
-    expect(out).not.toContain(">new<");
-  });
-
-  it("says new and no streak yet, in the consumable's amber", () => {
-    const out = html(
-      <ModuleBountyRow
-        glyph="catfood"
-        name="Cat food"
-        kind="consumable"
-        isNew
-        streak={null}
-        status="Again from 18:00"
-        points={null}
-        action={null}
-      />,
-    );
-    expect(out).toContain(">new<");
-    expect(out).toContain("no streak yet");
-    expect(out).toContain("Consumable");
-    expect(out).toContain("Again from 18:00");
-    // Status and points each on one line: rows stay the same height.
-    expect(out).toMatch(
-      /text-right whitespace-nowrap"><div data-bounty-status/,
-    );
-    expect(out).not.toContain("color:var(--color-bm-red)");
-    expect(out).not.toContain('text-bm-yellow">+');
-  });
-
-  it("gives the action a 60px frame of its own", () => {
-    expect(bountyActionClass).toContain("h-[60px]");
-    expect(bountyActionClass).toContain("[--pf-w:3px]");
     expect(html(<ModuleEmpty>Nothing here.</ModuleEmpty>)).toContain(
       "Nothing here.",
     );
