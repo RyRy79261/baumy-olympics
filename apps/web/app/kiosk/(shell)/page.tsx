@@ -24,9 +24,10 @@ import { kioskSeeNotesAction } from "../note-actions";
 // The kitchen screen's home (ADR 0005, issue #65): the portrait dashboard,
 // glanceable across the room with no taps. The header has the date, a big
 // clock and the Bounties, Shopping and Messages icons (SPEC §12 decision
-// 36, issue #193); under it, the month calendar, the only home view. It is read as the paired device whether or
-// not anyone has tapped in (the `display` gate), never scrolls, and re-reads
-// itself every 60 seconds and when it comes back into view.
+// 36, issue #193); under it, the month calendar, the only home view. It is
+// read as the paired device whether or not anyone has tapped in (the
+// `display` gate), never scrolls, and re-reads itself every 60 seconds and
+// when it comes back into view.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Kiosk" };

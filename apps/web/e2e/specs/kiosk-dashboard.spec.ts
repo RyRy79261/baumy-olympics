@@ -410,15 +410,35 @@ test("the kitchen dashboard: icons, modules, the month and its days", async ({
   await expect(standing).toContainText(/\d+/);
   await expect(kiosk.getByTestId("standings")).toContainText("Rank");
 
-  // With brain down (for this browser only) the basket is still there, dim
-  // and with no badge, and nothing on the home says it failed.
-  await context.addCookies([
-    { name: "baumy_e2e_brain", value: "down", domain: "localhost", path: "/" },
-  ]);
+  // With brain slow (for this browser only, BRAIN_SLOW_MS) the rest of the
+  // home is there first, and the basket says only "Shopping" while its count
+  // is on its way: loading, never "unavailable" before anything failed.
+  const brainIs = (value: "slow" | "down") =>
+    context.addCookies([
+      { name: "baumy_e2e_brain", value, domain: "localhost", path: "/" },
+    ]);
+  await brainIs("slow");
+  await kiosk.goto("/kiosk", { waitUntil: "commit" });
+  await expect(kiosk.getByTestId("month-title")).toBeVisible();
+  await expect(basket).toHaveAttribute("data-status", "loading");
+  await expect(basket).toHaveAttribute("aria-label", "Shopping");
+  await expect(basket.locator("[data-badge]")).toHaveCount(0);
+  // Then the count comes in, and loading is gone.
+  await expect(basket).toHaveAttribute("data-status", "ready", {
+    timeout: 15_000,
+  });
+  await expect(basket).toHaveAttribute("aria-label", /^Shopping: \d+$/);
+
+  // With brain down the basket is still there, dim and with no badge, says
+  // "unavailable" only to a screen reader once the read has failed, and
+  // nothing on the home says it failed.
+  await brainIs("down");
   await kiosk.goto("/kiosk");
   await expect(kiosk.getByTestId("month-title")).toBeVisible();
   await expect(basket).toBeVisible();
   await expect(basket).toHaveAttribute("data-status", "unavailable");
+  await expect(basket).toHaveAttribute("aria-label", "Shopping: unavailable");
+  await expect(kiosk.locator('[data-status="loading"]')).toHaveCount(0);
   await expect(basket.locator("[data-badge]")).toHaveCount(0);
   expect(await basket.getAttribute("data-count")).toBeNull();
   await expect(kiosk.getByTestId("kiosk-home")).not.toContainText(

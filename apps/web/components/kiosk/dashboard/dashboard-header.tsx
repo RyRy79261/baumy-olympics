@@ -86,6 +86,7 @@ function IconLink({
   label,
   tone,
   count,
+  loading = false,
   testId,
 }: {
   href: "/kiosk/chores" | "/kiosk/shopping";
@@ -93,21 +94,29 @@ function IconLink({
   label: string;
   tone: "yellow" | "amber";
   count?: number | null;
+  /**
+   * Its count is still on its way: dim, no badge, and only its name for a
+   * screen reader, never "unavailable" before anything has failed.
+   */
+  loading?: boolean;
   testId: string;
 }) {
   return (
     <Link
       href={href}
       data-icon={testId}
-      aria-label={notificationIconLabel(label, count)}
-      data-count={count ?? undefined}
-      data-status={count === null ? "unavailable" : "ready"}
+      aria-label={loading ? label : notificationIconLabel(label, count)}
+      aria-busy={loading || undefined}
+      data-count={loading ? undefined : (count ?? undefined)}
+      data-status={
+        loading ? "loading" : count === null ? "unavailable" : "ready"
+      }
       className={notificationIconClass}
     >
       <NotificationIconFace
         icon={icon}
         label={label}
-        count={count}
+        count={loading ? 0 : count}
         tone={tone}
       />
     </Link>
@@ -253,7 +262,7 @@ export function DashboardHeader({
           tone="yellow"
           testId="bounties"
         />
-        {/* Until brain answers, the basket shows with no badge. */}
+        {/* Until brain answers, the basket shows dim, as loading. */}
         <Suspense
           fallback={
             <IconLink
@@ -261,7 +270,7 @@ export function DashboardHeader({
               icon="basket"
               label="Shopping"
               tone="amber"
-              count={null}
+              loading
               testId="shopping"
             />
           }
