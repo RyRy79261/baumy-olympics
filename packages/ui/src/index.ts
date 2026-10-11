@@ -190,7 +190,12 @@ export {
 } from "./pixel/pixel-grid";
 export { scale2x } from "./pixel/scale2x";
 export { ProofPhoto } from "./proof-photo";
-export { RACCOON_FRAMES, RACCOON_PALETTE, Raccoon } from "./raccoon";
+export {
+  RACCOON_PALETTE,
+  RACCOON_POSES,
+  Raccoon,
+  type RaccoonPose,
+} from "./raccoon";
 export { ReminderScreen, type ReminderFace } from "./reminder-screen";
 export { SCREENSAVER_ART, Screensaver } from "./screensaver";
 export { Points, Stat, StreakFlame, Table, Td, Th } from "./scores";

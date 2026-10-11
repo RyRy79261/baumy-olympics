@@ -8,9 +8,11 @@ import { Raccoon } from "./raccoon";
 // The kitchen screen's screensaver (ADR 0005 §6), the approved prototype's
 // (proto/kiosk-home-pixel, shared-overlays.tsx `Screensaver`): a dim night
 // room with a moonlit window, fairy lights, a big dim clock, Baumy asleep on
-// a shelf, and three raccoons on the floor: one knocks the bin over, one
-// carries a sock off, one pushes a box. It replaces the old night screen;
-// the app decides when it shows (at night, and after 5 minutes untouched).
+// a shelf, and four raccoons (raccoon.tsx, issue #191): one sits by the
+// bin, one stands under the shelf reaching up for Baumy, one walks off on
+// its hind legs with a jar, and one pushes a box.
+// It replaces the old night screen; the app decides when it shows (at
+// night, and after 5 minutes untouched).
 //
 // It is one big button, so a tap anywhere wakes the screen and never lands
 // on whatever is underneath. Under reduced motion the scene stands still:
@@ -24,14 +26,6 @@ import { Raccoon } from "./raccoon";
 // were passing the moon. All of it is transform and opacity, so the iPad
 // composites it without repainting.
 
-const SOCK: Sprite = [
-  "..KK..",
-  ".KPK..",
-  ".KPK..",
-  ".KPPKK",
-  ".KPWPK",
-  "..KKK.",
-];
 const BOX: Sprite = [
   "KKKKKKKKKKKK",
   "KbbbbTTbbbbK",
@@ -53,10 +47,9 @@ const BIN: Sprite = [
   ".KgKgKKgKgK.",
   "..KKKKKKKK..",
 ];
-const TRASH: Sprite = ["..KK.K", ".KYKKW", "KPK.KK"];
 
 /** The props the screensaver's floor clutter is drawn from, for tests. */
-export const SCREENSAVER_ART = { SOCK, BOX, BIN, TRASH } as const;
+export const SCREENSAVER_ART = { BOX, BIN } as const;
 
 const INK = "#07040c";
 /** The dim clock's colour: readable across a dark kitchen, never bright. */
@@ -72,17 +65,8 @@ const STARS: readonly (readonly [number, number])[] = [
 // The scene's own keyframes (the prototype's), scoped by their `bm-ss-`
 // names. Raccoons cross the whole width of whatever screen this is.
 const SCENE_CSS = `
-@keyframes bm-ss-run { from { transform: translateX(-160px); } to { transform: translateX(calc(100vw + 160px)); } }
-@keyframes bm-ss-run-back { from { transform: translateX(calc(100vw + 160px)); } to { transform: translateX(-200px); } }
-@keyframes bm-ss-bin {
-  0%, 38% { transform: rotate(0deg) translateX(0); }
-  44%, 100% { transform: rotate(84deg) translate(22px, -6px); }
-}
-@keyframes bm-ss-trash {
-  0%, 41% { opacity: 0; transform: translate(0, 0); }
-  50% { opacity: 1; transform: translate(34px, -10px); }
-  64%, 100% { opacity: 1; transform: translate(64px, 0); }
-}
+@keyframes bm-ss-run { from { transform: translateX(-300px); } to { transform: translateX(calc(100vw + 60px)); } }
+@keyframes bm-ss-run-back { from { transform: translateX(calc(100vw + 60px)); } to { transform: translateX(-300px); } }
 @keyframes bm-ss-bulb { 0%, 100% { opacity: 1; filter: brightness(1.2); } 50% { opacity: 0.35; filter: brightness(0.7); } }
 @keyframes bm-ss-zzz { 0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(24px, -60px); opacity: 0; } }
 @keyframes bm-ss-hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
@@ -246,78 +230,53 @@ export function Screensaver({
             aria-hidden
             className="absolute -inset-x-8 top-[71%] -bottom-8 block bg-[repeating-linear-gradient(90deg,#1d1020_0_80px,#180c1a_80px_160px)] shadow-[inset_0_4px_0_#2a1628]"
           >
-            {/* The bin that gets knocked over, and what falls out. */}
-            <span className="absolute -top-[54px] left-[46%] block">
-              <span
+            {/* The bin. */}
+            <span className="absolute -top-[72px] left-[calc(18vw+32px)] block">
+              <PixelArt
+                grid={BIN}
+                scale={8}
+                palette={{ K: INK, G: "#3d4a5c", g: "#2c3645" }}
                 className="block"
-                style={{
-                  animation: "bm-ss-bin 7s steps(6) infinite",
-                  transformOrigin: "100% 100%",
-                }}
-              >
-                <PixelArt
-                  grid={BIN}
-                  scale={6}
-                  palette={{ K: INK, G: "#3d4a5c", g: "#2c3645" }}
-                  className="block"
-                />
-              </span>
-              <span
-                className="absolute bottom-0 left-[70px] block"
-                style={{ animation: "bm-ss-trash 7s steps(8) infinite" }}
-              >
-                <PixelArt
-                  grid={TRASH}
-                  scale={5}
-                  palette={{ K: INK, Y: "#8a7a2c", W: "#6f6a80", P: "#7a3a5c" }}
-                  className="block"
-                />
-              </span>
+              />
             </span>
-            {/* Raccoon 1 runs right into the bin. */}
+            {/* Raccoon 1 sits by the bin. */}
             <span
-              data-raccoon="bin"
-              className="absolute -top-[60px] left-0 block"
-              style={{ animation: "bm-ss-run 7s linear infinite" }}
+              data-raccoon="sit"
+              className="absolute -top-[120px] left-[calc(18vw+136px)] block"
             >
-              <Raccoon scale={6} />
+              <Raccoon pose="sit" scale={4} />
             </span>
-            {/* Raccoon 2 carries a sock back left. */}
+            {/* Raccoon 2 stands under Baumy's shelf, reaching up. */}
             <span
-              data-raccoon="sock"
-              className="absolute top-[60px] left-0 block"
+              data-raccoon="reach"
+              className="absolute -top-[144px] left-[calc(57vw+36px)] block"
+              style={{ animation: "bm-ss-hop 1.6s steps(2) infinite" }}
+            >
+              <Raccoon pose="reach" scale={4} />
+            </span>
+            {/* Raccoon 3 walks off on its hind legs with a jar. */}
+            <span
+              data-raccoon="jar"
+              className="absolute top-[10px] left-0 block"
               style={{
-                animation: "bm-ss-run-back 9s linear infinite",
-                animationDelay: "-3s",
+                animation: "bm-ss-run-back 18s linear infinite",
+                animationDelay: "-5s",
               }}
             >
-              <span className="relative block">
-                <span
-                  className="absolute -top-[22px] left-[40px] block"
-                  style={{ animation: "bm-ss-hop 0.32s steps(2) infinite" }}
-                >
-                  <PixelArt
-                    grid={SOCK}
-                    scale={5}
-                    palette={{ K: INK, P: "#b84a8a", W: "#e8e4f0" }}
-                    className="block"
-                  />
-                </span>
-                <Raccoon scale={6} flip />
-              </span>
+              <Raccoon pose="carry" scale={4} flip />
             </span>
-            {/* Raccoon 3 pushes a box. */}
+            {/* Raccoon 4 pushes a box. */}
             <span
               data-raccoon="box"
-              className="absolute top-[170px] left-0 block"
+              className="absolute top-[160px] left-0 block"
               style={{
                 animation: "bm-ss-run 14s linear infinite",
                 animationDelay: "-6s",
               }}
             >
               <span className="flex items-end">
-                <Raccoon scale={6} />
-                <span className="-ml-1 block">
+                <Raccoon pose="walk" scale={4} />
+                <span className="-ml-4 block">
                   <PixelArt
                     grid={BOX}
                     scale={6}
