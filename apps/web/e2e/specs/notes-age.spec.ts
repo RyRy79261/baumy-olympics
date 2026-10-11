@@ -64,7 +64,9 @@ test("a note 3 days old is not new any more, for anyone", async ({
   await icon.click();
   await expect(messages).toBeVisible();
   await expect(messages.getByTestId(`message-${title}`)).toHaveCount(0);
-  await expect(messages).toContainText("No new notes. Older ones are on the Board.");
+  await expect(messages).toContainText(
+    "No new notes. Older ones are on the Board.",
+  );
   await messages.getByRole("button", { name: "Close" }).click();
 
   // Someone picked: still nothing new for them.
