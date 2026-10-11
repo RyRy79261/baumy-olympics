@@ -28,7 +28,6 @@ import {
   memoryBrain,
 } from "@/lib/integrations/brain-memory";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
-import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { HUB_NOTES, loadHub, startHub } from "./load";
 
 // The hub's reads through the real runAction on PGlite (issue #20): each
@@ -55,7 +54,7 @@ let ryan: string;
 async function seedReadyTrash() {
   const { choreId } = await seedChore(db(), {
     ...SEED_CHORES.trash,
-    createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS - 6 * 24 * HOUR),
+    createdAt: new Date(FIXED_NOW.getTime() - 9 * 24 * HOUR),
   });
   const fiveDaysAgo = new Date(FIXED_NOW.getTime() - 5 * 24 * HOUR);
   const logged = await runAction(
@@ -100,9 +99,9 @@ afterEach(() => {
 describe("loadHub", () => {
   it("fills every widget from its action", async () => {
     // Trash was added long ago and last done 5 days ago. Dishes was added
-    // an hour ago and never done: new. Bathroom was done an hour ago. The
-    // hub lists no bounties (owner, 2026-10-11); only the New count reads
-    // them.
+    // an hour ago and never done. Bathroom was done an hour ago. The hub
+    // lists no bounties (owner, 2026-10-11) and counts no new ones (issue
+    // #193).
     await seedReadyTrash();
     await seedChore(db(), {
       ...SEED_CHORES.dishes,
@@ -110,7 +109,7 @@ describe("loadHub", () => {
     });
     const { choreId: bathroom } = await seedChore(db(), {
       ...SEED_CHORES.bathroom,
-      createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS - HOUR),
+      createdAt: new Date(FIXED_NOW.getTime() - 4 * 24 * HOUR),
     });
     expect(
       (
@@ -178,9 +177,9 @@ describe("loadHub", () => {
       status: "ready",
       data: [{ id: pinned.ok && pinned.data.note.id, title: "Wifi" }],
     });
-    // Only Dishes is new; of the notes, Ryan has seen only the one he wrote
-    // through create_note. There is no urgent count (issue #189).
-    expect(hub.counts).toEqual({ new: 1, messages: 1 });
+    // Of the notes, Ryan has seen only the one he wrote through
+    // create_note. There is no urgent (issue #189) or new count (#193).
+    expect(hub.counts).toEqual({ messages: 1 });
   });
 
   it("counts nothing for a tile whose read failed", async () => {
@@ -192,11 +191,11 @@ describe("loadHub", () => {
       input: unknown,
       ctx: never,
     ) =>
-      name === "list_chores" || name === "list_notes"
+      name === "list_notes"
         ? Promise.reject(new Error("boom"))
         : real(name, input, ctx)) as never);
     const hub = await loadHub(ctxFor(sessionActor(ryan)));
-    expect(hub.counts).toEqual({ new: null, messages: null });
+    expect(hub.counts).toEqual({ messages: null });
     expect(hub.standings.status).toBe("ready");
   });
 
@@ -335,7 +334,7 @@ describe("startHub", () => {
 
     const hub = startHub(ctxFor(sessionActor(ryan)));
     const local = await hub.local;
-    expect(local.counts.new).toEqual(expect.any(Number));
+    expect(local.counts.messages).toEqual(expect.any(Number));
     expect(local.standings.status).not.toBe("unavailable");
     expect(local).not.toHaveProperty("events");
     expect(local).not.toHaveProperty("shopping");

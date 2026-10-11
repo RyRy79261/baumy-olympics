@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { Suspense, use, useEffect, useId, useState } from "react";
 import {
-  ModuleBountyRow,
   MemberCharacter,
   KioskModal,
   MarkdownBody,
@@ -12,20 +11,13 @@ import {
   ModuleEmpty,
   ModulePanel,
   NotificationIcon,
-  SheetTabs,
-  bountyActionClass,
-  choreGlyph,
-  cx,
-  type DashboardTone,
-  type PixelIconName,
+  NotificationIconFace,
+  notificationIconClass,
+  notificationIconLabel,
 } from "@baumy/ui";
 import {
-  bountyTabCounts,
   headerClock,
-  inTab,
   whoOf,
-  type BountyRowView,
-  type BountyTab,
   type DashboardMember,
   type MessageView,
 } from "@/lib/kiosk/dashboard";
@@ -37,18 +29,16 @@ import {
 import { useIdle } from "../use-idle";
 
 // The dashboard's header (ADR 0005 §1, issue #65): the date, a big clock
-// in Berlin time and two notification icons, New and Messages (there is no
-// Urgent: a chore has no due date, SPEC §12 decision 35, issue #189). Each
-// opens its calm module: the bounties (All, Consumables,
-// Maintenance) with "I'll do it" leading to the log flow, or the notes not
-// every member has seen yet (issue #153); opening those with someone picked
-// marks them seen by that member only.
+// in Berlin time and three icons (owner ruling 2026-10-11, SPEC §12
+// decision 36, issue #193): the star opens the Bounties tab, the basket
+// opens the Shop tab with a badge of the items open on the list, and
+// Messages opens its calm module, the notes not every member has seen yet
+// (issue #153); opening those with someone picked marks them seen by that
+// member only. There is no Urgent (decision 35) and no New.
 
 /** A list, or why it could not be read; `count` overrides its length. */
 type Listed<T> =
   { ok: true; rows: T[]; count?: number } | { ok: false; message: string };
-
-type ModuleKey = "new" | "messages";
 
 function Clock({ serverNow }: { serverNow: string }) {
   // Starts from the server's `now` and keeps its offset from this device's
@@ -86,111 +76,64 @@ function Clock({ serverNow }: { serverNow: string }) {
   );
 }
 
-const TABS: readonly {
-  key: BountyTab;
+/**
+ * A header icon that is a way into a tab (Bounties, Shopping): a link, so
+ * the tab opens as the footer's would, with no pop-up.
+ */
+function IconLink({
+  href,
+  icon,
+  label,
+  tone,
+  count,
+  loading = false,
+  testId,
+}: {
+  href: "/kiosk/chores" | "/kiosk/shopping";
+  icon: "star" | "basket";
   label: string;
-  tone?: DashboardTone;
-}[] = [
-  { key: "all", label: "All" },
-  { key: "consumable", label: "Consumables", tone: "amber" },
-  { key: "maintenance", label: "Maintenance", tone: "teal" },
-];
-
-function BountyList({ rows }: { rows: BountyRowView[] }) {
-  if (rows.length === 0) {
-    return <ModuleEmpty>Nothing here. Baumy approves.</ModuleEmpty>;
-  }
+  tone: "yellow" | "amber";
+  count?: number | null;
+  /**
+   * Its count is still on its way: dim, no badge, and only its name for a
+   * screen reader, never "unavailable" before anything has failed.
+   */
+  loading?: boolean;
+  testId: string;
+}) {
   return (
-    <ul className="flex flex-col">
-      {rows.map((b) => (
-        <ModuleBountyRow
-          key={b.id}
-          data-testid={`bounty-${b.name}`}
-          glyph={choreGlyph(b.sprite)}
-          name={b.name}
-          kind={b.kind}
-          isNew={b.isNew}
-          streak={
-            b.streak
-              ? {
-                  name: b.streak.holderName,
-                  length: b.streak.length,
-                  colour: b.streak.colour,
-                }
-              : null
-          }
-          status={b.status}
-          points={b.points}
-          action={
-            !b.loggable ? (
-              <span className={cx(bountyActionClass, "opacity-40")}>
-                Not yet
-              </span>
-            ) : (
-              <Link
-                href={`/kiosk/chores?chore=${encodeURIComponent(b.id)}`}
-                className={bountyActionClass}
-                aria-label={`I'll do ${b.name}`}
-              >
-                I&apos;ll do it
-              </Link>
-            )
-          }
-        />
-      ))}
-    </ul>
+    <Link
+      href={href}
+      data-icon={testId}
+      aria-label={loading ? label : notificationIconLabel(label, count)}
+      aria-busy={loading || undefined}
+      data-count={loading ? undefined : (count ?? undefined)}
+      data-status={
+        loading ? "loading" : count === null ? "unavailable" : "ready"
+      }
+      className={notificationIconClass}
+    >
+      <NotificationIconFace
+        icon={icon}
+        label={label}
+        count={loading ? 0 : count}
+        tone={tone}
+      />
+    </Link>
   );
 }
 
-function BountyModule({
-  title,
-  titleId,
-  icon,
-  tone,
-  subtitle,
-  listed,
-  onClose,
-}: {
-  title: string;
-  titleId: string;
-  icon: PixelIconName;
-  tone: DashboardTone;
-  subtitle: string;
-  listed: Listed<BountyRowView>;
-  onClose: () => void;
-}) {
-  const [tab, setTab] = useState<BountyTab>("all");
-  const rows = listed.ok ? listed.rows : [];
-  const counts = bountyTabCounts(rows);
+/** The Shopping icon, once brain's count has come in. */
+function ShoppingIcon({ count }: { count: Promise<number | null> }) {
   return (
-    <ModulePanel
-      title={title}
-      titleId={titleId}
-      icon={icon}
-      tone={tone}
-      subtitle={subtitle}
-      onClose={onClose}
-      tabs={
-        listed.ok ? (
-          <SheetTabs
-            value={tab}
-            onPick={setTab}
-            items={TABS.map((t) => ({
-              key: t.key,
-              label: t.label,
-              count: counts[t.key],
-              tone: t.tone ?? tone,
-            }))}
-          />
-        ) : undefined
-      }
-    >
-      {listed.ok ? (
-        <BountyList rows={rows.filter((r) => inTab(r, tab))} />
-      ) : (
-        <ModuleEmpty>{listed.message}</ModuleEmpty>
-      )}
-    </ModulePanel>
+    <IconLink
+      href="/kiosk/shopping"
+      icon="basket"
+      label="Shopping"
+      tone="amber"
+      count={use(count)}
+      testId="shopping"
+    />
   );
 }
 
@@ -268,7 +211,7 @@ function MessagesModule({
 
 export function DashboardHeader({
   serverNow,
-  fresh,
+  shopping,
   messages,
   members,
   actingId,
@@ -276,7 +219,11 @@ export function DashboardHeader({
 }: {
   /** The instant the page was read at, ISO 8601. */
   serverNow: string;
-  fresh: Listed<BountyRowView>;
+  /**
+   * How many items are open on the shopping list, streamed in (brain can be
+   * slow); null when it could not be read, which shows no badge.
+   */
+  shopping: Promise<number | null>;
   messages: Listed<MessageView>;
   members: DashboardMember[];
   /** The member picked on the kiosk, or null. */
@@ -284,7 +231,7 @@ export function DashboardHeader({
   /** acknowledge_note as the picked member (app/kiosk/note-actions.ts). */
   seeNotes: SeenAction;
 }) {
-  const [open, setOpen] = useState<ModuleKey | null>(null);
+  const [open, setOpen] = useState(false);
   // The Messages box keeps the rows it opened with: reading them marks them
   // seen (issue #153), and the last reader must not see a note vanish while
   // it is open. Closing it refreshes the page, so the count catches up.
@@ -292,14 +239,14 @@ export function DashboardHeader({
   const router = useRouter();
   const id = useId();
   const close = () => {
-    if (open === "messages") {
+    if (open) {
       setOpened(null);
       router.refresh();
     }
-    setOpen(null);
+    setOpen(false);
   };
-  // A module left open closes after a minute untouched.
-  useIdle(open !== null, KIOSK_IDLE_MS, close);
+  // The module left open closes after a minute untouched.
+  useIdle(open, KIOSK_IDLE_MS, close);
   const count = (l: Listed<unknown>) =>
     l.ok ? (l.count ?? l.rows.length) : null;
   const titleId = `${id}-module`;
@@ -308,14 +255,28 @@ export function DashboardHeader({
     <header className="flex h-[156px] shrink-0 items-center justify-between gap-6 px-6">
       <Clock serverNow={serverNow} />
       <div className="flex shrink-0 gap-6 pt-2 pr-2">
-        <NotificationIcon
+        <IconLink
+          href="/kiosk/chores"
           icon="star"
-          label="New"
+          label="Bounties"
           tone="yellow"
-          count={count(fresh)}
-          data-icon="new"
-          onClick={() => setOpen("new")}
+          testId="bounties"
         />
+        {/* Until brain answers, the basket shows dim, as loading. */}
+        <Suspense
+          fallback={
+            <IconLink
+              href="/kiosk/shopping"
+              icon="basket"
+              label="Shopping"
+              tone="amber"
+              loading
+              testId="shopping"
+            />
+          }
+        >
+          <ShoppingIcon count={shopping} />
+        </Suspense>
         <NotificationIcon
           icon="envelope"
           label="Messages"
@@ -324,22 +285,12 @@ export function DashboardHeader({
           data-icon="messages"
           onClick={() => {
             setOpened(messages);
-            setOpen("messages");
+            setOpen(true);
           }}
         />
       </div>
-      <KioskModal open={open !== null} onClose={close} labelledBy={titleId}>
-        {open === "new" ? (
-          <BountyModule
-            title="New bounties"
-            titleId={titleId}
-            icon="star"
-            tone="yellow"
-            subtitle="Added in the last 3 days"
-            listed={fresh}
-            onClose={close}
-          />
-        ) : open === "messages" ? (
+      <KioskModal open={open} onClose={close} labelledBy={titleId}>
+        {open ? (
           <MessagesModule
             titleId={titleId}
             listed={opened ?? messages}

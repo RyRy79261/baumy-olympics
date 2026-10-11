@@ -198,13 +198,14 @@ test("every hub page is in the kit and fits the screen", async ({
 }, testInfo) => {
   await founderAdmin(page, testInfo.project.name);
 
-  // The hub's top row: the clock and the two status tiles, each a 16-bit
-  // icon; a tile with nothing to show is dim and has no badge. There is no
-  // Urgent tile (SPEC §12 decision 35).
+  // The hub's top row: the clock and the Messages tile, a 16-bit icon; with
+  // nothing to show it is dim and has no badge. There is no Urgent tile
+  // (SPEC §12 decision 35) and no New tile (decision 36).
   await expect(page.getByTestId("clock-time")).toHaveText(/^\d\d:\d\d$/);
-  await expect(page.getByTestId("hub-tile-new")).toBeVisible();
+  await expect(page.getByTestId("hub-tile-messages")).toBeVisible();
+  await expect(page.getByTestId("hub-tile-new")).toHaveCount(0);
   await expect(page.getByTestId("hub-tile-urgent")).toHaveCount(0);
-  for (const key of ["new", "messages"]) {
+  for (const key of ["messages"]) {
     const tile = page.getByTestId(`hub-tile-${key}`);
     await expect(tile).toBeVisible();
     await expect(tile.locator("svg").first()).toBeVisible();

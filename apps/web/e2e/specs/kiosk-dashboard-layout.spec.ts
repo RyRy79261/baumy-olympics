@@ -41,7 +41,7 @@ async function headerBoxes(kiosk: Page) {
       const r = range.getBoundingClientRect();
       return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
     };
-    const icons = ["new", "messages"].map((key) => {
+    const icons = ["bounties", "shopping", "messages"].map((key) => {
       const el = document.querySelector(`[data-icon="${key}"]`)!;
       const r = el.getBoundingClientRect();
       const box: Box = {
@@ -122,7 +122,7 @@ test("the dashboard clock never touches the icons on an iPad", async ({
     await kiosk.setViewportSize(size);
     await kiosk.goto("/kiosk");
     await expect(kiosk.getByTestId("clock-time")).toHaveText(/^\d\d:\d\d$/);
-    await expect(kiosk.locator('[data-icon="new"]')).toBeVisible();
+    await expect(kiosk.locator('[data-icon="bounties"]')).toBeVisible();
     // Today's date and time, as they are.
     await expectClear(kiosk, `${label}, today`);
 

@@ -77,13 +77,8 @@ export interface BountyFields {
   points: number | null;
   /** E.g. "Ryan · streak 3", or "No streak yet". */
   streak: ReactNode;
-  /**
-   * "Ready", or "Again from Wed 30 Sep, 08:00". Left out where the list
-   * already says it (the hub's "Ready bounties").
-   */
+  /** "Ready", or "Again from Wed 30 Sep, 08:00"; left out, no line. */
   status?: ReactNode;
-  /** Added in the last 3 days. */
-  isNew?: boolean;
 }
 
 /** The glyph, the lines and the points of one bounty. */
@@ -94,7 +89,6 @@ function BountyFace({
   points,
   streak,
   status,
-  isNew = false,
   kiosk,
 }: BountyFields & { kiosk: boolean }) {
   return (
@@ -105,21 +99,14 @@ function BountyFace({
         size={kiosk ? "kiosk" : "default"}
       />
       <span className="flex w-0 min-w-0 flex-1 flex-col gap-1">
-        <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span
-            data-bounty-name
-            className={cx(
-              "min-w-0 leading-tight font-semibold [overflow-wrap:anywhere]",
-              kiosk ? "text-3xl" : "text-xl sm:text-2xl",
-            )}
-          >
-            {name}
-          </span>
-          {isNew ? (
-            <span className="font-label text-xs font-bold text-bm-yellow uppercase">
-              New
-            </span>
-          ) : null}
+        <span
+          data-bounty-name
+          className={cx(
+            "min-w-0 leading-tight font-semibold [overflow-wrap:anywhere]",
+            kiosk ? "text-3xl" : "text-xl sm:text-2xl",
+          )}
+        >
+          {name}
         </span>
         {/* Two phrases that each stay whole: on a phone the streak drops to
             its own line rather than breaking mid-phrase. */}
@@ -178,7 +165,6 @@ export function BountyRow({
   points,
   streak,
   status,
-  isNew = false,
   cta = "Log it",
   kiosk = false,
   className,
@@ -198,7 +184,7 @@ export function BountyRow({
       {...props}
     >
       <BountyFace
-        {...{ name, sprite, kind, points, streak, status, isNew }}
+        {...{ name, sprite, kind, points, streak, status }}
         kiosk={kiosk}
       />
       {/* Only for the eye: the row itself is the button. */}
@@ -214,32 +200,6 @@ export function BountyRow({
         {cta}
       </span>
     </button>
-  );
-}
-
-/** One bounty as a line in a widget, not a button: the hub's list. */
-export function BountySummary({
-  name,
-  sprite,
-  kind,
-  points,
-  streak,
-  status,
-  isNew = false,
-  className,
-  ...props
-}: BountyFields & Omit<HTMLAttributes<HTMLLIElement>, "children">) {
-  return (
-    <li
-      data-kind={kind}
-      className={cx("flex items-center gap-3 py-3 text-bm-text", className)}
-      {...props}
-    >
-      <BountyFace
-        {...{ name, sprite, kind, points, streak, status, isNew }}
-        kiosk={false}
-      />
-    </li>
   );
 }
 

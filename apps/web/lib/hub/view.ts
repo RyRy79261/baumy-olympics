@@ -102,12 +102,12 @@ export function clockLines(now: Date): { time: string; date: string } {
 }
 
 /**
- * The hub's two counts (ADR 0005 §1; no Urgent since SPEC §12 decision 35):
- * new bounties, and messages, the notes this member has not seen since their words last
- * changed (list_notes' `unseenCount`, issue #153). Null when the read behind it failed: the tile then says
- * so instead of showing a zero.
+ * The hub's one count (ADR 0005 §1; no Urgent since SPEC §12 decision 35 and
+ * no New since decision 36): messages, the notes this member has not seen
+ * since their words last changed (list_notes' `unseenCount`, issue #153).
+ * Null when the read behind it failed: the tile then says so instead of
+ * showing a zero.
  */
 export interface HubCounts {
-  new: number | null;
   messages: number | null;
 }

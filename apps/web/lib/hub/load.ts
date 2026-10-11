@@ -42,7 +42,7 @@ export interface HubData {
   /** The pot's total, "€80.50", or why it cannot be shown. */
   pot: { ok: true; total: string } | { ok: false; message: string };
   notes: WidgetState<NoteView[]>;
-  /** The New and Messages counts (ADR 0005 §1). */
+  /** The Messages count (ADR 0005 §1). */
   counts: HubCounts;
   /**
    * brain's shopping list. Ready even when empty: the widget's quick-add
@@ -108,10 +108,9 @@ export async function loadHub(ctx: RequestCtx): Promise<HubData> {
 }
 
 async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
-  const [chores, standings, pot, notes] = await Promise.all([
-    // Only for the New count: the hub lists no bounties (owner, 2026-10-11,
-    // issue #189); the board does.
-    read(() => runAction("list_chores", {}, ctx)),
+  // No chores: the hub lists no bounties (owner, 2026-10-11, issue #189)
+  // and has no New tile (issue #193); the board does.
+  const [standings, pot, notes] = await Promise.all([
     read(() => runAction("get_standings", { recent: 0 }, ctx)),
     read(() => runAction("get_pot", {}, ctx)),
     // The pinned notes for the widget, and the Messages count: the notes
@@ -143,7 +142,6 @@ async function loadLocal(ctx: RequestCtx): Promise<HubLocal> {
       "Nothing is pinned. Pin a note on the Board.",
     ),
     counts: {
-      new: chores.ok ? chores.data.chores.filter((c) => c.isNew).length : null,
       messages: notes.ok ? notes.data.unseenCount : null,
     },
   };

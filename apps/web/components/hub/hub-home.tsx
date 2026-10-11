@@ -27,30 +27,23 @@ import { LiveClock } from "./live-clock";
 
 // The hub home on a phone or a laptop (SPEC §3.1; ADR 0005 Consequences):
 // the kitchen screen's calm look in a normal scrolling page. On top, the
-// clock and the two status tiles (New, Messages), each dim at zero and a
-// link to its slice (no Urgent: a chore has no due date, SPEC §12 decision
-// 35). Then today's agenda in the wide column (no bounty card: the board
-// lists them, owner 2026-10-11), the scores with the pot, the pinned notes (the
-// Board) and the shopping list in the narrow one. Each widget keeps its own
-// empty and unavailable state (lib/hub/load.ts). The page's own card (Post a
-// reminder) stacks under the wide column's, so the short column leaves no
-// gap (issue #152). It comes right after Today at every width, so what is
-// seen and what is read or tabbed through keep one order.
+// clock with the Messages tile beside it, dim at zero and a link to the
+// notes (no Urgent: a chore has no due date, SPEC §12 decision 35; no New,
+// decision 36, issue #193). Then today's agenda, the page's own card (Post
+// a reminder) and the pinned notes (the Board) in the wide column (no
+// bounty card: the board lists them, owner 2026-10-11), and the scores with
+// the pot and the shopping list in the narrow one, so neither column ends
+// far above the other (issue #193's review). Each widget keeps its own
+// empty and unavailable state (lib/hub/load.ts). What is seen and what is
+// read or tabbed through keep one order at every width (issue #152).
 
 const TILES: {
-  key: "new" | "messages";
+  key: "messages";
   label: string;
   icon: PixelIconName;
   accent: TabAccent;
   href: Route;
 }[] = [
-  {
-    key: "new",
-    label: "New",
-    icon: "star",
-    accent: "yellow",
-    href: "/chores?show=new" as Route,
-  },
   {
     key: "messages",
     label: "Messages",
@@ -213,7 +206,7 @@ export function HubHome({
       <section
         aria-label="At a glance"
         data-testid="hub-glance"
-        className="mb-6 flex flex-wrap items-center justify-between gap-4"
+        className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-4"
       >
         <LiveClock serverNow={hub.now} />
         <nav aria-label="Needs attention" className="flex gap-3">
@@ -253,6 +246,33 @@ export function HubHome({
           </Deferred>
 
           {children}
+
+          <Widget
+            id="widget-notes"
+            data-testid="widget-notes"
+            title="Board"
+            status={notes.status}
+            message={notes.status === "ready" ? undefined : notes.message}
+            action={<More href="/notes" label="All notes" />}
+          >
+            {notes.status === "ready" ? (
+              <div className="flex flex-col gap-3">
+                {notes.data.map((n) => (
+                  <StickyNote
+                    key={n.id}
+                    data-testid={`hub-note-${n.title}`}
+                    title={n.title}
+                    color={n.color}
+                    pinned
+                    clamp
+                    className="overflow-hidden"
+                  >
+                    {n.bodyMd ? <MarkdownBody>{n.bodyMd}</MarkdownBody> : null}
+                  </StickyNote>
+                ))}
+              </div>
+            ) : null}
+          </Widget>
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
@@ -298,33 +318,6 @@ export function HubHome({
                   />
                 ))}
               </WidgetList>
-            ) : null}
-          </Widget>
-
-          <Widget
-            id="widget-notes"
-            data-testid="widget-notes"
-            title="Board"
-            status={notes.status}
-            message={notes.status === "ready" ? undefined : notes.message}
-            action={<More href="/notes" label="All notes" />}
-          >
-            {notes.status === "ready" ? (
-              <div className="flex flex-col gap-3">
-                {notes.data.map((n) => (
-                  <StickyNote
-                    key={n.id}
-                    data-testid={`hub-note-${n.title}`}
-                    title={n.title}
-                    color={n.color}
-                    pinned
-                    clamp
-                    className="overflow-hidden"
-                  >
-                    {n.bodyMd ? <MarkdownBody>{n.bodyMd}</MarkdownBody> : null}
-                  </StickyNote>
-                ))}
-              </div>
             ) : null}
           </Widget>
 

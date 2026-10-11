@@ -224,8 +224,9 @@ describe("Glyph", () => {
 describe("PixelIcon", () => {
   it("has the header's three icons, each 16 × 16 in its own palette", () => {
     expect(Object.keys(PIXEL_ICONS)).toEqual(
-      expect.arrayContaining(["siren", "star", "envelope"]),
+      expect.arrayContaining(["star", "basket", "envelope"]),
     );
+    expect(Object.keys(PIXEL_ICONS)).not.toContain("siren");
     for (const icon of Object.values(PIXEL_ICONS) as PixelIconArt[]) {
       expect(gridSize(icon.grid)).toEqual({ w: 16, h: 16 });
       for (const row of icon.grid)
@@ -234,12 +235,12 @@ describe("PixelIcon", () => {
   });
 
   it("draws at its scale, and dims to grey when there is nothing", () => {
-    const out = html(<PixelIcon name="siren" scale={4} label="Urgent" />);
+    const out = html(<PixelIcon name="star" scale={4} label="Bounties" />);
     expect(out).toContain('width="64"');
-    expect(out).toContain('fill="#ff4d5e"');
-    expect(out).toContain('aria-label="Urgent"');
+    expect(out).toContain('fill="#ffe46b"');
+    expect(out).toContain('aria-label="Bounties"');
     expect(out).not.toContain("grayscale");
-    expect(html(<PixelIcon name="siren" dim />)).toContain(
+    expect(html(<PixelIcon name="star" dim />)).toContain(
       "opacity:0.28;filter:grayscale(1)",
     );
   });

@@ -28,7 +28,7 @@
   {
     "name": "list_chores",
     "title": "List chores",
-    "description": "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
+    "description": "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

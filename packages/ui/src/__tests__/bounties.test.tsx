@@ -5,7 +5,6 @@ import {
   BountyGlyph,
   BountyList,
   BountyRow,
-  BountySummary,
   StatusTileFace,
   TabLabel,
   statusTileClass,
@@ -24,7 +23,6 @@ describe("BountyRow", () => {
         points={15}
         streak="Ryan · streak 3"
         status="Ready"
-        isNew
       />,
     );
     expect(out.match(/<button/g)).toHaveLength(1);
@@ -37,9 +35,10 @@ describe("BountyRow", () => {
     expect(out).toContain("text-bm-amber");
     expect(out).toContain("Ryan · streak 3");
     expect(out).toContain("15 pts");
-    // New in yellow; the status line is calm, never red (issue #189).
-    expect(out).toMatch(/text-bm-yellow uppercase">New</);
+    // The status line is calm, never red (issue #189), and there is no
+    // "New" tag (issue #193).
     expect(out).toMatch(/text-bm-dim">Ready</);
+    expect(out).not.toContain(">New<");
     expect(out).not.toContain("text-bm-red");
     expect(out).not.toContain("data-urgent");
     // The kind and the streak are two phrases that each stay whole.
@@ -122,55 +121,6 @@ describe("BountyGlyph", () => {
   });
 });
 
-describe("BountySummary", () => {
-  it("is a list line with the same face, and no button", () => {
-    const out = html(
-      <BountySummary
-        data-testid="hub-chore-Bins"
-        name="Bins"
-        sprite="trash"
-        kind="maintenance"
-        points={20}
-        streak="No streak yet"
-        status="Ready"
-        isNew
-      />,
-    );
-    expect(out.startsWith("<li")).toBe(true);
-    expect(out).not.toContain("<button");
-    expect(out).toContain('data-testid="hub-chore-Bins"');
-    expect(out).toContain("Maintenance");
-    expect(out).toContain("20 pts");
-    expect(out).toContain(">New<");
-    expect(out).toMatch(/text-bm-dim">Ready</);
-    expect(out).not.toContain("text-bm-red");
-    const calm = html(
-      <BountySummary
-        name="Mop"
-        sprite="mop"
-        kind="consumable"
-        points={null}
-        streak="No streak yet"
-        status="Again from Thu 1 Oct, 08:00"
-      />,
-    );
-    expect(calm).toMatch(/text-bm-dim">Again from/);
-    expect(calm).not.toContain(">New<");
-    // Without a status (the hub's "Ready bounties"), no empty line.
-    const bare = html(
-      <BountySummary
-        name="Mop"
-        sprite="mop"
-        kind="consumable"
-        points={null}
-        streak="No streak yet"
-      />,
-    );
-    expect(bare).toContain("No streak yet");
-    expect(bare).not.toContain("data-bounty-status");
-  });
-});
-
 describe("AgendaItem", () => {
   it("shows the time, the bar in its colour, the title and the line under", () => {
     const out = html(
@@ -224,9 +174,14 @@ describe("filter tabs", () => {
 describe("status tiles", () => {
   it("shows the icon, the label and a count badge in its accent", () => {
     const out = html(
-      <StatusTileFace icon="siren" label="Urgent" count={5} accent="red" />,
+      <StatusTileFace
+        icon="envelope"
+        label="Messages"
+        count={5}
+        accent="red"
+      />,
     );
-    expect(out).toContain("Urgent");
+    expect(out).toContain("Messages");
     expect(out).toMatch(/bg-bm-red">5</);
     expect(out).toContain("data-count");
     expect(out).not.toContain("grayscale");

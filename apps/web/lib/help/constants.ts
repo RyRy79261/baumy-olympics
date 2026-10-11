@@ -12,7 +12,6 @@ import {
   KIOSK_PIN_MIN_DIGITS,
 } from "@baumy/types";
 import { MAX_RECORDING_MS } from "@/lib/ai/voice";
-import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import { DEFAULT_NIGHT_WINDOW } from "@/lib/kiosk/night";
 import { DEFAULT_TELEGRAM_BOT_USERNAME } from "@/lib/telegram/deep-link";
@@ -27,7 +26,6 @@ import { DEFAULT_TELEGRAM_BOT_USERNAME } from "@/lib/telegram/deep-link";
 // the manual explains how things work, not how to get around them.
 
 const MINUTE_MS = 60_000;
-const DAY_MS = 24 * 60 * MINUTE_MS;
 
 /** `390` minutes after midnight → `06:30`. */
 function clockTime(minutes: number): string {
@@ -50,7 +48,6 @@ export const HELP_CONSTANTS: Readonly<Record<string, string | number>> = {
   SUGGESTED_POINTS_MIN: FREQUENCY_V1.minPoints,
   SUGGESTED_POINTS_MAX: FREQUENCY_V1.maxPoints,
   // Bounties (SPEC §3.2).
-  NEW_BOUNTY_DAYS: NEW_BOUNTY_MS / DAY_MS,
   PHOTO_RETENTION_DAYS: PHOTO_DAYS,
   // The kitchen iPad (SPEC §8).
   KIOSK_PAIRING_CODE_MIN: KIOSK_PAIRING_TTL_MS / MINUTE_MS,

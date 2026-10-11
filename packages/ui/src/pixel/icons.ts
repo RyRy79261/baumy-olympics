@@ -1,8 +1,9 @@
 // The 16×16 multi-colour icons from the approved prototype (branch
-// proto/kiosk-home-pixel, calm-icons.ts): the header's New star and Messages
-// envelope, the siren (the Urgent icon's until issue #189 removed it; kept
-// with the set as drawn), and the basket, wrench and board. One character per
-// pixel through each icon's own palette ("." is clear). Copied as drawn.
+// proto/kiosk-home-pixel, calm-icons.ts): the header's Bounties star,
+// Shopping basket (issue #193) and Messages envelope, and the wrench and
+// board. One character per pixel through each icon's own palette ("." is
+// clear). Copied as drawn. (The siren, the Urgent icon's, went with Urgent,
+// issues #189 and #193.)
 
 import type { Palette, Sprite } from "./pixel-grid";
 
@@ -12,36 +13,6 @@ export interface PixelIconArt {
 }
 
 const INK = "#0b0712";
-
-export const SIREN = {
-  grid: [
-    "................",
-    "..Y....YY....Y..",
-    "...Y........Y...",
-    "......KKKK......",
-    ".....KRRRRK.....",
-    "....KRWWRRRK....",
-    "....KRWRRRRK....",
-    "....KRWRRRRK....",
-    "....KRRRRRRK....",
-    "...KRRRRRRRRK...",
-    "...KrrrrrrrrK...",
-    "..KKKKKKKKKKKK..",
-    "..KGGGGGGGGGGK..",
-    "..KggggggggggK..",
-    "..KKKKKKKKKKKK..",
-    "................",
-  ],
-  pal: {
-    K: INK,
-    R: "#ff4d5e",
-    r: "#b8243a",
-    W: "#ffd0d6",
-    G: "#8d7fae",
-    g: "#4a3d63",
-    Y: "#ffe46b",
-  },
-} satisfies PixelIconArt;
 
 export const STAR = {
   grid: [
@@ -164,7 +135,6 @@ export const BOARD = {
 
 /** The icons by name. */
 export const PIXEL_ICONS = {
-  siren: SIREN,
   star: STAR,
   envelope: ENVELOPE,
   basket: BASKET,

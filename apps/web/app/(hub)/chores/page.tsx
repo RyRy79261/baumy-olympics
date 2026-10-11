@@ -15,9 +15,8 @@ import { BountyBoard } from "./bounty-board";
 
 // /chores, shown as "Bounties" (SPEC §3.2; ADR 0005 §2): the bounty board.
 // Tap a bounty, check the preview, log it. The data is `list_chores`, the
-// same read the AI and MCP get. `?show=new` (or consumable, maintenance)
-// opens it on that tab: the hub's New tile links
-// there.
+// same read the AI and MCP get. `?show=consumable` (or maintenance) opens
+// it on that tab; there is no New tab (issue #193), so `?show=new` is All.
 //
 // An admin also gets New bounty and an Edit button per bounty (issue #109),
 // the same dialogs as /admin/chores; points change only through a scheduled

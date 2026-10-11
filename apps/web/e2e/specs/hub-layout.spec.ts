@@ -39,8 +39,9 @@ const WIDTHS = [
 const CARDS = [
   "widget-events",
   "post-reminder",
-  "widget-leaderboard",
+  // The Board sits in the wide column now, so the columns end together.
   "widget-notes",
+  "widget-leaderboard",
   "widget-shopping",
 ];
 

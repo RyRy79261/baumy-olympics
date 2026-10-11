@@ -4,17 +4,18 @@ import { berlinDateKey } from "@baumy/core";
 import type { KioskMemberWithAvatar } from "@baumy/db/members";
 import type { RequestCtx } from "@/lib/actions/define";
 import { avatarImageView } from "@/lib/avatars/paths";
-import type { ChoreView } from "@/lib/actions/list-chores";
 import type { NoteView } from "@/lib/actions/notes";
 import { runAction } from "@/lib/actions/registry";
 import type { ActionResult } from "@/lib/actions/result";
 import type { CalendarEventView } from "@/lib/calendar/view";
 import { monthGridDays, type DashboardMember } from "./dashboard";
 
-// The kitchen dashboard's reads (ADR 0005, issue #65): the chores (as
-// bounties), the month grid's events and the notes, each through runAction
-// as the paired device (the `display` gate), side by side. One read failing
-// (Google down, say) is that part's own message; the rest still shows.
+// The kitchen dashboard's reads (ADR 0005, issue #65): the month grid's
+// events and the notes, each through runAction as the paired device (the
+// `display` gate), side by side, and the Shopping icon's count, which the
+// page streams in (`shoppingCount`). One read failing (Google down, say) is
+// that part's own message; the rest still shows. The home reads no chores:
+// its star only opens the Bounties tab (SPEC §12 decision 36, issue #193).
 
 export interface DashboardData {
   /** The instant the page was read at, ISO 8601. */
@@ -24,7 +25,6 @@ export interface DashboardData {
   /** The month the grid shows, "YYYY-MM". */
   month: string;
   members: DashboardMember[];
-  chores: { ok: true; data: ChoreView[] } | { ok: false; message: string };
   events:
     { ok: true; data: CalendarEventView[] } | { ok: false; message: string };
   /**
@@ -63,11 +63,7 @@ export async function loadDashboard(
   readMembers: () => Promise<KioskMemberWithAvatar[]>,
 ): Promise<DashboardData> {
   const days = monthGridDays(month);
-  const [chores, events, notes, members] = await Promise.all([
-    read(
-      () => runAction("list_chores", {}, ctx),
-      (d) => d.chores,
-    ),
+  const [events, notes, members] = await Promise.all([
     read(
       () => runAction("list_events", { from: days[0], to: days.at(-1) }, ctx),
       (d) => d.events,
@@ -91,8 +87,22 @@ export async function loadDashboard(
       color: m.color,
       sprites: avatarImageView(m.avatarImage),
     })),
-    chores,
     events,
     notes,
   };
+}
+
+/**
+ * The Shopping icon's badge (issue #193): how many items are open on brain's
+ * list (`list_shopping`). Null when brain is down, not set up, or the read
+ * throws: the icon then shows no badge, never an error. It never rejects.
+ * brain can take seconds when it starts cold (issue #128), so the page
+ * streams this in rather than waiting for it.
+ */
+export async function shoppingCount(ctx: RequestCtx): Promise<number | null> {
+  const listed = await read(
+    () => runAction("list_shopping", {}, ctx),
+    (d) => d.items.length,
+  );
+  return listed.ok ? listed.data : null;
 }

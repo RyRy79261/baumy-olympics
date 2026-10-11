@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { RULESET_V1 } from "@baumy/core";
-import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import { LANDING_DESCRIPTION, LandingPage } from "./landing-page";
 
@@ -61,10 +60,11 @@ describe("LandingPage", () => {
     expect(out).toContain(`up to ${r.breakPctPerLen * r.breakLenCap}%`);
     expect(out).toContain(`For ${r.challengeWindowH} hours`);
     expect(out).toContain(`within ${r.undoWindowMin} minutes`);
-    expect(out).toContain(`last ${NEW_BOUNTY_MS / 86_400_000} days`);
     // A bounty is ready or cooling down; nothing is due or urgent (#189).
     expect(out).toContain("A bounty is ready, or cooling down after someone");
     expect(out).not.toMatch(/\burgent\b|\bdue\b|\boverdue\b/i);
+    // And no "new" bounties (issue #193).
+    expect(out).not.toMatch(/new ones|last \d+ days/i);
     expect(out).toContain(`after ${SCREENSAVER_IDLE_MS / 60_000} minutes`);
   });
 

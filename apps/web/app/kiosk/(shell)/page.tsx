@@ -13,22 +13,21 @@ import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { getKioskActor } from "@/lib/auth";
 import { householdMembers } from "@/lib/members/household";
 import {
-  bountyRows,
-  isNewBounty,
   monthCells,
   parseMonthParams,
   unseenMessages,
 } from "@/lib/kiosk/dashboard";
-import { loadDashboard } from "@/lib/kiosk/dashboard-load";
+import { loadDashboard, shoppingCount } from "@/lib/kiosk/dashboard-load";
 import { clearPickAction } from "../actions";
 import { kioskSeeNotesAction } from "../note-actions";
 
 // The kitchen screen's home (ADR 0005, issue #65): the portrait dashboard,
 // glanceable across the room with no taps. The header has the date, a big
-// clock and the New and Messages icons; under it, the month
-// calendar, the only home view. It is read as the paired device whether or
-// not anyone has tapped in (the `display` gate), never scrolls, and re-reads
-// itself every 60 seconds and when it comes back into view.
+// clock and the Bounties, Shopping and Messages icons (SPEC §12 decision
+// 36, issue #193); under it, the month calendar, the only home view. It is
+// read as the paired device whether or not anyone has tapped in (the
+// `display` gate), never scrolls, and re-reads itself every 60 seconds and
+// when it comes back into view.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Kiosk" };
@@ -49,22 +48,18 @@ export default async function KioskHomePage({
   const today = berlinDateKey(ctx.now);
   const params = await searchParams;
   const { month, day } = parseMonthParams(params, today);
+  // Started first and not awaited: the Shopping badge streams in.
+  const shopping = shoppingCount(ctx);
   const data = await loadDashboard(ctx, month, () =>
     householdMembers(ctx.householdId),
   );
-  const fresh = data.chores.ok
-    ? {
-        ok: true as const,
-        rows: bountyRows(data.chores.data, isNewBounty, data.members, ctx.now),
-      }
-    : data.chores;
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="kiosk-home">
       {/* The dashboard is its own heading; this names the page for readers. */}
       <h1 className="sr-only">Kitchen</h1>
       <DashboardHeader
         serverNow={data.now}
-        fresh={fresh}
+        shopping={shopping}
         messages={
           data.notes.ok
             ? {
