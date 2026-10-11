@@ -46,34 +46,54 @@ test("a note 3 days old is not new any more, for anyone", async ({
   );
   const icon = kiosk.locator('[data-icon="messages"]');
   const messages = kiosk.getByRole("dialog", { name: "Messages" });
+  /**
+   * The open Messages list: its count (the subtitle, the icon's number) is
+   * exactly the notes it lists, so a note not listed is not counted, whatever
+   * other specs left on the board.
+   */
+  async function countIsTheList() {
+    const listed = await messages.locator('[data-testid^="message-"]').count();
+    await expect(
+      messages.getByText(`${listed} not read by everyone yet`),
+    ).toBeVisible();
+    await expect(icon).toHaveAttribute("data-count", String(listed));
+  }
 
   // Fresh: the other members have not read it, so it is a message.
   await expect(icon).toHaveAttribute("data-count", /^[1-9]\d*$/);
   await icon.click();
   await expect(messages.getByTestId(`message-${title}`)).toBeVisible();
+  await countIsTheList();
   await messages.getByRole("button", { name: "Close" }).click();
   await expect(messages).toBeHidden();
 
   // Three days and a minute later, on the server's clock.
   await advanceClock(page, PAST_NEW_MS);
 
-  // Nobody picked: not in the list. Every note in this household is at
-  // least that old now, so the count is zero and the icon dim.
+  // Nobody picked: not in the list, so not in the count.
   await kiosk.goto("/kiosk");
-  await expect(icon).toHaveAttribute("aria-label", "Messages: 0");
+  await expect(icon).toBeVisible();
   await icon.click();
   await expect(messages).toBeVisible();
   await expect(messages.getByTestId(`message-${title}`)).toHaveCount(0);
-  await expect(messages).toContainText(
-    "No new notes. Older ones are on the Board.",
-  );
+  if ((await icon.getAttribute("data-count")) === null) {
+    // Nothing else is new either.
+    await expect(messages).toContainText(
+      "No new notes. Older ones are on the Board.",
+    );
+  } else {
+    await countIsTheList();
+  }
   await messages.getByRole("button", { name: "Close" }).click();
 
-  // Someone picked: still nothing new for them.
+  // Someone picked: still not new for them.
   await kioskNav(kiosk, "Calendar");
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await kioskNav(kiosk, "Home");
-  await expect(icon).toHaveAttribute("aria-label", "Messages: 0");
+  await icon.click();
+  await expect(messages).toBeVisible();
+  await expect(messages.getByTestId(`message-${title}`)).toHaveCount(0);
+  await messages.getByRole("button", { name: "Close" }).click();
 
   // Still on the Board, though: only its "new" ended.
   await kioskNav(kiosk, "Board");

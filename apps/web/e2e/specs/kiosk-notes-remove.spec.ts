@@ -94,12 +94,17 @@ test("remove a note from the kitchen Board and from Messages, with no PIN", asyn
   const row = messages.getByTestId(`message-${parcel}`);
   await expect(row).toBeVisible();
   await expect(messages.getByTestId("messages-pick-hint")).toHaveCount(0);
+  const unread = messages.getByText(/^\d+ not read by everyone yet$/);
+  const before = Number((await unread.textContent())!.split(" ")[0]);
+  expect(before).toBeGreaterThan(0);
   await row.getByRole("button", { name: `Remove ${parcel}` }).click();
   await row
     .getByRole("group", { name: `Remove ${parcel}?` })
     .getByRole("button", { name: "Remove", exact: true })
     .click();
   await expect(row).toHaveCount(0);
+  // The count under the title keeps in step.
+  await expect(unread).toHaveText(`${before - 1} not read by everyone yet`);
   await messages.getByRole("button", { name: "Close" }).click();
   await kioskNav(kiosk, "Board");
   await expect(kiosk.getByTestId(`note-${parcel}`)).toHaveCount(0);
@@ -115,7 +120,7 @@ test("remove a note from the kitchen Board and from Messages, with no PIN", asyn
   await kiosk.locator('[data-icon="messages"]').click();
   await expect(messages.getByTestId(`message-Bins day ${tag}`)).toBeVisible();
   await expect(messages.getByTestId("messages-pick-hint")).toHaveText(
-    "To remove a note, close this and tap your avatar at the top.",
+    "To remove a note, close this, open Board at the bottom and tap your avatar there.",
   );
   await expect(messages.getByRole("button", { name: /^Remove / })).toHaveCount(
     0,

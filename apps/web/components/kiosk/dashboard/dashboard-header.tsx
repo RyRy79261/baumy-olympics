@@ -164,6 +164,10 @@ function MessagesModule({
   const rows = listed.ok
     ? listed.rows.filter((m) => !removed.includes(m.id))
     : [];
+  // In step with a Remove here: the notes removed were in the count.
+  const unread = listed.ok
+    ? Math.max(0, (listed.count ?? listed.rows.length) - removed.length)
+    : 0;
   const pinLabel = `${actingId ? whoOf(actingId, members).name : "Your"}'s PIN`;
   return (
     <ModulePanel
@@ -172,9 +176,7 @@ function MessagesModule({
       icon="envelope"
       tone="pink"
       subtitle={
-        listed.ok
-          ? `${listed.count ?? listed.rows.length} not read by everyone yet`
-          : "The notes board"
+        listed.ok ? `${unread} not read by everyone yet` : "The notes board"
       }
       onClose={onClose}
     >
@@ -191,51 +193,54 @@ function MessagesModule({
       ) : rows.length === 0 ? (
         <ModuleEmpty>No new notes. Older ones are on the Board.</ModuleEmpty>
       ) : (
-        <ul className="flex flex-col">
+        <>
           {actingId ? null : (
-            <li
+            <p
               data-testid="messages-pick-hint"
               className="pb-4 font-body text-[20px] text-bm-muted"
             >
-              To remove a note, close this and tap your avatar at the top.
-            </li>
+              To remove a note, close this, open Board at the bottom and tap
+              your avatar there.
+            </p>
           )}
-          {rows.map((m) => {
-            const who = whoOf(m.authorId, members);
-            return (
-              <MessageRow
-                key={m.id}
-                data-testid={`message-${m.title}`}
-                who={
-                  <MemberCharacter
-                    sprites={who.member?.sprites}
-                    name={who.member ? who.name : m.authorName}
-                    colour={who.colour}
-                    scale={4}
-                  />
-                }
-                name={who.member ? who.name : m.authorName}
-                colour={who.colour}
-                when={m.when}
-                title={m.title}
-                action={
-                  actingId ? (
-                    <RemoveNote
-                      note={m}
-                      action={removeNote}
-                      pinLabel={pinLabel}
-                      onRemoved={(noteId) =>
-                        setRemoved((ids) => [...ids, noteId])
-                      }
+          <ul className="flex flex-col">
+            {rows.map((m) => {
+              const who = whoOf(m.authorId, members);
+              return (
+                <MessageRow
+                  key={m.id}
+                  data-testid={`message-${m.title}`}
+                  who={
+                    <MemberCharacter
+                      sprites={who.member?.sprites}
+                      name={who.member ? who.name : m.authorName}
+                      colour={who.colour}
+                      scale={4}
                     />
-                  ) : undefined
-                }
-              >
-                {m.bodyMd ? <MarkdownBody>{m.bodyMd}</MarkdownBody> : null}
-              </MessageRow>
-            );
-          })}
-        </ul>
+                  }
+                  name={who.member ? who.name : m.authorName}
+                  colour={who.colour}
+                  when={m.when}
+                  title={m.title}
+                  action={
+                    actingId ? (
+                      <RemoveNote
+                        note={m}
+                        action={removeNote}
+                        pinLabel={pinLabel}
+                        onRemoved={(noteId) =>
+                          setRemoved((ids) => [...ids, noteId])
+                        }
+                      />
+                    ) : undefined
+                  }
+                >
+                  {m.bodyMd ? <MarkdownBody>{m.bodyMd}</MarkdownBody> : null}
+                </MessageRow>
+              );
+            })}
+          </ul>
+        </>
       )}
     </ModulePanel>
   );

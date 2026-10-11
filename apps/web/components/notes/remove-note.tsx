@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@baumy/ui";
 import { AttestedForm } from "@/components/kiosk/attested-form";
-import type { FormAction } from "@/components/use-action-form";
+import { useReporting, type FormAction } from "@/components/use-action-form";
 import type { DeleteNoteData } from "@/lib/actions/notes";
 import { toast, toastActionError } from "@/lib/ui/toast";
 
@@ -29,21 +29,12 @@ export function RemoveNote({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
-  const removed = useRef(onRemoved);
-  removed.current = onRemoved;
-  // The success is reported from the action itself: once the note is gone
-  // the page re-renders without it, and this form unmounts before it could
-  // see its own answer.
-  const [remove] = useState(() => {
-    const send: FormAction<DeleteNoteData> = async (prev, form) => {
-      const r = await action(prev, form);
-      if (r.ok) {
-        toast.success(`Removed ${r.data.title}.`);
-        removed.current?.(note.id);
-      }
-      return r;
-    };
-    return send;
+  // The success is reported from the action itself (useReporting): once
+  // the note is gone the page re-renders without it, and this form unmounts
+  // before it could see its own answer.
+  const remove = useReporting(action, (data) => {
+    toast.success(`Removed ${data.title}.`);
+    onRemoved?.(note.id);
   });
   if (!confirming) {
     return (
