@@ -507,6 +507,12 @@ describe("ChoreGrid with nobody picked", () => {
     expect(mop.querySelector("[data-bounty-status]")!.textContent).toMatch(
       /^Again from /,
     );
+    // Ready reads as ready by being bright; cooling down is dimmed, as a
+    // disabled row is on the picked board.
+    expect(mop.querySelector("[data-kind]")!.className).toContain("opacity-50");
+    expect(trash.querySelector("[data-kind]")!.className).not.toContain(
+      "opacity-50",
+    );
     // Nothing in the list is a button, and there is no log sheet.
     expect(
       el.querySelector('[aria-label="Bounties"]')!.querySelectorAll("button"),

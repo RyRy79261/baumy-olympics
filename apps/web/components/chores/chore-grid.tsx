@@ -296,6 +296,8 @@ export function ChoreGrid({
                 streak={streakLabel(c)}
                 status={statusLabel(c)}
                 kiosk={kiosk}
+                // Dimmed like a disabled row on the picked board.
+                dim={c.state !== "ready"}
               />
             ) : (
               <BountyRow

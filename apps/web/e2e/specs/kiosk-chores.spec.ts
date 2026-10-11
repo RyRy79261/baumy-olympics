@@ -136,6 +136,8 @@ test("on the kiosk, the bounties show before anyone is picked, to read only", as
   await expect(row).toContainText("15 pts");
   // Ready says nothing; nothing in the list is a button; no Check my PIN.
   await expect(row.locator("[data-bounty-status]")).toHaveCount(0);
+  // Ready reads as ready by being bright: not dimmed.
+  await expect(row.locator("[data-kind]")).toHaveCSS("opacity", "1");
   await expect(list.locator("li").first()).toBeVisible();
   await expect(list.getByRole("button")).toHaveCount(0);
   await expect(list).not.toContainText("Log it");
@@ -165,6 +167,8 @@ test("on the kiosk, the bounties show before anyone is picked, to read only", as
   await kiosk.getByRole("button", { name: "Done" }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveCount(0);
   await expect(row.locator("[data-bounty-status]")).toHaveText(/^Again from /);
+  // Dimmed while it cools down, as a disabled row on the picked board.
+  await expect(row.locator("[data-kind]")).toHaveCSS("opacity", "0.5");
   await expect(row).toContainText(`${founder} · streak 1`);
   await expect(list.getByRole("button")).toHaveCount(0);
 

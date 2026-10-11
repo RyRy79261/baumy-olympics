@@ -50,6 +50,26 @@ describe("BountyEntry", () => {
     expect(out).toContain("Mop");
     expect(out).not.toContain("data-bounty-status");
     expect(out).not.toContain("pts");
+    // Bright unless told to dim.
+    expect(out).not.toContain("opacity-50");
+    expect(out).not.toContain("data-dim");
+  });
+
+  it("dims as a disabled BountyRow does when it is not ready", () => {
+    const out = html(
+      <BountyEntry
+        name="Mop"
+        sprite="mop"
+        kind="maintenance"
+        points={10}
+        streak="No streak yet"
+        status="Again from Thu 1 Oct, 08:00"
+        dim
+      />,
+    );
+    expect(out).toContain("Mop");
+    expect(out).toContain("opacity-50");
+    expect(out).toContain('data-dim=""');
   });
 });
 

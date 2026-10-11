@@ -216,19 +216,27 @@ export function BountyEntry({
   streak,
   status,
   kiosk = false,
+  dim = false,
   className,
   ...props
 }: BountyFields &
   Omit<HTMLAttributes<HTMLDivElement>, keyof BountyFields> & {
     /** The kiosk's larger text, as a kiosk BountyRow has. */
     kiosk?: boolean;
+    /**
+     * Not ready (cooling down): dimmed as a disabled BountyRow is, so a
+     * ready bounty reads as ready by being bright, as on the board.
+     */
+    dim?: boolean;
   }) {
   return (
     <div
       data-kind={kind}
+      data-dim={dim ? "" : undefined}
       className={cx(
         "flex w-full items-center gap-3 py-3 text-bm-text sm:gap-4",
         kiosk ? "min-h-24 py-4" : "min-h-16",
+        dim && "opacity-50",
         className,
       )}
       {...props}
