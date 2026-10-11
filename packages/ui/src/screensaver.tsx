@@ -58,6 +58,14 @@ export const PARKED = { jar: 520, box: 100 } as const;
 /** The props the screensaver's floor clutter is drawn from, for tests. */
 export const SCREENSAVER_ART = { BOX, BIN } as const;
 
+/** Baumy on the shelf: the approved sprite, scaled by a whole number. */
+export const BAUMY_SCALE = 5;
+/**
+ * Baumy's coat is near black, so on the night wall it is lifted in
+ * brightness as a whole (a render filter, never a changed pixel).
+ */
+export const BAUMY_LIFT = "brightness(1.8)";
+
 const INK = "#07040c";
 /** The dim clock's colour: readable across a dark kitchen, never bright. */
 const CLOCK = "#3d2d57";
@@ -203,18 +211,36 @@ export function Screensaver({
               {date} · all quiet
             </span>
           </span>
-          {/* Baumy, asleep on a shelf. */}
-          <span aria-hidden className="absolute top-[47%] left-[57%] block">
-            <span className="relative block opacity-70">
-              <span className="absolute -top-[40px] right-[-6px] block">
+          {/* The floor, and what happens on it. Its height is whole pixels
+              from the bottom, so its line is on a whole pixel (768px down
+              on an 820 × 1180 screen), and the shelf, Baumy and the
+              raccoons stand at whole pixels from that line. */}
+          <span
+            aria-hidden
+            className="absolute -inset-x-8 -bottom-8 block h-[444px] bg-[repeating-linear-gradient(90deg,#1d1020_0_80px,#180c1a_80px_160px)] shadow-[inset_0_4px_0_#2a1628]"
+          >
+            {/* Baumy, asleep on a shelf just over the reacher's paws. The
+                cat is the approved sprite at a whole-number scale (5), at
+                full opacity and lifted in brightness so the dark coat reads
+                on the night wall; no pixel of it is redrawn. The frame
+                (34 × 32 art pixels, 170 × 160) stands on the shelf. */}
+            <span
+              data-baumy-shelf
+              className="absolute -top-[324px] left-[480px] block"
+            >
+              {/* The z's rise 60px and fade out, ending under the clock's
+                  lowest spot. */}
+              <span className="absolute top-[32px] right-[8px] block">
                 <span
                   className="absolute block font-display text-[18px] text-bm-violet"
                   style={{ animation: "bm-ss-zzz 3s linear infinite" }}
                 >
                   z
                 </span>
+                {/* Below and left of the first, so the two never sit on
+                    each other when motion is reduced. */}
                 <span
-                  className="absolute block font-display text-[14px] text-bm-teal"
+                  className="absolute top-[20px] -left-[12px] block font-display text-[14px] text-bm-teal"
                   style={{
                     animation: "bm-ss-zzz 3s linear infinite",
                     animationDelay: "1.5s",
@@ -223,20 +249,21 @@ export function Screensaver({
                   z
                 </span>
               </span>
-              <BaumyCat
-                state="sleeping"
-                scale={3}
-                facing="right"
-                showMark={false}
-              />
+              <span className="block" style={{ filter: BAUMY_LIFT }}>
+                <BaumyCat
+                  state="sleeping"
+                  scale={BAUMY_SCALE}
+                  facing="right"
+                  showMark={false}
+                />
+              </span>
             </span>
-            <span className="block h-[12px] w-[200px] -translate-x-[40px] bg-[#3a2518] shadow-[0_4px_0_#1a0f0a]" />
-          </span>
-          {/* The floor, and what happens on it. */}
-          <span
-            aria-hidden
-            className="absolute -inset-x-8 top-[71%] -bottom-8 block bg-[repeating-linear-gradient(90deg,#1d1020_0_80px,#180c1a_80px_160px)] shadow-[inset_0_4px_0_#2a1628]"
-          >
+            {/* The shelf: 164px over the floor, its shadow ending 8px over
+                the reacher's raised paws (4px at the top of its hop). */}
+            <span
+              data-shelf
+              className="absolute -top-[164px] left-[446px] block h-[12px] w-[240px] bg-[#3a2518] shadow-[0_4px_0_#1a0f0a]"
+            />
             {/* The bin. */}
             <span className="absolute -top-[72px] left-[180px] block">
               <PixelArt
@@ -269,7 +296,7 @@ export function Screensaver({
                 both wholly on screen. */}
             <span
               data-raccoon="jar"
-              className="absolute top-0 left-0 block"
+              className="absolute top-[32px] left-0 block"
               style={{
                 transform: `translateX(${PARKED.jar}px)`,
                 animation: "bm-ss-run-back 18s linear infinite",
@@ -281,7 +308,7 @@ export function Screensaver({
             {/* Raccoon 4 pushes a box. */}
             <span
               data-raccoon="box"
-              className="absolute top-[172px] left-0 block"
+              className="absolute top-[212px] left-0 block"
               style={{
                 transform: `translateX(${PARKED.box}px)`,
                 animation: "bm-ss-run 14s linear infinite",
