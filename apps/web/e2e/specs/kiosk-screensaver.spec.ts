@@ -4,7 +4,7 @@ import { pairedKiosk } from "../lib/kiosk";
 
 // Issue #66 (ADR 0005 §6), on the kitchen iPad: by day, 5 minutes untouched
 // bring on the raccoon screensaver (a dim room, the clock, Baumy asleep and
-// three raccoons); a tap wakes it and never reaches the page; a touch
+// four raccoons); a tap wakes it and never reaches the page; a touch
 // before the 5 minutes starts the wait again. Only the iPad's clock moves
 // (Playwright's), so it runs alongside everything else.
 
@@ -51,7 +51,7 @@ test("the screensaver comes on after 5 minutes untouched and a tap wakes it", as
   );
   await expect(saver).toContainText("all quiet");
   await expect(saver.locator('[data-state="sleeping"]')).toHaveCount(1);
-  await expect(saver.locator("[data-raccoon]")).toHaveCount(3);
+  await expect(saver.locator("[data-raccoon]")).toHaveCount(4);
 
   // A tap in the middle of the screen wakes it, and lands on nothing else.
   const url = kiosk.url();

@@ -38,10 +38,18 @@ describe("Screensaver", () => {
     expect(out).toContain("Sunday 27 September · all quiet");
     expect(out).toContain("TAP ANYWHERE TO WAKE");
     expect(out).toContain('type="button"');
-    // The three raccoons: into the bin, off with a sock, pushing a box.
-    for (const r of ["bin", "sock", "box"]) {
-      expect(out).toContain(`data-raccoon="${r}"`);
+    // The four raccoons (issue #191), each in its own approved pose.
+    for (const [r, pose] of [
+      ["sit", "sit"],
+      ["reach", "reach"],
+      ["jar", "carry"],
+      ["box", "walk"],
+    ]) {
+      // The pose drawn before the next raccoon starts is this one's.
+      const own = out.split(`data-raccoon="${r}"`)[1]!.split("data-raccoon")[0];
+      expect(own).toContain(`data-pose="${pose}"`);
     }
+    expect(out.match(/data-raccoon=/g)).toHaveLength(4);
     expect(out.match(/data-light/g)).toHaveLength(16);
     expect(out).toContain("@keyframes bm-ss-run");
   });
@@ -64,7 +72,7 @@ describe("Screensaver", () => {
     expect(
       drift.querySelector('[data-testid="screensaver-time"]'),
     ).not.toBeNull();
-    expect(drift.querySelectorAll("[data-raccoon]")).toHaveLength(3);
+    expect(drift.querySelectorAll("[data-raccoon]")).toHaveLength(4);
     const outside = [...screen.children].filter((el) => el !== drift);
     expect(outside.length).toBeGreaterThan(0);
     for (const el of outside) {

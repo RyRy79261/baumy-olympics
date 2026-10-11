@@ -13,7 +13,12 @@ import {
 import { CAT_FRAMES, CAT_H, CAT_W } from "../pixel/inkblot-cat";
 import { gridSize } from "../pixel/pixel-grid";
 import { scale2x } from "../pixel/scale2x";
-import { RACCOON_FRAMES, RACCOON_PALETTE, Raccoon } from "../raccoon";
+import {
+  RACCOON_PALETTE,
+  RACCOON_POSES,
+  Raccoon,
+  type RaccoonPose,
+} from "../raccoon";
 import { ToastItem, ToastList } from "../toast";
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
@@ -138,25 +143,82 @@ describe("BaumyCat", () => {
 });
 
 describe("Raccoon", () => {
-  it("walks on two frames of one size that differ only in the legs", () => {
-    expect(RACCOON_FRAMES).toHaveLength(2);
-    const [a, b] = RACCOON_FRAMES;
-    expect(gridSize(a!)).toEqual({ w: 18, h: 10 });
-    expect(gridSize(b!)).toEqual(gridSize(a!));
-    expect(a!.slice(0, 8)).toEqual(b!.slice(0, 8));
-    expect(a!.slice(8)).not.toEqual(b!.slice(8));
-    for (const f of RACCOON_FRAMES)
-      for (const row of f)
-        for (const ch of row)
-          if (ch !== ".") expect(RACCOON_PALETTE[ch]).toBeTruthy();
+  // The approved sizes (issue #191): a change to the art shows up here.
+  const SIZES = {
+    walk: { w: 42, h: 23, frames: 2 },
+    carry: { w: 42, h: 36, frames: 2 },
+    reach: { w: 30, h: 36, frames: 1 },
+    sit: { w: 30, h: 30, frames: 1 },
+  } as const;
+
+  it("draws each pose at its approved size, in the approved colours only", () => {
+    expect(Object.keys(RACCOON_POSES).sort()).toEqual(
+      Object.keys(SIZES).sort(),
+    );
+    const allowed = new Set([".", ...Object.keys(RACCOON_PALETTE)]);
+    for (const [pose, size] of Object.entries(SIZES)) {
+      const frames = RACCOON_POSES[pose as RaccoonPose];
+      expect(frames, pose).toHaveLength(size.frames);
+      for (const frame of frames) {
+        expect(frame, pose).toHaveLength(size.h);
+        for (const row of frame) {
+          expect(row.length, `${pose}: ${row}`).toBe(size.w);
+          for (const ch of row)
+            expect(allowed.has(ch), `${pose}: ${ch}`).toBe(true);
+        }
+      }
+    }
+    expect(RACCOON_PALETTE).toEqual({
+      K: "#07040c",
+      G: "#3b3448",
+      g: "#7d7590",
+      l: "#a9a2bb",
+      W: "#e8e3f0",
+      M: "#15101d",
+      e: "#ffe46b",
+      R: "#d23b3b",
+      o: "#c27a45",
+      O: "#8f5530",
+      d: "#28212f",
+    });
   });
 
-  it("trots in place, facing left when flipped", () => {
-    const out = html(<Raccoon scale={6} />);
-    expect(out).toContain('data-frames="2"');
-    expect(out).toContain("--sprite-duration:320ms");
-    expect(out).toContain("width:108px;height:60px");
-    expect(html(<Raccoon flip />)).toContain("scaleX(-1)");
+  it("walks and carries on two frames that differ only in the legs", () => {
+    // Rows above `legs` are the same in both frames; the legs below differ.
+    for (const [pose, legs] of [
+      ["walk", 15],
+      ["carry", 27],
+    ] as const) {
+      const [a, b] = RACCOON_POSES[pose];
+      expect(a!.slice(0, legs), pose).toEqual(b!.slice(0, legs));
+      // The first row that changes is the top of the legs.
+      expect(
+        a!.findIndex((row, y) => row !== b![y]),
+        pose,
+      ).toBe(legs);
+    }
+  });
+
+  it("plays its pose in place, facing left when flipped", () => {
+    const walk = html(<Raccoon scale={4} />);
+    expect(walk).toContain('data-pose="walk"');
+    expect(walk).toContain('data-frames="2"');
+    expect(walk).toContain("--sprite-duration:400ms");
+    expect(walk).toContain("width:168px;height:92px");
+    const carry = html(<Raccoon pose="carry" scale={4} flip />);
+    expect(carry).toContain('data-frames="2"');
+    expect(carry).toContain("--sprite-duration:600ms");
+    expect(carry).toContain("width:168px;height:144px");
+    expect(carry).toContain("scaleX(-1)");
+    // The reacher and the sitter hold one frame, so nothing animates.
+    for (const pose of ["reach", "sit"] as const) {
+      const out = html(<Raccoon pose={pose} scale={4} />);
+      expect(out).toContain('data-frames="1"');
+      expect(out).not.toContain("animate-");
+    }
+    expect(html(<Raccoon pose="sit" scale={4} />)).toContain(
+      "width:120px;height:120px",
+    );
   });
 });
 
