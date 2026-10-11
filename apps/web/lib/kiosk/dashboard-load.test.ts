@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Queryable } from "@baumy/db";
-import { SEED_CHORES, seedChore } from "@baumy/db/game-fixtures";
 import { useTestDb } from "@baumy/db/test-harness";
 import { HOUSEHOLD_ID } from "@baumy/db/household";
 import { listActiveMembers } from "@baumy/db/members";
@@ -17,6 +16,15 @@ import {
 } from "@/test-utils/actions";
 import { runAction } from "@/lib/actions/registry";
 import {
+  setBrainClientForTests,
+  unconfiguredBrain,
+} from "@/lib/integrations/brain";
+import {
+  clearMemoryShopping,
+  memoryAdd,
+  memoryBrain,
+} from "@/lib/integrations/brain-memory";
+import {
   setCalendarClientForTests,
   unconfiguredCalendar,
 } from "@/lib/integrations/calendar";
@@ -25,12 +33,13 @@ import type {
   TimeRange,
 } from "@/lib/integrations/google-calendar";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
-import { loadDashboard } from "./dashboard-load";
+import { loadDashboard, shoppingCount } from "./dashboard-load";
 
 // The kitchen dashboard's reads through the real runAction on PGlite
-// (issue #65), as the paired device before anyone taps in: the chores, the
-// whole month grid's events, the notes and the members' characters, and one
-// failing read (the calendar down, or throwing) leaves the others alone.
+// (issue #65), as the paired device before anyone taps in: the whole month
+// grid's events, the notes and the members' characters, and one failing
+// read (the calendar down, or throwing) leaves the others alone; and the
+// Shopping icon's count (issue #193).
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -83,12 +92,13 @@ beforeEach(async () => {
 
 afterEach(() => {
   setCalendarClientForTests(null);
+  setBrainClientForTests(null);
+  clearMemoryShopping();
   vi.restoreAllMocks();
 });
 
 describe("loadDashboard", () => {
-  it("reads the chores, the month's events, the notes and the members", async () => {
-    await seedChore(db(), SEED_CHORES.trash);
+  it("reads the month's events, the notes and the members, and no chores", async () => {
     await runAction(
       "create_note",
       { title: "Pasta", bodyMd: "Who ate it?" },
@@ -110,10 +120,8 @@ describe("loadDashboard", () => {
       data: [{ id: "flea", title: "Flea market", addedBy: ryan }],
     });
     expect(data.events.ok && data.events.data).toHaveLength(1);
-    expect(data.chores).toMatchObject({
-      ok: true,
-      data: [{ name: SEED_CHORES.trash.name, state: "ready", next: null }],
-    });
+    // The star only opens the Bounties tab (issue #193): no chores read.
+    expect(data).not.toHaveProperty("chores");
     expect(data.notes).toMatchObject({
       ok: true,
       // Ryan wrote it, so has read it; he is everyone here.
@@ -146,14 +154,12 @@ describe("loadDashboard", () => {
   });
 
   it("says the calendar is not connected, and reads everything else", async () => {
-    await seedChore(db(), SEED_CHORES.trash);
     setCalendarClientForTests(unconfiguredCalendar);
     const data = await loadDashboard(kioskCtx(), "2026-09", readMembers);
     expect(data.events).toEqual({
       ok: false,
       message: expect.stringContaining("not connected yet"),
     });
-    expect(data.chores.ok).toBe(true);
     expect(data.notes.ok).toBe(true);
   });
 
@@ -173,11 +179,35 @@ describe("loadDashboard", () => {
       ok: false,
       message: "This could not be loaded just now. It will try again.",
     });
-    expect(data.chores.ok).toBe(true);
     expect(data.events.ok).toBe(true);
     expect(errors).toHaveBeenCalledWith(
       "[kiosk] a dashboard read failed",
       expect.any(Error),
     );
+  });
+});
+
+describe("shoppingCount", () => {
+  it("counts the open items on brain's list", async () => {
+    setBrainClientForTests(memoryBrain());
+    expect(await shoppingCount(kioskCtx())).toBe(0);
+    memoryAdd(["milk", "eggs", "bread"]);
+    expect(await shoppingCount(kioskCtx())).toBe(3);
+  });
+
+  it("is null, never an error, when brain is not set up", async () => {
+    setBrainClientForTests(unconfiguredBrain);
+    expect(await shoppingCount(kioskCtx())).toBeNull();
+  });
+
+  it("is null when the read throws", async () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    setBrainClientForTests({
+      ...memoryBrain(),
+      listShopping: () => Promise.reject(new Error("boom")),
+    });
+    expect(await shoppingCount(kioskCtx())).toBeNull();
+    // runAction logged it and answered INTERNAL; nothing reached the page.
+    expect(errors).toHaveBeenCalled();
   });
 });

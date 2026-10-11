@@ -32,21 +32,22 @@ test("log a chore, then meet its cooldown", async ({ page }, testInfo) => {
 
   await addChore(page, { name, basePoints: 20, cooldownHours: 48 });
 
-  // Never done and just added: a new maintenance bounty, ready to log.
-  // There is no due date and no Urgent tab (SPEC §12 decision 35, issue
-  // #189). The hub's New tile opens the board on its tab, and the other
-  // tabs narrow it.
-  await page.goto("/");
-  const newTile = page.getByTestId("hub-tile-new");
-  await expect(newTile).toHaveAccessibleName(/^New: [1-9]\d*$/);
-  await newTile.click();
-  await expect(page).toHaveURL(/\/chores\?show=new$/);
+  // Never done and just added: a maintenance bounty, ready to log. There
+  // is no due date and no Urgent tab (SPEC §12 decision 35, issue #189),
+  // and no "new" (decision 36, issue #193): an old link to the New tab
+  // shows All, and the row has no "New" tag. The tabs narrow the board.
+  await page.goto("/chores?show=new");
   const tabs = page.getByRole("group", { name: "Show" });
-  await expect(tabs.getByRole("button", { name: /^New/ })).toHaveAttribute(
+  await expect(tabs.getByRole("button", { name: /^All/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(tile(page, name)).toContainText("New");
+  await expect(
+    tabs.getByRole("button", { name: /^Consumables/ }),
+  ).toBeVisible();
+  await expect(tabs.getByRole("button", { name: /^New/ })).toHaveCount(0);
+  await expect(tile(page, name)).toContainText(name);
+  await expect(tile(page, name)).not.toContainText(/\bnew\b/i);
   // Ready: "Log it", and no status line at all (nearly every bounty is
   // ready, so saying so on each row would be noise).
   await expect(tile(page, name)).toContainText("Log it");

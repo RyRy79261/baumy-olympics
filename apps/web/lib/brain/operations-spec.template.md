@@ -173,9 +173,8 @@ waiting on Sam?": send `X-Baumy-On-Behalf-Of: <Sam's member id>`.
   bathroom). It has base points and a cooldown. A chore has no due date and
   is never urgent or overdue: its `state` is `ready` (it can be logged now)
   or `cooldown` (done recently; it can be logged again from `availableAt`),
-  or `unavailable` (no points set, or archived). `isNew` means added in the
-  last 3 days. Logging a chore inside its cooldown is refused (`COOLDOWN`,
-  with `retryAt`).
+  or `unavailable` (no points set, or archived). Logging a chore inside its
+  cooldown is refused (`COOLDOWN`, with `retryAt`).
 - **Streaks and break bonuses.** Each chore has one streak holder. Doing a
   chore again while you hold it grows the streak (+25% of base per step, no
   cap). Doing a chore someone else holds **breaks** their streak: you get a

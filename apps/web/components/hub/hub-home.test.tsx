@@ -44,29 +44,28 @@ const render = (counts: HubData["counts"]) =>
 
 describe("HubHome's status tiles", () => {
   it("badges a count and links it to its slice; a zero is dim with no badge", () => {
-    const html = render({ new: 3, messages: 0 });
-    const fresh = tile(html, "new");
-    expect(fresh).toContain('aria-label="New: 3"');
-    expect(fresh).toContain('href="/chores?show=new"');
-    expect(fresh).toContain("data-count");
-    const messages = tile(html, "messages");
+    const three = tile(render({ messages: 3 }), "messages");
+    expect(three).toContain('aria-label="Messages: 3"');
+    expect(three).toContain('href="/notes"');
+    expect(three).toContain("data-count");
+    const messages = tile(render({ messages: 0 }), "messages");
     expect(messages).toContain('aria-label="Messages: 0"');
-    expect(messages).toContain('href="/notes"');
     expect(messages).not.toContain("data-count");
     expect(messages).not.toContain("data-unavailable");
   });
 
-  it("has New and Messages and no Urgent tile (issue #189)", () => {
-    const html = render({ new: 1, messages: 1 });
-    expect(html).toContain('data-testid="hub-tile-new"');
+  it("has Messages and no Urgent (issue #189) or New tile (issue #193)", () => {
+    const html = render({ messages: 1 });
     expect(html).toContain('data-testid="hub-tile-messages"');
     expect(html).not.toContain('data-testid="hub-tile-urgent"');
+    expect(html).not.toContain('data-testid="hub-tile-new"');
     expect(html).not.toContain("show=urgent");
+    expect(html).not.toContain("show=new");
     expect(html).not.toMatch(/urgent|overdue/i);
   });
 
   it("lists no bounties: the board does (owner, 2026-10-11)", () => {
-    const html = render({ new: 1, messages: 1 });
+    const html = render({ messages: 1 });
     expect(html).toContain('data-testid="widget-events"');
     expect(html).toContain('data-testid="widget-leaderboard"');
     expect(html).not.toContain('data-testid="widget-chores"');
@@ -74,12 +73,11 @@ describe("HubHome's status tiles", () => {
   });
 
   it("says a count it could not read is unavailable, never zero", () => {
-    const html = render({ new: 2, messages: null });
+    const html = render({ messages: null });
     const messages = tile(html, "messages");
     expect(messages).toContain('aria-label="Messages: unavailable"');
     expect(messages).toContain("data-unavailable");
     expect(messages).not.toContain("data-count");
-    expect(tile(html, "new")).toContain("data-count");
   });
 });
 
@@ -99,7 +97,7 @@ describe("HubHome's streamed widgets", () => {
     shopping: Promise<HubData["shopping"]>,
   ) => (
     <HubHome
-      hub={{ ...hub({ new: 1, messages: 0 }), events, shopping }}
+      hub={{ ...hub({ messages: 1 }), events, shopping }}
       memberColors={{}}
       shopping={{ add: vi.fn(), checkOff: vi.fn() }}
     />
@@ -108,7 +106,7 @@ describe("HubHome's streamed widgets", () => {
   it("shows the rest of the page while the calendar and the list are on their way", () => {
     const never = new Promise<never>(() => {});
     const html = renderToStaticMarkup(streamed(never, never));
-    expect(tile(html, "new")).toContain('aria-label="New: 1"');
+    expect(tile(html, "messages")).toContain('aria-label="Messages: 1"');
     for (const id of ["widget-events", "widget-shopping"]) {
       const w = widget(html, id);
       expect(w).toContain('data-status="loading"');
@@ -153,7 +151,7 @@ describe("HubHome's extra card", () => {
   it("sits in the wide column right after Today", () => {
     const html = renderToStaticMarkup(
       <HubHome
-        hub={hub({ new: 0, messages: 0 })}
+        hub={hub({ messages: 0 })}
         memberColors={{}}
         shopping={{ add: vi.fn(), checkOff: vi.fn() }}
       >

@@ -2,7 +2,6 @@ import { z } from "zod";
 import { choreTiming, nextScore, type ChoreState } from "@baumy/core";
 import { listChoreBoard } from "@baumy/db/chores";
 import type { ChoreKind, ProofMode } from "@baumy/types";
-import { isNewChore } from "@/lib/chores/new-bounty";
 import { defineAction } from "./define";
 
 // The chore grid (SPEC §3.1, §3.2), on every surface: each chore with its
@@ -11,8 +10,8 @@ import { defineAction } from "./define";
 // A chore has no due date (SPEC §12 decision 35, issue #189). The AI reads it to find
 // chore ids; the grid builds its tiles and previews from it.
 //
-// The kitchen screen shows chores as bounties (ADR 0005): each has a kind,
-// and `isNew` (lib/chores/new-bounty.ts) is what its New icon counts.
+// The kitchen screen shows chores as bounties (ADR 0005), each with a kind.
+// There is no "new" bounty (SPEC §12 decision 36, issue #193).
 
 /** What logging a chore now would score (`nextScore` in packages/core). */
 export interface NextScoreView {
@@ -43,8 +42,6 @@ export interface ChoreView {
   state: ChoreState | "unavailable";
   /** While cooling down: when it can be logged again. */
   availableAt: string | null;
-  /** Created in the last 3 days (`NEW_BOUNTY_MS`). */
-  isNew: boolean;
   /** When it was added, ISO 8601. */
   createdAt: string;
   /**
@@ -64,7 +61,7 @@ export const listChores = defineAction({
   name: "list_chores",
   title: "List chores",
   description:
-    "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `isNew` (added in the last 3 days), `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
+    "Lists the household's chores with their ids, kind (consumable: buy or refill; maintenance: clean or fix), base points, cooldown, who holds each chore's streak this season and how long it is, its `state`: ready (it can be logged now), cooldown (done recently; it can be logged again from availableAt) or unavailable (no points set, or archived); chores have no due date. Also `createdAt`, and `next`: what logging it right now would score for you (total points, streak length, break bonus). Times are ISO 8601 in UTC; the household lives in Europe/Berlin. Archived chores are left out unless includeArchived is true.",
   consent: "See the household's chores, streaks and points",
   kind: "read",
   risk: "safe",
@@ -112,7 +109,6 @@ export const listChores = defineAction({
           lastDoneAt: iso(c.lastDoneAt),
           state,
           availableAt: iso(timing?.availableAt ?? null),
-          isNew: isNewChore(c.createdAt, ctx.now),
           createdAt: c.createdAt.toISOString(),
           next: next
             ? {

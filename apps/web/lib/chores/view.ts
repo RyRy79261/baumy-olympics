@@ -60,16 +60,11 @@ export function previewFor(
 }
 
 // Bounties (ADR 0005 §2): the board shows every chore as a bounty, and one
-// row of tabs narrows it to the new ones or one kind. The hub's New tile
-// links straight to its tab (`?show=`).
+// row of tabs narrows it to one kind (`?show=`). There is no "new" tab
+// (SPEC §12 decision 36, issue #193): an old `?show=new` shows All.
 
 /** What the bounty board can narrow itself to. */
-export const BOUNTY_FILTERS = [
-  "all",
-  "new",
-  "consumable",
-  "maintenance",
-] as const;
+export const BOUNTY_FILTERS = ["all", "consumable", "maintenance"] as const;
 export type BountyFilter = (typeof BOUNTY_FILTERS)[number];
 
 /** The `?show=` value as a filter; anything else is "all". */
@@ -79,17 +74,10 @@ export function parseBountyFilter(value: unknown): BountyFilter {
     : "all";
 }
 
-type BountyFields = Pick<ChoreView, "kind" | "isNew">;
+type BountyFields = Pick<ChoreView, "kind">;
 
 function matches(c: BountyFields, filter: BountyFilter): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "new":
-      return c.isNew;
-    default:
-      return c.kind === filter;
-  }
+  return filter === "all" || c.kind === filter;
 }
 
 /** The bounties a filter keeps, in the order given. */

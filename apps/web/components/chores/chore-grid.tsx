@@ -40,7 +40,7 @@ import { toast } from "@/lib/ui/toast";
 // whose avatar was tapped). The ones ready to log come first, by name, then
 // those cooling down ("Again from …"), the soonest first; a chore has no due
 // date (SPEC §12 decision 35, issue #189). One row of tabs narrows the board
-// to the new or one kind. Tapping a row opens
+// to one kind (there is no "new", decision 36, issue #193). Tapping a row opens
 // a sheet with the preview ("+25, streak 2") and a confirm button. Logging
 // for someone else is a choice in the sheet, and vouches for them; it needs
 // no PIN on the kiosk (owner ruling 2026-10-02, issue #145). The form is
@@ -52,9 +52,9 @@ import { toast } from "@/lib/ui/toast";
 // time). The page re-renders from the server action's revalidatePath.
 //
 // The "+N" floats where the bounty was when it was tapped, even though the
-// board re-sorts and that row moves; the page never scrolls. A sheet opened
-// from the dashboard's "I'll do it" had no tap on a row, so its "+N" floats
-// in the middle of the screen (owner ruling 2026-10-06, issue #181).
+// board re-sorts and that row moves; the page never scrolls (owner ruling
+// 2026-10-06, issue #181). If that place is off the screen by the answer, it
+// floats in the middle.
 
 export interface GridMember {
   id: string;
@@ -66,7 +66,6 @@ const POP_MS = 2500;
 /** The board's tabs, in order, each with its accent (ADR 0005 §8). */
 const TABS: { filter: BountyFilter; label: string; accent: TabAccent }[] = [
   { filter: "all", label: "All", accent: "violet" },
-  { filter: "new", label: "New", accent: "yellow" },
   { filter: "consumable", label: "Consumables", accent: "amber" },
   { filter: "maintenance", label: "Maintenance", accent: "teal" },
 ];
@@ -74,7 +73,6 @@ const TABS: { filter: BountyFilter; label: string; accent: TabAccent }[] = [
 /** What the board says when a tab keeps nothing. */
 const EMPTY: Record<BountyFilter, string> = {
   all: "",
-  new: "No bounties added in the last 3 days.",
   consumable: "No consumables to buy or refill.",
   maintenance: "No maintenance bounties.",
 };
@@ -97,7 +95,6 @@ export function ChoreGrid({
   actorId,
   kiosk = false,
   action,
-  initialOpenId,
   rowAction,
 }: {
   chores: ChoreView[];
@@ -106,34 +103,23 @@ export function ChoreGrid({
   actorId: string;
   kiosk?: boolean;
   action: FormAction<LogCompletionData>;
-  /**
-   * A chore whose sheet opens at once: the dashboard's "I'll do it"
-   * (`/kiosk/chores?chore=<id>`, ADR 0005 §1). Ignored if it is not listed.
-   */
-  initialOpenId?: string;
   /** A control beside each row: an admin's Edit on /chores (issue #109). */
   rowAction?: (chore: ChoreView) => ReactNode;
 }) {
-  // The tab lives in the address (`?show=`): the hub's New tile links to
-  // its tab, and a refresh keeps it. A tap shows the tab at once and
-  // writes the address without a server round trip; a navigation (a tile's
-  // link, back) brings the address's tab in.
+  // The tab lives in the address (`?show=`), so a refresh keeps it. A tap
+  // shows the tab at once and writes the address without a server round
+  // trip; a navigation (back) brings the address's tab in.
   const shownInUrl = parseBountyFilter(useSearchParams().get("show"));
   const [filter, setFilter] = useState<BountyFilter>(shownInUrl);
   useEffect(() => setFilter(shownInUrl), [shownInUrl]);
-  const [openId, setOpenId] = useState<string | null>(() =>
-    chores.some((c) => c.id === initialOpenId && c.state === "ready")
-      ? initialOpenId!
-      : null,
-  );
+  const [openId, setOpenId] = useState<string | null>(null);
   const [doneBy, setDoneBy] = useState(actorId);
   const [pop, setPop] = useState<{
     key: number;
     points: number;
     at: ScorePopBox | "middle";
   } | null>(null);
-  // Where the open sheet's row was on the screen when it was tapped; null
-  // for a sheet the dashboard opened.
+  // Where the open sheet's row was on the screen when it was tapped.
   const tappedAt = useRef<ScorePopBox | null>(null);
   const [broken, setBroken] = useState<LogCompletionData | null>(null);
   const router = useRouter();
@@ -303,7 +289,6 @@ export function ChoreGrid({
               streak={streakLabel(c)}
               status={statusLabel(c)}
               cta={c.state === "ready" ? "Log it" : "Not yet"}
-              isNew={c.isNew}
               kiosk={kiosk}
               // Only a ready bounty can be logged: one cooling down says
               // "Not yet", as on the kitchen screen's home.

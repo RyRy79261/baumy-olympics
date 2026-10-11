@@ -129,7 +129,7 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
       },
     ],
     returns:
-      "`chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (`ready`; `cooldown`, with `availableAt`, when it can be logged again; or `unavailable`), `isNew`, `streak` (holder and length) and `next` (what logging it now would score the asker). There is no due date, `dueAt` or `urgent`: never call a chore due, late or overdue.",
+      "`chores`: each one's `id`, `name`, `kind` (consumable or maintenance), `basePoints`, `cooldownMinutes`, `state` (`ready`; `cooldown`, with `availableAt`, when it can be logged again; or `unavailable`), `createdAt`, `streak` (holder and length) and `next` (what logging it now would score the asker). There is no due date, `dueAt` or `urgent`: never call a chore due, late or overdue.",
     errors: [],
     reply:
       'Ready ones first, then those cooling down ("again from <time>"); say points as "+N". Times in Berlin time.',

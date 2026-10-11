@@ -61,7 +61,6 @@ const chore: ChoreView = {
   lastDoneAt: null,
   state: "ready",
   availableAt: null,
-  isNew: false,
   createdAt: "2026-09-01T10:00:00.000Z",
   next: null,
 };
@@ -111,9 +110,14 @@ async function openSheet(
         actorId="m-1"
         kiosk
         action={action}
-        initialOpenId={chore.id}
       />,
     ),
+  );
+  // A tap on the row opens its sheet.
+  await act(async () =>
+    el
+      .querySelector<HTMLButtonElement>('[data-testid="chore-Trash"] button')!
+      .click(),
   );
   const sheet = el.querySelector<HTMLDialogElement>(
     'dialog[aria-label="Log Trash"]',
@@ -139,7 +143,7 @@ async function tapOutside(sheet: HTMLDialogElement) {
 }
 
 describe("ChoreGrid's log sheet", () => {
-  it("opens from I'll do it for a ready bounty, never one cooling down", async () => {
+  it("opens from a tap on a ready bounty, never one cooling down", async () => {
     const render = async (c: ChoreView) => {
       const el = document.createElement("div");
       document.body.append(el);
@@ -152,9 +156,15 @@ describe("ChoreGrid's log sheet", () => {
             actorId="m-1"
             kiosk
             action={vi.fn()}
-            initialOpenId={c.id}
           />,
         ),
+      );
+      await act(async () =>
+        el
+          .querySelector<HTMLButtonElement>(
+            '[data-testid="chore-Trash"] button',
+          )!
+          .click(),
       );
       return el.querySelector<HTMLDialogElement>(
         'dialog[aria-label="Log Trash"]',
@@ -249,8 +259,8 @@ describe("ChoreGrid's log sheet", () => {
 
 // Issue #181, owner ruling 2026-10-06: the "+N" floats where the bounty was
 // when it was tapped, though logging re-sorts the board and the row moves
-// or leaves the tab; the page never scrolls. From the dashboard's "I'll do
-// it" (no tap on a row) it floats in the middle of the screen.
+// or leaves the tab; the page never scrolls. If that spot is off the screen
+// by the answer, it floats in the middle.
 describe("ChoreGrid's floating score (issue #181)", () => {
   const bathroom: ChoreView = {
     ...chore,
@@ -391,40 +401,39 @@ describe("ChoreGrid's floating score (issue #181)", () => {
     expect(scrolls).not.toHaveBeenCalled();
   });
 
-  it("has a New tab and no Urgent tab (issue #189)", async () => {
+  it("has the kind tabs, and no Urgent (issue #189) or New tab (issue #193)", async () => {
     await board([bathroom, chore]);
-    expect(document.querySelector('[data-tab="new"]')).not.toBeNull();
+    const tabs = [...document.querySelectorAll("[data-tab]")].map((t) =>
+      t.getAttribute("data-tab"),
+    );
+    expect(tabs).toEqual(["all", "consumable", "maintenance"]);
+    expect(document.querySelector('[data-tab="new"]')).toBeNull();
     expect(document.querySelector('[data-tab="urgent"]')).toBeNull();
     expect(document.body.textContent).not.toMatch(/urgent|overdue|due /i);
+    // No row says "New" either.
+    expect(
+      document.querySelector('[data-testid="chore-Trash"]'),
+    ).not.toBeNull();
+    expect(document.body.textContent).not.toMatch(/\bnew\b/i);
   });
 
   it("stays where the row was tapped when the tab drops it", async () => {
-    const fresh = { ...chore, isNew: true };
-    const { render, answer } = await board([bathroom, fresh]);
+    const bought = { ...chore, kind: "consumable" as const };
+    const { render, answer } = await board([bathroom, bought]);
     await act(async () =>
-      document.querySelector<HTMLButtonElement>('[data-tab="new"]')!.click(),
+      document
+        .querySelector<HTMLButtonElement>('[data-tab="consumable"]')!
+        .click(),
     );
     expect(document.querySelector('[data-testid="chore-Bathroom"]')).toBeNull();
     await tapAndLog("Trash", answer);
-    await render([bathroom, { ...fresh, isNew: false }]);
+    // The re-render drops Trash from the tab.
+    await render([bathroom, { ...bought, kind: "maintenance" }]);
     expect(document.querySelector('[data-testid="chore-Trash"]')).toBeNull();
 
     const pop = theFloat();
     expect(pop.textContent).toBe("+40");
     expectAtTheTap(pop);
-    expect(scrolls).not.toHaveBeenCalled();
-  });
-
-  it("floats in the middle of the screen from the dashboard's I'll do it", async () => {
-    const { sheet, answer } = await openSheet();
-    await act(async () => sheet.querySelector("form")!.requestSubmit());
-    await act(async () => answer());
-
-    const pop = theFloat();
-    expect(pop.textContent).toBe("+40");
-    expect(pop.getAttribute("data-placement")).toBe("middle");
-    expect(pop.className).toContain("inset-0");
-    expect(pop.style.top).toBe("");
     expect(scrolls).not.toHaveBeenCalled();
   });
 

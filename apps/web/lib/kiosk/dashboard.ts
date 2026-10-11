@@ -4,14 +4,8 @@ import {
   berlinTimeKey,
   dateKeyWeekday,
 } from "@baumy/core";
-import {
-  isCalendarDate,
-  type AvatarSprites,
-  type ChoreKind,
-} from "@baumy/types";
+import { isCalendarDate, type AvatarSprites } from "@baumy/types";
 import { HOUSE_COLOUR } from "@baumy/ui";
-import type { ChoreView } from "@/lib/actions/list-chores";
-import { sortBounties } from "@/lib/chores/view";
 import type { NoteView } from "@/lib/actions/notes";
 import {
   eventsOnDay,
@@ -20,10 +14,11 @@ import {
 } from "@/lib/calendar/view";
 
 // What the portrait kitchen dashboard shows (ADR 0005, issue #65). Pure and
-// client-safe: the kiosk home reads list_chores, list_events and list_notes
-// like every other surface, and these pick out the header's two counts
-// (New and Messages; there is no Urgent, SPEC §12 decision 35), the bounty
-// and message modules, and the month grid with its day sheet.
+// client-safe: the kiosk home reads list_events, list_notes and
+// list_shopping like every other surface, and these pick out the Messages
+// module and its count, the Shopping count, and the month grid with its day
+// sheet. The header's star only opens the Bounties tab (SPEC §12 decision
+// 36, issue #193); there is no Urgent (decision 35) and no New.
 // Days and times are Berlin's (packages/core time.ts).
 
 /** A member as the dashboard shows them: their character and colour. */
@@ -85,109 +80,6 @@ export function longDay(day: string): string {
 /** The header's two lines at `now`: "Monday 28 September" and "17:42". */
 export function headerClock(now: Date): { date: string; time: string } {
   return { date: longDay(berlinDateKey(now)), time: berlinTimeKey(now) };
-}
-
-// ---------------------------------------------------------------- bounties
-
-/**
- * A bounty's status on the kitchen screen, short enough for its row: "Ready",
- * or "Again from 18:00" while it cools down ("Again from Wed 18:00" on
- * another day this week, "Again from 30 Sep" further off). A chore has no
- * due date (SPEC §12 decision 35, issue #189).
- */
-export function bountyStatus(
-  c: Pick<ChoreView, "state" | "availableAt">,
-  now: Date,
-): string {
-  if (c.state === "unavailable") return "No points yet";
-  if (c.state === "ready" || c.availableAt === null) return "Ready";
-  const at = new Date(c.availableAt);
-  const day = berlinDateKey(at);
-  const today = berlinDateKey(now);
-  const time = berlinTimeKey(at);
-  if (day === today) return `Again from ${time}`;
-  if (day < addDaysToDateKey(today, 7)) {
-    return `Again from ${WEEKDAYS_LONG[dateKeyWeekday(day) - 1]!.slice(0, 3)} ${time}`;
-  }
-  const month = MONTHS_LONG[Number(day.slice(5, 7)) - 1]!.slice(0, 3);
-  return `Again from ${Number(day.slice(8, 10))} ${month}`;
-}
-
-/** One bounty in the New module. */
-export interface BountyRowView {
-  id: string;
-  name: string;
-  sprite: string;
-  kind: ChoreKind;
-  isNew: boolean;
-  /** What logging it scores: yours once you tap in, else its base points. */
-  points: number | null;
-  /** "Ready", or "Again from 18:00" (`bountyStatus`). */
-  status: string;
-  /** The streak you would steal by doing it, if anyone holds one. */
-  streak: {
-    holderId: string;
-    holderName: string;
-    length: number;
-    colour: string;
-  } | null;
-  /** It can be logged now; false while cooling down or with no weight yet. */
-  loggable: boolean;
-}
-
-/**
- * The chores a module lists as bounties, in the board's order (ready first,
- * then the soonest ready again; `sortBounties`). Archived chores are never
- * listed (list_chores leaves them out anyway).
- */
-export function bountyRows(
-  chores: readonly ChoreView[],
-  pick: (c: ChoreView) => boolean,
-  members: readonly DashboardMember[],
-  now: Date,
-): BountyRowView[] {
-  return sortBounties(chores.filter((c) => !c.archived && pick(c))).map(
-    (c) => ({
-      id: c.id,
-      name: c.name,
-      sprite: c.sprite,
-      kind: c.kind,
-      isNew: c.isNew,
-      points: c.next?.totalPts ?? c.basePoints,
-      status: bountyStatus(c, now),
-      streak: c.streak
-        ? {
-            ...c.streak,
-            colour: whoOf(c.streak.holderId, members).colour,
-          }
-        : null,
-      loggable: c.state === "ready",
-    }),
-  );
-}
-
-export const isNewBounty = (c: ChoreView) => c.isNew;
-
-/** The module's tabs: every bounty, or one kind. */
-export type BountyTab = "all" | ChoreKind;
-
-export function bountyTabCounts(
-  rows: readonly BountyRowView[],
-): Record<BountyTab, number> {
-  return {
-    all: rows.length,
-    consumable: rows.filter((r) => r.kind === "consumable").length,
-    maintenance: rows.filter((r) => r.kind === "maintenance").length,
-  };
-}
-
-export function inTab(row: BountyRowView, tab: BountyTab): boolean {
-  return tab === "all" || row.kind === tab;
-}
-
-/** "Maintenance", "Consumable". */
-export function kindLabel(kind: ChoreKind): string {
-  return kind === "consumable" ? "Consumable" : "Maintenance";
 }
 
 // ---------------------------------------------------------------- messages

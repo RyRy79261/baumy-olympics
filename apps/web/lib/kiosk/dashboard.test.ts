@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { MEMBER_COLORS } from "@baumy/types";
-import type { ChoreView } from "@/lib/actions/list-chores";
 import type { NoteView } from "@/lib/actions/notes";
 import { eventView } from "@/lib/calendar/view";
 import {
@@ -13,16 +12,10 @@ import {
   HOUSE_COLOUR,
   addMonths,
   agoLabel,
-  bountyRows,
-  bountyStatus,
-  bountyTabCounts,
   chipsFor,
   chipsThatFit,
   dayHeading,
   headerClock,
-  inTab,
-  isNewBounty,
-  kindLabel,
   longDay,
   monthCells,
   monthGridDays,
@@ -54,28 +47,6 @@ const JO: DashboardMember = {
   color: MEMBER_COLORS[1],
 };
 const MEMBERS = [RYAN, JO];
-
-function chore(over: Partial<ChoreView>): ChoreView {
-  return {
-    id: over.name ?? "c",
-    name: "c",
-    sprite: "bin",
-    kind: "maintenance",
-    proofMode: "none",
-    effortFactorPct: 100,
-    archived: false,
-    basePoints: 10,
-    cooldownMinutes: 60,
-    streak: null,
-    lastDoneAt: null,
-    state: "ready",
-    availableAt: null,
-    isNew: false,
-    createdAt: at(-200),
-    next: null,
-    ...over,
-  };
-}
 
 describe("the house's colour", () => {
   it("is the kit's --color-bm-house, which no member colour offered uses", () => {
@@ -117,130 +88,6 @@ describe("the header", () => {
       time: "01:30",
     });
     expect(longDay("2027-01-03")).toBe("Sunday 3 January");
-  });
-});
-
-describe("bountyStatus", () => {
-  it("says Ready, and no points yet for a chore without a weight", () => {
-    expect(bountyStatus(chore({ state: "ready" }), NOW)).toBe("Ready");
-    expect(bountyStatus(chore({ state: "unavailable" }), NOW)).toBe(
-      "No points yet",
-    );
-  });
-
-  it("says when a cooling-down bounty can be done again, never a due date", () => {
-    const again = (h: number) =>
-      bountyStatus(chore({ state: "cooldown", availableAt: at(h) }), NOW);
-    // 17:42 Berlin now: later today is the time alone…
-    expect(again(2)).toBe("Again from 19:42");
-    // …another day this week its weekday (Tue 29 Sep, Sun 4 Oct)…
-    expect(again(10)).toBe("Again from Tue 03:42");
-    expect(again(6 * 24)).toBe("Again from Sun 17:42");
-    // …and a week or more away, the date (Mon 5 Oct).
-    expect(again(7 * 24)).toBe("Again from 5 Oct");
-    for (const h of [2, 10, 6 * 24, 7 * 24]) {
-      expect(again(h)).not.toMatch(/due|late|overdue/i);
-    }
-  });
-});
-
-describe("bountyRows", () => {
-  const chores = [
-    chore({ name: "Later", state: "ready" }),
-    chore({
-      name: "Bins",
-      state: "ready",
-      streak: { holderId: "m-ryan", holderName: "Ryan", length: 6 },
-    }),
-    chore({
-      name: "Cat food",
-      kind: "consumable",
-      state: "cooldown",
-      availableAt: at(5),
-      isNew: true,
-      streak: { holderId: "m-gone", holderName: "Kim", length: 2 },
-      next: {
-        totalPts: 23,
-        streakLen: 1,
-        streakPts: 0,
-        breakPts: 3,
-        brokenMemberId: "m-gone",
-        brokenLen: 2,
-      },
-    }),
-    chore({ name: "Archived", archived: true, isNew: true }),
-    chore({ name: "Unweighted", state: "unavailable", isNew: true }),
-  ];
-
-  it("lists the bounties picked: ready by name, then cooling down, then unscorable", () => {
-    const rows = bountyRows(chores, () => true, MEMBERS, NOW);
-    expect(rows.map((r) => r.name)).toEqual([
-      "Bins",
-      "Later",
-      "Cat food",
-      "Unweighted",
-    ]);
-    expect(rows[0]).toEqual({
-      id: "Bins",
-      name: "Bins",
-      sprite: "bin",
-      kind: "maintenance",
-      isNew: false,
-      points: 10,
-      status: "Ready",
-      streak: {
-        holderId: "m-ryan",
-        holderName: "Ryan",
-        length: 6,
-        colour: MEMBER_COLORS[5],
-      },
-      loggable: true,
-    });
-    // What you would score, once someone is asking; the holder's colour
-    // falls back to the house's for someone who left. Cooling down: not
-    // loggable, and says when it can be done again.
-    expect(rows[2]).toMatchObject({
-      points: 23,
-      loggable: false,
-      status: "Again from 22:42",
-      streak: { holderName: "Kim", colour: HOUSE_COLOUR },
-    });
-  });
-
-  it("picks every new one, one without a weight last and not loggable", () => {
-    const rows = bountyRows(chores, isNewBounty, MEMBERS, NOW);
-    expect(rows.map((r) => r.name)).toEqual(["Cat food", "Unweighted"]);
-    // Exactly list_chores' isNew (archived left out), so the icon's count
-    // is the list's.
-    expect(rows).toHaveLength(
-      chores.filter((c) => c.isNew && !c.archived).length,
-    );
-    expect(rows[1]).toMatchObject({
-      loggable: false,
-      status: "No points yet",
-    });
-  });
-
-  it("breaks a tie by name", () => {
-    const same = [chore({ name: "B" }), chore({ name: "A" })];
-    expect(
-      bountyRows(same, () => true, MEMBERS, NOW).map((r) => r.name),
-    ).toEqual(["A", "B"]);
-  });
-
-  it("counts and filters the tabs by kind", () => {
-    const rows = bountyRows(chores, () => true, MEMBERS, NOW);
-    expect(bountyTabCounts(rows)).toEqual({
-      all: 4,
-      consumable: 1,
-      maintenance: 3,
-    });
-    expect(
-      rows.filter((r) => inTab(r, "consumable")).map((r) => r.name),
-    ).toEqual(["Cat food"]);
-    expect(rows.filter((r) => inTab(r, "all"))).toHaveLength(4);
-    expect(kindLabel("consumable")).toBe("Consumable");
-    expect(kindLabel("maintenance")).toBe("Maintenance");
   });
 });
 

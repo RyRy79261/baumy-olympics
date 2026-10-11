@@ -27,9 +27,9 @@ import { LiveClock } from "./live-clock";
 
 // The hub home on a phone or a laptop (SPEC §3.1; ADR 0005 Consequences):
 // the kitchen screen's calm look in a normal scrolling page. On top, the
-// clock and the two status tiles (New, Messages), each dim at zero and a
-// link to its slice (no Urgent: a chore has no due date, SPEC §12 decision
-// 35). Then today's agenda in the wide column (no bounty card: the board
+// clock and the Messages tile, dim at zero and a link to the notes (no
+// Urgent: a chore has no due date, SPEC §12 decision 35; no New, decision
+// 36, issue #193). Then today's agenda in the wide column (no bounty card: the board
 // lists them, owner 2026-10-11), the scores with the pot, the pinned notes (the
 // Board) and the shopping list in the narrow one. Each widget keeps its own
 // empty and unavailable state (lib/hub/load.ts). The page's own card (Post a
@@ -38,19 +38,12 @@ import { LiveClock } from "./live-clock";
 // seen and what is read or tabbed through keep one order.
 
 const TILES: {
-  key: "new" | "messages";
+  key: "messages";
   label: string;
   icon: PixelIconName;
   accent: TabAccent;
   href: Route;
 }[] = [
-  {
-    key: "new",
-    label: "New",
-    icon: "star",
-    accent: "yellow",
-    href: "/chores?show=new" as Route,
-  },
   {
     key: "messages",
     label: "Messages",

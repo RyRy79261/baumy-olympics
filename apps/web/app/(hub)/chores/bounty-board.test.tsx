@@ -60,7 +60,6 @@ const chore: ChoreView = {
   lastDoneAt: null,
   state: "ready",
   availableAt: null,
-  isNew: false,
   createdAt: "2026-09-01T10:00:00.000Z",
   next: null,
 };

@@ -12,31 +12,32 @@ import {
 
 describe("bounty filters", () => {
   const board = [
-    { name: "Toilet paper", kind: "consumable", isNew: false },
-    { name: "Cat food", kind: "consumable", isNew: true },
-    { name: "Bins", kind: "maintenance", isNew: true },
-    { name: "Mop", kind: "maintenance", isNew: false },
+    { name: "Toilet paper", kind: "consumable" },
+    { name: "Cat food", kind: "consumable" },
+    { name: "Bins", kind: "maintenance" },
+    { name: "Mop", kind: "maintenance" },
   ] as const;
   const names = (f: (typeof BOUNTY_FILTERS)[number]) =>
     filterBounties(board, f).map((c) => c.name);
 
-  it("keeps the new, or one kind", () => {
+  it("keeps every bounty, or one kind", () => {
     expect(names("all")).toEqual(["Toilet paper", "Cat food", "Bins", "Mop"]);
-    expect(names("new")).toEqual(["Cat food", "Bins"]);
     expect(names("consumable")).toEqual(["Toilet paper", "Cat food"]);
     expect(names("maintenance")).toEqual(["Bins", "Mop"]);
   });
 
-  it("has no urgent tab any more (issue #189)", () => {
-    expect(BOUNTY_FILTERS).toContain("new");
+  it("has no urgent tab (issue #189) and no new tab (issue #193)", () => {
+    expect(BOUNTY_FILTERS).toContain("consumable");
     expect(BOUNTY_FILTERS).not.toContain("urgent");
+    expect(BOUNTY_FILTERS).not.toContain("new");
     expect(parseBountyFilter("urgent")).toBe("all");
+    // An old link to the New tab shows every bounty.
+    expect(parseBountyFilter("new")).toBe("all");
   });
 
   it("counts what each tab keeps", () => {
     expect(bountyCounts(board)).toEqual({
       all: 4,
-      new: 2,
       consumable: 2,
       maintenance: 2,
     });
@@ -46,7 +47,7 @@ describe("bounty filters", () => {
     for (const f of BOUNTY_FILTERS) expect(parseBountyFilter(f)).toBe(f);
     expect(parseBountyFilter("errand")).toBe("all");
     expect(parseBountyFilter(undefined)).toBe("all");
-    expect(parseBountyFilter(["new"])).toBe("all");
+    expect(parseBountyFilter(["consumable"])).toBe("all");
   });
 });
 

@@ -20,13 +20,7 @@ import { CheckPinForm } from "./check-pin-form";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Bounties · Kiosk" };
 
-export default async function KioskChoresPage({
-  searchParams,
-}: {
-  /** `chore`: the dashboard's "I'll do it" opens that chore's sheet. */
-  searchParams: Promise<{ chore?: string | string[] }>;
-}) {
-  const { chore } = await searchParams;
+export default async function KioskChoresPage() {
   const kiosk = await getKioskActor();
   if (!kiosk) redirect("/kiosk/pair");
   const acting = kiosk.memberId;
@@ -65,7 +59,6 @@ export default async function KioskChoresPage({
               actorId={acting}
               kiosk
               action={kioskLogCompletionAction}
-              initialOpenId={Array.isArray(chore) ? chore[0] : chore}
             />
           ) : (
             <FormMessage tone="error">{listed.message}</FormMessage>

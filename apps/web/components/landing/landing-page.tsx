@@ -11,7 +11,6 @@ import {
   linkClass,
 } from "@baumy/ui";
 import { LegalLinks } from "@/components/legal/legal-page";
-import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 
 // The public landing page at `/` (issue #96): what a signed-out visitor, and
@@ -23,7 +22,6 @@ import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 // The explainer's numbers come from the constants the code runs on, so the
 // page cannot promise a rule the game does not play.
 const R = RULESET_V1;
-const NEW_DAYS = NEW_BOUNTY_MS / 86_400_000;
 const THIRD_IN_A_ROW_PCT = 100 + 2 * R.streakStepPct;
 const BREAK_CAP_PCT = R.breakPctPerLen * R.breakLenCap;
 const SCREENSAVER_MIN = SCREENSAVER_IDLE_MS / 60_000;
@@ -142,9 +140,7 @@ function HowItWorks() {
           </p>
           <p>
             A bounty is ready, or cooling down after someone did it, and says
-            when it can be done again.{" "}
-            <span className="text-bm-yellow">New</span> ones were added in the
-            last {NEW_DAYS} days.
+            when it can be done again.
           </p>
         </Step>
         <Step

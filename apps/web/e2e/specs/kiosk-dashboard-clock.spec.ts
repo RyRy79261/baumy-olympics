@@ -83,9 +83,9 @@ test("the dashboard shows the server's Berlin time, and tidies itself when idle"
   await context.clock.fastForward(61_000);
   await expect(sheet).toHaveCount(0);
 
-  // So does a module.
-  await kiosk.locator('[data-icon="new"]').click();
-  const module = kiosk.getByRole("dialog", { name: "New bounties" });
+  // So does the Messages module.
+  await kiosk.locator('[data-icon="messages"]').click();
+  const module = kiosk.getByRole("dialog", { name: "Messages" });
   await expect(module).toBeVisible();
   await context.clock.fastForward(61_000);
   await expect(module).toBeHidden();

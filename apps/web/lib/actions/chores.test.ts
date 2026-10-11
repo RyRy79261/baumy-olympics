@@ -26,7 +26,6 @@ import {
   sessionActor,
 } from "@/test-utils/actions";
 import type { Actor } from "@/lib/auth";
-import { NEW_BOUNTY_MS } from "@/lib/chores/new-bounty";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { RequestCtx } from "./define";
 import { spriteFor } from "./manage-chore";
@@ -149,7 +148,6 @@ describe("list_chores", () => {
       lastDoneAt: FIXED_NOW.toISOString(),
       state: "cooldown",
       availableAt: at(48).toISOString(),
-      isNew: false,
       createdAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT.*Z$/),
       // Ryan would break the partner's 1-streak: 20 + 20% of 20.
       next: {
@@ -172,24 +170,27 @@ describe("list_chores", () => {
     });
   });
 
-  it("says each chore's kind, and whether it is new (added in the last 3 days)", async () => {
+  it("says each chore's kind, and never whether it is new (issue #193)", async () => {
     await seedChore(db(), {
       ...SEED_CHORES.dishes,
       kind: "consumable",
-      createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS + MIN),
+      createdAt: new Date(FIXED_NOW.getTime() - MIN),
     });
-    await seedChore(db(), {
-      ...SEED_CHORES.bathroom,
-      createdAt: new Date(FIXED_NOW.getTime() - NEW_BOUNTY_MS),
-    });
+    await seedChore(db(), SEED_CHORES.bathroom);
     const data = ok(
       await runAction("list_chores", {}, ctxFor(sessionActor(ryan))),
     );
-    expect(data.chores.map((c) => [c.name, c.kind, c.isNew])).toEqual([
-      ["Bathroom", "maintenance", false],
-      ["Dishes", "consumable", true],
-      ["Trash", "maintenance", false],
+    expect(data.chores.map((c) => [c.name, c.kind])).toEqual([
+      ["Bathroom", "maintenance"],
+      ["Dishes", "consumable"],
+      ["Trash", "maintenance"],
     ]);
+    // Added a minute ago, and still no "new" on it.
+    const dishes = data.chores.find((c) => c.name === "Dishes")!;
+    expect(dishes.createdAt).toBe(
+      new Date(FIXED_NOW.getTime() - MIN).toISOString(),
+    );
+    expect(dishes).not.toHaveProperty("isNew");
   });
 
   it("is ready or cooling down, never due: no due date, however long ago (issue #189)", async () => {

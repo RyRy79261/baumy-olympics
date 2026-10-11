@@ -52,8 +52,10 @@ test("pin a note on the phone and see it on the kiosk home after a refresh", asy
     await expect(page.getByTestId(id)).toBeVisible();
   }
   // No bounty card and no Urgent tile: a chore has no due date, and the
-  // board lists the bounties (SPEC §12 decision 35, issue #189).
-  await expect(page.getByTestId("hub-tile-new")).toBeVisible();
+  // board lists the bounties (SPEC §12 decision 35, issue #189). No New
+  // tile either (decision 36, issue #193): Messages is the only one.
+  await expect(page.getByTestId("hub-tile-messages")).toBeVisible();
+  await expect(page.getByTestId("hub-tile-new")).toHaveCount(0);
   await expect(page.getByTestId("widget-chores")).toHaveCount(0);
   await expect(page.getByTestId("hub-tile-urgent")).toHaveCount(0);
   await expect(page.getByTestId("hub-glance")).not.toContainText(/urgent/i);
