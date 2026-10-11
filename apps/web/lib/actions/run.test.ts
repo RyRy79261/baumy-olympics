@@ -1146,7 +1146,13 @@ describe("secrets in the input or the result", () => {
   it("keeps the secret out of the ledger and the audit row, and hands it over once", async () => {
     const me = await seedMember(db());
     const ctx = ctxFor(sessionActor(me));
-    const res = await run("test_secretive", { pin: "4321", label: "x" }, ctx);
+    // Not hex: a random id or a hash in the rows can never contain it by chance
+    // (a "4321" PIN once matched the UUID 745c0d2f-1850-4321-…).
+    const res = await run(
+      "test_secretive",
+      { pin: "PIN-SECRET-QX", label: "x" },
+      ctx,
+    );
     expect(res).toEqual({
       ok: true,
       data: { code: "SECRET-CODE", label: "x" },
@@ -1159,7 +1165,7 @@ describe("secrets in the input or the result", () => {
     const [audit] = await auditRows();
     expect(audit?.payload).toEqual({ label: "x" });
     const everything = JSON.stringify([ledger, audit]);
-    expect(everything).not.toContain("4321");
+    expect(everything).not.toContain("PIN-SECRET-QX");
     expect(everything).not.toContain("SECRET-CODE");
 
     // A replay gets the stored form, without the code.
