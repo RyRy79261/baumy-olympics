@@ -189,7 +189,7 @@ function MessagesModule({
       {!listed.ok ? (
         <ModuleEmpty>{listed.message}</ModuleEmpty>
       ) : rows.length === 0 ? (
-        <ModuleEmpty>Everyone has read every note.</ModuleEmpty>
+        <ModuleEmpty>No new notes. Older ones are on the Board.</ModuleEmpty>
       ) : (
         <ul className="flex flex-col">
           {actingId ? null : (
