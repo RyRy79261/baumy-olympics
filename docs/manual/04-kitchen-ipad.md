@@ -18,7 +18,9 @@ covers:
 
 The iPad on the kitchen wall is the house's shared screen. Its home shows the date and the clock, then three icons: the star opens **Bounties**, the basket opens **Shop** (its number is how many things are on the shopping list), and **Messages** shows the notes not everyone has read yet. Under them are the month's calendar, and Baumy at the bottom. The bar along the bottom goes to Bounties, Calendar, Board, Activity, Shop and Scores. **Activity** is what happened in the house, newest first; a chore is disputed from there.
 
-The **Messages** number on the iPad counts the notes that not everyone in the house has read yet, so it stays until every member has read them. Tap your avatar first, then open **Messages** or the **Board**: that marks those notes read for you only. With nobody picked, looking marks nothing. Reading them on your phone counts too.
+The **Messages** number on the iPad counts the notes that not everyone in the house has read yet, so it stays until every member has read them, or until the note is {{NOTE_NEW_DAYS}} days old (counted from when it was posted or last changed), for everyone. Tap your avatar first, then open **Messages** or the **Board**: that marks those notes read for you only. With nobody picked, looking marks nothing. Reading them on your phone counts too.
+
+To take a note away when it is done with, tap your avatar, then tap **Remove** on the note (on the **Board**, or in **Messages**), and **Remove** again to be sure. It goes for everyone, and no PIN is needed.
 
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
 
