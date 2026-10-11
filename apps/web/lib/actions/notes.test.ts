@@ -13,6 +13,7 @@ import {
   sessionActor,
 } from "@/test-utils/actions";
 import type { Actor } from "@/lib/auth";
+import { NOTE_NEW_MS } from "@/lib/notes/view";
 import { __resetMemoryRateLimits } from "@/lib/rate-limit";
 import type { RequestCtx } from "./define";
 import type { NoteView } from "./notes";
@@ -284,6 +285,38 @@ describe("list_notes", () => {
     );
     expect(await counts(ryan)).toEqual([0, 1]);
     expect(await counts(partner)).toEqual([1, 1]);
+  });
+
+  it("counts a note as new only for 3 days after it was posted or edited, for everyone (issue #194)", async () => {
+    const days = NOTE_NEW_MS / MIN;
+    // Posted exactly 3 days ago: no longer new. A minute later: still new.
+    const old = await add("Old", {}, as(partner, { now: at(-days) }));
+    await add("Recent", {}, as(partner, { now: at(-days + 1) }));
+    const counts = async (ctx: RequestCtx) => {
+      const d = ok(await runAction("list_notes", {}, ctx));
+      return [d.unseenCount, d.unseenByAnyoneCount];
+    };
+    const nobody = ctxFor(
+      { kind: "kiosk", deviceId: "dev-1" },
+      { source: "kiosk" },
+    );
+    expect(await counts(as(ryan))).toEqual([1, 1]);
+    expect(await counts(kiosk(ryan))).toEqual([1, 1]);
+    expect(await counts(nobody)).toEqual([null, 1]);
+    // Both are still listed: only their "new" ends.
+    const listed = ok(await runAction("list_notes", {}, as(ryan))).notes;
+    expect(listed.map((n) => n.title).sort()).toEqual(["Old", "Recent"]);
+    // Changing its words makes the old note new again, for 3 more days.
+    ok(
+      await runAction(
+        "update_note",
+        { noteId: old.id, title: "Old, changed" },
+        as(partner, { now: at(-1) }),
+      ),
+    );
+    expect(await counts(as(ryan))).toEqual([2, 2]);
+    // Three days on, neither is new for anyone.
+    expect(await counts(as(ryan, { now: at(days) }))).toEqual([0, 0]);
   });
 
   it("has no count of its own for a kiosk with nobody picked", async () => {

@@ -7,6 +7,7 @@ import {
 import { isCalendarDate, type AvatarSprites } from "@baumy/types";
 import { HOUSE_COLOUR } from "@baumy/ui";
 import type { NoteView } from "@/lib/actions/notes";
+import { isNoteNew } from "@/lib/notes/view";
 import {
   eventsOnDay,
   viewRange,
@@ -112,9 +113,10 @@ export interface MessageView {
 /**
  * The notes that not every active member has seen as they are now (issue
  * #153: the kitchen screen "should show a number, until all members have
- * indicated they've read the message"), the newest change first: the notes
- * list_notes' `unseenByAnyoneCount` counts, so the icon's number and the
- * module's list agree.
+ * indicated they've read the message"), among those posted or changed in
+ * the last 3 days (issue #194: an older note is never new), the newest
+ * change first: the notes list_notes' `unseenByAnyoneCount` counts, so the
+ * icon's number and the module's list agree.
  */
 export function unseenMessages(
   notes: readonly NoteView[],
@@ -122,6 +124,7 @@ export function unseenMessages(
   now: Date,
 ): MessageView[] {
   return notes
+    .filter((n) => isNoteNew(n, now))
     .filter((n) => members.some((m) => !n.seenBy.includes(m.id)))
     .sort((a, b) => Date.parse(b.editedAt) - Date.parse(a.editedAt))
     .map((n) => {

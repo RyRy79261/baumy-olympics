@@ -223,6 +223,25 @@ describe("MessageRow", () => {
       ),
     ).not.toContain("line-clamp-2");
   });
+
+  it("puts an action (Remove, issue #194) under the text, only when given", () => {
+    const out = html(
+      <MessageRow
+        who={null}
+        name="Jo"
+        colour="#fff"
+        when="now"
+        title="Hi"
+        action={<button>Remove</button>}
+      />,
+    );
+    expect(out).toMatch(/>Hi<\/div><div class="mt-3 flex"><button>Remove</);
+    expect(
+      html(
+        <MessageRow who={null} name="Jo" colour="#fff" when="now" title="Hi" />,
+      ),
+    ).not.toContain("mt-3 flex");
+  });
 });
 
 describe("the month grid", () => {

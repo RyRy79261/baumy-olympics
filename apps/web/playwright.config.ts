@@ -21,6 +21,8 @@ const SHARED_CLOCK_SPECS = [
   // the household read a note on the kiosk, which no parallel spec's
   // Messages count must see happen (issue #153).
   "**/notes-seen.spec.ts",
+  // Moves the clock 3 days on (issue #194).
+  "**/notes-age.spec.ts",
 ];
 
 export default defineConfig({

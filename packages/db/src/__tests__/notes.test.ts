@@ -426,4 +426,41 @@ describe("seen notes (issue #153)", () => {
     });
     expect(row!.seenBy).toEqual([sam, author]);
   });
+
+  it("counts only the notes whose words changed after editedAfter (issue #194)", async () => {
+    const old = await add("Old", { now: at(0) });
+    const fresh = await add("Fresh", { now: at(10) });
+    // The window starts at minute 0: a note edited exactly then is out.
+    expect(
+      await countUnseenNotes(db(), {
+        householdId: HOUSEHOLD_ID,
+        memberId: sam,
+        editedAfter: at(0),
+      }),
+    ).toBe(1);
+    expect(await countNotesUnseenByAnyone(db(), HOUSEHOLD_ID, at(0))).toBe(1);
+    // A minute earlier, both are in.
+    expect(
+      await countUnseenNotes(db(), {
+        householdId: HOUSEHOLD_ID,
+        memberId: sam,
+        editedAfter: at(-1),
+      }),
+    ).toBe(2);
+    expect(await countNotesUnseenByAnyone(db(), HOUSEHOLD_ID, at(-1))).toBe(2);
+    // Seen still counts inside the window.
+    await see(sam, [fresh], at(11));
+    await see(author, [fresh], at(11));
+    expect(await countNotesUnseenByAnyone(db(), HOUSEHOLD_ID, at(0))).toBe(0);
+    // An edit brings an old note back into the window.
+    await edit(old, "Old, edited", at(12));
+    expect(
+      await countUnseenNotes(db(), {
+        householdId: HOUSEHOLD_ID,
+        memberId: sam,
+        editedAfter: at(0),
+      }),
+    ).toBe(1);
+    expect(await countNotesUnseenByAnyone(db(), HOUSEHOLD_ID, at(0))).toBe(1);
+  });
 });

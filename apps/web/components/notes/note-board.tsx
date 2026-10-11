@@ -30,6 +30,7 @@ import type {
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
 import { NOTE_COLOR_OPTIONS, noteMeta } from "@/lib/notes/view";
 import { toast, toastActionError } from "@/lib/ui/toast";
+import { RemoveNote } from "./remove-note";
 
 // The household's notes (SPEC §3.5), the same on the phone (/notes) and on
 // the kiosk (/kiosk/notes, acting as the member whose avatar was tapped).
@@ -37,6 +38,8 @@ import { toast, toastActionError } from "@/lib/ui/toast";
 // MarkdownBody, the sanitising renderer. On the kiosk every change runs as
 // the acting member with no PIN (owner ruling 2026-10-02, issue #145); the
 // forms stay AttestedForms, so a PIN would be asked if the gate wanted one.
+// On the kiosk each note has a big "Remove" that asks "Remove this note?" in
+// place (issue #194); the phone keeps "Delete…" and its dialog.
 //
 // Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
@@ -110,14 +113,22 @@ export function NoteBoard({
                     >
                       Edit
                     </Button>
-                    <Button
-                      variant="secondary"
-                      size={size}
-                      onClick={() => setDeleting(n)}
-                      aria-label={`Delete ${n.title}`}
-                    >
-                      Delete…
-                    </Button>
+                    {kiosk ? (
+                      <RemoveNote
+                        note={n}
+                        action={actions.remove}
+                        pinLabel={pinLabel}
+                      />
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size={size}
+                        onClick={() => setDeleting(n)}
+                        aria-label={`Delete ${n.title}`}
+                      >
+                        Delete…
+                      </Button>
+                    )}
                   </>
                 ) : null
               }

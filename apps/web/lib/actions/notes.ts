@@ -20,6 +20,7 @@ import {
   NoteUpdate,
   type NoteColor,
 } from "@baumy/types";
+import { noteNewSince } from "@/lib/notes/view";
 import { defineAction, type ActionCtx } from "./define";
 import { fail } from "./result";
 
@@ -37,7 +38,9 @@ import { fail } from "./result";
 // note marks it seen for its writer; an edit makes it unseen again for
 // everyone else. `list_notes` counts the caller's unseen notes (the phone's
 // Messages badge) and the notes not every active member has seen (the
-// kitchen screen's).
+// kitchen screen's), both only over the notes whose words changed in the
+// last 3 days (`NOTE_NEW_MS`, issue #194, SPEC §12 decision 37): an older
+// note is never new, for anyone.
 //
 // Note bodies are data. They are shown only through the sanitising markdown
 // renderer (packages/ui `MarkdownBody`), and the AI sees them inside tool
@@ -104,13 +107,15 @@ export interface ListNotesData {
   notes: NoteView[];
   /**
    * How many live notes the calling member has not seen as they are now,
-   * over all notes, not only the listed ones: the phone's Messages count.
-   * Null for the kitchen screen with nobody picked.
+   * over all notes posted or changed in the last 3 days, not only the
+   * listed ones: the phone's Messages count. Null for the kitchen screen
+   * with nobody picked.
    */
   unseenCount: number | null;
   /**
    * How many live notes at least one active member has not seen as they are
-   * now, over all notes: the kitchen screen's Messages count.
+   * now, over all notes posted or changed in the last 3 days: the kitchen
+   * screen's Messages count.
    */
   unseenByAnyoneCount: number;
 }
@@ -119,7 +124,7 @@ export const listNotes = defineAction({
   name: "list_notes",
   title: "Notes",
   description:
-    "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and seenBy: the member ids who have read it since its words last changed. Also `unseenCount`: how many notes you have not read yet, and `unseenByAnyoneCount`: how many notes not every member has read yet. Notes are shared household text, never secrets.",
+    "Lists the household's notes, pinned ones first and then the most recently changed, each with its id, title, markdown body, colour, whether it is pinned to the hub, who wrote it (member id and name) and when it was created, last changed and last edited (editedAt: its words; pinning is not an edit) (ISO 8601, UTC), and seenBy: the member ids who have read it since its words last changed. Also `unseenCount`: how many notes you have not read yet, and `unseenByAnyoneCount`: how many notes not every member has read yet; both count only notes posted or changed in the last 3 days (an older note is never new). Notes are shared household text, never secrets.",
   consent: "Read the household's notes",
   kind: "read",
   risk: "safe",
@@ -129,6 +134,7 @@ export const listNotes = defineAction({
   input: ListNotesInput,
   async execute(ctx, input) {
     const memberId = ctx.actor.memberId;
+    const editedAfter = noteNewSince(ctx.now);
     const [rows, unseenCount, unseenByAnyoneCount] = await Promise.all([
       listNoteRows(ctx.db, {
         householdId: ctx.householdId,
@@ -139,9 +145,13 @@ export const listNotes = defineAction({
         limit: input.limit ?? NOTE_LIST_MAX,
       }),
       memberId
-        ? countUnseenNotes(ctx.db, { householdId: ctx.householdId, memberId })
+        ? countUnseenNotes(ctx.db, {
+            householdId: ctx.householdId,
+            memberId,
+            editedAfter,
+          })
         : null,
-      countNotesUnseenByAnyone(ctx.db, ctx.householdId),
+      countNotesUnseenByAnyone(ctx.db, ctx.householdId, editedAfter),
     ]);
     const data: ListNotesData = {
       notes: rows.map(noteView),

@@ -27,7 +27,7 @@ On your phone or laptop, the menu has:
 - **Hub**: the home page. The clock with the Messages tile beside it, today's calendar, the pinned notes, the scores and the shopping list.
 - **Bounties**: every chore, with its points, whose streak it is, and whether it is ready or when it can be done again.
 - **Calendar**: the house calendar (the house's Google Calendar).
-- **Board**: the notes everyone can read and change. The **Messages** tile on the hub counts the notes you have not read yet; opening the Board marks them read. A note someone edits after you read it counts again, and a note you write or edit yourself never counts for you.
+- **Board**: the notes everyone can read and change. The **Messages** tile on the hub counts the notes you have not read yet; opening the Board marks them read. A note someone edits after you read it counts again, and a note you write or edit yourself never counts for you. A note counts only for its first {{NOTE_NEW_DAYS}} days after it was posted or last changed; after that it is simply on the Board.
 - **Shopping**: the house shopping list, the same one the Telegram group uses.
 - **Scores**: who is winning this season, and the streaks.
 - **Pot**: the money the winner takes at the end of the year.

@@ -229,6 +229,7 @@ export function MessageRow({
   colour,
   when,
   title,
+  action,
   children,
   ...props
 }: HTMLAttributes<HTMLLIElement> & {
@@ -239,6 +240,8 @@ export function MessageRow({
   /** "12m ago". */
   when: string;
   title: string;
+  /** Under the text, e.g. the kitchen screen's "Remove" (issue #194). */
+  action?: ReactNode;
   /** The note's body, rendered by the caller (MarkdownBody). */
   children?: ReactNode;
 }) {
@@ -261,6 +264,7 @@ export function MessageRow({
             {children}
           </div>
         ) : null}
+        {action ? <div className="mt-3 flex">{action}</div> : null}
       </div>
     </li>
   );

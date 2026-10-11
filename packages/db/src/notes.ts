@@ -23,6 +23,11 @@ import { members, noteReads, notes } from "./schema";
 // `seen_at` is at or after the moment its words last changed (`edited_at`,
 // else `created_at`). An edit therefore makes it unseen again for everyone
 // who has not opened it since. Pinning is not an edit, so it never does.
+//
+// New (issue #194, SPEC §12 decision 37): the counts take `editedAfter`, and
+// then count only the notes whose words changed after it (the caller passes
+// now minus three days), so a note left on the board for weeks stops
+// counting as unread for everyone.
 
 export interface NoteRow {
   id: string;
@@ -123,29 +128,45 @@ export async function listNotes(
   return withSeenBy(db, rows);
 }
 
+/** Only the notes whose words changed after `editedAfter`, when given. */
+function editedAfterSql(editedAfter: Date | undefined): SQL | undefined {
+  return editedAfter === undefined
+    ? undefined
+    : sql`${editedAtSql} > ${editedAfter.toISOString()}`;
+}
+
 /**
  * How many live notes this member has not seen as they are now (the phone's
- * Messages count, issue #153), over every note.
+ * Messages count, issue #153), over every note, or over those whose words
+ * changed after `editedAfter`.
  */
 export async function countUnseenNotes(
   db: Queryable,
-  input: { householdId: string; memberId: string },
+  input: { householdId: string; memberId: string; editedAfter?: Date },
 ): Promise<number> {
   const [row] = await db
     .select({ n: count() })
     .from(notes)
-    .where(and(live(input.householdId), sql`not ${seenBy(input.memberId)}`));
+    .where(
+      and(
+        live(input.householdId),
+        editedAfterSql(input.editedAfter),
+        sql`not ${seenBy(input.memberId)}`,
+      ),
+    );
   return Number(row?.n ?? 0);
 }
 
 /**
  * How many live notes at least one active member has not seen as they are
  * now: the kitchen screen's Messages count, which shows a number until every
- * member has read the message (issue #153).
+ * member has read the message (issue #153), or until its words are older
+ * than `editedAfter`.
  */
 export async function countNotesUnseenByAnyone(
   db: Queryable,
   householdId: string,
+  editedAfter?: Date,
 ): Promise<number> {
   const [row] = await db
     .select({ n: count() })
@@ -153,6 +174,7 @@ export async function countNotesUnseenByAnyone(
     .where(
       and(
         live(householdId),
+        editedAfterSql(editedAfter),
         sql`exists (select 1 from ${members} where ${and(
           eq(members.householdId, householdId),
           isNull(members.deactivatedAt),

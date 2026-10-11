@@ -26,6 +26,9 @@ import {
   MarkNotesSeen,
   type SeenAction,
 } from "@/components/notes/mark-notes-seen";
+import { RemoveNote } from "@/components/notes/remove-note";
+import type { FormAction } from "@/components/use-action-form";
+import type { DeleteNoteData } from "@/lib/actions/notes";
 import { useIdle } from "../use-idle";
 
 // The dashboard's header (ADR 0005 §1, issue #65): the date, a big clock
@@ -143,6 +146,7 @@ function MessagesModule({
   members,
   actingId,
   seeNotes,
+  removeNote,
   onClose,
 }: {
   titleId: string;
@@ -151,8 +155,20 @@ function MessagesModule({
   /** The picked member, who has now seen them; null with nobody picked. */
   actingId: string | null;
   seeNotes: SeenAction;
+  /** delete_note as the picked member, no PIN (issue #194). */
+  removeNote: FormAction<DeleteNoteData>;
   onClose: () => void;
 }) {
+  // A note removed here leaves the list at once; closing refreshes the rest.
+  const [removed, setRemoved] = useState<readonly string[]>([]);
+  const rows = listed.ok
+    ? listed.rows.filter((m) => !removed.includes(m.id))
+    : [];
+  // In step with a Remove here: the notes removed were in the count.
+  const unread = listed.ok
+    ? Math.max(0, (listed.count ?? listed.rows.length) - removed.length)
+    : 0;
+  const pinLabel = `${actingId ? whoOf(actingId, members).name : "Your"}'s PIN`;
   return (
     <ModulePanel
       title="Messages"
@@ -160,9 +176,7 @@ function MessagesModule({
       icon="envelope"
       tone="pink"
       subtitle={
-        listed.ok
-          ? `${listed.count ?? listed.rows.length} not read by everyone yet`
-          : "The notes board"
+        listed.ok ? `${unread} not read by everyone yet` : "The notes board"
       }
       onClose={onClose}
     >
@@ -176,34 +190,57 @@ function MessagesModule({
       ) : null}
       {!listed.ok ? (
         <ModuleEmpty>{listed.message}</ModuleEmpty>
-      ) : listed.rows.length === 0 ? (
-        <ModuleEmpty>Everyone has read every note.</ModuleEmpty>
+      ) : rows.length === 0 ? (
+        <ModuleEmpty>No new notes. Older ones are on the Board.</ModuleEmpty>
       ) : (
-        <ul className="flex flex-col">
-          {listed.rows.map((m) => {
-            const who = whoOf(m.authorId, members);
-            return (
-              <MessageRow
-                key={m.id}
-                data-testid={`message-${m.title}`}
-                who={
-                  <MemberCharacter
-                    sprites={who.member?.sprites}
-                    name={who.member ? who.name : m.authorName}
-                    colour={who.colour}
-                    scale={4}
-                  />
-                }
-                name={who.member ? who.name : m.authorName}
-                colour={who.colour}
-                when={m.when}
-                title={m.title}
-              >
-                {m.bodyMd ? <MarkdownBody>{m.bodyMd}</MarkdownBody> : null}
-              </MessageRow>
-            );
-          })}
-        </ul>
+        <>
+          {actingId ? null : (
+            <p
+              data-testid="messages-pick-hint"
+              className="pb-4 font-body text-[20px] text-bm-muted"
+            >
+              To remove a note, close this, open Board at the bottom and tap
+              your avatar there.
+            </p>
+          )}
+          <ul className="flex flex-col">
+            {rows.map((m) => {
+              const who = whoOf(m.authorId, members);
+              return (
+                <MessageRow
+                  key={m.id}
+                  data-testid={`message-${m.title}`}
+                  who={
+                    <MemberCharacter
+                      sprites={who.member?.sprites}
+                      name={who.member ? who.name : m.authorName}
+                      colour={who.colour}
+                      scale={4}
+                    />
+                  }
+                  name={who.member ? who.name : m.authorName}
+                  colour={who.colour}
+                  when={m.when}
+                  title={m.title}
+                  action={
+                    actingId ? (
+                      <RemoveNote
+                        note={m}
+                        action={removeNote}
+                        pinLabel={pinLabel}
+                        onRemoved={(noteId) =>
+                          setRemoved((ids) => [...ids, noteId])
+                        }
+                      />
+                    ) : undefined
+                  }
+                >
+                  {m.bodyMd ? <MarkdownBody>{m.bodyMd}</MarkdownBody> : null}
+                </MessageRow>
+              );
+            })}
+          </ul>
+        </>
       )}
     </ModulePanel>
   );
@@ -216,6 +253,7 @@ export function DashboardHeader({
   members,
   actingId,
   seeNotes,
+  removeNote,
 }: {
   /** The instant the page was read at, ISO 8601. */
   serverNow: string;
@@ -230,6 +268,8 @@ export function DashboardHeader({
   actingId: string | null;
   /** acknowledge_note as the picked member (app/kiosk/note-actions.ts). */
   seeNotes: SeenAction;
+  /** delete_note as the picked member (app/kiosk/actions.ts). */
+  removeNote: FormAction<DeleteNoteData>;
 }) {
   const [open, setOpen] = useState(false);
   // The Messages box keeps the rows it opened with: reading them marks them
@@ -297,6 +337,7 @@ export function DashboardHeader({
             members={members}
             actingId={actingId}
             seeNotes={seeNotes}
+            removeNote={removeNote}
             onClose={close}
           />
         ) : null}

@@ -119,8 +119,16 @@ describe("unseenMessages", () => {
         note({ title: "Pasta", createdAt: at(-0.2) }),
         note({ title: "Wifi", createdAt: at(-40), editedAt: at(-3) }),
         note({ title: "Now", createdAt: at(0), seenBy: [] }),
-        // Old, but Sam has still not read it.
-        note({ title: "Old", createdAt: at(-80) }),
+        // Nearly 3 days old, and Sam has still not read it.
+        note({ title: "Old", createdAt: at(-71) }),
+        // Unread too, but 3 days old or more: never new (issue #194).
+        note({ title: "Three days", createdAt: at(-72) }),
+        note({ title: "Weeks", createdAt: at(-24 * 21) }),
+        note({
+          title: "Changed long ago",
+          createdAt: at(-24 * 30),
+          editedAt: at(-24 * 4),
+        }),
       ],
       everyone,
       NOW,
@@ -129,7 +137,7 @@ describe("unseenMessages", () => {
       ["Now", "just now", []],
       ["Pasta", "12m ago", ["m-jo"]],
       ["Wifi", "changed 3h ago", ["m-jo"]],
-      ["Old", "3d ago", ["m-jo"]],
+      ["Old", "2d ago", ["m-jo"]],
     ]);
   });
 
