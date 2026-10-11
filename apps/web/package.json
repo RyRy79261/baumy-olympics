@@ -30,7 +30,7 @@
     "@baumy/ui": "workspace:*",
     "@better-auth/passkey": "1.6.25",
     "@modelcontextprotocol/sdk": "1.31.0",
-    "@simplewebauthn/browser": "13.3.0",
+    "@simplewebauthn/browser": "14.0.0",
     "@vercel/blob": "^2.8.0",
     "better-auth": "1.6.25",
     "drizzle-orm": "^0.45.3",
