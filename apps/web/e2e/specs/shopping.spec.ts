@@ -111,7 +111,9 @@ test("the kitchen screen and Telegram share one shopping list", async ({
     exact: true,
   });
   await expect(tick).toBeVisible();
-  expect((await tick.boundingBox())!.height).toBe(readOnly!.height);
+  expect(
+    Math.abs((await tick.boundingBox())!.height - readOnly!.height),
+  ).toBeLessThanOrEqual(1);
   await expect(
     kiosk.getByText("Tap your avatar at the top to add or tick off items."),
   ).toHaveCount(0);

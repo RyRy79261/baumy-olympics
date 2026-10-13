@@ -2,9 +2,11 @@ import type { ButtonHTMLAttributes, HTMLAttributes } from "react";
 import { cx } from "./cx";
 
 // The shopping list in the pixel kit (SPEC §3.4; ADR 0005): a list of big
-// rows, each one tap to tick off. The row is a
-// submit button, so the page puts each in a form that sends the item. At
-// least 44px tall, 56px with `kiosk`, and nothing depends on hover.
+// rows, each one tap to tick off. CheckItemButton is a submit button, so the
+// page puts each in a form that sends the item; CheckItemEntry is the same
+// row only to read, not a button (the kitchen screen with nobody picked,
+// issue #204). At least 44px tall, 56px with `kiosk`, and nothing depends on
+// hover.
 
 export function CheckList({
   children,

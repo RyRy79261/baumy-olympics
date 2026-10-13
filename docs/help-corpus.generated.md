@@ -168,7 +168,7 @@ To take a note away when it is done with, tap your avatar, then tap **Remove** o
 
 **Bounties** always lists every bounty, with its points and, if it was done recently, when it can be done again. To log one, tap your avatar at the top first; then tap the bounty.
 
-**Shop** always shows the whole shopping list. To add something or tick it off, tap your avatar at the top first; then tap an item when it's bought.
+**Shop** always shows the whole shopping list, unless Baumy Brain can't be reached; then it says so. To add something or tick it off, tap your avatar at the top first; then tap an item when it's bought.
 
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
 
