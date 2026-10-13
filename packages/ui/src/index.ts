@@ -48,7 +48,7 @@ export {
   type TabAccent,
 } from "./bounties";
 export { Card } from "./card";
-export { CheckItemButton, CheckList } from "./check-list";
+export { CheckItemButton, CheckItemEntry, CheckList } from "./check-list";
 export {
   ChoiceGroup,
   ChoreTile,

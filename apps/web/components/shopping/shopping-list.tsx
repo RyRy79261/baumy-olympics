@@ -4,12 +4,11 @@ import { useState } from "react";
 import {
   Button,
   CheckItemButton,
+  CheckItemEntry,
   CheckList,
   Field,
   FormMessage,
   Input,
-  WidgetItem,
-  WidgetList,
 } from "@baumy/ui";
 import {
   useActionForm,
@@ -29,7 +28,8 @@ import { toast, toastActionError } from "@/lib/ui/toast";
 // row per item that checks it off in one tap. The list itself is brain's
 // (ADR 0003); every change goes through the registry's actions, and the page
 // re-reads the list afterwards. On the kiosk nobody can change it until
-// someone taps their avatar; it asks for no PIN.
+// someone taps their avatar; it asks for no PIN. Until then the kiosk shows
+// the same rows, only to read: no quick-add and nothing to tap (issue #204).
 //
 // Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
@@ -62,24 +62,18 @@ export function ShoppingList({
         <p className="text-sm text-bm-muted" data-testid="shopping-empty">
           The list is empty.
         </p>
-      ) : canEdit ? (
+      ) : (
         <CheckList data-testid="shopping-items" className="min-h-0">
           {items.map((i) => (
             <li key={i.id} data-testid={`shopping-item-${i.item}`}>
-              <CheckOffRow item={i} action={actions.checkOff} kiosk={kiosk} />
+              {canEdit ? (
+                <CheckOffRow item={i} action={actions.checkOff} kiosk={kiosk} />
+              ) : (
+                <CheckItemEntry label={i.item} kiosk={kiosk} />
+              )}
             </li>
           ))}
         </CheckList>
-      ) : (
-        <WidgetList data-testid="shopping-items">
-          {items.map((i) => (
-            <WidgetItem
-              key={i.id}
-              data-testid={`shopping-item-${i.item}`}
-              primary={i.item}
-            />
-          ))}
-        </WidgetList>
       )}
     </div>
   );

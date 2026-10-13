@@ -86,9 +86,37 @@ test("the kitchen screen and Telegram share one shopping list", async ({
   await rereads(kiosk);
   await expect(row(list, oatMilk)).toBeVisible();
 
+  // Issue #204: with nobody picked it is the same framed row as once
+  // someone is picked (56px tall, its empty box), only to read: nothing in
+  // the list is a button, and the line is said once.
+  const items = list.getByTestId("shopping-items");
+  await expect(row(list, oatMilk)).toHaveText(oatMilk);
+  const readOnly = await row(list, oatMilk).locator("> div").boundingBox();
+  expect(readOnly!.height).toBeGreaterThanOrEqual(56);
+  await expect(items.locator("li").first()).toBeVisible();
+  await expect(items.getByRole("button")).toHaveCount(0);
+  await expect(
+    kiosk.getByRole("button", { name: `Check off ${oatMilk}` }),
+  ).toHaveCount(0);
+  await expect(
+    kiosk.getByText("Tap your avatar at the top to add or tick off items."),
+  ).toHaveCount(1);
+
   // Someone taps in and adds two things at once, with no PIN.
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+  // The same row is now the check-off button, the same size.
+  const tick = kiosk.getByRole("button", {
+    name: `Check off ${oatMilk}`,
+    exact: true,
+  });
+  await expect(tick).toBeVisible();
+  expect(
+    Math.abs((await tick.boundingBox())!.height - readOnly!.height),
+  ).toBeLessThanOrEqual(1);
+  await expect(
+    kiosk.getByText("Tap your avatar at the top to add or tick off items."),
+  ).toHaveCount(0);
   await list.getByLabel("Add to the list").fill(`${eggs}, ${bread}`);
   await list.getByRole("button", { name: "Add", exact: true }).click();
   await expect(
@@ -121,6 +149,38 @@ test("the kitchen screen and Telegram share one shopping list", async ({
   await expect(row(kiosk, bread)).toBeVisible();
   await expect(row(kiosk, oatMilk)).toHaveCount(0);
   expect(await telegram(page.request)).not.toContain(oatMilk);
+
+  await context.close();
+});
+
+// Issue #204: before anyone is picked, brain being down is still its own
+// sentence on the kitchen screen's Shop page, not a broken page.
+test("with brain down the kitchen screen's Shop page says so before anyone is picked", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
+  const tag = Math.random().toString(36).slice(2, 8);
+
+  await founderAdmin(page, project);
+  const { context, page: kiosk } = await pairedKiosk(
+    browser,
+    page,
+    `iPad ${tag}`,
+  );
+  await context.addCookies([
+    { name: "baumy_e2e_brain", value: "down", domain: "localhost", path: "/" },
+  ]);
+  await kioskNav(kiosk, "Shop");
+  await expect(
+    kiosk.getByRole("heading", { name: "Shopping list", level: 1 }),
+  ).toBeVisible();
+  await expect(
+    kiosk.getByText(/The shopping list is unavailable right now/),
+  ).toBeVisible();
+  await expect(kiosk.getByTestId("acting-as")).toHaveCount(0);
+  await expect(kiosk.getByTestId("shopping-items")).toHaveCount(0);
 
   await context.close();
 });

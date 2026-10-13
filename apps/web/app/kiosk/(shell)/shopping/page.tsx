@@ -15,7 +15,9 @@ import {
 
 // The whole shopping list on the kitchen iPad (SPEC §3.4, §8): anyone can
 // read it; the member whose avatar was tapped can add to it or tick things
-// off, with no PIN (adding milk vouches for nobody).
+// off, with no PIN (adding milk vouches for nobody). Before anyone is picked
+// it shows the same rows, only to read; the heading's line says how to
+// change it (issue #204).
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Shopping · Kiosk" };
