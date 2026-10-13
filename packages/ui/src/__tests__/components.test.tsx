@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AppShell, navItemClass } from "../app-shell";
-import { Button, buttonClass, choiceClass } from "../button";
+import { Button, buttonClass, choiceClass, iconChoiceClass } from "../button";
 import { Card } from "../card";
 import { cx } from "../cx";
 import {
@@ -63,6 +63,17 @@ describe("Button", () => {
     expect(current).toContain("bg-bm-raised");
     expect(current).not.toContain("bg-bm-green");
     expect(current.match(/\[--pf:[^\]]+\]/g)).toHaveLength(1);
+  });
+
+  // Owner 2026-10-13 (layout A): the groups as small icon squares.
+  it("has an icon-only choice: square, 44px, 56px on the kiosk, in each state", () => {
+    expect(iconChoiceClass("off", true)).toMatch(/bg-bm-raised.*size-14/);
+    expect(iconChoiceClass("off")).toContain("size-11");
+    expect(iconChoiceClass("on")).toContain("bg-bm-green");
+    expect(iconChoiceClass("current")).toContain(
+      "[--pf:var(--color-bm-green)]",
+    );
+    expect(iconChoiceClass("off", true).match(/\b(min-h|px)-/g)).toBeNull();
   });
 });
 

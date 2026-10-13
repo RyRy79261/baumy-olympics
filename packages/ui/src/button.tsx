@@ -80,6 +80,25 @@ export function choiceClass(
   );
 }
 
+/**
+ * A square, icon-only choice (its name is its aria-label): the same states
+ * as `choiceClass`, 44px square, 56px with `kiosk`.
+ */
+export function iconChoiceClass(
+  state: ChoiceState,
+  kiosk = false,
+  className?: string,
+): string {
+  return cx(
+    "inline-grid shrink-0 place-items-center",
+    "active:translate-y-px",
+    "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0",
+    CHOICE_STATES[state],
+    kiosk ? "size-14" : "size-11",
+    className,
+  );
+}
+
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;

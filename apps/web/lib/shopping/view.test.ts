@@ -69,6 +69,17 @@ describe("CATEGORY_GLYPHS", () => {
     for (const n of names) expect(GLYPH_NAMES).toContain(n);
     expect(new Set(names).size).toBe(names.length);
   });
+
+  it("is the owner's pick: the tin for Pantry and the house for Household (2026-10-13)", () => {
+    expect(CATEGORY_GLYPHS).toEqual({
+      pantry: "catfood",
+      fresh: "fridge",
+      coffee: "coffee",
+      cleaning: "soap",
+      maintenance: "wrench",
+      household: "home",
+    });
+  });
 });
 
 describe("categoryMessage", () => {

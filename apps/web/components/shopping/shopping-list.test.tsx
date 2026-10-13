@@ -95,7 +95,7 @@ describe("ShoppingList", () => {
     expect(out).toContain('data-testid="shopping-item-milk"');
     expect(out).not.toContain("Add to the list");
     expect(out).not.toContain("Check off");
-    expect(out).not.toContain("Change the group");
+    expect(out).not.toContain("shopping-group-button");
   });
 
   // Issue #204: the kitchen screen with nobody picked shows the picked
@@ -206,23 +206,41 @@ describe("ShoppingList's groups (issue #208)", () => {
       ),
     );
     expect(el.querySelectorAll("section, h2")).toHaveLength(0);
-    // The group button is there anyway, to sort the first one.
+    // The group square is there anyway, to sort the first one: Not sorted's
+    // neutral mark, no icon and no text.
+    const square = el.querySelector(
+      '[data-testid="shopping-item-milk"] [data-testid="shopping-group-button"]',
+    )!;
+    expect(square.getAttribute("aria-label")).toBe(
+      "Group: Not sorted — change",
+    );
     expect(
-      el.querySelector('[aria-label="Change the group of milk"]'),
+      square.querySelector('[data-testid="not-sorted-mark"]'),
     ).not.toBeNull();
+    expect(square.querySelector("svg")).toBeNull();
+    expect(square.textContent).toBe("");
   });
 
-  it("gives each row a 56px group button on the kiosk, and offers the six groups to add into", () => {
+  it("gives each row a 56px square with its group's icon on the kiosk, and six icon chips to add into", () => {
     const el = html(
       renderToStaticMarkup(
         <ShoppingList items={grouped} canEdit kiosk actions={actions} />,
       ),
     );
-    const groupButtons = el.querySelectorAll(
-      'button[aria-label^="Change the group of"]',
-    );
+    const groupButtons = [
+      ...el.querySelectorAll('[data-testid="shopping-group-button"]'),
+    ];
     expect(groupButtons).toHaveLength(grouped.length);
-    expect(groupButtons[0]!.className).toContain("min-h-14");
+    // Each shows the item's current group: its icon, and its name to AT.
+    const beans = el.querySelector(
+      '[data-testid="shopping-item-beans"] [data-testid="shopping-group-button"]',
+    )!;
+    expect(beans.getAttribute("aria-label")).toBe("Group: Coffee — change");
+    expect(beans.querySelector("svg")!.getAttribute("data-glyph")).toBe(
+      "coffee",
+    );
+    expect(beans.textContent).toBe("");
+    for (const b of groupButtons) expect(b.className).toContain("size-14");
     // Room after the last row, so Baumy in the corner never covers its button.
     expect(
       el.querySelector('[data-testid="shopping-end-room"]'),
@@ -236,7 +254,7 @@ describe("ShoppingList's groups (issue #208)", () => {
     const choices = el.querySelectorAll(
       '[data-testid="shopping-add-groups"] button',
     );
-    expect([...choices].map((b) => b.textContent)).toEqual([
+    expect([...choices].map((b) => b.getAttribute("aria-label"))).toEqual([
       "Pantry",
       "Fresh",
       "Coffee",
@@ -246,10 +264,22 @@ describe("ShoppingList's groups (issue #208)", () => {
     ]);
     for (const b of choices) {
       expect(b.getAttribute("aria-pressed")).toBe("false");
-      expect(b.className).toContain("min-h-14");
+      // Icon only, and a 56px square on the kiosk.
+      expect(b.textContent).toBe("");
+      expect(b.querySelector("svg")).not.toBeNull();
+      expect(b.className).toContain("size-14");
     }
-    // The Group button is the kit's own size: no padding of its own on top.
-    expect(groupButtons[0]!.className.match(/\bpx-\d+/g)).toEqual(["px-6"]);
+    // No caption row of their own, so the list starts higher.
+    expect(el.textContent).not.toContain("Add into a group");
+    // On the phone: 44px squares in one row that wraps rather than cuts.
+    const phoneChips = phone.querySelectorAll(
+      '[data-testid="shopping-add-groups"] button',
+    );
+    expect(phoneChips).toHaveLength(6);
+    for (const b of phoneChips) expect(b.className).toContain("size-11");
+    expect(
+      phone.querySelector('[data-testid="shopping-add-groups"]')!.className,
+    ).toContain("flex-wrap");
   });
 
   it("makes the groups h3 under a widget's h2 title", () => {
@@ -297,6 +327,10 @@ describe("ShoppingList's group buttons (issue #208)", () => {
   const button = (el: HTMLElement, text: string) =>
     [...el.querySelectorAll("button")].find((b) => b.textContent === text)!;
   const dialog = () => document.querySelector("dialog");
+  const chip = (el: HTMLElement, name: string) =>
+    el.querySelector<HTMLButtonElement>(
+      `[data-testid="shopping-add-groups"] [aria-label="${name}"]`,
+    )!;
 
   it("opens the groups for one item, sends the one tapped, and closes", async () => {
     const setCategory = vi.fn(async (): Promise<SetResult> => ({
@@ -308,7 +342,7 @@ describe("ShoppingList's group buttons (issue #208)", () => {
     await act(async () =>
       el
         .querySelector<HTMLButtonElement>(
-          '[aria-label="Change the group of beans"]',
+          '[data-testid="shopping-item-beans"] [data-testid="shopping-group-button"]',
         )!
         .click(),
     );
@@ -338,12 +372,13 @@ describe("ShoppingList's group buttons (issue #208)", () => {
       // No choice is the green "go" fill.
       expect(b.className).not.toContain("bg-bm-green");
     }
-    // "Not sorted" has no icon: a spacer of the icon's size keeps it in line.
+    // "Not sorted" has no icon: the rows' neutral mark in an icon-sized box
+    // keeps it in line.
     const notSorted = choices.at(-1)!;
     expect(notSorted.querySelector("svg")).toBeNull();
-    expect(
-      notSorted.querySelector('span[aria-hidden="true"]')!.className,
-    ).toContain("size-8");
+    const box = notSorted.querySelector('span[aria-hidden="true"]')!;
+    expect(box.className).toContain("size-8");
+    expect(box.querySelector('[data-testid="not-sorted-mark"]')).not.toBeNull();
     expect(choices[0]!.querySelector("svg")!.getAttribute("width")).toBe("32");
     await act(async () => button(open, "Pantry").click());
     expect(setCategory).toHaveBeenCalledTimes(1);
@@ -366,7 +401,7 @@ describe("ShoppingList's group buttons (issue #208)", () => {
     await act(async () =>
       el
         .querySelector<HTMLButtonElement>(
-          '[aria-label="Change the group of rice"]',
+          '[data-testid="shopping-item-rice"] [data-testid="shopping-group-button"]',
         )!
         .click(),
     );
@@ -390,7 +425,7 @@ describe("ShoppingList's group buttons (issue #208)", () => {
     await act(async () =>
       el
         .querySelector<HTMLButtonElement>(
-          '[aria-label="Change the group of rice"]',
+          '[data-testid="shopping-item-rice"] [data-testid="shopping-group-button"]',
         )!
         .click(),
     );
@@ -406,7 +441,7 @@ describe("ShoppingList's group buttons (issue #208)", () => {
     await act(async () =>
       el
         .querySelector<HTMLButtonElement>(
-          '[aria-label="Change the group of rice"]',
+          '[data-testid="shopping-item-rice"] [data-testid="shopping-group-button"]',
         )!
         .click(),
     );
@@ -457,7 +492,7 @@ describe("ShoppingList's group buttons (issue #208)", () => {
       },
     }));
     const el = await mount(items, { add });
-    const coffee = button(el, "Coffee");
+    const coffee = chip(el, "Coffee");
     await act(async () => coffee.click());
     expect(coffee.getAttribute("aria-pressed")).toBe("true");
     // Its icon turns to ink on the green, so it never vanishes into it.
@@ -465,13 +500,13 @@ describe("ShoppingList's group buttons (issue #208)", () => {
       "var(--color-bm-ink)",
     );
     expect(
-      button(el, "Fresh").querySelector("svg path")!.getAttribute("fill"),
+      chip(el, "Fresh").querySelector("svg path")!.getAttribute("fill"),
     ).toBe("var(--color-bm-green)");
     expect(el.textContent).toContain("Add to Coffee");
     // A second group replaces the first; tapping it again picks none.
-    await act(async () => button(el, "Fresh").click());
+    await act(async () => chip(el, "Fresh").click());
     expect(coffee.getAttribute("aria-pressed")).toBe("false");
-    await act(async () => button(el, "Fresh").click());
+    await act(async () => chip(el, "Fresh").click());
     expect(
       el.querySelectorAll(
         '[data-testid="shopping-add-groups"] [aria-pressed="true"]',

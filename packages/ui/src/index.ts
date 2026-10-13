@@ -20,6 +20,7 @@ export {
   Button,
   buttonClass,
   choiceClass,
+  iconChoiceClass,
   type ButtonProps,
   type ChoiceState,
   type ButtonSize,

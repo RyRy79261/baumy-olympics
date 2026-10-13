@@ -232,10 +232,12 @@ test("the kitchen screen shows the shopping list in its groups, and moves and ad
   // Someone taps in and moves the beans to Coffee with the big buttons.
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  const move = list.getByRole("button", {
-    name: `Change the group of ${beans}`,
+  // Its small square shows where it is now (owner 2026-10-13, layout A).
+  const move = row(list, beans).getByRole("button", {
+    name: "Group: Not sorted — change",
     exact: true,
   });
+  await expect(move.getByTestId("not-sorted-mark")).toBeVisible();
   // Into the middle of the screen, as a finger would scroll it, so Baumy in
   // the corner is not over it (the list ends with room for that).
   await move.evaluate((el) => el.scrollIntoView({ block: "center" }));
@@ -258,6 +260,12 @@ test("the kitchen screen shows the shopping list in its groups, and moves and ad
   ).toBeVisible();
   await expect(row(coffee, beans)).toBeVisible();
   await expect(row(unsorted, beans)).toHaveCount(0);
+  // Its square now shows the cup.
+  await expect(
+    row(coffee, beans)
+      .getByRole("button", { name: "Group: Coffee — change", exact: true })
+      .locator('svg[data-glyph="coffee"]'),
+  ).toBeVisible();
   expect((await telegramGroups(page.request))[beans]).toBe("coffee");
 
   // Adds straight into Fresh: pick the group, type, Add.
@@ -300,8 +308,8 @@ test("the phone's shopping list moves an item into a group and adds into one", a
   await page.getByLabel("Add to the list").fill(bleach);
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(row(page, bleach)).toBeVisible();
-  await page
-    .getByRole("button", { name: `Change the group of ${bleach}`, exact: true })
+  await row(page, bleach)
+    .getByRole("button", { name: /^Group: .* — change$/ })
     .click();
   const picker = page.getByRole("dialog", { name: `Group for ${bleach}` });
   await picker.getByRole("button", { name: "Cleaning", exact: true }).click();
@@ -320,8 +328,8 @@ test("the phone's shopping list moves an item into a group and adds into one", a
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(row(group(page, "maintenance"), bulbs)).toBeVisible();
   // And back to Not sorted.
-  await page
-    .getByRole("button", { name: `Change the group of ${bulbs}`, exact: true })
+  await row(page, bulbs)
+    .getByRole("button", { name: "Group: Maintenance — change", exact: true })
     .click();
   await page
     .getByRole("dialog", { name: `Group for ${bulbs}` })

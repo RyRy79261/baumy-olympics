@@ -170,7 +170,7 @@ To take a note away when it is done with, tap your avatar, then tap **Remove** o
 
 **Shop** always shows the whole shopping list, unless Baumy Brain can't be reached; then it says so. To add something or tick it off, tap your avatar at the top first; then tap an item when it's bought.
 
-The list is sorted into groups: **Pantry**, **Fresh**, **Coffee**, **Cleaning**, **Maintenance** and **Household**, each under its own heading and picture, with **Not sorted** last. Baumy Brain puts each new item in a group by itself a few seconds after it is added. If it got one wrong, tap your avatar, tap **Group** beside the item and tap the right group; Baumy remembers it for next time. To add straight into a group, tap the group above the "Add to the list" box, type the item, and tap **Add**.
+The list is sorted into groups: **Pantry**, **Fresh**, **Coffee**, **Cleaning**, **Maintenance** and **Household**, each under its own heading and picture, with **Not sorted** last. Baumy Brain puts each new item in a group by itself a few seconds after it is added. Beside each item is a small square with its group's picture (an empty dashed box while it is not sorted). If Baumy got one wrong, tap your avatar, tap that square and tap the right group; Baumy remembers it for next time. Tapping the item itself still ticks it off. To add straight into a group, tap its picture in the row above the "Add to the list" box (the box then says "Add to" that group), type the item, and tap **Add**.
 
 Anyone can look. To change anything, say who you are first: **tap your avatar** (on the home, Baumy asks who is talking). Tap **Done** when you finish, so the next person does not act as you.
 

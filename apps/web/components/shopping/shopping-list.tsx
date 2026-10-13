@@ -13,6 +13,7 @@ import {
   Input,
   choiceClass,
   cx,
+  iconChoiceClass,
 } from "@baumy/ui";
 import {
   SHOPPING_CATEGORIES,
@@ -53,8 +54,9 @@ import { toast, toastActionError } from "@/lib/ui/toast";
 // the fixed order, "Not sorted" last, and only groups with items get one;
 // read-only too. With no group on any item (an older brain, or everything
 // just added) the list is flat, as before. Someone who may change it gets a
-// "Group" button beside each row, which opens the groups as big buttons, and
-// group buttons above the quick-add field: pick one (or none), type, Add.
+// small square beside each row showing the item's group icon, which opens
+// the groups as big buttons, and a row of icon chips above the quick-add
+// field: pick one (or none), type, Add (owner 2026-10-13, layout A).
 //
 // Layout only: the look is the pixel kit's (packages/ui, issue #64).
 
@@ -90,6 +92,23 @@ function GroupGlyph({
       size={size}
       color={on ? "var(--color-bm-ink)" : GROUP_COLOURS[category]}
       accent={on ? "var(--color-bm-ink)" : "var(--color-bm-text)"}
+    />
+  );
+}
+
+/**
+ * "Not sorted" on an item's group square: an empty dashed box, the "no
+ * group yet" slot. Plain CSS, no art (owner 2026-10-13: a neutral marker).
+ */
+function NotSortedMark({ kiosk }: { kiosk: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="not-sorted-mark"
+      className={cx(
+        "border-2 border-dashed border-bm-dim",
+        kiosk ? "size-7" : "size-5",
+      )}
     />
   );
 }
@@ -131,15 +150,21 @@ export function ShoppingList({
               <div className="min-w-0 flex-1">
                 <CheckOffRow item={i} action={actions.checkOff} kiosk={kiosk} />
               </div>
-              <Button
-                variant="secondary"
-                size={kiosk ? "kiosk" : "default"}
-                aria-label={`Change the group of ${i.item}`}
+              <button
+                type="button"
+                aria-label={`Group: ${shoppingCategoryLabel(i.category)} — change`}
                 aria-haspopup="dialog"
+                data-testid="shopping-group-button"
+                data-category={i.category ?? NO_GROUP}
                 onClick={() => setPicking(i)}
+                className={iconChoiceClass("off", kiosk)}
               >
-                Group
-              </Button>
+                {i.category ? (
+                  <GroupGlyph category={i.category} size={kiosk ? 32 : 24} />
+                ) : (
+                  <NotSortedMark kiosk={kiosk} />
+                )}
+              </button>
             </div>
           ) : (
             <CheckItemEntry label={i.item} kiosk={kiosk} />
@@ -244,17 +269,13 @@ function QuickAdd({
     <form action={formAction} className="flex flex-col gap-2">
       <input type="hidden" name="requestId" value={requestId} />
       {group ? <input type="hidden" name="category" value={group} /> : null}
-      <p
-        id={`${id}-groups`}
-        className="font-label text-sm font-bold tracking-wide text-bm-muted uppercase"
-      >
-        Add into a group (optional)
-      </p>
+      {/* Owner 2026-10-13 (layout A): one compact row of icon chips, named
+          for screen readers; the field's label says which one is picked. */}
       <div
         role="group"
-        aria-labelledby={`${id}-groups`}
+        aria-label="Add into a group (optional)"
         data-testid="shopping-add-groups"
-        className={cx("grid gap-2", kiosk ? "grid-cols-3" : "grid-cols-2")}
+        className="flex flex-wrap gap-2"
       >
         {SHOPPING_CATEGORIES.map((c) => {
           const on = group === c;
@@ -262,12 +283,12 @@ function QuickAdd({
             <button
               key={c}
               type="button"
+              aria-label={shoppingCategoryLabel(c)}
               aria-pressed={on}
               onClick={() => setGroup(on ? null : c)}
-              className={choiceClass(on ? "on" : "off", kiosk)}
+              className={iconChoiceClass(on ? "on" : "off", kiosk)}
             >
-              <GroupGlyph category={c} size={kiosk ? 28 : 20} on={on} />
-              <span className="truncate">{shoppingCategoryLabel(c)}</span>
+              <GroupGlyph category={c} size={kiosk ? 32 : 24} on={on} />
             </button>
           );
         })}
@@ -374,8 +395,14 @@ function GroupPicker({
                 {c ? (
                   <GroupGlyph category={c} size={32} />
                 ) : (
-                  // Keeps "Not sorted" in line with the labels beside icons.
-                  <span aria-hidden="true" className="size-8 shrink-0" />
+                  // The rows' neutral mark, in an icon-sized box, so "Not
+                  // sorted" lines up with the labels beside icons.
+                  <span
+                    aria-hidden="true"
+                    className="grid size-8 shrink-0 place-items-center"
+                  >
+                    <NotSortedMark kiosk />
+                  </span>
                 )}
                 {shoppingCategoryLabel(c)}
                 {current ? (

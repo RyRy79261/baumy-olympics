@@ -21,8 +21,10 @@ import type { ShoppingEntry } from "@/lib/integrations/brain";
  * Each group's heading icon (issue #208): existing glyphs of the kit only
  * (packages/ui/src/pixel/glyphs.ts), never drawn for this. Pantry is the tin
  * (`catfood`, a can with a ring-pull lid), Fresh the fridge, Coffee the cup,
- * Cleaning the soap bottle, Maintenance the wrench and Household the toilet
- * roll. "Not sorted" has none: its heading is the words only.
+ * Cleaning the soap bottle, Maintenance the wrench and Household the house
+ * (`home`). Owner, 2026-10-13: the tin for Pantry stays, and Household is
+ * `home`, not the toilet roll. "Not sorted" has none: its heading is the
+ * words only.
  */
 export const CATEGORY_GLYPHS: Record<ShoppingCategory, GlyphName> = {
   pantry: "catfood",
@@ -30,7 +32,7 @@ export const CATEGORY_GLYPHS: Record<ShoppingCategory, GlyphName> = {
   coffee: "coffee",
   cleaning: "soap",
   maintenance: "wrench",
-  household: "tp",
+  household: "home",
 };
 
 /** One heading's items: a group's, or the unsorted ones (null). */
