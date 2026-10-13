@@ -41,6 +41,7 @@ vi.mock("./reminder-actions", () => ({ createReminderAction: vi.fn() }));
 vi.mock("./shopping/actions", () => ({
   addShoppingAction: vi.fn(),
   checkOffShoppingAction: vi.fn(),
+  setShoppingCategoryAction: vi.fn(),
 }));
 vi.mock("@/lib/integrations/groq", () => ({ voiceConfigured: () => false }));
 const hasPin = vi.fn(async () => true);

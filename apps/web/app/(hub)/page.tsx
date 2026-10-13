@@ -16,7 +16,11 @@ import { startHub } from "@/lib/hub/load";
 import { voiceConfigured } from "@/lib/integrations/groq";
 import { landingMetadata } from "@/lib/seo";
 import { createReminderAction } from "./reminder-actions";
-import { addShoppingAction, checkOffShoppingAction } from "./shopping/actions";
+import {
+  addShoppingAction,
+  checkOffShoppingAction,
+  setShoppingCategoryAction,
+} from "./shopping/actions";
 
 // The hub home (SPEC §3.1, issue #20; ADR 0005): the clock and the New and
 // Messages tiles, today's events, the
@@ -60,7 +64,11 @@ export default async function HubPage() {
         hub={{ ...hub, events, shopping }}
         voice={voiceConfigured()}
         memberColors={rosterColours(people)}
-        shopping={{ add: addShoppingAction, checkOff: checkOffShoppingAction }}
+        shopping={{
+          add: addShoppingAction,
+          checkOff: checkOffShoppingAction,
+          setCategory: setShoppingCategoryAction,
+        }}
       >
         {/* Issue #66: a reminder for the kitchen screen. */}
         <PostReminderForm action={createReminderAction} />

@@ -20,6 +20,7 @@ import type { WeightDecisionData } from "@/lib/actions/weights";
 import type {
   AddShoppingData,
   CheckOffShoppingData,
+  SetShoppingCategoryData,
 } from "@/lib/actions/shopping";
 import { getKioskActor } from "@/lib/auth";
 import {
@@ -31,7 +32,7 @@ import {
 } from "@/lib/kiosk/cookies";
 import { pickKioskMember } from "@/lib/kiosk/selection";
 import { changesFromForm } from "@/lib/chores/bulk-edit";
-import { splitItemsForm } from "@/lib/shopping/view";
+import { groupFormInput, splitItemsForm } from "@/lib/shopping/view";
 
 // The kiosk's server actions (SPEC §8). Picking who is acting is the
 // kiosk's own sign-in state, kept in its cookies (pairing is the
@@ -248,6 +249,21 @@ export async function kioskCheckOffShoppingAction(
   form: FormData,
 ): Promise<CheckOffShoppingResult> {
   const result = await kioskActionForm("check_off_shopping_items", form);
+  if (result.ok) revalidateKioskShopping();
+  return result;
+}
+
+/** A group button for one item, as the acting member (issue #208). */
+export async function kioskSetShoppingCategoryAction(
+  _prev: ActionResult<SetShoppingCategoryData> | null,
+  form: FormData,
+): Promise<ActionResult<SetShoppingCategoryData>> {
+  const result = await kioskActionForm(
+    "set_shopping_category",
+    form,
+    undefined,
+    groupFormInput,
+  );
   if (result.ok) revalidateKioskShopping();
   return result;
 }
