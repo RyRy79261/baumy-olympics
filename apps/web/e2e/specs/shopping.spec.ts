@@ -270,7 +270,7 @@ test("the kitchen screen shows the shopping list in its groups, and moves and ad
 
   // Adds straight into Fresh: pick the group, type, Add.
   const addGroups = list.getByRole("group", {
-    name: "Add into a group (optional)",
+    name: "Group (optional)",
   });
   await addGroups.getByRole("button", { name: "Fresh", exact: true }).click();
   await expect(
@@ -321,7 +321,7 @@ test("the phone's shopping list moves an item into a group and adds into one", a
   await expect(row(group(page, "cleaning"), bleach)).toBeVisible();
 
   await page
-    .getByRole("group", { name: "Add into a group (optional)" })
+    .getByRole("group", { name: "Group (optional)" })
     .getByRole("button", { name: "Maintenance", exact: true })
     .click();
   await page.getByLabel("Add to Maintenance").fill(bulbs);

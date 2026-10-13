@@ -270,10 +270,17 @@ function QuickAdd({
       <input type="hidden" name="requestId" value={requestId} />
       {group ? <input type="hidden" name="category" value={group} /> : null}
       {/* Owner 2026-10-13 (layout A): one compact row of icon chips, named
-          for screen readers; the field's label says which one is picked. */}
+          for screen readers, under a short caption in the field label's
+          style; the field's label says which one is picked. */}
+      <p
+        id={`${id}-groups`}
+        className="font-label text-sm font-bold tracking-wide text-bm-text uppercase"
+      >
+        Group (optional)
+      </p>
       <div
         role="group"
-        aria-label="Add into a group (optional)"
+        aria-labelledby={`${id}-groups`}
         data-testid="shopping-add-groups"
         className="flex flex-wrap gap-2"
       >

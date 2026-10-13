@@ -269,7 +269,20 @@ describe("ShoppingList's groups (issue #208)", () => {
       expect(b.querySelector("svg")).not.toBeNull();
       expect(b.className).toContain("size-14");
     }
-    // No caption row of their own, so the list starts higher.
+    // Owner 2026-10-13: a short caption over them, in the field label's
+    // style, which also names the group of chips; on the phone too.
+    const groupRow = el.querySelector('[data-testid="shopping-add-groups"]')!;
+    const caption = el.querySelector(
+      `#${groupRow.getAttribute("aria-labelledby")}`,
+    )!;
+    expect(caption.textContent).toBe("Group (optional)");
+    expect(caption.className).toContain("font-label");
+    expect(caption.className).toContain("uppercase");
+    expect(
+      caption.compareDocumentPosition(groupRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(phone.textContent).toContain("Group (optional)");
     expect(el.textContent).not.toContain("Add into a group");
     // On the phone: 44px squares in one row that wraps rather than cuts.
     const phoneChips = phone.querySelectorAll(
