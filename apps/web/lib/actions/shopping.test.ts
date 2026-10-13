@@ -148,6 +148,48 @@ describe("add_shopping_items", () => {
     expect(names()).toEqual(["Bread, wholemeal"]);
   });
 
+  it("takes a JSON-string array from an MCP client as its items (issue #206)", async () => {
+    const me = await seedMember(db());
+    const data = ok(
+      await run(
+        "add_shopping_items",
+        { items: '["Ginger"]' },
+        ctxFor(mcp(me), { source: "mcp" }),
+      ),
+    ) as { added: string[] };
+    expect(data.added).toEqual(["Ginger"]);
+    ok(
+      await run(
+        "add_shopping_items",
+        { items: '["a","b"]' },
+        ctxFor(mcp(me), { source: "mcp" }),
+      ),
+    );
+    expect(names()).toEqual(["Ginger", "a", "b"]);
+  });
+
+  it("refuses the whole call when one item is too long, and names it", async () => {
+    const me = await seedMember(db());
+    const long = `Organic oat milk ${"x".repeat(80)}`;
+    const res = await run(
+      "add_shopping_items",
+      { items: ["milk", long] },
+      ctxFor(mcp(me), { source: "mcp" }),
+    );
+    expect(res).toMatchObject({
+      ok: false,
+      code: "INVALID_INPUT",
+      issues: [
+        {
+          path: ["items", 1],
+          message: '"Organic oat milk xxx…" is over 80 characters.',
+        },
+      ],
+    });
+    expect(seen).toEqual([]);
+    expect(names()).toEqual([]);
+  });
+
   it("says what was on the list already", async () => {
     const me = await seedMember(db());
     memoryAdd(["Milk"]);
