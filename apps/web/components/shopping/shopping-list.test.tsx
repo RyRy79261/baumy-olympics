@@ -221,6 +221,16 @@ describe("ShoppingList's groups (issue #208)", () => {
     );
     expect(groupButtons).toHaveLength(grouped.length);
     expect(groupButtons[0]!.className).toContain("min-h-14");
+    // Room after the last row, so Baumy in the corner never covers its button.
+    expect(
+      el.querySelector('[data-testid="shopping-end-room"]'),
+    ).not.toBeNull();
+    const phone = html(
+      renderToStaticMarkup(
+        <ShoppingList items={grouped} canEdit actions={actions} />,
+      ),
+    );
+    expect(phone.querySelector('[data-testid="shopping-end-room"]')).toBeNull();
     const choices = el.querySelectorAll(
       '[data-testid="shopping-add-groups"] button',
     );
@@ -352,6 +362,13 @@ describe("ShoppingList's group buttons (issue #208)", () => {
     const coffee = button(el, "Coffee");
     await act(async () => coffee.click());
     expect(coffee.getAttribute("aria-pressed")).toBe("true");
+    // Its icon turns to ink on the green, so it never vanishes into it.
+    expect(coffee.querySelector("svg path")!.getAttribute("fill")).toBe(
+      "var(--color-bm-ink)",
+    );
+    expect(
+      button(el, "Fresh").querySelector("svg path")!.getAttribute("fill"),
+    ).toBe("var(--color-bm-green)");
     expect(el.textContent).toContain("Add to Coffee");
     // A second group replaces the first; tapping it again picks none.
     await act(async () => button(el, "Fresh").click());

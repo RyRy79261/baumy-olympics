@@ -232,9 +232,14 @@ test("the kitchen screen shows the shopping list in its groups, and moves and ad
   // Someone taps in and moves the beans to Coffee with the big buttons.
   await kiosk.getByRole("button", { name: founder, exact: true }).click();
   await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
-  await list
-    .getByRole("button", { name: `Change the group of ${beans}`, exact: true })
-    .click();
+  const move = list.getByRole("button", {
+    name: `Change the group of ${beans}`,
+    exact: true,
+  });
+  // Into the middle of the screen, as a finger would scroll it, so Baumy in
+  // the corner is not over it (the list ends with room for that).
+  await move.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await move.click();
   const picker = kiosk.getByRole("dialog", { name: `Group for ${beans}` });
   await expect(picker).toBeVisible();
   await expect(

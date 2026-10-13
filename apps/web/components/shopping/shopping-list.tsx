@@ -77,16 +77,19 @@ const GROUP_COLOURS: Record<ShoppingCategory, string> = {
 function GroupGlyph({
   category,
   size,
+  on = false,
 }: {
   category: ShoppingCategory;
   size: number;
+  /** On a picked (green) button: in ink, so Fresh's green never vanishes. */
+  on?: boolean;
 }) {
   return (
     <Glyph
       name={CATEGORY_GLYPHS[category]}
       size={size}
-      color={GROUP_COLOURS[category]}
-      accent="var(--color-bm-text)"
+      color={on ? "var(--color-bm-ink)" : GROUP_COLOURS[category]}
+      accent={on ? "var(--color-bm-ink)" : "var(--color-bm-text)"}
     />
   );
 }
@@ -185,6 +188,15 @@ export function ShoppingList({
         <QuickAdd action={actions.add} kiosk={kiosk} id={`${idPrefix}-add`} />
       ) : null}
       {list}
+      {kiosk && canEdit ? (
+        // Room at the end to scroll the last row's Group button out from
+        // under Baumy, who sits over the footer's right end.
+        <div
+          aria-hidden="true"
+          data-testid="shopping-end-room"
+          className="h-20 shrink-0"
+        />
+      ) : null}
       {canEdit && picking ? (
         <GroupPicker
           key={picking.id}
@@ -244,7 +256,7 @@ function QuickAdd({
               onClick={() => setGroup(on ? null : c)}
               className={choiceClass(on, kiosk)}
             >
-              <GroupGlyph category={c} size={kiosk ? 28 : 20} />
+              <GroupGlyph category={c} size={kiosk ? 28 : 20} on={on} />
               <span className="truncate">{shoppingCategoryLabel(c)}</span>
             </button>
           );
@@ -335,7 +347,7 @@ function GroupPicker({
                 // Big on every screen: 56px, whether kiosk or phone.
                 className={choiceClass(current, true)}
               >
-                {c ? <GroupGlyph category={c} size={32} /> : null}
+                {c ? <GroupGlyph category={c} size={32} on={current} /> : null}
                 {shoppingCategoryLabel(c)}
               </button>
             );
