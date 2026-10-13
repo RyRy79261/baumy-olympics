@@ -121,7 +121,9 @@ setting and reload.
   soon as the connection is back (and every minute). Nothing is stored for
   offline use.
 - **Freshness.** The kitchen home and the Shop page re-read themselves
-  every 60 seconds and when they come back into view (issues #20, #65).
+  every 60 seconds and when they come back into view (issues #20, #65),
+  but not while the screensaver is up: they re-read the moment the screen
+  wakes (issue #210).
 
 ## 6. Checks before calling it done
 
