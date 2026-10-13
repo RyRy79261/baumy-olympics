@@ -12,13 +12,15 @@ import {
 
 // The kitchen screen's freshness (SPEC §8): router.refresh() every 60s and
 // when the screen comes back into view, but never while someone is typing or
-// has a dialog open.
+// has a dialog open, and never while the screen is asleep or hidden (issue
+// #210), refreshing once when it wakes.
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 const { AutoRefresh, HUB_REFRESH_MS, isBusy } = await import("./auto-refresh");
 const { REFRESH_COOKIE } = await import("@/lib/hub/refresh");
+const { setKioskAsleep } = await import("@/lib/kiosk/asleep");
 
 beforeAll(() => {
   (
@@ -34,9 +36,18 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root?.unmount());
   root = null;
+  setKioskAsleep(false);
+  setVisibility("visible");
   document.body.innerHTML = "";
   vi.useRealTimers();
 });
+
+function setVisibility(state: DocumentVisibilityState) {
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    get: () => state,
+  });
+}
 
 function mount() {
   const div = document.createElement("div");
@@ -85,12 +96,50 @@ describe("AutoRefresh", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("does not refresh while the screen is asleep, then once on waking", () => {
+    mount();
+    act(() => vi.advanceTimersByTime(HUB_REFRESH_MS));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    act(() => setKioskAsleep(true));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(HUB_REFRESH_MS * 30));
+    act(() => window.dispatchEvent(new Event("focus")));
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    act(() => setKioskAsleep(false));
+    expect(refresh).toHaveBeenCalledTimes(2);
+    act(() => vi.advanceTimersByTime(HUB_REFRESH_MS));
+    expect(refresh).toHaveBeenCalledTimes(3);
+  });
+
+  it("knows the screen is asleep when it mounts under the screensaver", () => {
+    // The idle reset can go home at night: the page mounts asleep.
+    setKioskAsleep(true);
+    mount();
+    act(() => vi.advanceTimersByTime(HUB_REFRESH_MS * 5));
+    expect(refresh).not.toHaveBeenCalled();
+    act(() => setKioskAsleep(false));
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refresh while the page is hidden", () => {
+    mount();
+    setVisibility("hidden");
+    act(() => vi.advanceTimersByTime(HUB_REFRESH_MS * 3));
+    expect(refresh).not.toHaveBeenCalled();
+    setVisibility("visible");
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it("stops when it unmounts", () => {
     mount();
     act(() => root!.unmount());
     root = null;
     act(() => vi.advanceTimersByTime(HUB_REFRESH_MS));
     window.dispatchEvent(new Event("focus"));
+    setKioskAsleep(true);
+    setKioskAsleep(false);
     expect(refresh).not.toHaveBeenCalled();
   });
 });

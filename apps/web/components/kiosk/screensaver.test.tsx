@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 import { DEFAULT_NIGHT_WINDOW, NIGHT_EVENT } from "@/lib/kiosk/night";
+import { isKioskAsleep, setKioskAsleep } from "@/lib/kiosk/asleep";
 import { SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import { KioskScreensaver } from "./screensaver";
 
@@ -41,6 +42,7 @@ afterEach(() => {
   root = null;
   div?.remove();
   window.removeEventListener(NIGHT_EVENT, onNight);
+  setKioskAsleep(false);
   vi.useRealTimers();
 });
 
@@ -72,6 +74,23 @@ describe("KioskScreensaver", () => {
     expect(screen()).not.toBeNull();
     expect(screen()!.textContent).toContain("23:30");
     expect(events).toEqual([true]);
+  });
+
+  it("tells the pages it is asleep, and that it woke (issue #210)", () => {
+    mount(SERVER_NIGHT);
+    expect(screen()).not.toBeNull();
+    expect(isKioskAsleep()).toBe(true);
+    act(() => screen()!.click());
+    expect(screen()).toBeNull();
+    expect(isKioskAsleep()).toBe(false);
+  });
+
+  it("does not leave the pages thinking it is asleep when it unmounts", () => {
+    mount(SERVER_NIGHT);
+    expect(isKioskAsleep()).toBe(true);
+    act(() => root!.unmount());
+    root = null;
+    expect(isKioskAsleep()).toBe(false);
   });
 
   it("wakes on a tap and sleeps again after a minute untouched", () => {
