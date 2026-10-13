@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Screensaver } from "@baumy/ui";
 import { clockLines } from "@/lib/hub/view";
 import { isKioskBusy } from "@/lib/kiosk/busy";
+import { setKioskAsleep } from "@/lib/kiosk/asleep";
 import { KIOSK_IDLE_MS, SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import {
   NIGHT_EVENT,
@@ -26,6 +27,9 @@ import { closeOpenDialogs } from "./idle-reset";
 // on the page). It keeps the server's time the way the hub clock does (the
 // server's `now` at render, plus how far this device's clock has moved
 // since), so e2e's moved server clock moves it too.
+//
+// It is the one writer of lib/kiosk/asleep.ts, which pauses the home and Shop
+// pages' 60-second re-read while it is up (issue #210).
 //
 // Its memory (asleep, the last touch, whether it was night at the last
 // tick) lives in refs, so the kiosk home's 60-second refresh, which hands it
@@ -56,12 +60,17 @@ export function KioskScreensaver({
     asleepRef.current = next;
     if (next) closeOpenDialogs(document);
     setAsleep(next);
+    // The home and Shop pages stop re-reading while asleep (issue #210).
+    setKioskAsleep(next);
     window.dispatchEvent(
       new CustomEvent<NightEventDetail>(NIGHT_EVENT, {
         detail: { asleep: next },
       }),
     );
   }, []);
+
+  // Leaving the shell asleep must not leave the next screen thinking so.
+  useEffect(() => () => setKioskAsleep(false), []);
 
   const startMin = nightWindow?.startMin;
   const endMin = nightWindow?.endMin;
