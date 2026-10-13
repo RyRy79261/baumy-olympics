@@ -30,7 +30,13 @@ describe("/api/test/brain", () => {
 
   it("refuses a body it does not know", async () => {
     vi.stubEnv("E2E_TEST_MODE", "1");
-    for (const body of ["not json", { add: [] }, { remove: ["milk"] }]) {
+    for (const body of [
+      "not json",
+      { add: [] },
+      { remove: ["milk"] },
+      { sort: { item: "milk", category: "Coffee" } },
+      { sort: { item: "milk" } },
+    ]) {
       expect((await post(body)).status).toBe(400);
     }
   });
@@ -46,5 +52,26 @@ describe("/api/test/brain", () => {
     expect(await off.json()).toMatchObject({ checkedOff: ["milk"] });
     const list = await (await GET()).json();
     expect(list.items.map((i: { item: string }) => i.item)).toEqual(["eggs"]);
+  });
+
+  // Issue #208: plays brain sorting an item, or a pick in Telegram.
+  it("sorts an item into a group, and back to Not sorted", async () => {
+    vi.stubEnv("E2E_TEST_MODE", "1");
+    await post({ add: ["Oat milk"] });
+    const sorted = await post({
+      sort: { item: "oat milk", category: "fresh" },
+    });
+    expect(await sorted.json()).toMatchObject({
+      outcome: "set",
+      item: "Oat milk",
+      category: "fresh",
+      items: [{ item: "Oat milk", category: "fresh" }],
+    });
+    await post({ sort: { item: "Oat milk", category: null } });
+    expect((await (await GET()).json()).items).toEqual([
+      expect.objectContaining({ item: "Oat milk", category: null }),
+    ]);
+    const missing = await post({ sort: { item: "tea", category: "coffee" } });
+    expect(await missing.json()).toMatchObject({ outcome: "not_found" });
   });
 });

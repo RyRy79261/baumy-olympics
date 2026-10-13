@@ -638,7 +638,7 @@
   {
     "name": "list_shopping",
     "title": "Shopping list",
-    "description": "Lists what is on the house shopping list (the same list the house Telegram group keeps with Baumy), oldest first: each item's id, its name and when it was added (ISO 8601, UTC).",
+    "description": "Lists what is on the house shopping list (the same list the house Telegram group keeps with Baumy), oldest first: each item's id, its name, when it was added (ISO 8601, UTC) and its group (pantry, fresh, coffee, cleaning, maintenance or household; null while not sorted).",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -651,7 +651,7 @@
   {
     "name": "add_shopping_items",
     "title": "Add to the shopping list",
-    "description": "Adds one or more items to the house shopping list, which the house Telegram group shares. Send every item of one request in ONE call, one entry each: \"add milk and eggs\" is items [\"milk\", \"eggs\"]. Something already on the list is left as it is.",
+    "description": "Adds one or more items to the house shopping list, which the house Telegram group shares. Send every item of one request in ONE call, one entry each: \"add milk and eggs\" is items [\"milk\", \"eggs\"]. Something already on the list is left as it is. With `category`, the new items go into that group; without it, brain sorts each one by itself a few seconds later.",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -668,6 +668,18 @@
             {
               "type": "string"
             }
+          ]
+        },
+        "category": {
+          "description": "Optional: the group every new item goes into (pantry, fresh, coffee, cleaning, maintenance or household). Leave it out and brain sorts each new item by itself a few seconds later.",
+          "type": "string",
+          "enum": [
+            "pantry",
+            "fresh",
+            "coffee",
+            "cleaning",
+            "maintenance",
+            "household"
           ]
         }
       },
@@ -704,6 +716,54 @@
       },
       "required": [
         "items"
+      ],
+      "additionalProperties": false
+    },
+    "kind": "write",
+    "risk": "safe"
+  },
+  {
+    "name": "set_shopping_category",
+    "title": "Put a shopping item in a group",
+    "description": "Puts one item on the house shopping list into a group: pantry, fresh, coffee, cleaning, maintenance or household, or null for \"Not sorted\". Name the item by its id from list_shopping (best) or by its name. Brain sorts new items by itself; use this when someone says where an item belongs, and brain remembers it for next time.",
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The item's id, as list_shopping gives it. Wins over `item`.",
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+        },
+        "item": {
+          "description": "The item's name, as list_shopping gives it, when you have no id.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "pantry",
+                "fresh",
+                "coffee",
+                "cleaning",
+                "maintenance",
+                "household"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The group: pantry, fresh, coffee, cleaning, maintenance or household; null for \"Not sorted\"."
+        }
+      },
+      "required": [
+        "category"
       ],
       "additionalProperties": false
     },

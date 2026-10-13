@@ -41,6 +41,8 @@ const db = () => t.db() as unknown as Queryable;
 let txDepth = 0;
 /** The open-transaction depth at each brain call, by method. */
 let seen: [string, number][] = [];
+/** What each group pick asked brain for. */
+let picks: unknown[] = [];
 let txCalls = 0;
 let failTxAt: number | null = null;
 
@@ -53,6 +55,7 @@ function watching(inner: BrainClient): BrainClient {
   for (const key of Object.keys(inner) as (keyof BrainClient)[]) {
     out[key] = (async (...args: unknown[]) => {
       seen.push([key, txDepth]);
+      if (key === "setShoppingCategory") picks.push(args[0]);
       return (inner[key] as (...a: unknown[]) => unknown)(...args);
     }) as never;
   }
@@ -64,6 +67,7 @@ let run: ReturnType<typeof createRunner>;
 beforeEach(() => {
   txDepth = 0;
   seen = [];
+  picks = [];
   txCalls = 0;
   failTxAt = null;
   clearMemoryShopping();
@@ -345,6 +349,356 @@ describe("add_shopping_items", () => {
   });
 });
 
+// Issue #208: the groups.
+const category = () => memoryShopping().map((i) => [i.item, i.category]);
+
+describe("add_shopping_items into a group", () => {
+  it("puts only the new items in the group, by id, as the member, with no transaction open", async () => {
+    const me = await seedMember(db(), { telegramUserId: 4242 });
+    memoryAdd(["coffee filters"]);
+    const data = ok(
+      await run(
+        "add_shopping_items",
+        { items: ["beans", "Coffee filters"], category: "coffee" },
+        ctxFor(kiosk(me), { source: "kiosk" }),
+      ),
+    ) as { added: string[]; category: string; notSorted: string[] };
+    expect(data).toMatchObject({
+      added: ["beans"],
+      already: ["Coffee filters"],
+      category: "coffee",
+      notSorted: [],
+      items: [
+        expect.objectContaining({ item: "coffee filters", category: null }),
+        expect.objectContaining({ item: "beans", category: "coffee" }),
+      ],
+    });
+    expect(category()).toEqual([
+      ["coffee filters", null],
+      ["beans", "coffee"],
+    ]);
+    expect(seen).toEqual([
+      ["addShopping", 0],
+      ["setShoppingCategory", 0],
+    ]);
+    expect(picks).toEqual([
+      {
+        id: memoryShopping()[1]!.id,
+        category: "coffee",
+        telegramUserId: 4242,
+      },
+    ]);
+    expect((await audits())[0]).toMatchObject({
+      action: "add_shopping_items",
+      payload: {
+        items: ["beans", "Coffee filters"],
+        added: ["beans"],
+        category: "coffee",
+      },
+    });
+  });
+
+  it("asks nothing more when nothing was new, or no group was picked", async () => {
+    const me = await seedMember(db());
+    memoryAdd(["beans"]);
+    const same = ok(
+      await run(
+        "add_shopping_items",
+        { items: ["beans"], category: "coffee" },
+        ctxFor(sessionActor(me)),
+      ),
+    );
+    expect(same).not.toHaveProperty("category");
+    ok(
+      await run(
+        "add_shopping_items",
+        { items: ["tea"] },
+        ctxFor(sessionActor(me)),
+      ),
+    );
+    expect(seen.map(([m]) => m)).toEqual(["addShopping", "addShopping"]);
+    expect(category()).toEqual([
+      ["beans", null],
+      ["tea", null],
+    ]);
+    expect((await audits())[0]!.payload).not.toHaveProperty("category");
+  });
+
+  it("keeps the add when the group cannot be set, and says what stayed Not sorted", async () => {
+    const me = await seedMember(db());
+    setBrainClientForTests(
+      watching({
+        ...memoryBrain(),
+        setShoppingCategory: async () => ({
+          ok: false,
+          reason: "unavailable",
+        }),
+      }),
+    );
+    const data = ok(
+      await run(
+        "add_shopping_items",
+        { items: ["beans", "milk"], category: "pantry" },
+        ctxFor(sessionActor(me)),
+      ),
+    );
+    expect(data).toMatchObject({
+      added: ["beans", "milk"],
+      category: "pantry",
+      notSorted: ["beans", "milk"],
+    });
+    expect(names()).toEqual(["beans", "milk"]);
+    // Sent without a Telegram account: brain records nobody.
+    expect(picks[0]).not.toHaveProperty("telegramUserId");
+  });
+
+  it("refuses a group that is not one of the six, before calling brain", async () => {
+    const me = await seedMember(db());
+    for (const cat of ["Coffee", "garden", ""]) {
+      expect(
+        await run(
+          "add_shopping_items",
+          { items: ["beans"], category: cat },
+          ctxFor(sessionActor(me)),
+        ),
+        cat,
+      ).toMatchObject({
+        ok: false,
+        code: "INVALID_INPUT",
+        issues: [expect.objectContaining({ path: ["category"] })],
+      });
+    }
+    expect(seen).toEqual([]);
+  });
+
+  it("names the group in its preview", async () => {
+    const ctx = { ...ctxFor(sessionActor("m")), db: db() };
+    expect(
+      await REGISTRY.add_shopping_items.preview!(ctx, {
+        items: ["beans", "filters"],
+        category: "coffee",
+      }),
+    ).toBe("Add beans and filters to the shopping list, under Coffee");
+  });
+});
+
+describe("set_shopping_category", () => {
+  it("puts an item in a group by id, as the member, with no transaction open, and audits it", async () => {
+    const me = await seedMember(db(), { telegramUserId: 777 });
+    memoryAdd(["Oat milk", "beans"]);
+    const oat = memoryShopping()[0]!;
+    const data = ok(
+      await run(
+        "set_shopping_category",
+        { id: oat.id, category: "fresh" },
+        ctxFor(kiosk(me), { source: "kiosk" }),
+      ),
+    );
+    expect(data).toEqual({
+      item: "Oat milk",
+      category: "fresh",
+      items: [
+        expect.objectContaining({ item: "Oat milk", category: "fresh" }),
+        expect.objectContaining({ item: "beans", category: null }),
+      ],
+    });
+    expect(seen).toEqual([["setShoppingCategory", 0]]);
+    expect(picks).toEqual([
+      { id: oat.id, category: "fresh", telegramUserId: 777 },
+    ]);
+    expect((await audits())[0]).toMatchObject({
+      action: "set_shopping_category",
+      entity: "shopping_list",
+      entityId: oat.id,
+      actorMemberId: me,
+      source: "kiosk",
+      payload: { item: "Oat milk", category: "fresh" },
+    });
+    expect((await requests())[0]).toMatchObject({ status: "done" });
+  });
+
+  it("takes the item by name, and null for Not sorted", async () => {
+    const me = await seedMember(db());
+    memoryAdd(["Oat milk"]);
+    ok(
+      await run(
+        "set_shopping_category",
+        { item: "oat milk", category: "pantry" },
+        ctxFor(sessionActor(me)),
+      ),
+    );
+    expect(category()).toEqual([["Oat milk", "pantry"]]);
+    const back = ok(
+      await run(
+        "set_shopping_category",
+        { item: "Oat milk", category: null },
+        ctxFor(mcp(me), { source: "mcp" }),
+      ),
+    );
+    expect(back).toMatchObject({ category: null });
+    expect(category()).toEqual([["Oat milk", null]]);
+    expect(picks).toEqual([
+      { item: "oat milk", category: "pantry" },
+      { item: "Oat milk", category: null },
+    ]);
+  });
+
+  it("says when the item is not on the list, and stores nothing", async () => {
+    const me = await seedMember(db());
+    memoryAdd(["tea"]);
+    expect(
+      await run(
+        "set_shopping_category",
+        { item: "milk", category: "fresh" },
+        ctxFor(sessionActor(me)),
+      ),
+    ).toEqual({
+      ok: false,
+      code: "NOT_FOUND",
+      message: "milk is not on the shopping list.",
+    });
+    expect(
+      await run(
+        "set_shopping_category",
+        { id: "00000000-0000-4000-8000-000000000999", category: "fresh" },
+        ctxFor(sessionActor(me)),
+      ),
+    ).toMatchObject({
+      code: "NOT_FOUND",
+      message: "That item is not on the shopping list any more.",
+    });
+    expect(await audits()).toHaveLength(0);
+  });
+
+  it("asks which one when the name fits more than one item", async () => {
+    const me = await seedMember(db());
+    setBrainClientForTests({
+      ...memoryBrain(),
+      setShoppingCategory: async (r) => ({
+        ok: true,
+        data: {
+          outcome: "ambiguous",
+          item: r.item!,
+          category: null,
+          matches: ["Milk", "Oat milk"],
+          items: [],
+        },
+      }),
+    });
+    expect(
+      await run(
+        "set_shopping_category",
+        { item: "milk", category: "fresh" },
+        ctxFor(sessionActor(me)),
+      ),
+    ).toEqual({
+      ok: false,
+      code: "AMBIGUOUS_ITEM",
+      message: '"milk" could be Milk and Oat milk. Name the one you mean.',
+    });
+    expect(await audits()).toHaveLength(0);
+  });
+
+  it("reports brain's failures", async () => {
+    const me = await seedMember(db());
+    setBrainClientForTests(unconfiguredBrain);
+    expect(
+      await run(
+        "set_shopping_category",
+        { item: "milk", category: "fresh" },
+        ctxFor(sessionActor(me)),
+      ),
+    ).toMatchObject({ code: "NOT_CONFIGURED" });
+    setBrainClientForTests({
+      ...unconfiguredBrain,
+      setShoppingCategory: async () => ({ ok: false, reason: "unavailable" }),
+    });
+    expect(
+      await run(
+        "set_shopping_category",
+        { item: "milk", category: "fresh" },
+        ctxFor(sessionActor(me)),
+      ),
+    ).toMatchObject({ code: "UNAVAILABLE" });
+    expect(await audits()).toHaveLength(0);
+  });
+
+  it("checks the input before calling brain", async () => {
+    const me = await seedMember(db());
+    for (const input of [
+      { item: "milk", category: "Coffee" },
+      { item: "milk" },
+      { category: "fresh" },
+      { id: "7", category: "fresh" },
+      { item: "", category: "fresh" },
+      { item: "milk", category: "fresh", extra: 1 },
+    ]) {
+      expect(
+        await run("set_shopping_category", input, ctxFor(sessionActor(me))),
+        JSON.stringify(input),
+      ).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    }
+    expect(seen).toEqual([]);
+  });
+
+  it("needs a member, and a kiosk with someone picked; no PIN; not brain", async () => {
+    const me = await seedMember(db());
+    memoryAdd(["milk"]);
+    const denied: [Actor, RequestCtx["source"], string][] = [
+      [accountActor("nobody"), "ui", "FORBIDDEN"],
+      [kiosk(), "kiosk", "FORBIDDEN"],
+      [mcp(me, ["baumy:read"]), "mcp", "FORBIDDEN"],
+      [brain(me), "brain", "SURFACE_FORBIDDEN"],
+    ];
+    for (const [actor, source, code] of denied) {
+      expect(
+        await run(
+          "set_shopping_category",
+          { item: "milk", category: "fresh" },
+          ctxFor(actor, { source }),
+        ),
+        source,
+      ).toMatchObject({ ok: false, code });
+    }
+    expect(seen).toEqual([]);
+    const allowed: [Actor, RequestCtx["source"]][] = [
+      [kiosk(me), "kiosk"],
+      [mcp(me), "mcp"],
+      [sessionActor(me), "ai"],
+      [sessionActor(me), "ui"],
+    ];
+    for (const [actor, source] of allowed) {
+      expect(
+        await run(
+          "set_shopping_category",
+          { item: "milk", category: "fresh" },
+          ctxFor(actor, { source }),
+        ),
+        source,
+      ).toMatchObject({ ok: true });
+    }
+    expect(seen).toHaveLength(4);
+  });
+
+  it("previews the item and its group, by name or by id", async () => {
+    memoryAdd(["Oat milk"]);
+    const ctx = { ...ctxFor(sessionActor("m")), db: db() };
+    const preview = REGISTRY.set_shopping_category.preview!;
+    expect(await preview(ctx, { item: "beans", category: "pantry" })).toBe(
+      "Put beans under Pantry",
+    );
+    expect(
+      await preview(ctx, { id: memoryShopping()[0]!.id, category: null }),
+    ).toBe("Move Oat milk to Not sorted");
+    expect(
+      await preview(ctx, {
+        id: "00000000-0000-4000-8000-000000000999",
+        category: "coffee",
+      }),
+    ).toBe("Put that item under Coffee");
+  });
+});
+
 describe("check_off_shopping_items", () => {
   it("checks items off with no transaction open, and audits it", async () => {
     const me = await seedMember(db());
@@ -438,8 +792,18 @@ describe("list_shopping", () => {
     const data = ok(await run("list_shopping", {}, ctxFor(sessionActor(me))));
     expect(data).toEqual({
       items: [
-        { id: "1", item: "milk", addedAt: expect.any(String) },
-        { id: "2", item: "eggs", addedAt: expect.any(String) },
+        {
+          id: expect.any(String),
+          item: "milk",
+          addedAt: expect.any(String),
+          category: null,
+        },
+        {
+          id: expect.any(String),
+          item: "eggs",
+          addedAt: expect.any(String),
+          category: null,
+        },
       ],
     });
   });

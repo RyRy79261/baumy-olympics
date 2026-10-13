@@ -77,6 +77,9 @@ const fakeBrain: BrainClient = {
   checkOffShopping: async () => {
     throw new Error("not here");
   },
+  setShoppingCategory: async () => {
+    throw new Error("not here");
+  },
   requestLoginApproval: async (message) => {
     if (!brainUp) return { ok: false, reason: "unavailable", status: 503 };
     dms.push(message);

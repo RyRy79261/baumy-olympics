@@ -36,6 +36,8 @@ export const BRAIN_EXCLUDED: Partial<Record<ActionName, string>> = {
     "The shopping list is brain's own (`baumy_list_items`); brain changes it directly, and Olympics calls brain to do the same.",
   check_off_shopping_items:
     "The shopping list is brain's own; brain ticks items off directly.",
+  set_shopping_category:
+    "The shopping list's groups are brain's own (it sorts each new item, and \"put coffee filters under coffee\" in Telegram sets one); brain changes them directly, and Olympics calls brain to do the same.",
   check_kiosk_pin:
     "Checks a PIN typed on the kitchen screen; only the kiosk has one.",
   set_kiosk_idle_minutes:
@@ -498,7 +500,8 @@ export const BRAIN_ACTION_NOTES: Record<string, BrainActionNotes> = {
     examples: [
       { say: "(brain reads its own list instead)", call: "list_shopping {}" },
     ],
-    returns: "`items`: id, name, when added.",
+    returns:
+      "`items`: id, name, when added, and group (`category`, null while not sorted).",
     errors: CALENDAR_ERRORS,
     reply: "Use brain's own list.",
   },

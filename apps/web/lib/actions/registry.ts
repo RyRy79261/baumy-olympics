@@ -88,6 +88,7 @@ import {
   addShoppingItems,
   checkOffShoppingItems,
   listShopping,
+  setShoppingCategory,
 } from "./shopping";
 import { setPrizeMode } from "./set-prize-mode";
 import { updateBounties } from "./update-bounties";
@@ -185,6 +186,7 @@ export const REGISTRY = {
   list_shopping: listShopping,
   add_shopping_items: addShoppingItems,
   check_off_shopping_items: checkOffShoppingItems,
+  set_shopping_category: setShoppingCategory,
   list_reminders: listReminders,
   create_reminder: createReminder,
   acknowledge_reminder: acknowledgeReminder,

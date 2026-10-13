@@ -91,6 +91,7 @@ export const ACTION_NAMES = [
   "list_shopping",
   "add_shopping_items",
   "check_off_shopping_items",
+  "set_shopping_category",
   "list_reminders",
   "create_reminder",
   "acknowledge_reminder",

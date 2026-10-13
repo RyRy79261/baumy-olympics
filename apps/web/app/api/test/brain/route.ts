@@ -8,12 +8,20 @@
 //   GET  /api/test/brain                        -> { items: [...] }
 //   POST /api/test/brain { add: ["milk"] }      -> { added, already, items }
 //   POST /api/test/brain { checkOff: ["milk"] } -> { checkedOff, notFound, items }
+//   POST /api/test/brain { sort: { item: "milk", category: "fresh" } }
+//                                               -> { outcome, item, category, items }
+//
+// `sort` (issue #208) plays brain sorting an item by itself a few seconds
+// after it was added, or a housemate's "put milk under fresh" in Telegram:
+// the fake never sorts on its own. `category: null` is "Not sorted".
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ShoppingCategoryKey } from "@baumy/types";
 import {
   memoryAdd,
   memoryCheckOff,
+  memorySetCategory,
   memoryShopping,
 } from "@/lib/integrations/brain-memory";
 import { isTestMode } from "@/lib/test-mode";
@@ -24,6 +32,12 @@ const Items = z.array(z.string().min(1).max(200)).min(1).max(30);
 const Body = z.union([
   z.strictObject({ add: Items }),
   z.strictObject({ checkOff: Items }),
+  z.strictObject({
+    sort: z.strictObject({
+      item: z.string().min(1).max(200),
+      category: ShoppingCategoryKey.nullable(),
+    }),
+  }),
 ]);
 
 export async function GET() {
@@ -36,13 +50,19 @@ export async function POST(request: Request) {
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Send { add: ["milk"] } or { checkOff: ["milk"] }.' },
+      {
+        error:
+          'Send { add: ["milk"] }, { checkOff: ["milk"] } or { sort: { item: "milk", category: "fresh" } }.',
+      },
       { status: 400 },
     );
   }
+  const body = parsed.data;
   const result =
-    "add" in parsed.data
-      ? memoryAdd(parsed.data.add)
-      : memoryCheckOff(parsed.data.checkOff);
+    "add" in body
+      ? memoryAdd(body.add)
+      : "checkOff" in body
+        ? memoryCheckOff(body.checkOff)
+        : memorySetCategory(body.sort);
   return NextResponse.json({ ...result, items: memoryShopping() });
 }
