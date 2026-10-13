@@ -599,6 +599,38 @@ describe("set_shopping_category", () => {
     expect(await audits()).toHaveLength(0);
   });
 
+  it("still says it is ambiguous in a sentence when brain names no matches", async () => {
+    const me = await seedMember(db());
+    for (const matches of [[], undefined]) {
+      setBrainClientForTests({
+        ...memoryBrain(),
+        setShoppingCategory: async (r) => ({
+          ok: true,
+          data: {
+            outcome: "ambiguous",
+            item: r.item!,
+            category: null,
+            ...(matches ? { matches } : {}),
+            items: [],
+          },
+        }),
+      });
+      expect(
+        await run(
+          "set_shopping_category",
+          { item: "milk", category: "fresh" },
+          ctxFor(sessionActor(me)),
+        ),
+        JSON.stringify(matches),
+      ).toEqual({
+        ok: false,
+        code: "AMBIGUOUS_ITEM",
+        message:
+          '"milk" fits more than one item on the list. Name the one you mean.',
+      });
+    }
+  });
+
   it("reports brain's failures", async () => {
     const me = await seedMember(db());
     setBrainClientForTests(unconfiguredBrain);

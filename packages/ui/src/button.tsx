@@ -45,13 +45,26 @@ export function buttonClass(
 }
 
 /**
- * A pressable choice in a grid (an icon and a short word, `on` when picked):
- * the button's look (primary when on, secondary when not) with a tighter,
- * left-aligned layout, so a long word still fits a narrow column. At least
- * 44px tall, 56px with `kiosk`.
+ * How a choice looks: `on` is picked to be used (a toggle that is on: the
+ * green primary), `current` is where something is now (outlined in green on
+ * the raised surface, never a green "go"), `off` the rest (secondary).
+ */
+export type ChoiceState = "off" | "on" | "current";
+
+const CHOICE_STATES: Record<ChoiceState, string> = {
+  off: VARIANTS.secondary,
+  on: VARIANTS.primary,
+  current:
+    "pixel-frame bg-bm-raised text-bm-text [--pf:var(--color-bm-green)] hover:bg-bm-line",
+};
+
+/**
+ * A pressable choice in a grid or a column (an icon and a short word): the
+ * button's look with a tighter, left-aligned layout, so a long word still
+ * fits a narrow column. At least 44px tall, 56px with `kiosk`.
  */
 export function choiceClass(
-  on: boolean,
+  state: ChoiceState,
   kiosk = false,
   className?: string,
 ): string {
@@ -59,7 +72,7 @@ export function choiceClass(
     "inline-flex min-w-0 items-center justify-start text-left font-label font-bold uppercase",
     "active:translate-y-px",
     "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0",
-    VARIANTS[on ? "primary" : "secondary"],
+    CHOICE_STATES[state],
     kiosk
       ? "min-h-14 gap-2 px-3 text-sm tracking-wide"
       : "min-h-11 gap-1.5 px-2 text-xs tracking-normal",

@@ -46,17 +46,23 @@ describe("Button", () => {
 
   // Issue #208: the shopping groups' buttons.
   it("has a choice look: primary when on, one min height and padding, 56px on the kiosk", () => {
-    const on = choiceClass(true, true, "extra");
+    const on = choiceClass("on", true, "extra");
     expect(on).toMatch(/bg-bm-green.*min-h-14.*extra/);
     expect(on).not.toContain("justify-center");
     expect(on.match(/\bmin-h-\d+/g)).toEqual(["min-h-14"]);
     expect(on.match(/\bpx-\d+/g)).toEqual(["px-3"]);
-    const off = choiceClass(false);
+    const off = choiceClass("off");
     expect(off).toContain("pixel-frame");
     expect(off).toContain("bg-bm-raised");
     expect(off.match(/\bmin-h-\d+/g)).toEqual(["min-h-11"]);
     expect(off.match(/\bpx-\d+/g)).toEqual(["px-2"]);
     expect(off.match(/\btracking-\w+/g)).toEqual(["tracking-normal"]);
+    // Where something is now: outlined in green, never the green "go" fill.
+    const current = choiceClass("current", true);
+    expect(current).toContain("[--pf:var(--color-bm-green)]");
+    expect(current).toContain("bg-bm-raised");
+    expect(current).not.toContain("bg-bm-green");
+    expect(current.match(/\[--pf:[^\]]+\]/g)).toHaveLength(1);
   });
 });
 

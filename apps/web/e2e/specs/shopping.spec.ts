@@ -242,9 +242,10 @@ test("the kitchen screen shows the shopping list in its groups, and moves and ad
   await move.click();
   const picker = kiosk.getByRole("dialog", { name: `Group for ${beans}` });
   await expect(picker).toBeVisible();
+  // Where it is now is marked "Now".
   await expect(
-    picker.getByRole("button", { name: "Not sorted", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+    picker.getByRole("button", { name: "Not sorted Now", exact: true }),
+  ).toHaveAttribute("aria-current", "true");
   await expectKioskTargets(picker);
   await picker.getByRole("button", { name: "Coffee", exact: true }).click();
   await expect(

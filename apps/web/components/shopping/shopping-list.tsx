@@ -100,6 +100,7 @@ export function ShoppingList({
   canEdit,
   kiosk = false,
   idPrefix = "shopping",
+  headingLevel = 2,
 }: {
   items: ShoppingEntry[];
   actions: ShoppingActions;
@@ -108,9 +109,19 @@ export function ShoppingList({
   kiosk?: boolean;
   /** Keeps ids apart when the page shows the list twice. */
   idPrefix?: string;
+  /** The groups' heading level: 3 inside a widget whose title is an h2. */
+  headingLevel?: 2 | 3;
 }) {
   const [picking, setPicking] = useState<ShoppingEntry | null>(null);
+  // The picker shows the item as the list has it now: the page re-reads
+  // itself (the kiosk every minute), so its group may have changed, or it
+  // may be gone (ticked off in Telegram), and then the picker closes.
+  const live = picking
+    ? (items.find((i) => i.id === picking.id) ?? null)
+    : null;
+  if (picking && !live) setPicking(null);
   const groups = groupShopping(items);
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   const rows = (list: ShoppingEntry[], testId?: string) => (
     <CheckList data-testid={testId} className="min-h-0">
       {list.map((i) => (
@@ -126,7 +137,6 @@ export function ShoppingList({
                 aria-label={`Change the group of ${i.item}`}
                 aria-haspopup="dialog"
                 onClick={() => setPicking(i)}
-                className={kiosk ? "px-4" : "px-3"}
               >
                 Group
               </Button>
@@ -161,7 +171,7 @@ export function ShoppingList({
               data-testid={`shopping-group-${key}`}
               className="flex flex-col gap-2"
             >
-              <h2
+              <Heading
                 id={headingId}
                 className={cx(
                   "flex items-center gap-3 font-display leading-relaxed",
@@ -173,7 +183,7 @@ export function ShoppingList({
                   <GroupGlyph category={g.category} size={kiosk ? 36 : 28} />
                 ) : null}
                 {g.label}
-              </h2>
+              </Heading>
               {rows(g.items)}
             </section>
           );
@@ -197,10 +207,10 @@ export function ShoppingList({
           className="h-20 shrink-0"
         />
       ) : null}
-      {canEdit && picking ? (
+      {canEdit && live ? (
         <GroupPicker
-          key={picking.id}
-          item={picking}
+          key={live.id}
+          item={live}
           action={actions.setCategory}
           onClose={() => setPicking(null)}
         />
@@ -254,7 +264,7 @@ function QuickAdd({
               type="button"
               aria-pressed={on}
               onClick={() => setGroup(on ? null : c)}
-              className={choiceClass(on, kiosk)}
+              className={choiceClass(on ? "on" : "off", kiosk)}
             >
               <GroupGlyph category={c} size={kiosk ? 28 : 20} on={on} />
               <span className="truncate">{shoppingCategoryLabel(c)}</span>
@@ -315,12 +325,25 @@ function GroupPicker({
   onClose: () => void;
 }) {
   const { state, formAction, pending, requestId } = useActionForm(
-    useReporting(action, (data) => {
-      toast.success(categoryMessage(data));
-      onClose();
-    }),
+    useReporting<SetShoppingCategoryData>(
+      async (prev, form) => {
+        const result = await action(prev, form);
+        // Gone meanwhile (ticked off elsewhere): say so and close; the
+        // list re-reads itself without it.
+        if (!result.ok && result.code === "NOT_FOUND") {
+          toast.error(result.message);
+          onClose();
+        }
+        return result;
+      },
+      (data) => {
+        toast.success(categoryMessage(data));
+        onClose();
+      },
+    ),
   );
-  const failed = state && !state.ok ? state : null;
+  const failed =
+    state && !state.ok && state.code !== "NOT_FOUND" ? state : null;
   const choices: (ShoppingCategory | null)[] = [...SHOPPING_CATEGORIES, null];
   return (
     <Dialog
@@ -343,12 +366,26 @@ function GroupPicker({
                 name="category"
                 value={c ?? NO_GROUP}
                 disabled={pending}
-                aria-pressed={current}
-                // Big on every screen: 56px, whether kiosk or phone.
-                className={choiceClass(current, true)}
+                aria-current={current ? "true" : undefined}
+                // Big on every screen: 56px, whether kiosk or phone. Where
+                // it is now is outlined with "Now", not a green "go".
+                className={choiceClass(current ? "current" : "off", true)}
               >
-                {c ? <GroupGlyph category={c} size={32} on={current} /> : null}
+                {c ? (
+                  <GroupGlyph category={c} size={32} />
+                ) : (
+                  // Keeps "Not sorted" in line with the labels beside icons.
+                  <span aria-hidden="true" className="size-8 shrink-0" />
+                )}
                 {shoppingCategoryLabel(c)}
+                {current ? (
+                  <span
+                    data-testid="group-now"
+                    className="ml-auto text-xs text-bm-green"
+                  >
+                    Now
+                  </span>
+                ) : null}
               </button>
             );
           })}

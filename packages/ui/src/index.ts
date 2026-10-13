@@ -21,6 +21,7 @@ export {
   buttonClass,
   choiceClass,
   type ButtonProps,
+  type ChoiceState,
   type ButtonSize,
   type ButtonVariant,
 } from "./button";

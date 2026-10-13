@@ -291,9 +291,13 @@ export const setShoppingCategory = defineAction({
       );
     }
     if (r.data.outcome === "ambiguous") {
+      const named = `"${i.item ?? r.data.item}"`;
+      const matches = r.data.matches ?? [];
       return fail(
         "AMBIGUOUS_ITEM",
-        `"${i.item ?? r.data.item}" could be ${listPhrase(r.data.matches ?? [])}. Name the one you mean.`,
+        matches.length > 0
+          ? `${named} could be ${listPhrase(matches)}. Name the one you mean.`
+          : `${named} fits more than one item on the list. Name the one you mean.`,
       );
     }
     const data: SetShoppingCategoryData = {

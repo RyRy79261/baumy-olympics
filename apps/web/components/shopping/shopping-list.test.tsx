@@ -17,8 +17,9 @@ import { ShoppingList, type ShoppingActions } from "./shopping-list";
 // group buttons on each row and the quick-add's group buttons.
 
 const toastSuccess = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/ui/toast", () => ({
-  toast: { success: toastSuccess, error: vi.fn() },
+  toast: { success: toastSuccess, error: toastError },
   toastActionError: () => false,
 }));
 
@@ -40,6 +41,7 @@ afterEach(async () => {
   root = null;
   document.body.innerHTML = "";
   toastSuccess.mockReset();
+  toastError.mockReset();
 });
 
 function entry(
@@ -145,7 +147,7 @@ describe("ShoppingList", () => {
 
 describe("ShoppingList's groups (issue #208)", () => {
   const headings = (el: HTMLElement) =>
-    [...el.querySelectorAll("section > h2")].map((h) => [
+    [...el.querySelectorAll("section > h2, section > h3")].map((h) => [
       h.textContent,
       h.querySelector("svg")?.getAttribute("data-glyph") ?? null,
     ]);
@@ -246,6 +248,25 @@ describe("ShoppingList's groups (issue #208)", () => {
       expect(b.getAttribute("aria-pressed")).toBe("false");
       expect(b.className).toContain("min-h-14");
     }
+    // The Group button is the kit's own size: no padding of its own on top.
+    expect(groupButtons[0]!.className.match(/\bpx-\d+/g)).toEqual(["px-6"]);
+  });
+
+  it("makes the groups h3 under a widget's h2 title", () => {
+    const el = html(
+      renderToStaticMarkup(
+        <ShoppingList
+          items={grouped}
+          canEdit
+          headingLevel={3}
+          actions={actions}
+        />,
+      ),
+    );
+    expect(
+      [...el.querySelectorAll("section > h3")].map((h) => h.textContent),
+    ).toEqual(["Pantry", "Coffee", "Cleaning", "Not sorted"]);
+    expect(el.querySelectorAll("h2")).toHaveLength(0);
   });
 });
 
@@ -299,19 +320,31 @@ describe("ShoppingList's group buttons (issue #208)", () => {
     ).toEqual([
       ["Pantry", "pantry"],
       ["Fresh", "fresh"],
-      ["Coffee", "coffee"],
+      ["CoffeeNow", "coffee"],
       ["Cleaning", "cleaning"],
       ["Maintenance", "maintenance"],
       ["Household", "household"],
       ["Not sorted", "none"],
     ]);
-    // Where it is now is the pressed one.
+    // Where it is now is marked "Now" and outlined, not a green "go".
+    const now = choices.filter(
+      (b) => b.getAttribute("aria-current") === "true",
+    );
+    expect(now.map((b) => b.getAttribute("value"))).toEqual(["coffee"]);
+    expect(now[0]!.querySelector('[data-testid="group-now"]')).not.toBeNull();
+    expect(now[0]!.className).toContain("[--pf:var(--color-bm-green)]");
+    for (const b of choices) {
+      expect(b.className).toContain("min-h-14");
+      // No choice is the green "go" fill.
+      expect(b.className).not.toContain("bg-bm-green");
+    }
+    // "Not sorted" has no icon: a spacer of the icon's size keeps it in line.
+    const notSorted = choices.at(-1)!;
+    expect(notSorted.querySelector("svg")).toBeNull();
     expect(
-      choices
-        .filter((b) => b.getAttribute("aria-pressed") === "true")
-        .map((b) => b.textContent),
-    ).toEqual(["Coffee"]);
-    for (const b of choices) expect(b.className).toContain("min-h-14");
+      notSorted.querySelector('span[aria-hidden="true"]')!.className,
+    ).toContain("size-8");
+    expect(choices[0]!.querySelector("svg")!.getAttribute("width")).toBe("32");
     await act(async () => button(open, "Pantry").click());
     expect(setCategory).toHaveBeenCalledTimes(1);
     const form = (setCategory.mock.calls[0] as unknown[])[1] as FormData;
@@ -345,6 +378,71 @@ describe("ShoppingList's group buttons (issue #208)", () => {
       "The shopping list is unavailable right now.",
     );
     expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("says so and closes when the item is gone by the time a group is tapped", async () => {
+    const setCategory = vi.fn(async (): Promise<SetResult> => ({
+      ok: false,
+      code: "NOT_FOUND",
+      message: "That item is not on the shopping list any more.",
+    }));
+    const el = await mount(grouped, { setCategory });
+    await act(async () =>
+      el
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Change the group of rice"]',
+        )!
+        .click(),
+    );
+    await act(async () => button(dialog()!, "Fresh").click());
+    expect(toastError).toHaveBeenCalledWith(
+      "That item is not on the shopping list any more.",
+    );
+    expect(dialog()).toBeNull();
+  });
+
+  it("follows the list as it re-reads: a new group shows as Now, and a gone item closes it", async () => {
+    const el = await mount(grouped);
+    await act(async () =>
+      el
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Change the group of rice"]',
+        )!
+        .click(),
+    );
+    const nowOf = () =>
+      dialog()!.querySelector('[aria-current="true"]')!.getAttribute("value");
+    expect(nowOf()).toBe("pantry");
+    // Brain (or Telegram) moved it meanwhile; the page re-read the list.
+    const moved = grouped.map((i) =>
+      i.item === "rice" ? { ...i, category: "fresh" as const } : i,
+    );
+    await act(async () =>
+      root!.render(
+        <ShoppingList items={moved} canEdit kiosk actions={actions} />,
+      ),
+    );
+    expect(dialog()!.getAttribute("aria-label")).toBe("Group for rice");
+    expect(nowOf()).toBe("fresh");
+    // Ticked off in Telegram: the next re-read has no rice, so it closes.
+    await act(async () =>
+      root!.render(
+        <ShoppingList
+          items={moved.filter((i) => i.item !== "rice")}
+          canEdit
+          kiosk
+          actions={actions}
+        />,
+      ),
+    );
+    expect(dialog()).toBeNull();
+    // And it does not come back on the next render.
+    await act(async () =>
+      root!.render(
+        <ShoppingList items={moved} canEdit kiosk actions={actions} />,
+      ),
+    );
+    expect(dialog()).toBeNull();
   });
 
   it("adds into the group picked, then forgets the pick", async () => {

@@ -170,6 +170,8 @@ function ShoppingWidget(
           canEdit
           actions={props.actions}
           idPrefix="hub-shopping"
+          // The widget's title is the h2; its groups go under it.
+          headingLevel={3}
         />
       )}
     </Widget>
