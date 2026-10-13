@@ -5,8 +5,9 @@ import { pairedKiosk } from "../lib/kiosk";
 // Issue #66 (ADR 0005 §6), on the kitchen iPad: by day, 5 minutes untouched
 // bring on the raccoon screensaver (a dim room, the clock, Baumy asleep and
 // four raccoons); a tap wakes it and never reaches the page; a touch
-// before the 5 minutes starts the wait again. Only the iPad's clock moves
-// (Playwright's), so it runs alongside everything else.
+// before the 5 minutes starts the wait again. While it is up, the home page
+// does not re-read itself, and waking re-reads it at once (issue #210). Only
+// the iPad's clock moves (Playwright's), so it runs alongside everything else.
 
 const MINUTE = 60_000;
 
@@ -24,6 +25,17 @@ test("the screensaver comes on after 5 minutes untouched and a tap wakes it", as
     `iPad ${suffix}`,
   );
   await context.clock.install();
+  // The home page's own re-reads: router.refresh() on /kiosk, not a prefetch.
+  let refreshes = 0;
+  kiosk.on("request", (request) => {
+    const headers = request.headers();
+    if (
+      new URL(request.url()).pathname === "/kiosk" &&
+      headers["rsc"] === "1" &&
+      !headers["next-router-prefetch"]
+    )
+      refreshes += 1;
+  });
   await kiosk.goto("/kiosk");
   await kiosk.waitForLoadState("networkidle");
   const shell = kiosk.locator("[data-kiosk]");
@@ -34,6 +46,8 @@ test("the screensaver comes on after 5 minutes untouched and a tap wakes it", as
   // 4 minutes, a touch, 4 more: still awake.
   await context.clock.fastForward(4 * MINUTE);
   await expect(saver).toHaveCount(0);
+  // Awake, it re-reads itself.
+  await expect.poll(() => refreshes).toBeGreaterThan(0);
   await kiosk.mouse.click(5, 5);
   await context.clock.fastForward(4 * MINUTE);
   await expect(saver).toHaveCount(0);
@@ -53,12 +67,24 @@ test("the screensaver comes on after 5 minutes untouched and a tap wakes it", as
   await expect(saver.locator('[data-state="sleeping"]')).toHaveCount(1);
   await expect(saver.locator("[data-raccoon]")).toHaveCount(4);
 
+  // Asleep, it does not (issue #210): three more minutes, no re-read.
+  await kiosk.waitForLoadState("networkidle");
+  refreshes = 0;
+  await context.clock.fastForward(MINUTE);
+  await context.clock.fastForward(MINUTE);
+  await context.clock.fastForward(MINUTE);
+  await kiosk.waitForLoadState("networkidle");
+  await expect(saver).toBeVisible();
+  expect(refreshes).toBe(0);
+
   // A tap in the middle of the screen wakes it, and lands on nothing else.
   const url = kiosk.url();
   await saver.click();
   await expect(saver).toHaveCount(0);
   await expect(shell).toBeVisible();
   expect(kiosk.url()).toBe(url);
+  // Waking re-reads the page at once.
+  await expect.poll(() => refreshes).toBeGreaterThan(0);
 
   await context.close();
 });
