@@ -19,10 +19,12 @@ export const ShoppingItem = z
       `${namedItem(iss.input)} is over ${SHOPPING_ITEM_MAX} characters.`,
   });
 
-/** How a too-long item is named in its error: its first 20 characters. */
+/**
+ * How a too-long item is named in its error: its first 20 characters. Only a
+ * trimmed string over the limit gets here, so it is always cut.
+ */
 function namedItem(input: unknown): string {
-  const text = typeof input === "string" ? input : "";
-  return text.length > 20 ? `"${text.slice(0, 20)}…"` : `"${text}"`;
+  return `"${String(input).slice(0, 20)}…"`;
 }
 
 /**
