@@ -122,12 +122,22 @@ export {
 } from "./notes";
 export {
   ListShoppingInput,
+  NOT_SORTED_LABEL,
+  SHOPPING_CATEGORIES,
+  SHOPPING_CATEGORY_LABELS,
   SHOPPING_ITEMS_MAX,
   SHOPPING_ITEM_MAX,
+  SetShoppingCategoryInput,
+  ShoppingAdd,
+  ShoppingCategoryKey,
   ShoppingItem,
+  ShoppingItemId,
   ShoppingItems,
   ShoppingWrite,
+  isShoppingCategory,
+  shoppingCategoryLabel,
   splitShoppingText,
+  type ShoppingCategory,
 } from "./shopping";
 export {
   ListRemindersInput,
