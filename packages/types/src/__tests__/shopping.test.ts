@@ -54,12 +54,62 @@ describe("ShoppingWrite", () => {
       ShoppingWrite.safeParse({ items: ["x".repeat(SHOPPING_ITEM_MAX)] })
         .success,
     ).toBe(true);
-    const r = ShoppingWrite.safeParse({
-      items: ["x".repeat(SHOPPING_ITEM_MAX + 1)],
-    });
+    const long = `Organic oat milk ${"x".repeat(SHOPPING_ITEM_MAX)}`;
+    const r = ShoppingWrite.safeParse({ items: ["milk", long, "eggs"] });
+    // The whole call is refused, and the error names the item.
+    expect(r.success).toBe(false);
+    expect(r.error!.issues).toHaveLength(1);
     expect(r.error!.issues[0]!.message).toBe(
-      `Keep each item to ${SHOPPING_ITEM_MAX} characters.`,
+      `"Organic oat milk xxx…" is over ${SHOPPING_ITEM_MAX} characters.`,
     );
+  });
+
+  it("takes 13 items as an array", () => {
+    const items = Array.from({ length: 13 }, (_, i) => `item ${i + 1}`);
+    expect(ShoppingWrite.parse({ items })).toEqual({ items });
+  });
+
+  it("takes a JSON-string array as that array (issue #206)", () => {
+    expect(ShoppingWrite.parse({ items: '["Ginger"]' })).toEqual({
+      items: ["Ginger"],
+    });
+    expect(ShoppingWrite.parse({ items: '["a", " b "]' })).toEqual({
+      items: ["a", "b"],
+    });
+    const thirteen = Array.from({ length: 13 }, (_, i) => `item ${i + 1}`);
+    expect(ShoppingWrite.parse({ items: JSON.stringify(thirteen) })).toEqual({
+      items: thirteen,
+    });
+  });
+
+  it("checks each item of a JSON-string array", () => {
+    const long = "y".repeat(SHOPPING_ITEM_MAX + 1);
+    const r = ShoppingWrite.safeParse({ items: JSON.stringify(["a", long]) });
+    expect(r.success).toBe(false);
+    expect(r.error!.issues[0]!.message).toBe(
+      `"${"y".repeat(20)}…" is over ${SHOPPING_ITEM_MAX} characters.`,
+    );
+    expect(ShoppingWrite.safeParse({ items: "[]" }).success).toBe(false);
+    const many = JSON.stringify(
+      Array.from({ length: SHOPPING_ITEMS_MAX + 1 }, (_, i) => `i${i}`),
+    );
+    expect(
+      ShoppingWrite.safeParse({ items: many }).error!.issues[0]!.message,
+    ).toBe(`Add at most ${SHOPPING_ITEMS_MAX} at once.`);
+  });
+
+  it("keeps any other string as one item", () => {
+    for (const items of [
+      "[1,2]",
+      '{"a":1}',
+      "[not json",
+      '["a", 1]',
+      '"milk"',
+    ]) {
+      expect(ShoppingWrite.parse({ items }), items).toEqual({
+        items: [items],
+      });
+    }
   });
 
   it(`refuses more than ${SHOPPING_ITEMS_MAX} items at once`, () => {

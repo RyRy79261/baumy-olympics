@@ -14,7 +14,32 @@ export const ShoppingItem = z
   .string({ error: "Name the item." })
   .trim()
   .min(1, "Name the item.")
-  .max(SHOPPING_ITEM_MAX, `Keep each item to ${SHOPPING_ITEM_MAX} characters.`);
+  .max(SHOPPING_ITEM_MAX, {
+    error: (iss) =>
+      `${namedItem(iss.input)} is over ${SHOPPING_ITEM_MAX} characters.`,
+  });
+
+/** How a too-long item is named in its error: its first 20 characters. */
+function namedItem(input: unknown): string {
+  const text = typeof input === "string" ? input : "";
+  return text.length > 20 ? `"${text.slice(0, 20)}…"` : `"${text}"`;
+}
+
+/**
+ * A string that is a JSON array of strings, as some MCP clients send a list
+ * (issue #206): that array. Anything else is not a list, so null.
+ */
+function jsonStringList(text: string): string[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  return Array.isArray(parsed) && parsed.every((x) => typeof x === "string")
+    ? parsed
+    : null;
+}
 
 /**
  * Split what someone typed in the quick-add field into items: commas and new
@@ -30,14 +55,16 @@ export function splitShoppingText(text: string): string[] {
 }
 
 /**
- * One or more items, each as it is: an array (JSON, a repeated form field)
- * or one string (a form with a single item).
+ * One or more items, each as it is: an array (JSON, a repeated form field),
+ * a string holding a JSON array of strings (some MCP clients send the list
+ * that way, issue #206), or any other string as one item (a form with a
+ * single item). One bad item refuses the whole call.
  */
 export const ShoppingItems = z
   .union([z.array(z.string()), z.string()], {
     error: "Name at least one item.",
   })
-  .transform((v) => (Array.isArray(v) ? v : [v]))
+  .transform((v) => (Array.isArray(v) ? v : (jsonStringList(v) ?? [v])))
   .pipe(
     z
       .array(ShoppingItem)
