@@ -17,7 +17,7 @@ covers:
 
 Baumy Brain is the house's Telegram bot, {{TELEGRAM_BOT}}. It lives in the house's Telegram group and in your direct messages, and it is the same Baumy as in the app: it can read the bounties, scores, notes, reminders, the calendar and the pot, and do things in the app for you.
 
-The **shopping list belongs to Baumy Brain**. "Buy milk" in the Telegram group and on the kitchen iPad is the same list, so whatever you add or tick off in one place shows in the other.
+The **shopping list belongs to Baumy Brain**. "Buy milk" in the Telegram group and on the kitchen iPad is the same list, so whatever you add or tick off in one place shows in the other. The same goes for its groups (Pantry, Fresh, Coffee and so on): Baumy Brain sorts each new item, and a group you pick in the app or in Telegram ("put coffee filters under coffee") shows in both.
 
 ## Linking your Telegram account
 
