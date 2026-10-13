@@ -30,7 +30,14 @@ const ITEM = {
   addedBy: null,
   createdAt: "2026-09-27T09:00:00.000Z",
 };
-const ENTRY = { id: "7", item: "Milk", addedAt: "2026-09-27T09:00:00.000Z" };
+// ITEM is what a brain from before its PR #30 sends: no `category`, which
+// reads as "Not sorted" (issue #208).
+const ENTRY = {
+  id: "7",
+  item: "Milk",
+  addedAt: "2026-09-27T09:00:00.000Z",
+  category: null,
+};
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -174,6 +181,140 @@ describe("httpBrain", () => {
     expect(calls[0]!.url).toBe(
       "https://brain.example.com/api/kitchen/shopping/checkoff",
     );
+  });
+
+  // Issue #208: brain's PR #30 adds `category` to every item.
+  it("reads each item's group, and a missing or unknown one as Not sorted", async () => {
+    const { client } = setup(async () =>
+      json({
+        ok: true,
+        items: [
+          { ...ITEM, id: "a", category: "coffee" },
+          { ...ITEM, id: "b", category: null },
+          { ...ITEM, id: "c" },
+          { ...ITEM, id: "d", category: "garden" },
+          { ...ITEM, id: "e", category: "Coffee" },
+          { ...ITEM, id: "f", category: 3, sortedBy: "guess", extra: {} },
+        ],
+      }),
+    );
+    const r = await client.listShopping();
+    expect(r.ok && r.data.map((i) => [i.id, i.category])).toEqual([
+      ["a", "coffee"],
+      ["b", null],
+      ["c", null],
+      ["d", null],
+      ["e", null],
+      ["f", null],
+    ]);
+    // Fields it does not read never reach the entries.
+    expect(r.ok && r.data[5]).toEqual({ ...ENTRY, id: "f" });
+  });
+
+  it("puts an item in a group by id, sending only what was asked", async () => {
+    const id = "6f1f3f0d-2a11-4c38-9a53-0b0e6c1a3a7e";
+    const { client, calls } = setup(async () =>
+      json({
+        ok: true,
+        outcome: "set",
+        id,
+        item: "Milk",
+        category: "fresh",
+        attributedTo: "42",
+        items: [{ ...ITEM, id, category: "fresh" }],
+      }),
+    );
+    expect(
+      await client.setShoppingCategory({
+        id,
+        category: "fresh",
+        telegramUserId: 42,
+      }),
+    ).toEqual({
+      ok: true,
+      data: {
+        outcome: "set",
+        id,
+        item: "Milk",
+        category: "fresh",
+        items: [{ ...ENTRY, id, category: "fresh" }],
+      },
+    });
+    expect(calls[0]!.url).toBe(
+      "https://brain.example.com/api/kitchen/shopping/category",
+    );
+    expect(calls[0]!.init.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
+      id,
+      category: "fresh",
+      telegramUserId: 42,
+    });
+  });
+
+  it("puts an item in no group by name, and passes on a miss or two matches", async () => {
+    const { client, calls } = setup(async (_url, init) => {
+      const body = JSON.parse(String(init.body)) as { item: string };
+      return body.item === "milk"
+        ? json({
+            ok: true,
+            outcome: "ambiguous",
+            item: "milk",
+            category: null,
+            matches: ["Milk", "Oat milk"],
+            attributedTo: null,
+            items: [ITEM],
+          })
+        : json({
+            ok: true,
+            outcome: "not_found",
+            item: body.item,
+            category: null,
+            attributedTo: null,
+            items: [ITEM],
+          });
+    });
+    expect(
+      await client.setShoppingCategory({ item: "milk", category: null }),
+    ).toEqual({
+      ok: true,
+      data: {
+        outcome: "ambiguous",
+        item: "milk",
+        category: null,
+        matches: ["Milk", "Oat milk"],
+        items: [ENTRY],
+      },
+    });
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
+      item: "milk",
+      category: null,
+    });
+    expect(
+      await client.setShoppingCategory({ item: "tea", category: "coffee" }),
+    ).toEqual({
+      ok: true,
+      data: {
+        outcome: "not_found",
+        item: "tea",
+        category: null,
+        items: [ENTRY],
+      },
+    });
+  });
+
+  it("answers unavailable when brain refuses a group or has no such route", async () => {
+    for (const [status, body] of [
+      [400, { ok: false, error: "bad_request" }],
+      // A brain from before its PR #30.
+      [404, { ok: false }],
+      [200, { ok: true, outcome: "moved", item: "x", items: [] }],
+    ] as const) {
+      const { client, logs } = setup(async () => json(body, status));
+      expect(
+        await client.setShoppingCategory({ item: "x", category: "coffee" }),
+      ).toEqual({ ok: false, reason: "unavailable" });
+      expect(logs[0]).toContain("[brain] category failed");
+    }
   });
 
   it("asks for a sign-in approval DM with the message as its body", async () => {
@@ -321,6 +462,8 @@ describe("cachedBrain", () => {
       checkOffShopping: async () => {
         throw new Error("boom");
       },
+      setShoppingCategory: async () =>
+        ({ ok: false, reason: "unavailable" }) as const,
       requestLoginApproval: async () =>
         ({ ok: true, data: { sent: true } }) as const,
     };
@@ -380,6 +523,9 @@ describe("cachedBrain", () => {
     await expect(client.checkOffShopping(["milk"])).rejects.toThrow("boom");
     await client.listShopping();
     expect(inner.reads).toBe(3);
+    await client.setShoppingCategory({ item: "milk", category: "fresh" });
+    await client.listShopping();
+    expect(inner.reads).toBe(4);
   });
 
   it("forgets the list when the kiosk's refresh asks", async () => {
@@ -413,6 +559,7 @@ describe("brainClient", () => {
       await client.listShopping(),
       await client.addShopping(["milk"]),
       await client.checkOffShopping(["milk"]),
+      await client.setShoppingCategory({ item: "milk", category: null }),
       await client.requestLoginApproval({
         requestId: "r",
         telegramUserId: 1,

@@ -131,7 +131,9 @@ export type DomainErrorCode =
   /** That gallery character is archived, so it cannot be picked now. */
   | "AVATAR_ARCHIVED"
   /** `create_service_token` for a name that already has a live token. */
-  | "SERVICE_TOKEN_EXISTS";
+  | "SERVICE_TOKEN_EXISTS"
+  /** `set_shopping_category`: the name fits more than one item on the list. */
+  | "AMBIGUOUS_ITEM";
 
 export type ActionErrorCode = PlatformErrorCode | DomainErrorCode;
 

@@ -19,7 +19,10 @@ export { STATE_MARK } from "./baumy-states";
 export {
   Button,
   buttonClass,
+  choiceClass,
+  iconChoiceClass,
   type ButtonProps,
+  type ChoiceState,
   type ButtonSize,
   type ButtonVariant,
 } from "./button";

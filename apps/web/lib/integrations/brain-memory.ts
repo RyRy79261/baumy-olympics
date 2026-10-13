@@ -1,11 +1,14 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import type { ShoppingCategory } from "@baumy/types";
 import { now } from "@/lib/clock";
 import type {
   BrainClient,
   BrainResult,
   LoginApprovalMessage,
+  ShoppingCategoryRequest,
+  ShoppingCategoryResult,
   ShoppingEntry,
 } from "./brain";
 
@@ -42,6 +45,18 @@ interface Row {
   item: string;
   norm: string;
   createdAt: Date;
+  /**
+   * Its group (issue #208). Null after an add, as brain's is until its
+   * sorting runs; this fake never sorts by itself, so an item gets a group
+   * only when one is picked (the kiosk, or `/api/test/brain` playing
+   * brain's sorting or a Telegram pick).
+   */
+  category: ShoppingCategory | null;
+}
+
+/** A UUID-shaped id from the counter, as brain's ids are UUIDs. */
+function rowId(seq: number): string {
+  return `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`;
 }
 
 const STORE_KEY = Symbol.for("baumy.brain.memory");
@@ -93,6 +108,7 @@ function view(): ShoppingEntry[] {
     id: r.id,
     item: r.item,
     addedAt: r.createdAt.toISOString(),
+    category: r.category,
   }));
 }
 
@@ -113,7 +129,13 @@ export function memoryAdd(items: string[]): {
       continue;
     }
     s.seq += 1;
-    s.rows.push({ id: String(s.seq), item, norm, createdAt: now() });
+    s.rows.push({
+      id: rowId(s.seq),
+      item,
+      norm,
+      createdAt: now(),
+      category: null,
+    });
     added.push(item);
   }
   return { added, already };
@@ -138,6 +160,34 @@ export function memoryCheckOff(items: string[]): {
     s.rows.splice(at, 1);
   }
   return { checkedOff, notFound };
+}
+
+/**
+ * Put one item in a group, as brain does: by id when given (it wins), else
+ * by the normalised name. A miss changes nothing and says `not_found`.
+ */
+export function memorySetCategory(
+  request: Pick<ShoppingCategoryRequest, "id" | "item" | "category">,
+): Omit<ShoppingCategoryResult, "items"> {
+  const rows = store().rows;
+  const row =
+    request.id !== undefined
+      ? rows.find((r) => r.id === request.id)
+      : rows.find((r) => r.norm === normalizeItem(request.item ?? ""));
+  if (!row) {
+    return {
+      outcome: "not_found",
+      item: request.item?.trim() ?? "",
+      category: request.category,
+    };
+  }
+  row.category = request.category;
+  return {
+    outcome: "set",
+    id: row.id,
+    item: row.item,
+    category: row.category,
+  };
 }
 
 /** The open list, as Telegram would see it. */
@@ -181,6 +231,8 @@ export function downWhenAsked(
       (await isDown()) ? DOWN : inner.addShopping(items),
     checkOffShopping: async (items) =>
       (await isDown()) ? DOWN : inner.checkOffShopping(items),
+    setShoppingCategory: async (request) =>
+      (await isDown()) ? DOWN : inner.setShoppingCategory(request),
     requestLoginApproval: async (message) =>
       (await isDown()) ? DOWN : inner.requestLoginApproval(message),
   };
@@ -194,6 +246,8 @@ export function memoryBrain(): BrainClient {
     addShopping: (items) => ok({ ...memoryAdd(items), items: view() }),
     checkOffShopping: (items) =>
       ok({ ...memoryCheckOff(items), items: view() }),
+    setShoppingCategory: (request) =>
+      ok({ ...memorySetCategory(request), items: view() }),
     requestLoginApproval: (message) => {
       // Keep the last few per server: a spec reads the newest for its user.
       const all = dms();

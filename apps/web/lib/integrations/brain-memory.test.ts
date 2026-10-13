@@ -65,7 +65,60 @@ describe("the fake brain", () => {
       "eggs",
       "bread",
     ]);
-    expect(list.ok && list.data[0]!.id).toBe("1");
+    // UUID-shaped, as brain's are; and Not sorted until someone sorts it.
+    expect(list.ok && list.data[0]).toMatchObject({
+      id: "00000000-0000-4000-8000-000000000001",
+      category: null,
+    });
+  });
+
+  // Issue #208.
+  it("puts an item in a group by id or by name, and says when it has none", async () => {
+    memoryAdd(["Oat Milk", "beans"]);
+    const brain = memoryBrain();
+    const [oat, beans] = memoryShopping();
+    const byId = await brain.setShoppingCategory({
+      id: beans!.id,
+      item: "oat milk",
+      category: "pantry",
+    });
+    expect(byId.ok && byId.data).toMatchObject({
+      outcome: "set",
+      id: beans!.id,
+      item: "beans",
+      category: "pantry",
+    });
+    const byName = await brain.setShoppingCategory({
+      item: " OAT  milk ",
+      category: "fresh",
+    });
+    expect(byName.ok && byName.data).toMatchObject({
+      outcome: "set",
+      id: oat!.id,
+      category: "fresh",
+      items: [
+        expect.objectContaining({ item: "Oat Milk", category: "fresh" }),
+        expect.objectContaining({ item: "beans", category: "pantry" }),
+      ],
+    });
+    await brain.setShoppingCategory({ id: oat!.id, category: null });
+    expect(memoryShopping()[0]!.category).toBeNull();
+    const missing = await brain.setShoppingCategory({
+      item: "tea",
+      category: "coffee",
+    });
+    expect(missing.ok && missing.data).toMatchObject({
+      outcome: "not_found",
+      item: "tea",
+    });
+    const noId = await brain.setShoppingCategory({
+      id: "00000000-0000-4000-8000-000000000999",
+      category: "coffee",
+    });
+    expect(noId.ok && noId.data).toMatchObject({
+      outcome: "not_found",
+      item: "",
+    });
   });
 
   it("checks off by the normalised name", async () => {
@@ -97,6 +150,10 @@ describe("the fake brain", () => {
     expect(await brain.listShopping()).toEqual(down);
     expect(await brain.addShopping(["eggs"])).toEqual(down);
     expect(await brain.checkOffShopping(["milk"])).toEqual(down);
+    expect(
+      await brain.setShoppingCategory({ item: "milk", category: "fresh" }),
+    ).toEqual(down);
+    expect(memoryShopping()[0]!.category).toBeNull();
     expect(await brain.requestLoginApproval(DM)).toEqual(down);
     expect(memoryLoginApproval(DM.telegramUserId)).toBeNull();
     expect(memoryShopping().map((i) => i.item)).toEqual(["milk"]);

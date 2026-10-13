@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { isShoppingCategory, type ShoppingCategory } from "@baumy/types";
 import { now } from "@/lib/clock";
 import { redactSecrets } from "@/lib/redact";
 import { isTestMode } from "@/lib/test-mode";
@@ -13,6 +14,14 @@ import { downWhenAsked, memoryBrain } from "./brain-memory";
 //   GET  {BRAIN_BASE_URL}/api/kitchen/shopping           → { ok, items }
 //   POST {BRAIN_BASE_URL}/api/kitchen/shopping/add       { items } → { ok, added, already, items }
 //   POST {BRAIN_BASE_URL}/api/kitchen/shopping/checkoff  { items } → { ok, checkedOff, notFound, items }
+//   POST {BRAIN_BASE_URL}/api/kitchen/shopping/category  { id? | item?, category, telegramUserId? } → { ok, outcome, id?, item, category, matches?, items }
+//
+// Each item is `{ id, item, addedBy, createdAt, category }`. `category` (issue
+// #208, baumy-brain PR #30) is one of the six group keys or null ("Not
+// sorted", and also just after an add, until brain sorts it a few seconds
+// later). A brain from before PR #30 sends no `category`, and a newer one may
+// send a key this app does not know yet: both read as null, never as a bad
+// answer, and fields this app does not read are ignored.
 //
 //   POST {BRAIN_BASE_URL}/api/kitchen/login-approval  { requestId, telegramUserId, device, choices, expiresAt, purpose? } → { ok, sent }
 //
@@ -60,6 +69,8 @@ export interface ShoppingEntry {
   item: string;
   /** When it was added, ISO 8601. */
   addedAt: string;
+  /** Its group, or null for "Not sorted" (issue #208). */
+  category: ShoppingCategory | null;
 }
 
 export interface ShoppingAddResult {
@@ -75,6 +86,27 @@ export interface ShoppingCheckOffResult {
   checkedOff: string[];
   /** Named but not on the list (or not one clear match). */
   notFound: string[];
+  items: ShoppingEntry[];
+}
+
+/** Which item to put in which group: by id (wins) or by name. */
+export interface ShoppingCategoryRequest {
+  id?: string;
+  item?: string;
+  category: ShoppingCategory | null;
+  /** The member's linked Telegram account, so brain knows who picked it. */
+  telegramUserId?: number;
+}
+
+export interface ShoppingCategoryResult {
+  /** `not_found`: nothing on the list matches; `ambiguous`: more than one does. */
+  outcome: "set" | "not_found" | "ambiguous";
+  id?: string;
+  /** The item as brain names it (or as it was asked for, on a miss). */
+  item: string;
+  category: ShoppingCategory | null;
+  /** With `ambiguous`: the items it could be. */
+  matches?: string[];
   items: ShoppingEntry[];
 }
 
@@ -107,6 +139,10 @@ export interface BrainClient {
   checkOffShopping(
     items: string[],
   ): Promise<BrainResult<ShoppingCheckOffResult>>;
+  /** Put one item in a group, or in none (issue #208). */
+  setShoppingCategory(
+    request: ShoppingCategoryRequest,
+  ): Promise<BrainResult<ShoppingCategoryResult>>;
   /** DM the approval buttons; `sent` is false when brain knows no such member. */
   requestLoginApproval(
     message: LoginApprovalMessage,
@@ -150,10 +186,20 @@ export function brainConfig(env: EnvBag): BrainConfig | null {
 
 // --- Brain's answers ---------------------------------------------------------
 
+/** A group key, or null when it is missing (an older brain) or unknown. */
+const Category = z
+  .unknown()
+  .optional()
+  .transform((c): ShoppingCategory | null =>
+    isShoppingCategory(c) ? c : null,
+  );
+
+// Not strict: brain's `addedBy`, and anything it adds later, is ignored.
 const Item = z.object({
   id: z.union([z.string(), z.number()]).transform(String),
   item: z.string(),
   createdAt: z.string(),
+  category: Category,
 });
 const Items = z.array(Item);
 
@@ -171,13 +217,28 @@ const CheckOffAnswer = z.object({
   items: Items,
 });
 
+const CategoryAnswer = z.object({
+  ok: z.literal(true),
+  outcome: z.enum(["set", "not_found", "ambiguous"]),
+  id: z.union([z.string(), z.number()]).transform(String).optional(),
+  item: z.string(),
+  category: Category,
+  matches: z.array(z.string()).optional(),
+  items: Items,
+});
+
 const LoginApprovalAnswer = z.object({
   ok: z.literal(true),
   sent: z.boolean(),
 });
 
 function entries(items: z.output<typeof Items>): ShoppingEntry[] {
-  return items.map((i) => ({ id: i.id, item: i.item, addedAt: i.createdAt }));
+  return items.map((i) => ({
+    id: i.id,
+    item: i.item,
+    addedAt: i.createdAt,
+    category: i.category,
+  }));
 }
 
 // --- The read cache (per server, shared by every route bundle) --------------
@@ -231,6 +292,13 @@ export function cachedBrain(
     async checkOffShopping(items) {
       try {
         return await inner.checkOffShopping(items);
+      } finally {
+        forgetShoppingReads();
+      }
+    },
+    async setShoppingCategory(request) {
+      try {
+        return await inner.setShoppingCategory(request);
       } finally {
         forgetShoppingReads();
       }
@@ -374,6 +442,36 @@ export function httpBrain(
           }
         : r;
     },
+    async setShoppingCategory(request) {
+      // Only what was asked: brain wants one of id or item (with both, the id).
+      const body = {
+        ...(request.id !== undefined ? { id: request.id } : {}),
+        ...(request.item !== undefined ? { item: request.item } : {}),
+        category: request.category,
+        ...(request.telegramUserId !== undefined
+          ? { telegramUserId: request.telegramUserId }
+          : {}),
+      };
+      const r = await call(
+        "category",
+        "/api/kitchen/shopping/category",
+        CategoryAnswer,
+        body,
+      );
+      if (!r.ok) return r;
+      const { outcome, id, item, category, matches } = r.data;
+      return {
+        ok: true,
+        data: {
+          outcome,
+          ...(id !== undefined ? { id } : {}),
+          item,
+          category,
+          ...(matches !== undefined ? { matches } : {}),
+          items: entries(r.data.items),
+        },
+      };
+    },
     async requestLoginApproval(message) {
       const r = await call(
         "login-approval",
@@ -394,6 +492,7 @@ export const unconfiguredBrain: BrainClient = {
   listShopping: async () => NOT_CONFIGURED,
   addShopping: async () => NOT_CONFIGURED,
   checkOffShopping: async () => NOT_CONFIGURED,
+  setShoppingCategory: async () => NOT_CONFIGURED,
   requestLoginApproval: async () => NOT_CONFIGURED,
 };
 

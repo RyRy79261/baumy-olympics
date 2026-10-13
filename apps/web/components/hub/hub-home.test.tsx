@@ -38,7 +38,7 @@ const render = (counts: HubData["counts"]) =>
     <HubHome
       hub={hub(counts)}
       memberColors={{}}
-      shopping={{ add: vi.fn(), checkOff: vi.fn() }}
+      shopping={{ add: vi.fn(), checkOff: vi.fn(), setCategory: vi.fn() }}
     />,
   );
 
@@ -99,7 +99,7 @@ describe("HubHome's streamed widgets", () => {
     <HubHome
       hub={{ ...hub({ messages: 1 }), events, shopping }}
       memberColors={{}}
-      shopping={{ add: vi.fn(), checkOff: vi.fn() }}
+      shopping={{ add: vi.fn(), checkOff: vi.fn(), setCategory: vi.fn() }}
     />
   );
 
@@ -153,7 +153,7 @@ describe("HubHome's extra card", () => {
       <HubHome
         hub={hub({ messages: 0 })}
         memberColors={{}}
-        shopping={{ add: vi.fn(), checkOff: vi.fn() }}
+        shopping={{ add: vi.fn(), checkOff: vi.fn(), setCategory: vi.fn() }}
       >
         <p data-testid="extra">Post a reminder</p>
       </HubHome>,

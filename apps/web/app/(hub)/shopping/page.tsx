@@ -4,7 +4,11 @@ import { ShoppingList } from "@/components/shopping/shopping-list";
 import { runAction } from "@/lib/actions/registry";
 import { uiRequestCtx } from "@/lib/actions/ui";
 import { requireMemberPage } from "@/lib/auth";
-import { addShoppingAction, checkOffShoppingAction } from "./actions";
+import {
+  addShoppingAction,
+  checkOffShoppingAction,
+  setShoppingCategoryAction,
+} from "./actions";
 
 // /shopping (SPEC §3.4, issue #26): the house shopping list. It is
 // baumy-brain's (ADR 0003), so it is the same list as in the Telegram
@@ -30,7 +34,11 @@ export default async function ShoppingPage() {
         <ShoppingList
           items={listed.data.items}
           canEdit
-          actions={{ add: addShoppingAction, checkOff: checkOffShoppingAction }}
+          actions={{
+            add: addShoppingAction,
+            checkOff: checkOffShoppingAction,
+            setCategory: setShoppingCategoryAction,
+          }}
         />
       ) : (
         <FormMessage tone="error">{listed.message}</FormMessage>

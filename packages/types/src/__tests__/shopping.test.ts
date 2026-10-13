@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   ListShoppingInput,
+  NOT_SORTED_LABEL,
+  SHOPPING_CATEGORIES,
+  SHOPPING_CATEGORY_LABELS,
   SHOPPING_ITEMS_MAX,
   SHOPPING_ITEM_MAX,
+  SetShoppingCategoryInput,
+  ShoppingAdd,
+  ShoppingCategoryKey,
   ShoppingWrite,
+  isShoppingCategory,
+  shoppingCategoryLabel,
   splitShoppingText,
 } from "../shopping";
 
@@ -134,5 +142,101 @@ describe("ListShoppingInput", () => {
   it("takes nothing", () => {
     expect(ListShoppingInput.parse({})).toEqual({});
     expect(ListShoppingInput.safeParse({ fresh: true }).success).toBe(false);
+  });
+});
+
+// Issue #208: brain's six keys (baumy-brain lib/lists/categories.ts), in the
+// owner's order (2026-10-11), and "Not sorted" for none.
+describe("the shopping groups", () => {
+  it("are brain's six keys, in the order they are shown, each with its label", () => {
+    expect(SHOPPING_CATEGORIES).toEqual([
+      "pantry",
+      "fresh",
+      "coffee",
+      "cleaning",
+      "maintenance",
+      "household",
+    ]);
+    expect(SHOPPING_CATEGORIES.map(shoppingCategoryLabel)).toEqual([
+      "Pantry",
+      "Fresh",
+      "Coffee",
+      "Cleaning",
+      "Maintenance",
+      "Household",
+    ]);
+    expect(Object.keys(SHOPPING_CATEGORY_LABELS)).toEqual([
+      ...SHOPPING_CATEGORIES,
+    ]);
+    expect(shoppingCategoryLabel(null)).toBe("Not sorted");
+    expect(NOT_SORTED_LABEL).toBe("Not sorted");
+  });
+
+  it("know a key from anything else", () => {
+    expect(isShoppingCategory("coffee")).toBe(true);
+    for (const x of ["Coffee", "garden", "", null, undefined, 3, {}]) {
+      expect(isShoppingCategory(x), String(x)).toBe(false);
+    }
+    expect(ShoppingCategoryKey.safeParse("fresh").success).toBe(true);
+    const label = ShoppingCategoryKey.safeParse("Fresh");
+    expect(label.error!.issues[0]!.message).toBe(
+      "Pick one of the groups: pantry, fresh, coffee, cleaning, maintenance, household.",
+    );
+  });
+});
+
+describe("ShoppingAdd", () => {
+  it("takes the items and, optionally, one group", () => {
+    expect(ShoppingAdd.parse({ items: ["beans"] })).toEqual({
+      items: ["beans"],
+    });
+    expect(ShoppingAdd.parse({ items: "beans", category: "coffee" })).toEqual({
+      items: ["beans"],
+      category: "coffee",
+    });
+    for (const category of ["Coffee", null, ""]) {
+      expect(
+        ShoppingAdd.safeParse({ items: ["beans"], category }).success,
+      ).toBe(false);
+    }
+    expect(ShoppingAdd.safeParse({ items: ["x"], extra: 1 }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("SetShoppingCategoryInput", () => {
+  const id = "6f1f3f0d-2a11-4c38-9a53-0b0e6c1a3a7e";
+
+  it("takes an item by id or by name, and a group or null", () => {
+    expect(SetShoppingCategoryInput.parse({ id, category: "pantry" })).toEqual({
+      id,
+      category: "pantry",
+    });
+    expect(
+      SetShoppingCategoryInput.parse({ item: " Oat milk ", category: null }),
+    ).toEqual({ item: "Oat milk", category: null });
+    expect(
+      SetShoppingCategoryInput.parse({ id, item: "x", category: "fresh" }),
+    ).toEqual({ id, item: "x", category: "fresh" });
+  });
+
+  it("needs the item and a group, and nothing else", () => {
+    const none = SetShoppingCategoryInput.safeParse({ category: "fresh" });
+    expect(none.error!.issues).toEqual([
+      expect.objectContaining({ path: ["item"], message: "Name the item." }),
+    ]);
+    for (const input of [
+      { item: "milk" },
+      { item: "milk", category: "Fresh" },
+      { id: "7", category: "fresh" },
+      { item: "x".repeat(SHOPPING_ITEM_MAX + 1), category: "fresh" },
+      { item: "milk", category: "fresh", telegramUserId: 1 },
+    ]) {
+      expect(
+        SetShoppingCategoryInput.safeParse(input).success,
+        JSON.stringify(input),
+      ).toBe(false);
+    }
   });
 });

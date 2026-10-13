@@ -985,7 +985,7 @@
   {
     "name": "list_shopping",
     "title": "Shopping list",
-    "description": "Lists what is on the house shopping list (the same list the house Telegram group keeps with Baumy), oldest first: each item's id, its name and when it was added (ISO 8601, UTC).",
+    "description": "Lists what is on the house shopping list (the same list the house Telegram group keeps with Baumy), oldest first: each item's id, its name, when it was added (ISO 8601, UTC) and its group (pantry, fresh, coffee, cleaning, maintenance or household; null while not sorted).",
     "input_schema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

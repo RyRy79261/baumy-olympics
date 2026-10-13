@@ -153,6 +153,192 @@ test("the kitchen screen and Telegram share one shopping list", async ({
   await context.close();
 });
 
+/** Brain sorts an item by itself (or a housemate picks its group in Telegram). */
+async function brainSorts(
+  request: APIRequestContext,
+  item: string,
+  category: string | null,
+) {
+  const res = await request.post("/api/test/brain", {
+    data: { sort: { item, category } },
+  });
+  expect(res.status()).toBe(200);
+  expect(await res.json()).toMatchObject({ outcome: "set" });
+}
+
+async function telegramGroups(request: APIRequestContext) {
+  const res = await request.get("/api/test/brain");
+  const body = (await res.json()) as {
+    items: { item: string; category: string | null }[];
+  };
+  return Object.fromEntries(body.items.map((i) => [i.item, i.category]));
+}
+
+function group(scope: Locator | Page, key: string): Locator {
+  return scope.getByTestId(`shopping-group-${key}`);
+}
+
+// Issue #208: the list under its groups' headings, read-only and picked; a
+// picked member moves an item with the big group buttons and adds straight
+// into a group, and brain (here the fake) has both at once.
+test("the kitchen screen shows the shopping list in its groups, and moves and adds into them", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(project !== "ipad-portrait", "The kiosk is an iPad in portrait.");
+  const tag = Math.random().toString(36).slice(2, 8);
+  const oatMilk = `Oat milk ${tag}`;
+  const beans = `Beans ${tag}`;
+  const eggs = `Eggs ${tag}`;
+  const founder = `Founder ${project}`;
+
+  await founderAdmin(page, project);
+  // Added in Telegram; brain sorted the oat milk, not yet the beans.
+  await telegramSays(page.request, { add: [oatMilk, beans] });
+  await brainSorts(page.request, oatMilk, "fresh");
+  const { context, page: kiosk } = await pairedKiosk(
+    browser,
+    page,
+    `iPad ${tag}`,
+  );
+
+  // Nobody picked: the groups are there to read, each with its icon. The
+  // re-read skips the server's 30s cache, which other specs may have filled.
+  await kioskNav(kiosk, "Shop");
+  await expect(
+    kiosk.getByRole("heading", { name: "Shopping list", level: 1 }),
+  ).toBeVisible();
+  await rereads(kiosk);
+  const list = kiosk.locator("main");
+  const fresh = group(list, "fresh");
+  const unsorted = group(list, "none");
+  await expect(
+    fresh.getByRole("heading", { name: "Fresh", exact: true }),
+  ).toBeVisible();
+  await expect(fresh.locator('svg[data-glyph="fridge"]')).toBeVisible();
+  await expect(row(fresh, oatMilk)).toBeVisible();
+  await expect(
+    unsorted.getByRole("heading", { name: "Not sorted", exact: true }),
+  ).toBeVisible();
+  await expect(row(unsorted, beans)).toBeVisible();
+  await expect(
+    list.getByTestId("shopping-items").getByRole("button"),
+  ).toHaveCount(0);
+  // Not sorted is the last heading.
+  const headings = list.getByTestId("shopping-items").getByRole("heading");
+  await expect(headings.last()).toHaveText("Not sorted");
+
+  // Someone taps in and moves the beans to Coffee with the big buttons.
+  await kiosk.getByRole("button", { name: founder, exact: true }).click();
+  await expect(kiosk.getByTestId("acting-as")).toHaveText(founder);
+  // Its small square shows where it is now (owner 2026-10-13, layout A).
+  const move = row(list, beans).getByRole("button", {
+    name: "Group: Not sorted — change",
+    exact: true,
+  });
+  await expect(move.getByTestId("not-sorted-mark")).toBeVisible();
+  // Into the middle of the screen, as a finger would scroll it, so Baumy in
+  // the corner is not over it (the list ends with room for that).
+  await move.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await move.click();
+  const picker = kiosk.getByRole("dialog", { name: `Group for ${beans}` });
+  await expect(picker).toBeVisible();
+  // Where it is now is marked "Now".
+  await expect(
+    picker.getByRole("button", { name: "Not sorted Now", exact: true }),
+  ).toHaveAttribute("aria-current", "true");
+  await expectKioskTargets(picker);
+  await picker.getByRole("button", { name: "Coffee", exact: true }).click();
+  await expect(
+    kiosk.getByRole("status").filter({ hasText: `Put ${beans} under Coffee.` }),
+  ).toBeVisible();
+  await expect(picker).toHaveCount(0);
+  const coffee = group(list, "coffee");
+  await expect(
+    coffee.getByRole("heading", { name: "Coffee", exact: true }),
+  ).toBeVisible();
+  await expect(row(coffee, beans)).toBeVisible();
+  await expect(row(unsorted, beans)).toHaveCount(0);
+  // Its square now shows the cup.
+  await expect(
+    row(coffee, beans)
+      .getByRole("button", { name: "Group: Coffee — change", exact: true })
+      .locator('svg[data-glyph="coffee"]'),
+  ).toBeVisible();
+  expect((await telegramGroups(page.request))[beans]).toBe("coffee");
+
+  // Adds straight into Fresh: pick the group, type, Add.
+  const addGroups = list.getByRole("group", {
+    name: "Group (optional)",
+  });
+  await addGroups.getByRole("button", { name: "Fresh", exact: true }).click();
+  await expect(
+    addGroups.getByRole("button", { name: "Fresh", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await list.getByLabel("Add to Fresh").fill(eggs);
+  await list.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(
+    kiosk.getByRole("status").filter({ hasText: `Added ${eggs} to Fresh.` }),
+  ).toBeVisible();
+  await expect(row(fresh, eggs)).toBeVisible();
+  await expect(row(fresh, oatMilk)).toBeVisible();
+  expect((await telegramGroups(page.request))[eggs]).toBe("fresh");
+  // The pick is forgotten once it is used.
+  await expect(list.getByLabel("Add to the list")).toHaveValue("");
+  await expectKioskTargets(list);
+
+  await context.close();
+});
+
+// Issue #208 on the phone: the same groups and buttons on /shopping.
+test("the phone's shopping list moves an item into a group and adds into one", async ({
+  page,
+}, testInfo) => {
+  const project = testInfo.project.name;
+  test.skip(project !== "mobile-360", "Once is enough, on the phone.");
+  const tag = Math.random().toString(36).slice(2, 8);
+  const bleach = `Bleach ${tag}`;
+  const bulbs = `Bulbs ${tag}`;
+
+  await founderAdmin(page, project);
+  // Added here (not in "Telegram"), so the server's 30s read cache, which
+  // other specs may have filled, is cleared by our own write.
+  await page.goto("/shopping");
+  await page.getByLabel("Add to the list").fill(bleach);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(row(page, bleach)).toBeVisible();
+  await row(page, bleach)
+    .getByRole("button", { name: /^Group: .* — change$/ })
+    .click();
+  const picker = page.getByRole("dialog", { name: `Group for ${bleach}` });
+  await picker.getByRole("button", { name: "Cleaning", exact: true }).click();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: `Put ${bleach} under Cleaning.` }),
+  ).toBeVisible();
+  await expect(row(group(page, "cleaning"), bleach)).toBeVisible();
+
+  await page
+    .getByRole("group", { name: "Group (optional)" })
+    .getByRole("button", { name: "Maintenance", exact: true })
+    .click();
+  await page.getByLabel("Add to Maintenance").fill(bulbs);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(row(group(page, "maintenance"), bulbs)).toBeVisible();
+  // And back to Not sorted.
+  await row(page, bulbs)
+    .getByRole("button", { name: "Group: Maintenance — change", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: `Group for ${bulbs}` })
+    .getByRole("button", { name: "Not sorted", exact: true })
+    .click();
+  await expect(row(group(page, "none"), bulbs)).toBeVisible();
+  expect((await telegramGroups(page.request))[bulbs]).toBeNull();
+});
+
 // Issue #204: before anyone is picked, brain being down is still its own
 // sentence on the kitchen screen's Shop page, not a broken page.
 test("with brain down the kitchen screen's Shop page says so before anyone is picked", async ({

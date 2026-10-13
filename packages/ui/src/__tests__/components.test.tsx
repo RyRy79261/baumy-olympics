@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AppShell, navItemClass } from "../app-shell";
-import { Button, buttonClass } from "../button";
+import { Button, buttonClass, choiceClass, iconChoiceClass } from "../button";
 import { Card } from "../card";
 import { cx } from "../cx";
 import {
@@ -42,6 +42,38 @@ describe("Button", () => {
     );
     expect(buttonClass("ghost")).toContain("underline-offset-4");
     expect(buttonClass("ghost")).not.toContain("pixel-frame");
+  });
+
+  // Issue #208: the shopping groups' buttons.
+  it("has a choice look: primary when on, one min height and padding, 56px on the kiosk", () => {
+    const on = choiceClass("on", true, "extra");
+    expect(on).toMatch(/bg-bm-green.*min-h-14.*extra/);
+    expect(on).not.toContain("justify-center");
+    expect(on.match(/\bmin-h-\d+/g)).toEqual(["min-h-14"]);
+    expect(on.match(/\bpx-\d+/g)).toEqual(["px-3"]);
+    const off = choiceClass("off");
+    expect(off).toContain("pixel-frame");
+    expect(off).toContain("bg-bm-raised");
+    expect(off.match(/\bmin-h-\d+/g)).toEqual(["min-h-11"]);
+    expect(off.match(/\bpx-\d+/g)).toEqual(["px-2"]);
+    expect(off.match(/\btracking-\w+/g)).toEqual(["tracking-normal"]);
+    // Where something is now: outlined in green, never the green "go" fill.
+    const current = choiceClass("current", true);
+    expect(current).toContain("[--pf:var(--color-bm-green)]");
+    expect(current).toContain("bg-bm-raised");
+    expect(current).not.toContain("bg-bm-green");
+    expect(current.match(/\[--pf:[^\]]+\]/g)).toHaveLength(1);
+  });
+
+  // Owner 2026-10-13 (layout A): the groups as small icon squares.
+  it("has an icon-only choice: square, 44px, 56px on the kiosk, in each state", () => {
+    expect(iconChoiceClass("off", true)).toMatch(/bg-bm-raised.*size-14/);
+    expect(iconChoiceClass("off")).toContain("size-11");
+    expect(iconChoiceClass("on")).toContain("bg-bm-green");
+    expect(iconChoiceClass("current")).toContain(
+      "[--pf:var(--color-bm-green)]",
+    );
+    expect(iconChoiceClass("off", true).match(/\b(min-h|px)-/g)).toBeNull();
   });
 });
 

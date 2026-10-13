@@ -5,9 +5,10 @@ import type { ActionResult } from "@/lib/actions/result";
 import type {
   AddShoppingData,
   CheckOffShoppingData,
+  SetShoppingCategoryData,
 } from "@/lib/actions/shopping";
 import { actionForm } from "@/lib/actions/ui";
-import { splitItemsForm } from "@/lib/shopping/view";
+import { groupFormInput, splitItemsForm } from "@/lib/shopping/view";
 
 // /shopping's server actions and the hub widget's: thin wrappers around the
 // registry (SPEC §3.4). The list is brain's; each change re-renders the
@@ -24,6 +25,20 @@ export async function addShoppingAction(
   form: FormData,
 ): Promise<ActionResult<AddShoppingData>> {
   const result = await actionForm("add_shopping_items", splitItemsForm(form));
+  if (result.ok) refresh();
+  return result;
+}
+
+/** A group button for one item (issue #208); "Not sorted" sends "none". */
+export async function setShoppingCategoryAction(
+  _prev: ActionResult<SetShoppingCategoryData> | null,
+  form: FormData,
+): Promise<ActionResult<SetShoppingCategoryData>> {
+  const result = await actionForm(
+    "set_shopping_category",
+    form,
+    groupFormInput,
+  );
   if (result.ok) refresh();
   return result;
 }

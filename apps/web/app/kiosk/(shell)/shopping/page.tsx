@@ -11,6 +11,7 @@ import { skipShoppingCacheOnRefresh } from "@/lib/hub/refresh-server";
 import {
   kioskAddShoppingAction,
   kioskCheckOffShoppingAction,
+  kioskSetShoppingCategoryAction,
 } from "../../actions";
 
 // The whole shopping list on the kitchen iPad (SPEC §3.4, §8): anyone can
@@ -55,6 +56,7 @@ export default async function KioskShoppingPage() {
           actions={{
             add: kioskAddShoppingAction,
             checkOff: kioskCheckOffShoppingAction,
+            setCategory: kioskSetShoppingCategoryAction,
           }}
         />
       ) : (

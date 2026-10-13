@@ -81,3 +81,79 @@ export const ShoppingWrite = z.strictObject({
     'The items, one entry each, as people would write them: ["milk", "eggs"]. Put every item of one request in this one list.',
   ),
 });
+
+// --- Groups (issue #208, SPEC §3.4, §12 decision 39) -------------------------
+// Owner, 2026-10-11: six groups. Brain owns each item's group (baumy-brain
+// PR #30, `lib/lists/categories.ts`): it sorts a new item by itself a few
+// seconds after the add, and a pick here sets it. The keys are brain's; the
+// labels and the order are what people see, "Not sorted" (a null group) last.
+
+export const SHOPPING_CATEGORIES = [
+  "pantry",
+  "fresh",
+  "coffee",
+  "cleaning",
+  "maintenance",
+  "household",
+] as const;
+export type ShoppingCategory = (typeof SHOPPING_CATEGORIES)[number];
+
+/** What people see, in the order the groups are shown. */
+export const SHOPPING_CATEGORY_LABELS: Record<ShoppingCategory, string> = {
+  pantry: "Pantry",
+  fresh: "Fresh",
+  coffee: "Coffee",
+  cleaning: "Cleaning",
+  maintenance: "Maintenance",
+  household: "Household",
+};
+
+/** The heading of the items in no group. Always shown last. */
+export const NOT_SORTED_LABEL = "Not sorted";
+
+export function isShoppingCategory(x: unknown): x is ShoppingCategory {
+  return (
+    typeof x === "string" &&
+    (SHOPPING_CATEGORIES as readonly string[]).includes(x)
+  );
+}
+
+/** "Coffee", or "Not sorted" for null. */
+export function shoppingCategoryLabel(c: ShoppingCategory | null): string {
+  return c ? SHOPPING_CATEGORY_LABELS[c] : NOT_SORTED_LABEL;
+}
+
+export const ShoppingCategoryKey = z.enum(SHOPPING_CATEGORIES, {
+  error: `Pick one of the groups: ${SHOPPING_CATEGORIES.join(", ")}.`,
+});
+
+/** `add_shopping_items`: the items, and optionally the group they go into. */
+export const ShoppingAdd = ShoppingWrite.extend({
+  category: ShoppingCategoryKey.optional().describe(
+    "Optional: the group every new item goes into (pantry, fresh, coffee, cleaning, maintenance or household). Leave it out and brain sorts each new item by itself a few seconds later.",
+  ),
+});
+
+/** Brain's ids are UUIDs. */
+export const ShoppingItemId = z.guid({ error: "That is not an item's id." });
+
+/**
+ * `set_shopping_category`: one item, by its id from `list_shopping` or by
+ * its name, and its group, or null for "Not sorted". With both, the id wins.
+ */
+export const SetShoppingCategoryInput = z
+  .strictObject({
+    id: ShoppingItemId.optional().describe(
+      "The item's id, as list_shopping gives it. Wins over `item`.",
+    ),
+    item: ShoppingItem.optional().describe(
+      "The item's name, as list_shopping gives it, when you have no id.",
+    ),
+    category: ShoppingCategoryKey.nullable().describe(
+      'The group: pantry, fresh, coffee, cleaning, maintenance or household; null for "Not sorted".',
+    ),
+  })
+  .refine((v) => v.id !== undefined || v.item !== undefined, {
+    error: "Name the item.",
+    path: ["item"],
+  });

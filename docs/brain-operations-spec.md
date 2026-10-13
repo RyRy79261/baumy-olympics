@@ -1944,7 +1944,7 @@ The house shopping list, as the kitchen screen shows it. The list is brain's own
 
 **When to use it.** Almost never: brain has the list itself (`baumy_list_items`). It exists so every surface can read it.
 
-**Tool description** (the registry's, verbatim): Lists what is on the house shopping list (the same list the house Telegram group keeps with Baumy), oldest first: each item's id, its name and when it was added (ISO 8601, UTC).
+**Tool description** (the registry's, verbatim): Lists what is on the house shopping list (the same list the house Telegram group keeps with Baumy), oldest first: each item's id, its name, when it was added (ISO 8601, UTC) and its group (pantry, fresh, coffee, cleaning, maintenance or household; null while not sorted).
 
 **Examples.**
 
@@ -1960,7 +1960,7 @@ The house shopping list, as the kitchen screen shows it. The list is brain's own
 }
 ```
 
-**Returns** (`data`): `items`: id, name, when added.
+**Returns** (`data`): `items`: id, name, when added, and group (`category`, null while not sorted).
 
 **Its errors:** `NOT_CONFIGURED` (503), `UNAVAILABLE` (503). Every call can also get the endpoint's codes (above).
 
@@ -2201,4 +2201,5 @@ Takes a reminder off the kitchen screen for everyone, seen or not.
 - `acknowledge_note`: Marks notes read when a member opens them on the phone or the kitchen screen. Brain's own read button comes later (issue #163); until then, reading the board through list_notes marks nothing.
 - `add_shopping_items`: The shopping list is brain's own (`baumy_list_items`); brain changes it directly, and Olympics calls brain to do the same.
 - `check_off_shopping_items`: The shopping list is brain's own; brain ticks items off directly.
+- `set_shopping_category`: The shopping list's groups are brain's own (it sorts each new item, and "put coffee filters under coffee" in Telegram sets one); brain changes them directly, and Olympics calls brain to do the same.
 - `report_bug`: Files an issue on the public bug tracker from the in-app reporter (a shake, or Settings); a report is the person's own words in the app. Tell them to shake their phone or use Settings → Bugs and feature requests.

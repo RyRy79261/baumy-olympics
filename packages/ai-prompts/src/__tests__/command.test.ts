@@ -74,6 +74,8 @@ describe("commandSystemPrompt", () => {
     );
     expect(BAUMY_PERSONA).toContain("Never invent an id");
     expect(BAUMY_PERSONA).toContain("ONE add_shopping_items call");
+    // Issue #208: groups only when someone names one.
+    expect(BAUMY_PERSONA).toContain("use set_shopping_category");
   });
 
   it("offers admins the bounty and pot writes, and nothing else admin (issue #107)", () => {
