@@ -235,7 +235,7 @@ describe("AttestedForm", () => {
     expect(el.querySelector("textarea")!.value).toBe("Still dirty");
   });
 
-  it("keeps the sheet around it open and locked while its request is on its way (#174)", async () => {
+  it("keeps the sheet around it open while its request is on its way (#174)", async () => {
     let answer!: (r: ActionResult<unknown>) => void;
     const action = vi.fn(
       () =>
@@ -265,13 +265,17 @@ describe("AttestedForm", () => {
     const logIt = [...sheet.querySelectorAll("button")].find(
       (b) => b.textContent === "Log it",
     )!;
+    expect(logIt).toBeDefined();
     expect(close.disabled).toBe(false);
-    expect(logIt.matches(":disabled")).toBe(false);
+    expect(logIt.disabled).toBe(false);
     await act(async () => sheet.querySelector("form")!.requestSubmit());
+    expect(action).toHaveBeenCalledTimes(1);
+    // On its way: the sheet's × and the form's own Log it are both locked.
     expect(close.disabled).toBe(true);
+    expect(logIt.disabled).toBe(true);
     await act(async () => answer({ ok: true, data: null }));
     expect(close.disabled).toBe(false);
-    expect(logIt.matches(":disabled")).toBe(false);
+    expect(logIt.disabled).toBe(false);
   });
 
   it("asks nothing for an action that needs no PIN", async () => {

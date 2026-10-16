@@ -29,10 +29,12 @@ import { useModalDialog } from "./use-modal-dialog";
 // it is sending with `useSheetSending(pending)` (or `<SheetSending>` when
 // its pending lives above the sheet). The sheet hears it through context,
 // with no wiring through its caller: while any form in it is sending,
-// nothing closes it, the × is disabled, and every control in its body is
-// locked at once (a disabled <fieldset>), so a Cancel, a "Who did it?" or a
-// photo cannot start or drop the request mid-send. A form inside a pop-up
-// opened from this one reports to that pop-up only.
+// nothing closes it and the × is disabled. The caller's other ways out (a
+// Cancel) and the choices that would start the form again ("Who did it?",
+// the photo) read the same state from `children` given as a function,
+// `(sending) => ...`, so no page keeps a copy of it. Text fields stay as
+// they are. A form inside a pop-up opened from this one reports to that
+// pop-up only.
 
 type Report = (key: string, sending: boolean) => void;
 
@@ -72,11 +74,12 @@ export function Dialog({
   title: string;
   /**
    * Only for a sheet whose request is not a form inside it (Ask Baumy's
-   * Confirm all): keeps it open like a sending form, but locks no field.
-   * A form inside uses `useSheetSending` instead.
+   * Confirm all): keeps it open like a sending form. A form inside uses
+   * `useSheetSending` instead.
    */
   busy?: boolean;
-  children: ReactNode;
+  /** Or a function of whether a form in it is sending, to lock controls. */
+  children: ReactNode | ((sending: boolean) => ReactNode);
 }) {
   const [senders, setSenders] = useState<ReadonlySet<string>>(() => new Set());
   const report = useCallback<Report>((key, on) => {
@@ -112,15 +115,9 @@ export function Dialog({
           data-testid="dialog-panel"
           className="min-h-0 overflow-y-auto overscroll-contain px-6 pt-1 pb-6"
         >
-          <fieldset
-            disabled={sending}
-            data-testid="dialog-fields"
-            className="m-0 min-w-0 border-0 p-0"
-          >
-            <SheetSendingContext.Provider value={report}>
-              {children}
-            </SheetSendingContext.Provider>
-          </fieldset>
+          <SheetSendingContext.Provider value={report}>
+            {typeof children === "function" ? children(sending) : children}
+          </SheetSendingContext.Provider>
         </div>
         <button
           type="button"

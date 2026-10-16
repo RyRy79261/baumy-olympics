@@ -239,42 +239,45 @@ export function CalendarBoard({
           sheet?.mode === "edit" ? `Edit ${sheet.event.title}` : "New event"
         }
       >
-        {sheet ? (
-          <div className="flex flex-col gap-4">
-            {sheet.mode === "edit" ? (
-              <EventDetails event={sheet.event} people={people} />
-            ) : null}
-            <EventForm
-              key={sheet.mode === "edit" ? sheet.event.id : sheet.date}
-              event={sheet.mode === "edit" ? sheet.event : null}
-              date={sheet.mode === "new" ? sheet.date : today}
-              kiosk={false}
-              pinLabel="Your PIN"
-              people={people}
-              action={sheet.mode === "edit" ? actions.update : actions.create}
-              onDone={(data) => {
-                setSheet(null);
-                toast.success(
-                  sheet.mode === "edit"
-                    ? `Saved ${data.event.title}.`
-                    : `Added ${data.event.title} to the calendar.`,
-                );
-              }}
-              onCancel={() => setSheet(null)}
-            />
-            {sheet.mode === "edit" ? (
-              <Button
-                variant="danger"
-                onClick={() => {
-                  setDeleting(sheet.event);
+        {(sending) =>
+          sheet ? (
+            <div className="flex flex-col gap-4">
+              {sheet.mode === "edit" ? (
+                <EventDetails event={sheet.event} people={people} />
+              ) : null}
+              <EventForm
+                key={sheet.mode === "edit" ? sheet.event.id : sheet.date}
+                event={sheet.mode === "edit" ? sheet.event : null}
+                date={sheet.mode === "new" ? sheet.date : today}
+                kiosk={false}
+                pinLabel="Your PIN"
+                people={people}
+                action={sheet.mode === "edit" ? actions.update : actions.create}
+                onDone={(data) => {
                   setSheet(null);
+                  toast.success(
+                    sheet.mode === "edit"
+                      ? `Saved ${data.event.title}.`
+                      : `Added ${data.event.title} to the calendar.`,
+                  );
                 }}
-              >
-                Delete…
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
+                onCancel={() => setSheet(null)}
+              />
+              {sheet.mode === "edit" ? (
+                <Button
+                  disabled={sending}
+                  variant="danger"
+                  onClick={() => {
+                    setDeleting(sheet.event);
+                    setSheet(null);
+                  }}
+                >
+                  Delete…
+                </Button>
+              ) : null}
+            </div>
+          ) : null
+        }
       </Dialog>
 
       <Dialog
@@ -313,7 +316,7 @@ function DeleteForm({
   const { state, formAction, pending, requestId } = useActionForm(
     useReporting(action, onDone),
   );
-  // Its sheet stays open, locked, while the delete is on its way (#174).
+  // Its sheet stays open while the delete is on its way (#174).
   useSheetSending(pending);
   return (
     <form action={formAction} className="flex flex-col gap-4">

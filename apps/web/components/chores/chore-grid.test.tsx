@@ -194,7 +194,7 @@ describe("ChoreGrid's log sheet", () => {
     const { sheet, button, action, answer } = await openSheet();
     await act(async () => sheet.querySelector("form")!.requestSubmit());
     expect(action).toHaveBeenCalledTimes(1);
-    expect(button("Cancel").matches(":disabled")).toBe(true);
+    expect(button("Cancel").disabled).toBe(true);
     expect(button("Close").disabled).toBe(true);
     await tapOutside(sheet);
     const escape = new Event("cancel", { cancelable: true });
@@ -243,16 +243,14 @@ describe("ChoreGrid's log sheet", () => {
       sheet.querySelector<HTMLInputElement>('input[type="file"]')!;
     expect(radios()).toHaveLength(2);
     expect(photo()).not.toBeNull();
-    // Locked by the sheet's own <fieldset>, so read :disabled, not the
-    // field's own attribute.
-    expect(radios().some((r) => r.matches(":disabled"))).toBe(false);
-    expect(photo().matches(":disabled")).toBe(false);
+    expect(radios().some((r) => r.disabled)).toBe(false);
+    expect(photo().disabled).toBe(false);
     await act(async () => sheet.querySelector("form")!.requestSubmit());
     try {
       // The form is keyed by who did it: a new pick now would remount it,
       // lose the answer and allow a second log.
-      expect(radios().every((r) => r.matches(":disabled"))).toBe(true);
-      expect(photo().matches(":disabled")).toBe(true);
+      expect(radios().every((r) => r.disabled)).toBe(true);
+      expect(photo().disabled).toBe(true);
     } finally {
       await act(async () => answer());
     }

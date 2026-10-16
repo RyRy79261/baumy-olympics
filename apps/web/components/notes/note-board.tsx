@@ -166,32 +166,37 @@ export function NoteBoard({
         onClose={() => setDeleting(null)}
         title={deleting ? `Delete ${deleting.title}?` : "Delete the note?"}
       >
-        {deleting ? (
-          <div className="flex flex-col gap-4">
-            <p className="text-sm">
-              This takes the note away for everyone in the house.
-            </p>
-            <AttestedForm
-              key={deleting.id}
-              action={actions.remove}
-              label="Delete note"
-              pinLabel={pinLabel}
-              fields={<input type="hidden" name="noteId" value={deleting.id} />}
-              onResult={(r) => {
-                if (toastActionError(r)) return;
-                if (r.ok) toast.success(`Deleted ${r.data.title}.`);
-                setDeleting(null);
-              }}
-            />
-            <Button
-              variant="secondary"
-              size="kiosk"
-              onClick={() => setDeleting(null)}
-            >
-              Keep it
-            </Button>
-          </div>
-        ) : null}
+        {(sending) =>
+          deleting ? (
+            <div className="flex flex-col gap-4">
+              <p className="text-sm">
+                This takes the note away for everyone in the house.
+              </p>
+              <AttestedForm
+                key={deleting.id}
+                action={actions.remove}
+                label="Delete note"
+                pinLabel={pinLabel}
+                fields={
+                  <input type="hidden" name="noteId" value={deleting.id} />
+                }
+                onResult={(r) => {
+                  if (toastActionError(r)) return;
+                  if (r.ok) toast.success(`Deleted ${r.data.title}.`);
+                  setDeleting(null);
+                }}
+              />
+              <Button
+                disabled={sending}
+                variant="secondary"
+                size="kiosk"
+                onClick={() => setDeleting(null)}
+              >
+                Keep it
+              </Button>
+            </div>
+          ) : null
+        }
       </Dialog>
     </div>
   );
@@ -259,7 +264,7 @@ function NoteForm({
   const { state, formAction, pending, requestId, errors } = useActionForm(
     useReporting(action, onDone),
   );
-  // Its sheet stays open, locked, while a save is on its way (#174).
+  // Its sheet stays open while a save is on its way (#174).
   useSheetSending(pending);
   const [attempt, setAttempt] = useState(0);
   // Controlled: React resets a form's uncontrolled fields after each action,

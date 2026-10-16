@@ -200,7 +200,7 @@ function CreateChoreBody({
 }) {
   const { state, formAction, pending, requestId, errors } =
     useActionForm(manageChoreAction);
-  // In a dialog, it stays open, locked, while the add is on its way (#174).
+  // In a dialog, it stays open while the add is on its way (#174).
   useSheetSending(pending);
   const [round, setRound] = useState(0);
   useEffect(() => {
@@ -280,7 +280,7 @@ export function EditChoreDialog({
   }, [state]);
   return (
     <Dialog open onClose={onClose} title={`Edit ${chore.name}`}>
-      {/* Open, and locked, while the save is on its way (#174). */}
+      {/* Open while the save is on its way (#174). */}
       <SheetSending pending={pending} />
       {points}
       {/* No browser validation: a cleared field gets the action's inline

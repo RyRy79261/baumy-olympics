@@ -269,7 +269,7 @@ export function MemberControls(props: MemberRowProps) {
         onClose={() => setConfirming(false)}
         title={`Deactivate ${props.displayName}?`}
       >
-        {/* Open, and locked, while the deactivate is on its way (#174). */}
+        {/* Open while the deactivate is on its way (#174). */}
         <SheetSending pending={status.pending} />
         <p className="mb-4 text-sm">
           They lose access to the hub straight away. Their history stays, and
@@ -277,7 +277,11 @@ export function MemberControls(props: MemberRowProps) {
         </p>
         <div className="flex gap-2">
           {statusForm}
-          <Button variant="secondary" onClick={() => setConfirming(false)}>
+          <Button
+            variant="secondary"
+            disabled={status.pending}
+            onClick={() => setConfirming(false)}
+          >
             Keep them
           </Button>
         </div>

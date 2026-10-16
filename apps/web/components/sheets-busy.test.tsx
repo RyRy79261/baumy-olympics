@@ -82,7 +82,7 @@ const sheetNamed = (name: string) =>
 async function expectHeld(sheet: HTMLDialogElement, keep: string) {
   expect(sheet.open).toBe(true);
   expect(corner(sheet).disabled).toBe(true);
-  expect(byText(sheet, keep)!.matches(":disabled")).toBe(true);
+  expect(byText(sheet, keep)!.disabled).toBe(true);
   await tapOutside(sheet);
   const escape = new Event("cancel", { cancelable: true });
   await act(async () => sheet.dispatchEvent(escape));
@@ -224,7 +224,7 @@ describe("CalendarManager's sheets", () => {
     await act(async () => edit.querySelector("form")!.requestSubmit());
     expect(save.action).toHaveBeenCalledTimes(1);
     await expectHeld(edit, "Cancel");
-    expect(byText(edit, "Delete…")!.matches(":disabled")).toBe(true);
+    expect(byText(edit, "Delete…")!.disabled).toBe(true);
     await act(async () => save.answer({ ok: true, data: { event: dinner } }));
     expect(edit.open).toBe(false);
   });

@@ -88,7 +88,7 @@ export function AttestedForm<T>({
     // `onResult` may be a new function on every render.
   }, [state]);
 
-  // A sheet around the form stays open, locked, until the answer is in
+  // A sheet around the form stays open until the answer is in
   // (issue #174, SPEC §12 decision 32).
   useSheetSending(pending);
 

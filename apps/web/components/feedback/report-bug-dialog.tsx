@@ -160,7 +160,7 @@ export function ReportBugDialog({
       onClose={onClose}
       title={kind === "bug" ? "Report a bug" : "Request a feature"}
     >
-      {/* Open, and locked, while the report is on its way (#174). */}
+      {/* Open while the report is on its way (#174). */}
       <SheetSending pending={pending} />
       <form
         className="flex flex-col gap-4"
@@ -245,7 +245,12 @@ export function ReportBugDialog({
         {error ? <FormMessage tone="error">{error}</FormMessage> : null}
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button size={size} variant="ghost" onClick={onClose}>
+          <Button
+            size={size}
+            variant="ghost"
+            onClick={onClose}
+            disabled={pending}
+          >
             Cancel
           </Button>
           {blocked ? null : (

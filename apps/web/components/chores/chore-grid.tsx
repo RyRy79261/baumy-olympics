@@ -342,79 +342,90 @@ export function ChoreGrid({
           onClose={closeSheet}
           title={open ? `Log ${open.name}` : "Log a chore"}
         >
-          {open ? (
-            <div className="flex flex-col gap-4">
-              {members.length > 1 ? (
-                <ChoiceGroup
-                  legend="Who did it?"
-                  name="doneByChoice"
-                  kiosk={kiosk}
-                  value={doneBy}
-                  onChange={setDoneBy}
-                  // The sheet locks it while Log it is sending: the form is
-                  // keyed by who, so a new pick mid-send would lose the
-                  // answer and allow a second log (#174).
-                  options={members.map((m) => ({
-                    value: m.id,
-                    label:
-                      m.id === actorId
-                        ? `${m.displayName} (me)`
-                        : m.displayName,
-                  }))}
-                />
-              ) : null}
-              {preview ? (
-                <div data-testid="log-preview" className="flex flex-col gap-1">
-                  <p className="text-3xl font-bold">{preview.headline}</p>
-                  {preview.breaks ? <p>{preview.breaks}</p> : null}
-                </div>
-              ) : null}
-              {doneBy !== actorId ? (
-                <p className="text-sm text-bm-muted">
-                  {`You are vouching that ${nameOf(doneBy)} did it.`}
-                </p>
-              ) : null}
-              {open.proofMode !== "none" ? (
-                <div className="flex flex-col gap-1">
-                  <PhotoPicker
-                    key={open.id}
+          {(sending) =>
+            open ? (
+              <div className="flex flex-col gap-4">
+                {members.length > 1 ? (
+                  <ChoiceGroup
+                    legend="Who did it?"
+                    name="doneByChoice"
                     kiosk={kiosk}
-                    label={
-                      open.proofMode === "required"
-                        ? "Add a photo (required)"
-                        : "Add a photo (optional)"
-                    }
-                    onPhoto={choosePhoto}
+                    value={doneBy}
+                    onChange={setDoneBy}
+                    // The form is keyed by who: a new pick mid-send would lose
+                    // the answer and allow a second log (#174).
+                    disabled={sending}
+                    options={members.map((m) => ({
+                      value: m.id,
+                      label:
+                        m.id === actorId
+                          ? `${m.displayName} (me)`
+                          : m.displayName,
+                    }))}
                   />
-                  {open.proofMode === "required" && !hasPhoto ? (
-                    <p className="text-sm text-bm-muted">
-                      {open.name} needs a photo as proof.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-              <AttestedForm
-                key={`${open.id}:${doneBy}`}
-                action={logAction}
-                disabled={open.proofMode === "required" && !hasPhoto}
-                label="Log it"
-                pinLabel={`${nameOf(actorId)}'s PIN`}
-                fields={
-                  <>
-                    <input type="hidden" name="choreId" value={open.id} />
-                    {doneBy !== actorId ? (
-                      <input type="hidden" name="doneBy" value={doneBy} />
+                ) : null}
+                {preview ? (
+                  <div
+                    data-testid="log-preview"
+                    className="flex flex-col gap-1"
+                  >
+                    <p className="text-3xl font-bold">{preview.headline}</p>
+                    {preview.breaks ? <p>{preview.breaks}</p> : null}
+                  </div>
+                ) : null}
+                {doneBy !== actorId ? (
+                  <p className="text-sm text-bm-muted">
+                    {`You are vouching that ${nameOf(doneBy)} did it.`}
+                  </p>
+                ) : null}
+                {open.proofMode !== "none" ? (
+                  <div className="flex flex-col gap-1">
+                    <PhotoPicker
+                      key={open.id}
+                      kiosk={kiosk}
+                      disabled={sending}
+                      label={
+                        open.proofMode === "required"
+                          ? "Add a photo (required)"
+                          : "Add a photo (optional)"
+                      }
+                      onPhoto={choosePhoto}
+                    />
+                    {open.proofMode === "required" && !hasPhoto ? (
+                      <p className="text-sm text-bm-muted">
+                        {open.name} needs a photo as proof.
+                      </p>
                     ) : null}
-                  </>
-                }
-                onResult={onResult}
-              />
-              {/* A way out that says so, as well as the corner's × (#174). */}
-              <Button variant="secondary" size="kiosk" onClick={closeSheet}>
-                Cancel
-              </Button>
-            </div>
-          ) : null}
+                  </div>
+                ) : null}
+                <AttestedForm
+                  key={`${open.id}:${doneBy}`}
+                  action={logAction}
+                  disabled={open.proofMode === "required" && !hasPhoto}
+                  label="Log it"
+                  pinLabel={`${nameOf(actorId)}'s PIN`}
+                  fields={
+                    <>
+                      <input type="hidden" name="choreId" value={open.id} />
+                      {doneBy !== actorId ? (
+                        <input type="hidden" name="doneBy" value={doneBy} />
+                      ) : null}
+                    </>
+                  }
+                  onResult={onResult}
+                />
+                {/* A way out that says so, as well as the corner's × (#174). */}
+                <Button
+                  variant="secondary"
+                  size="kiosk"
+                  disabled={sending}
+                  onClick={closeSheet}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : null
+          }
         </Dialog>
       )}
     </>

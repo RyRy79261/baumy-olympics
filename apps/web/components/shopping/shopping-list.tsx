@@ -376,7 +376,7 @@ function GroupPicker({
   const choices: (ShoppingCategory | null)[] = [...SHOPPING_CATEGORIES, null];
   return (
     <Dialog open onClose={onClose} title={`Group for ${item.item}`}>
-      {/* Open, and locked, while the move is on its way (#174). */}
+      {/* Open while the move is on its way (#174). */}
       <SheetSending pending={pending} />
       <form action={formAction} className="flex flex-col gap-3">
         <input type="hidden" name="requestId" value={requestId} />

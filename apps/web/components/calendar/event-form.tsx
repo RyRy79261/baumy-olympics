@@ -70,7 +70,7 @@ export function EventForm({
   const { state, formAction, pending, requestId, errors } = useActionForm(
     useReporting(action, onDone),
   );
-  // Its sheet stays open, locked, while a save is on its way (#174).
+  // Its sheet stays open while a save is on its way (#174).
   useSheetSending(pending);
   const [attempt, setAttempt] = useState(0);
   const [dismissed, setDismissed] = useState(false);
