@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { BASE_POINTS_MAX, BASE_POINTS_MIN, CHORE_NAME_MAX } from "@baumy/types";
 import {
   BountyGlyph,
@@ -13,8 +13,7 @@ import {
   cx,
   withStop,
 } from "@baumy/ui";
-import { AttestedForm } from "@/components/kiosk/attested-form";
-import { useActionForm, type FormAction } from "@/components/use-action-form";
+import type { FormAction } from "@/components/use-action-form";
 import type { ActionResult } from "@/lib/actions/result";
 import type { UpdateBountiesData } from "@/lib/actions/update-bounties";
 import {
@@ -40,12 +39,14 @@ import {
 } from "@/lib/chores/bulk-edit";
 import { hoursField } from "@/lib/weights/view";
 import { toast } from "@/lib/ui/toast";
+import type { BountySubmit } from "./bounty-submit";
 
 // Mass editing of bounties (issue #175, SPEC §12 decision 31): one editable
 // row per bounty, change as many as you like, then one Save that sends them
 // all to `update_bounties`, which saves all of them or none. Changed rows are
-// framed in violet and say "Changed". The admin page sends it with its
-// session; the kitchen screen (`pinLabel`) wraps it in AttestedForm, so the
+// framed in violet and say "Changed". This body is written once; how the
+// Save is sent is its `submit` adapter (./bounty-submit.tsx, issue #217):
+// the admin page's session, or the kitchen screen's AttestedForm, so the
 // picked admin's PIN goes with the one save.
 
 export interface BulkEditorBounty extends BulkBounty {
@@ -75,17 +76,19 @@ function mergeErrors(a: Errors, b: Errors): Errors {
 export function BountyBulkEditor({
   bounties,
   action,
-  pinLabel,
+  submit,
+  kiosk = false,
   onClose,
 }: {
   bounties: readonly BulkEditorBounty[];
   action: FormAction<UpdateBountiesData>;
-  /** The kitchen screen: the PIN pad's title, e.g. "Ryan's PIN". */
-  pinLabel?: string;
+  /** How the one Save is sent: `hubSubmit`, or `kioskSubmit(pinLabel)`. */
+  submit: BountySubmit;
+  /** The kitchen screen's touch-sized rows and grid (ADR 0005). */
+  kiosk?: boolean;
   /** The admin page: back to its list, after a save or Close. */
   onClose?: () => void;
 }) {
-  const kiosk = pinLabel !== undefined;
   // Only what the admin touched, per bounty (see `Touched`).
   const [touched, setTouched] = useState<Record<string, Touched>>({});
   const [result, setResult] = useState<ActionResult<UpdateBountiesData> | null>(
@@ -195,125 +198,21 @@ export function BountyBulkEditor({
     <FormMessage tone="error">{message}</FormMessage>
   ) : null;
 
-  if (kiosk) {
-    return (
-      <div data-testid="bounty-bulk-editor">
-        <AttestedForm
-          action={send}
-          label={saveLabel(count)}
-          pinLabel={pinLabel}
-          onResult={onResult}
-          disabled={!canSave}
-          fields={fields}
-          // Always in view at the bottom of the page, with what is wrong
-          // above its buttons, so the admin never scrolls to the end to
-          // save or to read why not. It spans the Card's padding, and its
-          // right end stays clear of Baumy, who stands over the footer's
-          // corner. It sits flush on the footer: the kiosk page's scroll
-          // box keeps 56px of padding under its content (pb-14, KioskFrame),
-          // and a sticky box stops that far above the bottom, so a bottom
-          // of -56px takes it down to the edge, with no rows showing under it.
-          // There Baumy's head rises into the bar's right end, so the
-          // buttons keep 176px (pr-44) clear of it.
-          bar={{
-            testId: "bulk-save-bar",
-            className:
-              "sticky -bottom-14 z-20 -mx-4 grid grid-cols-2 gap-3 border-t-4 border-bm-line bg-bm-bg py-3 pr-44 pl-4 sm:-mx-6 sm:pl-6",
-            extra: (
-              <>
-                <Button
-                  type="button"
-                  size="kiosk"
-                  variant="secondary"
-                  disabled={count === 0}
-                  onClick={discard}
-                >
-                  Discard
-                </Button>
-                <div className="order-first col-span-2 flex flex-col gap-2">
-                  {status}
-                  {error}
-                </div>
-              </>
-            ),
-          }}
-        />
-      </div>
-    );
-  }
-  return (
-    <HubForm
-      action={send}
-      count={count}
-      canSave={canSave}
-      onResult={onResult}
-      onDiscard={discard}
-      closeLabel={onClose && count === 0 ? "Close" : "Discard"}
-      error={error}
-      status={status}
-    >
-      {fields}
-    </HubForm>
-  );
-}
-
-/** The admin page's form: its session attests itself. */
-function HubForm({
-  action,
-  count,
-  canSave,
-  onResult,
-  onDiscard,
-  closeLabel,
-  error,
-  status,
-  children,
-}: {
-  action: FormAction<UpdateBountiesData>;
-  count: number;
-  canSave: boolean;
-  onResult: (r: ActionResult<UpdateBountiesData>) => void;
-  onDiscard: () => void;
-  closeLabel: string;
-  error: ReactNode;
-  status: ReactNode;
-  children: ReactNode;
-}) {
-  const { state, formAction, pending, requestId } = useActionForm(action);
-  useEffect(() => {
-    if (state) onResult(state);
-    // Once per answer: `onResult` is a new function on every render.
-  }, [state]);
-  return (
-    <form
-      action={formAction}
-      noValidate
-      className="flex flex-col gap-4"
-      data-testid="bounty-bulk-editor"
-      // Enter in a row's field submits nothing while it cannot save.
-      onSubmit={(e) => {
-        if (!canSave) e.preventDefault();
-      }}
-    >
-      <input type="hidden" name="requestId" value={requestId} />
-      {children}
-      {status}
-      {error}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={pending || !canSave}>
-          {pending ? "Saving..." : saveLabel(count)}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={pending || (closeLabel === "Discard" && count === 0)}
-          onClick={onDiscard}
-        >
-          {closeLabel}
-        </Button>
-      </div>
-    </form>
-  );
+  const closeLabel = onClose && count === 0 ? "Close" : "Discard";
+  return submit.render({
+    action: send,
+    label: saveLabel(count),
+    canSave,
+    onResult,
+    fields,
+    status,
+    error,
+    discard: {
+      label: closeLabel,
+      disabled: closeLabel === "Discard" && count === 0,
+      onClick: discard,
+    },
+  });
 }
 
 /** The three number fields, each a slider. */

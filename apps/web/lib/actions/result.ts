@@ -172,17 +172,32 @@ export function fail(
 }
 
 /**
+ * INVALID_INPUT issues under `at` (a path prefix), grouped by the next step
+ * of their path: `[]` gives each top-level field's, `["changes", 2]` each
+ * field's of the third row. Issues about the place itself go under `""`.
+ * The one place an issue finds its field, for every form (issue #217).
+ */
+export function issuesAt(
+  result: ActionResult<unknown> | null | undefined,
+  at: readonly (string | number)[] = [],
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  if (!result || result.ok || !result.issues) return out;
+  for (const issue of result.issues) {
+    if (at.some((step, i) => issue.path[i] !== step)) continue;
+    const next = issue.path[at.length];
+    const key = next === undefined ? "" : String(next);
+    (out[key] ??= []).push(issue.message);
+  }
+  return out;
+}
+
+/**
  * INVALID_INPUT issues grouped by their top-level field, for inline form
  * errors. Issues about the whole input go under `""`.
  */
 export function fieldErrors(
   result: ActionResult<unknown> | null | undefined,
 ): Record<string, string[]> {
-  const out: Record<string, string[]> = {};
-  if (!result || result.ok || !result.issues) return out;
-  for (const issue of result.issues) {
-    const key = issue.path.length > 0 ? String(issue.path[0]) : "";
-    (out[key] ??= []).push(issue.message);
-  }
-  return out;
+  return issuesAt(result);
 }

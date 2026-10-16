@@ -8,7 +8,7 @@ import {
   type ProofMode,
 } from "@baumy/types";
 import { stepStops } from "@baumy/ui";
-import type { ActionResult } from "@/lib/actions/result";
+import { issuesAt, type ActionResult } from "@/lib/actions/result";
 import { formatMinutes, hoursField } from "@/lib/weights/view";
 
 // The mass bounty editor's pure half (issue #175): each bounty's editable
@@ -200,22 +200,21 @@ export function changesFromForm(
 
 /**
  * The action's per-field errors, by bounty id and field. `changes` is the
- * list that was sent, so an issue's index finds its row.
+ * list that was sent, so an issue's index finds its row. Each row's issues
+ * come from `issuesAt`, the mapping every form uses; the id, and the row as
+ * a whole, are not a field the row shows, so they are left out.
  */
 export function rowErrors(
   result: ActionResult<unknown> | null,
   changes: readonly BountyChangeInput[],
 ): Record<string, Partial<Record<BountyField, string[]>>> {
   const out: Record<string, Partial<Record<BountyField, string[]>>> = {};
-  if (!result || result.ok || !result.issues) return out;
-  for (const issue of result.issues) {
-    const [top, index, field] = issue.path;
-    if (top !== CHANGES_FIELD || typeof index !== "number") continue;
-    const id = changes[index]?.choreId;
-    if (!id || typeof field !== "string" || field === "choreId") continue;
-    const row = (out[id] ??= {});
-    (row[field as BountyField] ??= []).push(issue.message);
-  }
+  changes.forEach(({ choreId }, index) => {
+    const row = issuesAt(result, [CHANGES_FIELD, index]);
+    delete row[""];
+    delete row.choreId;
+    if (Object.keys(row).length > 0) out[choreId] = row;
+  });
   return out;
 }
 
