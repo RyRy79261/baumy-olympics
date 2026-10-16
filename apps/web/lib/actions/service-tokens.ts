@@ -68,6 +68,7 @@ const common = {
   surfaces: ["ui"],
   requires: "admin",
   kind: "write",
+  refreshes: ["service_tokens"],
   rateLimit: { perMember: 10, perIp: 30, windowMs: 15 * 60_000 },
 } as const;
 

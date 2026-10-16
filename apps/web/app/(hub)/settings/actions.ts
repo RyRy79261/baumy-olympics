@@ -1,7 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { actionForm } from "@/lib/actions/ui";
+import { actionForm, actionFormRefreshing } from "@/lib/actions/ui";
 import type { ActionResult } from "@/lib/actions/result";
 import type { SetKioskPinData } from "@/lib/actions/set-kiosk-pin";
 import type { TelegramLinkCodeData } from "@/lib/actions/create-telegram-link-code";
@@ -14,9 +13,7 @@ export async function setKioskPinAction(
   _prev: ActionResult<SetKioskPinData> | null,
   form: FormData,
 ): Promise<ActionResult<SetKioskPinData>> {
-  const result = await actionForm("set_kiosk_pin", form);
-  if (result.ok) revalidatePath("/settings");
-  return result;
+  return actionFormRefreshing("set_kiosk_pin", form);
 }
 
 /** Pick my character from the gallery (issue #111). */
@@ -24,15 +21,15 @@ export async function chooseAvatarAction(
   _prev: ActionResult<ChooseAvatarData> | null,
   form: FormData,
 ): Promise<ActionResult<ChooseAvatarData>> {
-  const result = await actionForm("choose_avatar", form);
-  if (result.ok) revalidatePath("/", "layout");
-  return result;
+  return actionFormRefreshing("choose_avatar", form);
 }
 
 export async function createTelegramLinkCodeAction(
   _prev: ActionResult<TelegramLinkCodeData> | null,
   form: FormData,
 ): Promise<ActionResult<TelegramLinkCodeData>> {
+  // No refresh: the card shows the code from this answer and polls for the
+  // link; it refreshes the page itself once linked (settings-forms.tsx).
   return actionForm("create_telegram_link_code", form);
 }
 

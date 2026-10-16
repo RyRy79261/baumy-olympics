@@ -94,6 +94,7 @@ export const reportBug = defineAction({
     "Files a bug report or feature request as an issue on the household's public GitHub tracker, redacted of personal data. Only from the in-app reporter.",
   consent: "File bug reports on the household's public tracker",
   kind: "write",
+  refreshes: [],
   risk: "safe",
   // The hub and the kitchen screen only: a report is a person's own words.
   surfaces: ["ui", "kiosk"],

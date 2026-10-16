@@ -1,7 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { actionForm } from "@/lib/actions/ui";
+import { actionFormRefreshing } from "@/lib/actions/ui";
 import type { ActionResult } from "@/lib/actions/result";
 import type { RevokeMcpConnectionData } from "@/lib/actions/mcp-connections";
 
@@ -11,7 +10,5 @@ export async function revokeMcpConnectionAction(
   _prev: ActionResult<RevokeMcpConnectionData> | null,
   form: FormData,
 ): Promise<ActionResult<RevokeMcpConnectionData>> {
-  const result = await actionForm("revoke_mcp_connection", form);
-  if (result.ok) revalidatePath("/settings/connections");
-  return result;
+  return actionFormRefreshing("revoke_mcp_connection", form);
 }

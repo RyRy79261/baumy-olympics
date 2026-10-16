@@ -234,6 +234,7 @@ export const createEvent = defineAction({
     "Adds an event to the house calendar. Dates are Berlin days (YYYY-MM-DD) and times Berlin wall-clock times (HH:MM, 24h); give startTime and endTime for a `timed` event, or kind `all_day`. endDate is the last day, inclusive, and defaults to date. forMemberId names the one member it is for; leave it out (or null) for the whole house.",
   consent: "Add events to the house calendar",
   kind: "write",
+  refreshes: ["calendar"],
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
   requires: "member",
@@ -281,6 +282,7 @@ export const updateEvent = defineAction({
     "Changes an event on the house calendar: send its id (from list_events) and ALL of its fields as they should be, the same as for create_event, except forMemberId: leave it out to keep who it is for, or null to make it the whole house's.",
   consent: "Change events on the house calendar",
   kind: "write",
+  refreshes: ["calendar"],
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
   requires: "member",
@@ -324,6 +326,7 @@ export const deleteEvent = defineAction({
     "Deletes an event from the house calendar, by its id from list_events. Always confirm with the person first.",
   consent: "Delete events from the house calendar",
   kind: "write",
+  refreshes: ["calendar"],
   risk: "destructive",
   // Brain behind its confirm button (issue #70); never MCP.
   surfaces: ["ui", "kiosk", "ai", "brain"],

@@ -10,7 +10,8 @@ import type { ActionResult } from "@/lib/actions/result";
 // /join's server actions: thin wrappers around the registry (SPEC §6.3). On
 // success the new member goes straight to the hub; someone who joined with
 // a code goes to Settings first when the household has a gallery, to pick
-// their character there (issue #111: the gallery is for members).
+// their character there (issue #111: the gallery is for members). No
+// refresh: the redirect renders the page they land on afresh.
 
 export async function redeemInviteAction(
   _prev: ActionResult<unknown> | null,

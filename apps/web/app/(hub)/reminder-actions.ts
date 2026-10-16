@@ -1,6 +1,6 @@
 "use server";
 
-import { actionForm } from "@/lib/actions/ui";
+import { actionFormRefreshing } from "@/lib/actions/ui";
 import type { CreateReminderData } from "@/lib/actions/reminders";
 import type { ActionResult } from "@/lib/actions/result";
 
@@ -12,5 +12,5 @@ export async function createReminderAction(
   _prev: ActionResult<CreateReminderData> | null,
   form: FormData,
 ): Promise<ActionResult<CreateReminderData>> {
-  return actionForm("create_reminder", form);
+  return actionFormRefreshing("create_reminder", form);
 }

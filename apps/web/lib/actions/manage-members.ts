@@ -85,6 +85,7 @@ export const manageMembers = defineAction({
     "Changes a household member's role, deactivates or reactivates them, edits their display name, colour and avatar, or sets or clears their Telegram user id.",
   consent: "Manage household members",
   kind: "write",
+  refreshes: ["members"],
   risk: "confirm",
   surfaces: ["ui"],
   requires: "admin",

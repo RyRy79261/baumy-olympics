@@ -34,6 +34,7 @@ export const addPotContribution = defineAction({
     "Records a monthly contribution to the season's savings pot: the amount in euros, the month (YYYY-MM, default: this month), who paid it (a member id, default: you) and an optional note. Only a household admin may do this, in their own name.",
   consent: "Record money paid into the pot",
   kind: "write",
+  refreshes: ["pot"],
   risk: "confirm",
   surfaces: ["ui", "ai", "brain"],
   requires: "admin",

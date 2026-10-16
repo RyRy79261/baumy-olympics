@@ -174,6 +174,7 @@ export const createNote = defineAction({
     "Adds a note for the household: a short title, an optional markdown body (bold, italic, lists, links), an optional colour and whether to pin it to the hub and the kitchen screen. Never put secrets (passwords, codes that unlock anything) in a note.",
   consent: "Add notes for the household",
   kind: "write",
+  refreshes: ["notes"],
   risk: "safe",
   surfaces: ALL_SURFACES,
   requires: "member",
@@ -204,6 +205,7 @@ export const updateNote = defineAction({
     "Rewrites a note: its title, markdown body and colour are all replaced, so send the whole note (a body or colour left out is emptied). Pinning is pin_note. Anyone in the household may change any note.",
   consent: "Change the household's notes",
   kind: "write",
+  refreshes: ["notes"],
   risk: "confirm",
   surfaces: ALL_SURFACES,
   requires: "member",
@@ -237,6 +239,7 @@ export const pinNote = defineAction({
     "Pins a note to the hub and the kitchen screen (pinned: true), or takes it off (pinned: false).",
   consent: "Pin and unpin the household's notes",
   kind: "write",
+  refreshes: ["notes"],
   risk: "safe",
   surfaces: ALL_SURFACES,
   requires: "member",
@@ -271,6 +274,7 @@ export const deleteNote = defineAction({
     "Deletes a note for everyone in the household. Always ask before doing this.",
   consent: "Delete the household's notes",
   kind: "write",
+  refreshes: ["notes"],
   risk: "destructive",
   // Brain behind its confirm button (issue #70); never MCP.
   surfaces: ["ui", "kiosk", "ai", "brain"],
@@ -314,6 +318,7 @@ export const acknowledgeNote = defineAction({
     "Records that you have read these notes as they are now. A note edited afterwards counts as unread again. Seeing one twice changes nothing.",
   consent: "Mark notes as seen by you",
   kind: "write",
+  refreshes: ["notes_seen"],
   risk: "safe",
   // The phone's Board and the kitchen screen (issue #153); brain's "read"
   // button comes with issue #163.
