@@ -16,13 +16,12 @@ import {
   ProofMode,
 } from "@baumy/types";
 import {
+  batchNamesFree,
   editBounty,
-  editScope,
-  nameFree,
   type BountyPatch,
 } from "@/lib/chores/edit";
 import { defineAction } from "./define";
-import type { ManageChoreData } from "./manage-chore";
+import { editScope, type ManageChoreData } from "./manage-chore";
 import { fail, type ActionFailure } from "./result";
 
 // Mass editing of bounties (issue #175, SPEC §12 decision 31): one editable
@@ -210,15 +209,21 @@ export const updateBounties = defineAction({
     }
 
     // The names, on the end state: no two active bounties share one.
-    for (const [index, c] of changes.entries()) {
-      const chore = rows.get(c.choreId)!;
-      if (chore.archivedAt !== null) continue;
-      if (c.name === undefined && c.archived !== false) continue;
-      const taken = await nameFree(ctx, chore.name, chore.id);
-      if (taken) {
-        // On the name, or on the Status of a restore that clashes.
-        return onRow(taken, index, c.name !== undefined ? "name" : "archived");
-      }
+    const clash = await batchNamesFree(
+      ctx,
+      changes.map((c) => ({
+        chore: rows.get(c.choreId)!,
+        renamed: c.name !== undefined,
+        restored: c.archived === false,
+      })),
+    );
+    if (clash) {
+      // On the name, or on the Status of a restore that clashes.
+      return onRow(
+        clash.refusal,
+        clash.index,
+        clash.on === "name" ? "name" : "archived",
+      );
     }
 
     const data: UpdateBountiesData = { changed };

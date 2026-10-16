@@ -10,7 +10,7 @@ import {
   ProofMode,
   cooldownMinutesFromHours,
 } from "@baumy/types";
-import { editBounty, editScope, nameFree } from "@/lib/chores/edit";
+import { editBounty, nameFree, type EditScope } from "@/lib/chores/edit";
 import { defineAction, type ActionCtx, type ExecuteResult } from "./define";
 import { fail } from "./result";
 
@@ -79,6 +79,19 @@ export function spriteFor(name: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
   return slug || "chore";
+}
+
+/**
+ * An action's context as the bounty edit rules' scope (lib/chores/edit.ts):
+ * the acting admin edits. Shared by the actions that edit a bounty.
+ */
+export function editScope(ctx: ActionCtx): EditScope {
+  return {
+    db: ctx.db,
+    householdId: ctx.householdId,
+    by: ctx.actor.memberId!,
+    now: ctx.now,
+  };
 }
 
 /** A new chore's parsed settings, with its first weight. */

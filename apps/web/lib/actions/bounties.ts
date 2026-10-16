@@ -8,9 +8,13 @@ import {
   EffortFactorPct,
   ProofMode,
 } from "@baumy/types";
-import { editBounty, editScope } from "@/lib/chores/edit";
+import {
+  archivedRefusal,
+  editBounty,
+  type ArchivedPolicy,
+} from "@/lib/chores/edit";
 import { defineAction } from "./define";
-import { createChoreBy, type ManageChoreData } from "./manage-chore";
+import { createChoreBy, editScope, type ManageChoreData } from "./manage-chore";
 import { fail } from "./result";
 
 // Baumy's bounty writes (issue #107, SPEC §12 decision 10 as amended
@@ -121,8 +125,10 @@ const updateInput = z
   });
 
 const NOT_FOUND = fail("NOT_FOUND", "That bounty was not found.");
-const archivedSentence = (name: string) =>
-  `${name} is archived. Restore it on the admin page first.`;
+/** An archived bounty is restored on the admin page (preview and execute). */
+const ARCHIVED: ArchivedPolicy = {
+  refuse: (name) => `${name} is archived. Restore it on the admin page first.`,
+};
 
 export const updateBounty = defineAction({
   name: "update_bounty",
@@ -145,9 +151,8 @@ export const updateBounty = defineAction({
     });
     // What execute would refuse, said on the card instead (never run).
     if (!found) return { invalid: NOT_FOUND.message };
-    if (found.chore.archivedAt !== null) {
-      return { invalid: archivedSentence(found.chore.name) };
-    }
+    const archived = archivedRefusal(found.chore, ARCHIVED);
+    if (archived) return { invalid: archived.message };
     const { choreId: _id, name, ...rest } = i;
     const changes = describeBounty(rest);
     if (name !== undefined && name !== found.chore.name) {
@@ -163,7 +168,7 @@ export const updateBounty = defineAction({
     // what was asked); an archived bounty is restored on the admin page.
     const r = await editBounty(editScope(ctx), chore, patch, {
       halves: "keepOther",
-      archived: { refuse: archivedSentence },
+      archived: ARCHIVED,
       names: "now",
     });
     if (!r.ok) return r;

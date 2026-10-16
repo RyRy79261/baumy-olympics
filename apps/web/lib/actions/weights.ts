@@ -329,7 +329,7 @@ export const schedulePointsChange = defineAction({
     const chore = await lockChoreRow(ctx.db, ctx.householdId, input.choreId);
     if (!chore) return fail("NOT_FOUND", "That bounty was not found.");
     const archived = archivedRefusal(chore, {
-      refuse: () => "That bounty is archived. Restore it on Edit chores first.",
+      refuse: "That bounty is archived. Restore it on Edit chores first.",
     });
     if (archived) return archived;
     const rule = await currentRule(ctx.db, chore.id, ctx.now);
