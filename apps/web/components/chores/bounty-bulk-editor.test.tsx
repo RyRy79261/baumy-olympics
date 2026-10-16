@@ -6,6 +6,11 @@ import type { ActionResult } from "@/lib/actions/result";
 import type { UpdateBountiesData } from "@/lib/actions/update-bounties";
 import { CHANGES_FIELD, EFFORT_STOPS } from "@/lib/chores/bulk-edit";
 import { BountyBulkEditor, type BulkEditorBounty } from "./bounty-bulk-editor";
+import { hubSubmit, kioskSubmit } from "./bounty-submit";
+
+/** The admin page's adapter, or with `pinLabel` the kitchen screen's. */
+const submitOf = ({ pinLabel }: { pinLabel?: string }) =>
+  pinLabel === undefined ? hubSubmit : kioskSubmit(pinLabel);
 
 // The mass bounty editor (issue #175): one row per bounty, changed rows
 // marked, one Save that sends only what changed, Discard, the action's
@@ -84,7 +89,13 @@ async function mount(
   root = createRoot(el);
   await act(async () =>
     root!.render(
-      <BountyBulkEditor bounties={BOUNTIES} action={action} {...opts} />,
+      <BountyBulkEditor
+        bounties={BOUNTIES}
+        action={action}
+        submit={submitOf(opts)}
+        kiosk={opts.pinLabel !== undefined}
+        onClose={opts.onClose}
+      />,
     ),
   );
   return { el, action };
@@ -102,7 +113,12 @@ async function mountWith(
   const render = (list: BulkEditorBounty[]) =>
     act(async () =>
       root!.render(
-        <BountyBulkEditor bounties={list} action={action} {...opts} />,
+        <BountyBulkEditor
+          bounties={list}
+          action={action}
+          submit={submitOf(opts)}
+          kiosk={opts.pinLabel !== undefined}
+        />,
       ),
     );
   await render(bounties);

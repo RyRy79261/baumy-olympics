@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Card } from "@baumy/ui";
 import { BountyBulkEditor } from "@/components/chores/bounty-bulk-editor";
+import { hubSubmit } from "@/components/chores/bounty-submit";
 import type { ChoreView } from "@/lib/actions/list-chores";
 import { updateBountiesAction } from "./actions";
 import { ChoreAdminRow } from "./chore-forms";
@@ -22,6 +23,7 @@ export function ChoresCard({ chores }: { chores: ChoreView[] }) {
         <BountyBulkEditor
           bounties={chores}
           action={updateBountiesAction}
+          submit={hubSubmit}
           onClose={() => setBulk(false)}
         />
       </Card>

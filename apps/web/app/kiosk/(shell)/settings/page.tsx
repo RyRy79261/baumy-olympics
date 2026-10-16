@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { DEFAULT_KIOSK_IDLE_MINUTES } from "@baumy/types";
 import { Card, FormMessage, PageHeading, buttonClass } from "@baumy/ui";
 import { IdleMinutesForm } from "@/components/kiosk/idle-minutes-form";
-import { BountyBulkEditor } from "@/components/chores/bounty-bulk-editor";
+import { KioskBountyEditor } from "@/components/kiosk/kiosk-bounty-editor";
 import { KioskPointsForm } from "@/components/kiosk/kiosk-points-form";
 import { kioskRequestCtx } from "@/lib/actions/kiosk";
 import { runAction } from "@/lib/actions/registry";
@@ -104,7 +104,7 @@ export default async function KioskSettingsPage() {
             description="As an admin, with your PIN. Change any rows, then save them together; if one can't be saved, none are. New points count from now on."
           >
             {listed?.ok ? (
-              <BountyBulkEditor
+              <KioskBountyEditor
                 bounties={listed.data.chores}
                 pinLabel={pinLabel}
                 action={kioskUpdateBountiesAction}
