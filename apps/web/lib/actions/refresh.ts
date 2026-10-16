@@ -67,7 +67,16 @@ export interface RefreshPath {
 const page = (path: string): RefreshPath => ({ path });
 const layout = (path: string): RefreshPath => ({ path, layout: true });
 
-/** Tag → the pages that read it, per side. */
+/**
+ * Tag → the pages that read it, per side.
+ *
+ * Some entries are declarative only: no refreshing wrapper reaches them
+ * today, because those writes run through the plain adapters on purpose.
+ * `notes_seen` on the kiosk (app/kiosk/note-actions.ts), `telegram` (the
+ * link code; `link_telegram` is brain's) and `reminders` on the kiosk
+ * (app/kiosk/reminder-actions.ts). They still say which pages read the data,
+ * for the day a wrapper does refresh it.
+ */
 export const TAG_PATHS: Record<
   RefreshTag,
   Record<RefreshSide, readonly RefreshPath[]>

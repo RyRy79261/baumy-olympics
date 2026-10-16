@@ -254,7 +254,7 @@ export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
    * Writes only, and every write: the data it changes (refresh.ts). The hub
    * and kiosk server actions refresh the pages that read these tags after it
    * succeeds (revalidate.ts). `[]` when no page shows what it changes. Never
-   * part of a tool spec. registry.test.ts holds every write to it.
+   * part of a tool spec. refresh.test.ts holds every write to it.
    */
   refreshes?: readonly RefreshTag[];
   /**

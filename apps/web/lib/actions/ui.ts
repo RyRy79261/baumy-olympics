@@ -12,13 +12,14 @@ import { fail, type ActionResult } from "./result";
 import { refreshAfter } from "./revalidate";
 
 // The UI adapter (SPEC §6.3): a server action is a thin wrapper around
-// `actionForm`, which builds the request context from the session and runs
-// the action from the `ui` surface.
+// `actionFormRefreshing`, which runs `actionForm` (the request context from
+// the session, the action from the `ui` surface) and then refreshes the hub
+// pages of the action's `refreshes` tags (issue #215).
 //
 //   // app/(hub)/settings/actions.ts
 //   "use server";
 //   export async function updateMyProfileAction(_prev: unknown, form: FormData) {
-//     return actionForm("update_my_profile", form);
+//     return actionFormRefreshing("update_my_profile", form);
 //   }
 //
 // The form carries a hidden `requestId` (a fresh UUID per submission attempt,
