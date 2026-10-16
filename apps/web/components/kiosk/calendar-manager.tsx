@@ -72,9 +72,6 @@ export function CalendarManager({
 }) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [deleting, setDeleting] = useState<CalendarEventView | null>(null);
-  // A save or a delete on its way: its sheet stays open for the answer.
-  const [saving, setSaving] = useState(false);
-  const [removing, setRemoving] = useState(false);
 
   return (
     <div className="flex flex-col gap-8">
@@ -158,7 +155,6 @@ export function CalendarManager({
       <Dialog
         open={sheet !== null}
         onClose={() => setSheet(null)}
-        busy={saving}
         title={
           sheet?.mode === "edit" ? `Edit ${sheet.event.title}` : "New event"
         }
@@ -185,13 +181,11 @@ export function CalendarManager({
                 );
               }}
               onCancel={() => setSheet(null)}
-              onPending={setSaving}
             />
             {sheet.mode === "edit" ? (
               <Button
                 variant="danger"
                 size="kiosk"
-                disabled={saving}
                 onClick={() => {
                   setDeleting(sheet.event);
                   setSheet(null);
@@ -207,7 +201,6 @@ export function CalendarManager({
       <Dialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        busy={removing}
         title={deleting ? `Delete ${deleting.title}?` : "Delete the event?"}
       >
         {deleting ? (
@@ -229,12 +222,10 @@ export function CalendarManager({
                 if (r.ok) toast.success(`Deleted ${r.data.title}.`);
                 setDeleting(null);
               }}
-              onPending={setRemoving}
             />
             <Button
               variant="secondary"
               size="kiosk"
-              disabled={removing}
               onClick={() => setDeleting(null)}
             >
               Keep it

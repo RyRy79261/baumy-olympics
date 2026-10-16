@@ -13,6 +13,7 @@ import {
   Select,
   StickyNote,
   Textarea,
+  useSheetSending,
 } from "@baumy/ui";
 import { NOTE_BODY_MAX, NOTE_TITLE_MAX } from "@baumy/types";
 import { AttestedForm } from "@/components/kiosk/attested-form";
@@ -21,7 +22,6 @@ import {
   useReporting,
   type FormAction,
 } from "@/components/use-action-form";
-import { useReportPending } from "@/components/use-report-pending";
 import type {
   DeleteNoteData,
   NoteView,
@@ -69,9 +69,6 @@ export function NoteBoard({
 }) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [deleting, setDeleting] = useState<NoteView | null>(null);
-  // A save or a delete on its way: its sheet stays open for the answer.
-  const [saving, setSaving] = useState(false);
-  const [removing, setRemoving] = useState(false);
   const size = kiosk ? "kiosk" : "default";
 
   return (
@@ -142,7 +139,6 @@ export function NoteBoard({
       <Dialog
         open={sheet !== null}
         onClose={() => setSheet(null)}
-        busy={saving}
         title={sheet?.mode === "edit" ? `Edit ${sheet.note.title}` : "New note"}
       >
         {sheet ? (
@@ -161,7 +157,6 @@ export function NoteBoard({
               );
             }}
             onCancel={() => setSheet(null)}
-            onPending={setSaving}
           />
         ) : null}
       </Dialog>
@@ -169,7 +164,6 @@ export function NoteBoard({
       <Dialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        busy={removing}
         title={deleting ? `Delete ${deleting.title}?` : "Delete the note?"}
       >
         {deleting ? (
@@ -188,12 +182,10 @@ export function NoteBoard({
                 if (r.ok) toast.success(`Deleted ${r.data.title}.`);
                 setDeleting(null);
               }}
-              onPending={setRemoving}
             />
             <Button
               variant="secondary"
               size="kiosk"
-              disabled={removing}
               onClick={() => setDeleting(null)}
             >
               Keep it
@@ -256,7 +248,6 @@ function NoteForm({
   action,
   onDone,
   onCancel,
-  onPending,
 }: {
   note: NoteView | null;
   kiosk: boolean;
@@ -264,13 +255,12 @@ function NoteForm({
   action: FormAction<NoteWriteData>;
   onDone: (data: NoteWriteData) => void;
   onCancel: () => void;
-  /** Told while a save is on its way (the sheet stays open, #174). */
-  onPending?: (pending: boolean) => void;
 }) {
   const { state, formAction, pending, requestId, errors } = useActionForm(
     useReporting(action, onDone),
   );
-  useReportPending(pending, onPending);
+  // Its sheet stays open, locked, while a save is on its way (#174).
+  useSheetSending(pending);
   const [attempt, setAttempt] = useState(0);
   // Controlled: React resets a form's uncontrolled fields after each action,
   // and a PIN prompt sends the same fields a second time.
@@ -378,7 +368,6 @@ function NoteForm({
       <Dialog
         open={pinOpen}
         onClose={() => setDismissed(true)}
-        busy={pending}
         title={pinLabel}
       >
         <div className="flex flex-col gap-4">

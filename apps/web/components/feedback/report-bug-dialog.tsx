@@ -13,6 +13,7 @@ import {
   Dialog,
   Field,
   FormMessage,
+  SheetSending,
   Textarea,
 } from "@baumy/ui";
 import type { ReportBugData } from "@/lib/actions/report-bug";
@@ -157,9 +158,10 @@ export function ReportBugDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      busy={pending}
       title={kind === "bug" ? "Report a bug" : "Request a feature"}
     >
+      {/* Open, and locked, while the report is on its way (#174). */}
+      <SheetSending pending={pending} />
       <form
         className="flex flex-col gap-4"
         data-testid="report-bug-dialog"
@@ -243,12 +245,7 @@ export function ReportBugDialog({
         {error ? <FormMessage tone="error">{error}</FormMessage> : null}
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            size={size}
-            variant="ghost"
-            onClick={onClose}
-            disabled={pending}
-          >
+          <Button size={size} variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           {blocked ? null : (

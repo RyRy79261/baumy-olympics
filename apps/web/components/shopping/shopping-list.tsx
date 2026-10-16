@@ -11,6 +11,7 @@ import {
   FormMessage,
   Glyph,
   Input,
+  SheetSending,
   choiceClass,
   cx,
   iconChoiceClass,
@@ -374,12 +375,9 @@ function GroupPicker({
     state && !state.ok && state.code !== "NOT_FOUND" ? state : null;
   const choices: (ShoppingCategory | null)[] = [...SHOPPING_CATEGORIES, null];
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      title={`Group for ${item.item}`}
-      busy={pending}
-    >
+    <Dialog open onClose={onClose} title={`Group for ${item.item}`}>
+      {/* Open, and locked, while the move is on its way (#174). */}
+      <SheetSending pending={pending} />
       <form action={formAction} className="flex flex-col gap-3">
         <input type="hidden" name="requestId" value={requestId} />
         <input type="hidden" name="id" value={item.id} />

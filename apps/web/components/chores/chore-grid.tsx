@@ -130,8 +130,6 @@ export function ChoreGrid({
   const router = useRouter();
   const photo = useRef<Blob | null>(null);
   const [hasPhoto, setHasPhoto] = useState(false);
-  // "Log it" is on its way: the sheet stays open for the answer (#174).
-  const [sending, setSending] = useState(false);
   // One form action for the sheet: the upload route when a photo is picked,
   // else the page's server action. Read through refs, so it never goes stale.
   const serverAction = useRef(action);
@@ -342,7 +340,6 @@ export function ChoreGrid({
         <Dialog
           open={open !== null}
           onClose={closeSheet}
-          busy={sending}
           title={open ? `Log ${open.name}` : "Log a chore"}
         >
           {open ? (
@@ -354,9 +351,9 @@ export function ChoreGrid({
                   kiosk={kiosk}
                   value={doneBy}
                   onChange={setDoneBy}
-                  // The form is keyed by who: a new pick mid-send would lose
-                  // the answer and allow a second log (#174).
-                  disabled={sending}
+                  // The sheet locks it while Log it is sending: the form is
+                  // keyed by who, so a new pick mid-send would lose the
+                  // answer and allow a second log (#174).
                   options={members.map((m) => ({
                     value: m.id,
                     label:
@@ -382,7 +379,6 @@ export function ChoreGrid({
                   <PhotoPicker
                     key={open.id}
                     kiosk={kiosk}
-                    disabled={sending}
                     label={
                       open.proofMode === "required"
                         ? "Add a photo (required)"
@@ -412,15 +408,9 @@ export function ChoreGrid({
                   </>
                 }
                 onResult={onResult}
-                onPending={setSending}
               />
               {/* A way out that says so, as well as the corner's × (#174). */}
-              <Button
-                variant="secondary"
-                size="kiosk"
-                disabled={sending}
-                onClick={closeSheet}
-              >
+              <Button variant="secondary" size="kiosk" onClick={closeSheet}>
                 Cancel
               </Button>
             </div>

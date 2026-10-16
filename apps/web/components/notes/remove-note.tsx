@@ -28,7 +28,6 @@ export function RemoveNote({
   onRemoved?: (noteId: string) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const [pending, setPending] = useState(false);
   // The success is reported from the action itself (useReporting): once
   // the note is gone the page re-renders without it, and this form unmounts
   // before it could see its own answer.
@@ -64,14 +63,13 @@ export function RemoveNote({
         variant="danger"
         pinLabel={pinLabel}
         fields={<input type="hidden" name="noteId" value={note.id} />}
-        onPending={setPending}
         onResult={(r) => {
           if (toastActionError(r)) return;
           setConfirming(false);
         }}
         bar={{
           className: "flex flex-wrap gap-2",
-          extra: (
+          extra: (pending) => (
             <Button
               variant="secondary"
               size="kiosk"

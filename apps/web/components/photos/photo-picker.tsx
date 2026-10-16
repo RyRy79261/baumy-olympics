@@ -9,17 +9,18 @@ import { downscalePhoto } from "./downscale";
 // caller as a Blob. The upload itself is the caller's form
 // (`photoUploadAction`), so the photo survives a PIN prompt: React resets a
 // form's inputs after its action, but not this component's state.
+//
+// While the form it belongs to is sending, its sheet locks every field in
+// it (a disabled <fieldset>, SPEC §12 decision 32): the input is disabled
+// by that, and the button-looking label dims with it.
 
 export function PhotoPicker({
   label = "Add a photo",
   kiosk = false,
-  disabled = false,
   onPhoto,
 }: {
   label?: string;
   kiosk?: boolean;
-  /** While the form it belongs to is sending. */
-  disabled?: boolean;
   onPhoto: (photo: Blob | null) => void;
 }) {
   const id = useId();
@@ -56,13 +57,13 @@ export function PhotoPicker({
       {/* The native input lies, invisible, over the button-looking label, so
           it keeps keyboard focus and a touch target as big as the label
           (56px on the kiosk). */}
-      <div className="relative focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-bm-yellow">
+      <div className="relative focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-bm-yellow [&:has(input:disabled)>label]:opacity-50">
         <label
           htmlFor={id}
           className={buttonClass(
             "secondary",
             kiosk ? "kiosk" : "default",
-            disabled ? "w-full opacity-50" : "w-full",
+            "w-full",
           )}
         >
           {busy ? "Preparing the photo…" : preview ? "Change photo" : label}
@@ -72,7 +73,6 @@ export function PhotoPicker({
           type="file"
           accept="image/*"
           aria-label={label}
-          disabled={disabled}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
           onChange={(e) => void pick(e.currentTarget.files?.[0])}
         />
