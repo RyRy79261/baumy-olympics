@@ -22,7 +22,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/kiosk/actions", () => ({ clearPickAction }));
 
 const { IdleReset } = await import("./idle-reset");
-const { setKioskBusy } = await import("@/lib/kiosk/busy");
+const { holdScreen } = await import("@/lib/kiosk/screen");
 const { KIOSK_IDLE_MS } = await import("@/lib/kiosk/constants");
 
 beforeAll(() => {
@@ -39,7 +39,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root?.unmount());
   root = null;
-  setKioskBusy("test", false);
+  holdScreen("test", false);
   vi.useRealTimers();
 });
 
@@ -54,11 +54,11 @@ describe("IdleReset", () => {
     root = createRoot(document.createElement("div"));
     act(() => root!.render(<IdleReset memberPicked />));
     wait(30_000);
-    act(() => setKioskBusy("test", true));
+    act(() => holdScreen("test", true));
     // A long hold and a slow reply: well past the minute.
     wait(2 * KIOSK_IDLE_MS);
     expect(clearPickAction).not.toHaveBeenCalled();
-    act(() => setKioskBusy("test", false));
+    act(() => holdScreen("test", false));
     wait(KIOSK_IDLE_MS - 1_000);
     expect(clearPickAction).not.toHaveBeenCalled();
     wait(1_000);
@@ -76,7 +76,7 @@ describe("IdleReset", () => {
   });
 });
 
-describe("closeOpenDialogs", () => {
+describe("going home", () => {
   it("closes even a sheet that is waiting on an answer (#174)", async () => {
     // jsdom has <dialog> without the modal methods: these act as a browser.
     HTMLDialogElement.prototype.showModal ??= function (
@@ -89,7 +89,7 @@ describe("closeOpenDialogs", () => {
       this.dispatchEvent(new Event("close"));
     };
     const { Dialog } = await import("@baumy/ui");
-    const { closeOpenDialogs } = await import("./idle-reset");
+    const { takeScreen } = await import("@/lib/kiosk/screen");
     const onClose = vi.fn();
     const el = document.createElement("div");
     document.body.append(el);
@@ -107,7 +107,7 @@ describe("closeOpenDialogs", () => {
     act(() => sheet.close());
     expect(sheet.open).toBe(true);
     // … but the kiosk taking the screen closes it, and the page hears so.
-    act(() => closeOpenDialogs(document));
+    act(() => takeScreen("idle-reset", document));
     expect(sheet.open).toBe(false);
     expect(onClose).toHaveBeenCalledOnce();
   });

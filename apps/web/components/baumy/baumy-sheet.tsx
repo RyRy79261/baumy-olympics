@@ -26,11 +26,11 @@ import {
 import { isAsking, isTranscribing } from "@/lib/ai/conversation";
 import { confirmAllTargets, isOpen } from "@/lib/ai/review";
 import { canRecord } from "@/lib/ai/voice";
-import { KIOSK_COVER_EVENT, KIOSK_IDLE_MS } from "@/lib/kiosk/constants";
+import { KIOSK_IDLE_MS } from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
 import { useActingPin } from "@/components/kiosk/acting-pin";
 import { noPinHeadline } from "@/components/kiosk/no-pin-notice";
-import { setKioskBusy } from "@/lib/kiosk/busy";
+import { holdScreen, onScreenTaken } from "@/lib/kiosk/screen";
 import { announceScore } from "@/lib/ui/scored";
 import { SuggestionCards } from "./suggestion-cards";
 import { useConversation } from "./use-conversation";
@@ -83,7 +83,7 @@ type CatMode = "who" | "talk" | "thinking" | "answer";
 const VOICE_NOTE_HINT =
   "Say it like a voice note: \u201cI bought cat food and the bins are out.\u201d";
 
-/** This bubble's flag in lib/kiosk/busy.ts. */
+/** This bubble's hold on the screen (lib/kiosk/screen.ts). */
 const BUSY_ID = "baumy-cat";
 
 /** How long the "+N" stays after a save that scored. */
@@ -452,13 +452,13 @@ export function BaumySheet({
   // A bubble left open closes after a minute untouched; not while a finger
   // holds the button or Baumy is still listening back, thinking or saving
   // (the minute starts again when that ends). The kiosk's idle reset and
-  // screensaver wait for the same (lib/kiosk/busy.ts).
+  // screensaver wait for the same: it holds the screen (lib/kiosk/screen.ts).
   const catBusy = cat && bubble !== null && (held || busy || bulk);
   useIdle(cat && bubble !== null && !catBusy, KIOSK_IDLE_MS, hideBubble);
   useEffect(() => {
-    setKioskBusy(BUSY_ID, catBusy);
+    holdScreen(BUSY_ID, catBusy);
   }, [catBusy]);
-  useEffect(() => () => setKioskBusy(BUSY_ID, false), []);
+  useEffect(() => () => holdScreen(BUSY_ID, false), []);
   // A reminder or the screensaver taking the screen closes it at once, and
   // drops any recording: nothing listens under them.
   const hideLatest = useRef(hideBubble);
@@ -466,9 +466,7 @@ export function BaumySheet({
   const bubbleOpen = cat && bubble !== null;
   useEffect(() => {
     if (!bubbleOpen) return;
-    const onCover = () => hideLatest.current();
-    window.addEventListener(KIOSK_COVER_EVENT, onCover);
-    return () => window.removeEventListener(KIOSK_COVER_EVENT, onCover);
+    return onScreenTaken(window, () => hideLatest.current());
   }, [bubbleOpen]);
   // A tap or click anywhere else closes it, like Done: the microphone off,
   // nothing sent (issue #155). The cat and its bubble are not "anywhere

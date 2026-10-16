@@ -16,8 +16,8 @@ import {
   reminderFaces,
   withoutReminder,
 } from "@/lib/kiosk/reminders";
+import { takeScreen } from "@/lib/kiosk/screen";
 import { newRequestId } from "../use-action-form";
-import { closeOpenDialogs } from "./idle-reset";
 
 // The kitchen screen's full-screen reminder (ADR 0005 §4, issue #66). The
 // shell renders it with the reminders at render time; away from the home
@@ -108,7 +108,7 @@ export function KioskReminders({
   // the screensaver does: nothing waits half-done under it.
   const currentId = current?.id;
   useEffect(() => {
-    if (currentId) closeOpenDialogs(document);
+    if (currentId) takeScreen("reminder", document);
   }, [currentId]);
   if (!current || !shownData) return null;
 

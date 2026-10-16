@@ -34,10 +34,3 @@ export const SCREENSAVER_IDLE_MS = 5 * 60_000;
  * reminders with it) and while awake.
  */
 export const REMINDER_POLL_MS = 60_000;
-
-/**
- * Sent on `window` when something takes over the whole screen (a reminder,
- * the screensaver, the idle reset): whatever is open without being a
- * dialog, like Baumy's speech bubble and its recording, closes.
- */
-export const KIOSK_COVER_EVENT = "baumy:kiosk-cover";

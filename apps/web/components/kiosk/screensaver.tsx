@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Screensaver } from "@baumy/ui";
 import { clockLines } from "@/lib/hub/view";
-import { isKioskBusy } from "@/lib/kiosk/busy";
 import { setKioskAsleep } from "@/lib/kiosk/asleep";
 import { KIOSK_IDLE_MS, SCREENSAVER_IDLE_MS } from "@/lib/kiosk/constants";
 import {
@@ -12,7 +11,7 @@ import {
   type NightEventDetail,
   type NightWindow,
 } from "@/lib/kiosk/night";
-import { closeOpenDialogs } from "./idle-reset";
+import { screenHeldFor, takeScreen, type Takeover } from "@/lib/kiosk/screen";
 
 // The kitchen screen's raccoon screensaver (ADR 0005 §6; SPEC §8, issues #29
 // and #66). It shows:
@@ -55,19 +54,24 @@ export function KioskScreensaver({
   const wasNight = useRef(false);
   const lastTouch = useRef(0);
 
-  const show = useCallback((next: boolean) => {
-    if (asleepRef.current === next) return;
-    asleepRef.current = next;
-    if (next) closeOpenDialogs(document);
-    setAsleep(next);
-    // The home and Shop pages stop re-reading while asleep (issue #210).
-    setKioskAsleep(next);
-    window.dispatchEvent(
-      new CustomEvent<NightEventDetail>(NIGHT_EVENT, {
-        detail: { asleep: next },
-      }),
-    );
-  }, []);
+  const show = useCallback(
+    (...[next, takeover]: [next: false] | [next: true, takeover: Takeover]) => {
+      if (asleepRef.current === next) return;
+      // Coming on takes the screen (lib/kiosk/screen.ts), unless its rules
+      // say this takeover waits.
+      if (next && !takeScreen(takeover, document)) return;
+      asleepRef.current = next;
+      setAsleep(next);
+      // The home and Shop pages stop re-reading while asleep (issue #210).
+      setKioskAsleep(next);
+      window.dispatchEvent(
+        new CustomEvent<NightEventDetail>(NIGHT_EVENT, {
+          detail: { asleep: next },
+        }),
+      );
+    },
+    [],
+  );
 
   // Leaving the shell asleep must not leave the next screen thinking so.
   useEffect(() => () => setKioskAsleep(false), []);
@@ -85,17 +89,21 @@ export function KioskScreensaver({
       const at = new Date(Date.now() + offset);
       const night = isNightAt(at, win);
       // Mid-hold or mid-reply with Baumy is not idle (issue #132).
-      if (isKioskBusy()) lastTouch.current = Date.now();
+      if (screenHeldFor("screensaver-idle", document)) {
+        lastTouch.current = Date.now();
+      }
       const idle = Date.now() - lastTouch.current;
       setNow(at);
       if (night) {
-        if (!wasNight.current || idle >= KIOSK_IDLE_MS) show(true);
+        // Nightfall comes on at once, even mid-conversation.
+        if (!wasNight.current) show(true, "nightfall");
+        else if (idle >= KIOSK_IDLE_MS) show(true, "screensaver-idle");
       } else if (wasNight.current) {
         // The morning wakes it, and starts the day's idle wait afresh.
         lastTouch.current = Date.now();
         show(false);
       } else if (idle >= SCREENSAVER_IDLE_MS && !reminderShowing()) {
-        show(true);
+        show(true, "screensaver-idle");
       }
       wasNight.current = night;
     };
