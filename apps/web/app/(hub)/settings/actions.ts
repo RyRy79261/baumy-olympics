@@ -28,6 +28,8 @@ export async function createTelegramLinkCodeAction(
   _prev: ActionResult<TelegramLinkCodeData> | null,
   form: FormData,
 ): Promise<ActionResult<TelegramLinkCodeData>> {
+  // No refresh: the card shows the code from this answer and polls for the
+  // link; it refreshes the page itself once linked (settings-forms.tsx).
   return actionForm("create_telegram_link_code", form);
 }
 

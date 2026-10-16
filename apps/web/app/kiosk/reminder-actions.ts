@@ -11,6 +11,8 @@ import type { ActionResult } from "@/lib/actions/result";
 // The kitchen screen's full-screen reminder (ADR 0005 §4, issue #66):
 // thin wrappers around the registry. A face's tap acts as that member for
 // that one request (kioskActionAsFace), with no PIN and no change of pick.
+// They refresh nothing: the reminder keeps its own state (the tick, then it
+// closes) and asks for the next one itself.
 
 /** The reminders on the kitchen screen now (the reminder's poll). */
 export async function kioskRemindersAction(): Promise<
