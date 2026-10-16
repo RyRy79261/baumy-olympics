@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join, relative } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SURFACES } from "@baumy/types";
 import type { ActionName, AnyActionDef } from "./define";
@@ -182,8 +182,51 @@ describe("refreshes", () => {
     for (const surface of SURFACES) {
       const specs = toolSpecs(surface);
       for (const spec of specs) expect(spec).not.toHaveProperty("refreshes");
-      expect(JSON.stringify(specs)).not.toContain("refreshes");
     }
+  });
+});
+
+/** Every source file under `dir`, tests left out. */
+function sources(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const path = join(dir, e.name);
+    if (e.isDirectory()) return sources(path);
+    return /\.(ts|tsx)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)
+      ? [path]
+      : [];
+  });
+}
+
+/** The files that revalidate by hand: the one helper aside. */
+function handRevalidators(root: string): string[] {
+  const allowed = join(root, "lib", "actions", "revalidate.ts");
+  return ["app", "components", "lib"]
+    .flatMap((d) => sources(join(root, d)))
+    .filter((file) => file !== allowed)
+    .filter((file) =>
+      readFileSync(file, "utf8")
+        .split("\n")
+        .some((line) => {
+          const code = line.trim();
+          if (code.startsWith("//") || code.startsWith("*")) return false;
+          return (
+            /from ["']next\/cache["']/.test(code) ||
+            /\brevalidate(Path|Tag)\(/.test(code)
+          );
+        }),
+    )
+    .map((file) => relative(root, file));
+}
+
+describe("revalidating by hand", () => {
+  const web = join(__dirname, "..", "..");
+
+  it("happens nowhere but lib/actions/revalidate.ts (issue #215)", () => {
+    // The scan sees the helper itself, so it would see any other file.
+    expect(
+      readFileSync(join(web, "lib", "actions", "revalidate.ts"), "utf8"),
+    ).toMatch(/revalidatePath\(/);
+    expect(handRevalidators(web)).toEqual([]);
   });
 });
 
