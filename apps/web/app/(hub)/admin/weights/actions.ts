@@ -1,9 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/actions/result";
 import type { WeightDecisionData } from "@/lib/actions/weights";
-import { actionForm } from "@/lib/actions/ui";
+import { actionFormRefreshing } from "@/lib/actions/ui";
 
 // /admin/weights' server actions, the veto on /activity and Change points on
 // /chores (`schedule_points_change`, issue #115): thin wrappers around the
@@ -21,15 +20,7 @@ async function run(
     | "veto_weight",
   form: FormData,
 ): Promise<Result> {
-  const result = await actionForm(name, form);
-  if (result.ok) {
-    revalidatePath("/admin/weights");
-    revalidatePath("/activity");
-    // The Bounties page's edit dialog schedules and cancels too (#109).
-    revalidatePath("/chores");
-    revalidatePath("/chores/history");
-  }
-  return result;
+  return actionFormRefreshing(name, form);
 }
 
 export async function scheduleWeightAction(

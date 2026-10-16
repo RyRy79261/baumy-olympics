@@ -29,6 +29,7 @@ export const updateMyProfile = defineAction({
     "Changes the signed-in member's own display name and/or colour. Only from their own signed-in session.",
   consent: "Change your own display name and colour",
   kind: "write",
+  refreshes: ["profile"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "session",

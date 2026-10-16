@@ -9,6 +9,7 @@ import { getClientIp } from "@/lib/rate-limit";
 import type { ActionName, RequestCtx } from "./define";
 import { runAction, type ActionOutput } from "./registry";
 import { fail, type ActionResult } from "./result";
+import { refreshAfter } from "./revalidate";
 
 // The UI adapter (SPEC §6.3): a server action is a thin wrapper around
 // `actionForm`, which builds the request context from the session and runs
@@ -94,6 +95,22 @@ export async function actionForm<N extends ActionName>(
     console.error(`[actionForm:${name}]`, err);
     return fail("INTERNAL", "Something went wrong. Please try again.");
   }
+}
+
+/**
+ * `actionForm`, then, when it succeeded, refresh the hub pages that read
+ * what the action changed (its `refreshes` tags, issue #215). What a hub
+ * server action calls, unless re-rendering would undo what the user sees
+ * (then it calls `actionForm` and says why).
+ */
+export async function actionFormRefreshing<N extends ActionName>(
+  name: N,
+  form: FormData,
+  mapInput?: FormInputMap,
+): Promise<ActionResult<ActionOutput<N>>> {
+  const result = await actionForm(name, form, mapInput);
+  if (result.ok) refreshAfter(name, "hub");
+  return result;
 }
 
 /**

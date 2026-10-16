@@ -31,6 +31,7 @@ export const createTelegramLinkCode = defineAction({
     "Creates a one-time code, valid for 10 minutes, that links the signed-in member's Telegram account to Baumy when sent to the Baumy bot. Needs a recent 'Confirm it's you'.",
   consent: "Create a code to link your Telegram account",
   kind: "write",
+  refreshes: ["telegram"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "session",

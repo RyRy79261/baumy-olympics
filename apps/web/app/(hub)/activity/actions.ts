@@ -1,9 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import type { ClaimEventData } from "@/lib/actions/confirmations";
 import type { ActionResult } from "@/lib/actions/result";
-import { actionForm } from "@/lib/actions/ui";
+import { actionFormRefreshing } from "@/lib/actions/ui";
 
 // /activity's server actions: thin wrappers around the registry (SPEC §6.3).
 // Each refreshes the pages whose numbers a claim changes.
@@ -19,12 +18,7 @@ async function run(
     | "resolve_dispute",
   form: FormData,
 ): Promise<Result> {
-  const result = await actionForm(name, form);
-  if (result.ok) {
-    revalidatePath("/activity");
-    revalidatePath("/chores");
-  }
-  return result;
+  return actionFormRefreshing(name, form);
 }
 
 export async function disputeClaimAction(_prev: Result | null, form: FormData) {

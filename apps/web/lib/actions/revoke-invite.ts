@@ -14,6 +14,7 @@ export const revokeInvite = defineAction({
     "Cancels a household invite code so nobody else can join with it. Members who already joined stay.",
   consent: "Cancel household invite codes",
   kind: "write",
+  refreshes: ["members"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "admin",

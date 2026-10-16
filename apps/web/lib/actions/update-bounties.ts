@@ -131,6 +131,7 @@ export const updateBounties = defineAction({
     "Edits several bounties at once, all or none: for each, any of its name, kind, base points, cooldown in hours, proof mode and effort factor, and archiving or restoring it. New points count from now; nothing already scored changes. Only a household admin may do this.",
   consent: "Edit many bounties at once",
   kind: "write",
+  refreshes: ["chores", "activity"],
   risk: "confirm",
   // The kiosk too, for a picked admin with their PIN (issue #175).
   surfaces: ["ui", "kiosk"],

@@ -10,6 +10,7 @@ import { getClientIp } from "@/lib/rate-limit";
 import type { ActionName, RequestCtx } from "./define";
 import { runAction, type ActionOutput } from "./registry";
 import { fail, type ActionResult } from "./result";
+import { refreshAfter } from "./revalidate";
 import { formDataToInput, type FormInputMap } from "./ui";
 
 // The kiosk adapter (SPEC §6.3, §8): like the UI adapter (ui.ts), but the
@@ -86,6 +87,22 @@ export async function kioskActionForm<N extends ActionName>(
     console.error(`[kioskActionForm:${name}]`, err);
     return fail("INTERNAL", "Something went wrong. Please try again.");
   }
+}
+
+/**
+ * `kioskActionForm` as the picked member, then, when it succeeded, refresh
+ * the kiosk pages that read what the action changed (its `refreshes` tags,
+ * issue #215). What a kiosk server action calls, unless re-rendering would
+ * undo what the screen shows (then it calls `kioskActionForm` and says why).
+ */
+export async function kioskActionFormRefreshing<N extends ActionName>(
+  name: N,
+  form: FormData,
+  mapInput?: FormInputMap,
+): Promise<ActionResult<ActionOutput<N>>> {
+  const result = await kioskActionForm(name, form, undefined, mapInput);
+  if (result.ok) refreshAfter(name, "kiosk");
+  return result;
 }
 
 /** The form field that says whose face was tapped. */

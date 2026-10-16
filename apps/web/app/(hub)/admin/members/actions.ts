@@ -1,7 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { actionForm } from "@/lib/actions/ui";
+import { actionFormRefreshing } from "@/lib/actions/ui";
 import type { ActionResult } from "@/lib/actions/result";
 import type { ManageMembersData } from "@/lib/actions/manage-members";
 import type { MintInviteData } from "@/lib/actions/mint-invite";
@@ -13,25 +12,19 @@ export async function mintInviteAction(
   _prev: ActionResult<MintInviteData> | null,
   form: FormData,
 ): Promise<ActionResult<MintInviteData>> {
-  const result = await actionForm("mint_invite", form);
-  if (result.ok) revalidatePath("/admin/members");
-  return result;
+  return actionFormRefreshing("mint_invite", form);
 }
 
 export async function revokeInviteAction(
   _prev: ActionResult<{ code: string }> | null,
   form: FormData,
 ): Promise<ActionResult<{ code: string }>> {
-  const result = await actionForm("revoke_invite", form);
-  if (result.ok) revalidatePath("/admin/members");
-  return result;
+  return actionFormRefreshing("revoke_invite", form);
 }
 
 export async function manageMembersAction(
   _prev: ActionResult<ManageMembersData> | null,
   form: FormData,
 ): Promise<ActionResult<ManageMembersData>> {
-  const result = await actionForm("manage_members", form);
-  if (result.ok) revalidatePath("/admin/members");
-  return result;
+  return actionFormRefreshing("manage_members", form);
 }

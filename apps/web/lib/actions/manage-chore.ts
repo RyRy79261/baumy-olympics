@@ -152,6 +152,7 @@ export const manageChore = defineAction({
     "Creates a household chore, edits its name, kind (consumable or maintenance), icon, points, cooldown, proof mode and effort factor, or archives or restores it.",
   consent: "Manage the household's chores",
   kind: "write",
+  refreshes: ["chores", "activity"],
   risk: "confirm",
   surfaces: ["ui"],
   requires: "admin",

@@ -28,6 +28,7 @@ export const attachCompletionPhoto = defineAction({
     "Attaches the proof photo just uploaded to a chore claim you did or logged. Uploads go through the app's photo upload route.",
   consent: "Add proof photos to your chore claims",
   kind: "write",
+  refreshes: ["activity"],
   risk: "safe",
   surfaces: ["ui", "kiosk"],
   requires: "member",

@@ -45,6 +45,7 @@ export const linkTelegram = defineAction({
     "Links the calling Telegram user to the household member who created the one-time link code in Baumy's Settings. Call it when someone sends /link <code>, or /start link_<code> from the Settings deep link.",
   consent: "Link a Telegram account to a household member",
   kind: "write",
+  refreshes: ["telegram"],
   risk: "safe",
   surfaces: ["brain"],
   requires: "service",

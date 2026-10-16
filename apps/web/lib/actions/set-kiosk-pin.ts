@@ -35,6 +35,7 @@ export const setKioskPin = defineAction({
     "Sets or changes the signed-in member's own kiosk PIN (4 to 6 digits). Changing an existing PIN needs a recent 'Confirm it's you'.",
   consent: "Set your kiosk PIN",
   kind: "write",
+  refreshes: ["kiosk_pin"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "session",

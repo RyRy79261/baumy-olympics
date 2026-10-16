@@ -165,6 +165,7 @@ export const logCompletionAction = defineAction({
     "Logs that a household member did a chore and scores it (streaks and break bonuses). doneBy defaults to you; logging for someone else vouches for them. Refused with COOLDOWN (and retryAt) if the chore was done too recently, and with other codes for times in the future, more than 24h ago, or before the chore's last completion. Get chore and member ids from list_chores and whoami.",
   consent: "Log chores as done for you or, vouching for them, your housemates",
   kind: "write",
+  refreshes: ["chores", "activity", "scores"],
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
   // No PIN on the kiosk, even logging for someone else (owner ruling

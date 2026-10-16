@@ -2,6 +2,7 @@ import type { z } from "zod";
 import type { Queryable } from "@baumy/db";
 import type { AvatarPose, Surface } from "@baumy/types";
 import type { Actor } from "@/lib/auth";
+import type { RefreshTag } from "./refresh";
 import type { ActionFailure } from "./result";
 
 // ADR 0002, SPEC §6.3: every capability is one `ActionDef`. The UI, the AI
@@ -249,6 +250,13 @@ export interface ActionDef<I extends z.ZodType, O, N extends string = string> {
   transactional?: boolean;
   /** Overrides the defaults in run.ts. */
   rateLimit?: RateLimitSpec;
+  /**
+   * Writes only, and every write: the data it changes (refresh.ts). The hub
+   * and kiosk server actions refresh the pages that read these tags after it
+   * succeeds (revalidate.ts). `[]` when no page shows what it changes. Never
+   * part of a tool spec. registry.test.ts holds every write to it.
+   */
+  refreshes?: readonly RefreshTag[];
   /**
    * The input field that names the member the action is done for, when the
    * action has one (`log_completion`'s `doneBy`). Acting for a housemate goes

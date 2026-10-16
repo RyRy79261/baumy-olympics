@@ -48,6 +48,7 @@ export const mintInvite = defineAction({
     "Creates a household invite code with a role, a number of uses and an expiry.",
   consent: "Create household invite codes",
   kind: "write",
+  refreshes: ["members"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "admin",

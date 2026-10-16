@@ -75,6 +75,7 @@ export const createBounty = defineAction({
     "Adds a bounty (a household chore that scores points) to the board: its name, kind (consumable or maintenance, default maintenance), base points, cooldown in hours (default 24), proof mode (default none) and effort factor (default 100). Only a household admin may do this, in their own name.",
   consent: "Add bounties to the board",
   kind: "write",
+  refreshes: ["chores", "activity"],
   risk: "confirm",
   // The kiosk too, for an admin with their PIN (issue #147).
   surfaces: ["ui", "kiosk", "ai", "brain"],
@@ -204,6 +205,7 @@ export const updateBounty = defineAction({
     "Edits a bounty on the board (choreId from the context or list_chores): only the fields given change (name, kind, base points, cooldown in hours, proof mode, effort factor). A new weight counts from now; nothing already scored changes. Only a household admin may do this, in their own name.",
   consent: "Edit the bounties on the board",
   kind: "write",
+  refreshes: ["chores", "activity"],
   risk: "confirm",
   // The kiosk too, for an admin with their PIN (issue #147).
   surfaces: ["ui", "kiosk", "ai", "brain"],
