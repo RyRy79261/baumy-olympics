@@ -75,8 +75,7 @@ export interface EditOptions {
 }
 
 export type EditResult =
-  | { ok: true; chore: ChoreRow; weightChanged: boolean }
-  | ActionFailure;
+  { ok: true; chore: ChoreRow; weightChanged: boolean } | ActionFailure;
 
 /** CHORE_NAME_TAKEN, the sentence every bounty write uses. */
 export const nameTaken = (name: string) =>
