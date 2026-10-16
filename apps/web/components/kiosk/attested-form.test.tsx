@@ -1,4 +1,5 @@
 import { act, useState } from "react";
+import { Dialog } from "@baumy/ui";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ActionResult } from "@/lib/actions/result";
@@ -234,7 +235,7 @@ describe("AttestedForm", () => {
     expect(el.querySelector("textarea")!.value).toBe("Still dirty");
   });
 
-  it("says when its request is on its way and when the answer is in (#174)", async () => {
+  it("keeps the sheet around it open while its request is on its way (#174)", async () => {
     let answer!: (r: ActionResult<unknown>) => void;
     const action = vi.fn(
       () =>
@@ -242,26 +243,39 @@ describe("AttestedForm", () => {
           answer = r;
         }),
     );
-    const onPending = vi.fn();
     const el = document.createElement("div");
     document.body.append(el);
     root = createRoot(el);
     await act(async () =>
       root!.render(
-        <AttestedForm
-          action={action}
-          label="Log it"
-          pinLabel="Felix's PIN"
-          onResult={() => {}}
-          onPending={onPending}
-        />,
+        <Dialog open onClose={() => {}} title="Log Bins">
+          <AttestedForm
+            action={action}
+            label="Log it"
+            pinLabel="Felix's PIN"
+            onResult={() => {}}
+          />
+        </Dialog>,
       ),
     );
-    expect(onPending).toHaveBeenLastCalledWith(false);
-    await act(async () => el.querySelector("form")!.requestSubmit());
-    expect(onPending).toHaveBeenLastCalledWith(true);
+    const sheet = el.querySelector<HTMLDialogElement>("dialog")!;
+    const close = sheet.querySelector<HTMLButtonElement>(
+      ':scope > div > button[aria-label="Close"]',
+    )!;
+    const logIt = [...sheet.querySelectorAll("button")].find(
+      (b) => b.textContent === "Log it",
+    )!;
+    expect(logIt).toBeDefined();
+    expect(close.disabled).toBe(false);
+    expect(logIt.disabled).toBe(false);
+    await act(async () => sheet.querySelector("form")!.requestSubmit());
+    expect(action).toHaveBeenCalledTimes(1);
+    // On its way: the sheet's × and the form's own Log it are both locked.
+    expect(close.disabled).toBe(true);
+    expect(logIt.disabled).toBe(true);
     await act(async () => answer({ ok: true, data: null }));
-    expect(onPending).toHaveBeenLastCalledWith(false);
+    expect(close.disabled).toBe(false);
+    expect(logIt.disabled).toBe(false);
   });
 
   it("asks nothing for an action that needs no PIN", async () => {

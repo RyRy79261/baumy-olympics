@@ -26,7 +26,8 @@ import {
 //   in it, a tap outside does nothing; the close button, Cancel and Escape
 //   still close it. Typed means, since it opened, a text field typed in, or
 //   a control that says so with DIALOG_TYPED_EVENT (the PinPad's digits).
-// - While `busy` (a request on its way), nothing the user does closes it:
+// - While `busy` (a request on its way; the Dialog sets it from the forms
+//   inside it, issue #212), nothing the user does closes it:
 //   the close button is the caller's to disable, Escape is refused, a tap
 //   outside is ignored, and a close the browser forces anyway (a second
 //   Escape) opens it again at once, so the form that sent the request is

@@ -12,6 +12,7 @@ import {
   Input,
   MemberCharacter,
   Select,
+  SheetSending,
   SwatchPicker,
   memberColourOptions,
 } from "@baumy/ui";
@@ -266,9 +267,10 @@ export function MemberControls(props: MemberRowProps) {
       <Dialog
         open={confirming}
         onClose={() => setConfirming(false)}
-        busy={status.pending}
         title={`Deactivate ${props.displayName}?`}
       >
+        {/* Open while the deactivate is on its way (#174). */}
+        <SheetSending pending={status.pending} />
         <p className="mb-4 text-sm">
           They lose access to the hub straight away. Their history stays, and
           you can reactivate them later.

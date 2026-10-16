@@ -12,13 +12,13 @@ import {
   Dialog,
   FormMessage,
   tabClass,
+  useSheetSending,
 } from "@baumy/ui";
 import {
   useActionForm,
   useReporting,
   type FormAction,
 } from "@/components/use-action-form";
-import { useReportPending } from "@/components/use-report-pending";
 import type {
   CalendarWriteData,
   DeleteEventData,
@@ -91,9 +91,6 @@ export function CalendarBoard({
 }) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [deleting, setDeleting] = useState<CalendarEventView | null>(null);
-  // A save or a delete on its way: its sheet stays open for the answer.
-  const [saving, setSaving] = useState(false);
-  const [removing, setRemoving] = useState(false);
   const phoneAgenda = range.view === "month";
   const newDate =
     range.view === "day"
@@ -238,55 +235,54 @@ export function CalendarBoard({
       <Dialog
         open={sheet !== null}
         onClose={() => setSheet(null)}
-        busy={saving}
         title={
           sheet?.mode === "edit" ? `Edit ${sheet.event.title}` : "New event"
         }
       >
-        {sheet ? (
-          <div className="flex flex-col gap-4">
-            {sheet.mode === "edit" ? (
-              <EventDetails event={sheet.event} people={people} />
-            ) : null}
-            <EventForm
-              key={sheet.mode === "edit" ? sheet.event.id : sheet.date}
-              event={sheet.mode === "edit" ? sheet.event : null}
-              date={sheet.mode === "new" ? sheet.date : today}
-              kiosk={false}
-              pinLabel="Your PIN"
-              people={people}
-              action={sheet.mode === "edit" ? actions.update : actions.create}
-              onDone={(data) => {
-                setSheet(null);
-                toast.success(
-                  sheet.mode === "edit"
-                    ? `Saved ${data.event.title}.`
-                    : `Added ${data.event.title} to the calendar.`,
-                );
-              }}
-              onCancel={() => setSheet(null)}
-              onPending={setSaving}
-            />
-            {sheet.mode === "edit" ? (
-              <Button
-                variant="danger"
-                disabled={saving}
-                onClick={() => {
-                  setDeleting(sheet.event);
+        {(sending) =>
+          sheet ? (
+            <div className="flex flex-col gap-4">
+              {sheet.mode === "edit" ? (
+                <EventDetails event={sheet.event} people={people} />
+              ) : null}
+              <EventForm
+                key={sheet.mode === "edit" ? sheet.event.id : sheet.date}
+                event={sheet.mode === "edit" ? sheet.event : null}
+                date={sheet.mode === "new" ? sheet.date : today}
+                kiosk={false}
+                pinLabel="Your PIN"
+                people={people}
+                action={sheet.mode === "edit" ? actions.update : actions.create}
+                onDone={(data) => {
                   setSheet(null);
+                  toast.success(
+                    sheet.mode === "edit"
+                      ? `Saved ${data.event.title}.`
+                      : `Added ${data.event.title} to the calendar.`,
+                  );
                 }}
-              >
-                Delete…
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
+                onCancel={() => setSheet(null)}
+              />
+              {sheet.mode === "edit" ? (
+                <Button
+                  disabled={sending}
+                  variant="danger"
+                  onClick={() => {
+                    setDeleting(sheet.event);
+                    setSheet(null);
+                  }}
+                >
+                  Delete…
+                </Button>
+              ) : null}
+            </div>
+          ) : null
+        }
       </Dialog>
 
       <Dialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        busy={removing}
         title={deleting ? `Delete ${deleting.title}?` : "Delete the event?"}
       >
         {deleting ? (
@@ -299,7 +295,6 @@ export function CalendarBoard({
               toast.success(`Deleted ${data.title}.`);
             }}
             onCancel={() => setDeleting(null)}
-            onPending={setRemoving}
           />
         ) : null}
       </Dialog>
@@ -312,18 +307,17 @@ function DeleteForm({
   action,
   onDone,
   onCancel,
-  onPending,
 }: {
   event: CalendarEventView;
   action: FormAction<DeleteEventData>;
   onDone: (data: DeleteEventData) => void;
   onCancel: () => void;
-  onPending?: (pending: boolean) => void;
 }) {
   const { state, formAction, pending, requestId } = useActionForm(
     useReporting(action, onDone),
   );
-  useReportPending(pending, onPending);
+  // Its sheet stays open while the delete is on its way (#174).
+  useSheetSending(pending);
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="requestId" value={requestId} />

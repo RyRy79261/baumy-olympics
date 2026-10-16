@@ -72,9 +72,6 @@ export function CalendarManager({
 }) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [deleting, setDeleting] = useState<CalendarEventView | null>(null);
-  // A save or a delete on its way: its sheet stays open for the answer.
-  const [saving, setSaving] = useState(false);
-  const [removing, setRemoving] = useState(false);
 
   return (
     <div className="flex flex-col gap-8">
@@ -158,89 +155,89 @@ export function CalendarManager({
       <Dialog
         open={sheet !== null}
         onClose={() => setSheet(null)}
-        busy={saving}
         title={
           sheet?.mode === "edit" ? `Edit ${sheet.event.title}` : "New event"
         }
       >
-        {sheet ? (
-          <div className="flex flex-col gap-4">
-            {sheet.mode === "edit" ? (
-              <EventDetails event={sheet.event} people={people} kiosk />
-            ) : null}
-            <EventForm
-              key={sheet.mode === "edit" ? sheet.event.id : "new"}
-              event={sheet.mode === "edit" ? sheet.event : null}
-              date={today}
-              kiosk
-              pinLabel={pinLabel}
-              people={people}
-              action={sheet.mode === "edit" ? actions.update : actions.create}
-              onDone={(data) => {
-                setSheet(null);
-                toast.success(
-                  sheet.mode === "edit"
-                    ? `Saved ${data.event.title}.`
-                    : `Added ${data.event.title} to the calendar.`,
-                );
-              }}
-              onCancel={() => setSheet(null)}
-              onPending={setSaving}
-            />
-            {sheet.mode === "edit" ? (
-              <Button
-                variant="danger"
-                size="kiosk"
-                disabled={saving}
-                onClick={() => {
-                  setDeleting(sheet.event);
+        {(sending) =>
+          sheet ? (
+            <div className="flex flex-col gap-4">
+              {sheet.mode === "edit" ? (
+                <EventDetails event={sheet.event} people={people} kiosk />
+              ) : null}
+              <EventForm
+                key={sheet.mode === "edit" ? sheet.event.id : "new"}
+                event={sheet.mode === "edit" ? sheet.event : null}
+                date={today}
+                kiosk
+                pinLabel={pinLabel}
+                people={people}
+                action={sheet.mode === "edit" ? actions.update : actions.create}
+                onDone={(data) => {
                   setSheet(null);
+                  toast.success(
+                    sheet.mode === "edit"
+                      ? `Saved ${data.event.title}.`
+                      : `Added ${data.event.title} to the calendar.`,
+                  );
                 }}
-              >
-                Delete…
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
+                onCancel={() => setSheet(null)}
+              />
+              {sheet.mode === "edit" ? (
+                <Button
+                  disabled={sending}
+                  variant="danger"
+                  size="kiosk"
+                  onClick={() => {
+                    setDeleting(sheet.event);
+                    setSheet(null);
+                  }}
+                >
+                  Delete…
+                </Button>
+              ) : null}
+            </div>
+          ) : null
+        }
       </Dialog>
 
       <Dialog
         open={deleting !== null}
         onClose={() => setDeleting(null)}
-        busy={removing}
         title={deleting ? `Delete ${deleting.title}?` : "Delete the event?"}
       >
-        {deleting ? (
-          <div className="flex flex-col gap-4">
-            <p className="text-lg">
-              {deleting.when}. This takes it off the house calendar in Google
-              for everyone.
-            </p>
-            <AttestedForm
-              key={deleting.id}
-              action={actions.remove}
-              label="Delete event"
-              pinLabel={pinLabel}
-              fields={
-                <input type="hidden" name="eventId" value={deleting.id} />
-              }
-              onResult={(r) => {
-                if (toastActionError(r)) return;
-                if (r.ok) toast.success(`Deleted ${r.data.title}.`);
-                setDeleting(null);
-              }}
-              onPending={setRemoving}
-            />
-            <Button
-              variant="secondary"
-              size="kiosk"
-              disabled={removing}
-              onClick={() => setDeleting(null)}
-            >
-              Keep it
-            </Button>
-          </div>
-        ) : null}
+        {(sending) =>
+          deleting ? (
+            <div className="flex flex-col gap-4">
+              <p className="text-lg">
+                {deleting.when}. This takes it off the house calendar in Google
+                for everyone.
+              </p>
+              <AttestedForm
+                key={deleting.id}
+                action={actions.remove}
+                label="Delete event"
+                pinLabel={pinLabel}
+                fields={
+                  <input type="hidden" name="eventId" value={deleting.id} />
+                }
+                onResult={(r) => {
+                  if (toastActionError(r)) return;
+                  if (r.ok) toast.success(`Deleted ${r.data.title}.`);
+                  setDeleting(null);
+                }}
+              />
+              <Button
+                disabled={sending}
+                variant="secondary"
+                size="kiosk"
+                onClick={() => setDeleting(null)}
+              >
+                Keep it
+              </Button>
+            </div>
+          ) : null
+        }
       </Dialog>
     </div>
   );

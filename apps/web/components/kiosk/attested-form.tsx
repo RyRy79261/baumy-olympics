@@ -6,10 +6,10 @@ import {
   Dialog,
   FormMessage,
   PinPad,
+  useSheetSending,
   type ButtonVariant,
 } from "@baumy/ui";
 import { useActionForm, type FormAction } from "@/components/use-action-form";
-import { useReportPending } from "@/components/use-report-pending";
 import type { ActionResult } from "@/lib/actions/result";
 import { PIN_PROMPT_CODES } from "@/lib/kiosk/constants";
 import { useActingPin } from "./acting-pin";
@@ -39,7 +39,6 @@ export function AttestedForm<T>({
   fields,
   success,
   onResult,
-  onPending,
   disabled = false,
   variant = "primary",
   bar,
@@ -55,19 +54,19 @@ export function AttestedForm<T>({
   success?: (data: T) => ReactNode;
   /** Called once per answer that does not ask for a PIN. */
   onResult?: (result: ActionResult<T>) => void;
-  /**
-   * Told when a request starts and when its answer is in, so a sheet
-   * around the form stays open until then (issue #174).
-   */
-  onPending?: (pending: boolean) => void;
   disabled?: boolean;
   /** The start button's look; primary unless given. */
   variant?: ButtonVariant;
   /**
    * Puts the start button in a bar of its own, with `extra` beside it (a
-   * Discard), e.g. one that sticks to the bottom of a long form.
+   * Discard), e.g. one that sticks to the bottom of a long form. A function
+   * `extra` is told whether the request is on its way.
    */
-  bar?: { className: string; testId?: string; extra?: ReactNode };
+  bar?: {
+    className: string;
+    testId?: string;
+    extra?: ReactNode | ((pending: boolean) => ReactNode);
+  };
 }) {
   const { state, formAction, pending, requestId } = useActionForm(action);
   const [attempt, setAttempt] = useState(0);
@@ -89,7 +88,9 @@ export function AttestedForm<T>({
     // `onResult` may be a new function on every render.
   }, [state]);
 
-  useReportPending(pending, onPending);
+  // A sheet around the form stays open until the answer is in
+  // (issue #174, SPEC §12 decision 32).
+  useSheetSending(pending);
 
   return (
     <form
@@ -112,7 +113,7 @@ export function AttestedForm<T>({
           >
             {label}
           </Button>
-          {bar.extra}
+          {typeof bar.extra === "function" ? bar.extra(pending) : bar.extra}
         </div>
       ) : (
         <Button
@@ -133,7 +134,6 @@ export function AttestedForm<T>({
       <Dialog
         open={pinOpen}
         onClose={() => setDismissed(true)}
-        busy={pending}
         title={noPin ? "Personal PIN needed" : pinLabel}
       >
         <div className="flex flex-col gap-4">

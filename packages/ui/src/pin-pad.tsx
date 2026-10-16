@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { buttonClass } from "./button";
 import { cx } from "./cx";
+import { useSheetSending } from "./dialog";
 import { DIALOG_TYPED_EVENT } from "./use-modal-dialog";
 
 // The kiosk PIN pad in the pixel kit (SPEC §6.2, §8; ADR 0005). It sits INSIDE the form of the request it attests and submits the PIN
@@ -40,6 +41,9 @@ export function PinPad({
   onCancel?: () => void;
 }) {
   const [digits, setDigits] = useState("");
+  // Checking a PIN is its sheet sending: the pop-up it sits in stays open,
+  // locked, until the answer is in (SPEC §12 decision 32).
+  useSheetSending(pending);
   const pad = useRef<HTMLDivElement>(null);
   // A half-typed PIN is typed text: a tap outside its dialog keeps it
   // (owner ruling 2026-10-06, SPEC §12 decision 32).

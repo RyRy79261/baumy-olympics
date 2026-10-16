@@ -115,6 +115,7 @@ packages/ai-prompts system prompts + model tiers (no SDK imports)
   - A page's `metadata.title` is bare ("Bounties"); the root layout's template adds " · Baumy Olympics". Every page is noindex except the landing page (`lib/seo.ts`); add a new top-level path to its `DISALLOWED_PATHS`.
   - Pages start with `PageHeading`, except the kiosk dashboard and the hub home, whose header is its heading (with a screen-reader `h1`). Do not add `loading.tsx` files.
   - Form errors show inline; one-tap actions report through a toast.
+  - A form inside a `Dialog` says it is sending with `useSheetSending(pending)` (or `<SheetSending pending>` when its pending lives above the sheet; issue #212), and the sheet then stays open and greys its × (SPEC §12 decision 32). A control the ruling locks while sending (a Cancel, "Who did it?", the photo) reads it from `children` given as `(sending) => …`; never keep a copy in state or pass `onPending`. `Dialog`'s `busy` prop is Ask Baumy's alone.
   - Kiosk touch targets are at least 56px, with no hover-only affordances.
 
 ## Security

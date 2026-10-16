@@ -13,6 +13,7 @@ import {
   Dialog,
   Field,
   FormMessage,
+  SheetSending,
   Textarea,
 } from "@baumy/ui";
 import type { ReportBugData } from "@/lib/actions/report-bug";
@@ -157,9 +158,10 @@ export function ReportBugDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      busy={pending}
       title={kind === "bug" ? "Report a bug" : "Request a feature"}
     >
+      {/* Open while the report is on its way (#174). */}
+      <SheetSending pending={pending} />
       <form
         className="flex flex-col gap-4"
         data-testid="report-bug-dialog"
