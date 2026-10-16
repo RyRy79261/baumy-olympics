@@ -22,9 +22,8 @@ vi.mock("@/app/kiosk/actions", () => ({ clearPickAction: vi.fn() }));
 const { BaumySheet } = await import("./baumy-sheet");
 const { MIN_CLIP_MS } = await import("@/lib/ai/voice");
 const NOW = Date.parse("2026-09-28T10:00:00.000Z");
-const { closeOpenDialogs } = await import("@/components/kiosk/idle-reset");
+const { isScreenHeld, takeScreen } = await import("@/lib/kiosk/screen");
 const { KIOSK_IDLE_MS } = await import("@/lib/kiosk/constants");
-const { isKioskBusy } = await import("@/lib/kiosk/busy");
 const { ActingPinProvider } = await import("@/components/kiosk/acting-pin");
 
 beforeAll(() => {
@@ -703,7 +702,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     await settle(300);
     expect(bubble()!.dataset.mode).toBe("listening");
     // What the reminder and the screensaver do when they come up.
-    await act(async () => closeOpenDialogs(document));
+    await act(async () => takeScreen("reminder", document));
     expect(bubble()).toBeNull();
     await settle(300);
     // The recording was dropped, not sent.
@@ -724,7 +723,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     await talkToCat();
     expect(bubble()!.dataset.mode).toBe("thinking");
     expect(fetchMock.mock.calls.map((c) => c[0])).toContain("/api/ai/command");
-    await act(async () => closeOpenDialogs(document));
+    await act(async () => takeScreen("reminder", document));
     expect(bubble()).toBeNull();
     // The answer, with the last person's proposal, lands after that.
     await act(async () =>
@@ -768,7 +767,7 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
       "/api/ai/transcribe",
     ]);
-    await act(async () => closeOpenDialogs(document));
+    await act(async () => takeScreen("reminder", document));
     expect(bubble()).toBeNull();
     // The transcript lands after that: nobody is asking any more.
     await act(async () =>
@@ -1244,10 +1243,10 @@ describe("BaumySheet on the kitchen dashboard", () => {
       press(hold());
       expect(latestRecorder().state).toBe("recording");
       expect(track.stop).not.toHaveBeenCalled();
-      await act(async () => closeOpenDialogs(document));
+      await act(async () => takeScreen("reminder", document));
       expect(track.stop).toHaveBeenCalled();
       expect(latestRecorder().state).toBe("inactive");
-      expect(isKioskBusy()).toBe(false);
+      expect(isScreenHeld()).toBe(false);
     });
 
     it("turns it off when the page goes away mid-hold", async () => {
@@ -1256,12 +1255,12 @@ describe("BaumySheet on the kitchen dashboard", () => {
       await settle();
       press(hold());
       expect(latestRecorder().state).toBe("recording");
-      expect(isKioskBusy()).toBe(true);
+      expect(isScreenHeld()).toBe(true);
       act(() => root!.unmount());
       root = null;
       expect(track.stop).toHaveBeenCalled();
       expect(latestRecorder().state).toBe("inactive");
-      expect(isKioskBusy()).toBe(false);
+      expect(isScreenHeld()).toBe(false);
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
@@ -1311,13 +1310,13 @@ describe("BaumySheet on the kitchen dashboard", () => {
       press(hold());
       await advance(44_000);
       expect(bubble()!.dataset.mode).toBe("listening");
-      expect(isKioskBusy()).toBe(true);
+      expect(isScreenHeld()).toBe(true);
       lift(hold());
       await advance(30_000);
       await advance(0);
       expect(bubble()!.dataset.mode).toBe("answer");
       expect(bubble()!.textContent).toContain("Ryan is winning.");
-      expect(isKioskBusy()).toBe(false);
+      expect(isScreenHeld()).toBe(false);
       // The minute starts with the answer.
       await advance(KIOSK_IDLE_MS - 2_000);
       expect(bubble()!.textContent).toContain("Ryan is winning.");
