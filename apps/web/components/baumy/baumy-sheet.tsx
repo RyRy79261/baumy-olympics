@@ -24,7 +24,7 @@ import {
   SpeechBubble,
 } from "@baumy/ui";
 import { isAsking, isTranscribing } from "@/lib/ai/conversation";
-import { confirmAllTargets, isOpen, type ReviewRow } from "@/lib/ai/review";
+import { confirmAllTargets, isOpen } from "@/lib/ai/review";
 import { canRecord } from "@/lib/ai/voice";
 import { KIOSK_COVER_EVENT, KIOSK_IDLE_MS } from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
@@ -172,11 +172,14 @@ export function BaumySheet({
   // waiting with "<Name> hasn't set a personal PIN yet", never a PinPad.
   const acting = useActingPin();
   useEffect(
-    () => conversation.dispatch({ type: "pin_known" }),
+    () => conversation.actingChanged(),
     [conversation, acting.name, acting.hasPin],
   );
   const hasPin = acting.hasPin && !chat.pinMissing;
   const noPinMessage = `${noPinHeadline(acting.name ?? actingName)}.`;
+  // The latest, for Confirm all, which reads it again for each card.
+  const actingHasPin = useRef(acting.hasPin);
+  actingHasPin.current = acting.hasPin;
 
   async function ask(e: React.FormEvent) {
     e.preventDefault();
@@ -188,7 +191,7 @@ export function BaumySheet({
 
   function micUnavailable(message: string) {
     feel({ type: "record_cancel" });
-    conversation.dispatch({ type: "mic_off", message });
+    conversation.micOff(message);
     setMicHint(null);
     textRef.current?.focus();
   }
@@ -197,15 +200,8 @@ export function BaumySheet({
     return conversation.confirmAll({
       pin,
       kiosk,
-      hasPin: acting.hasPin,
+      hasPin: () => actingHasPin.current,
       noPinMessage,
-    });
-  }
-
-  function drop(row: ReviewRow) {
-    conversation.dispatch({
-      type: "drop",
-      proposalId: row.proposal.proposalId,
     });
   }
 
@@ -254,7 +250,7 @@ export function BaumySheet({
     onStart: () => {
       // A new hold: the last answer (all of it settled) makes way.
       feel({ type: "record_start" });
-      conversation.dispatch({ type: "clear" });
+      conversation.clear();
       setPraise(null);
       setHoldHint(null);
       setBubble("talk");
@@ -270,7 +266,7 @@ export function BaumySheet({
     onUnavailable: (message) => {
       // No microphone here: type instead, in the sheet.
       feel({ type: "record_cancel" });
-      conversation.dispatch({ type: "mic_off", message });
+      conversation.micOff(message);
       setBubble(null);
       setOpen(true);
     },
@@ -279,7 +275,7 @@ export function BaumySheet({
   /** "Hold to talk", with the microphone opened by the tap that got here. */
   function talk() {
     dropClip.current = false;
-    conversation.dispatch({ type: "clear" });
+    conversation.clear();
     setPraise(null);
     setHoldHint(null);
     setBubble("talk");
@@ -449,7 +445,7 @@ export function BaumySheet({
   }
 
   function sheetCancel() {
-    conversation.dispatch({ type: "cancel_all" });
+    conversation.cancelAll();
     close();
   }
 
@@ -567,7 +563,7 @@ export function BaumySheet({
         onConfirmAll={(pin) => void catConfirmAll(pin)}
         onCancel={catCancel}
         onDone={dismissBubble}
-        onDrop={drop}
+        onDrop={(row) => conversation.drop(row)}
       />
     </>
   ) : (
@@ -754,7 +750,7 @@ export function BaumySheet({
               onConfirmAll={(pin) => void confirmAll(pin)}
               onCancel={sheetCancel}
               onDone={close}
-              onDrop={drop}
+              onDrop={(row) => conversation.drop(row)}
               onEdit={(row, input) => conversation.edit(row, input)}
             />
           ) : null}

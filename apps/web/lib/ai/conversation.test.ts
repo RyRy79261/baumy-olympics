@@ -7,7 +7,6 @@ import {
   initialConversation,
   isAsking,
   isTranscribing,
-  type ConversationEvent,
   type ConversationPort,
   type ConversationState,
 } from "./conversation";
@@ -34,6 +33,8 @@ function proposal(over: Partial<Proposal> = {}): Proposal {
     ...over,
   };
 }
+
+type ConversationEvent = Parameters<typeof conversation>[1];
 
 const run = (s: ConversationState, ...events: ConversationEvent[]) =>
   events.reduce(conversation, s);
@@ -259,7 +260,7 @@ async function showing(
 
 const PIN_OPTS = {
   kiosk: true,
-  hasPin: true,
+  hasPin: () => true,
   noPinMessage: "Ryan hasn't set a personal PIN yet.",
 };
 
@@ -400,12 +401,62 @@ describe("the driver", () => {
     const note = proposal();
     const dispute = proposal({ needsPin: true });
     const { c, port } = await showing([dispute, note]);
-    await c.confirmAll({ ...PIN_OPTS, hasPin: false });
+    await c.confirmAll({ ...PIN_OPTS, hasPin: () => false });
     expect(vi.mocked(port.run).mock.calls).toEqual([[note, undefined]]);
     expect(c.getState().rows[0]).toMatchObject({
       state: "pending",
       message: PIN_OPTS.noPinMessage,
     });
+  });
+
+  it("reads whether the member has a PIN again for each card", async () => {
+    const first = proposal({ needsPin: true });
+    const second = proposal({ needsPin: true });
+    let hasPin = true;
+    const { c, port } = await showing([first, second], {
+      run: async () => {
+        // The acting member changes to one with no PIN mid-run.
+        hasPin = false;
+        return ok({});
+      },
+    });
+    await c.confirmAll({ ...PIN_OPTS, pin: "1234", hasPin: () => hasPin });
+    expect(vi.mocked(port.run).mock.calls).toEqual([[first, "1234"]]);
+    expect(c.getState().rows[1]).toMatchObject({
+      state: "pending",
+      message: PIN_OPTS.noPinMessage,
+    });
+  });
+
+  it("drops one card, cancels the rest, and clears for a new hold", async () => {
+    const a = proposal();
+    const b = proposal();
+    const { c } = await showing([a, b]);
+    c.drop(c.getState().rows[0]!);
+    expect(c.getState().rows.map((r) => r.state)).toEqual([
+      "rejected",
+      "pending",
+    ]);
+    c.cancelAll();
+    expect(c.getState().rows.map((r) => r.state)).toEqual([
+      "rejected",
+      "rejected",
+    ]);
+    c.clear();
+    expect(c.getState().rows).toEqual([]);
+    expect(c.getState().reply).toBeNull();
+    c.micOff("The microphone is blocked.");
+    expect(c.getState().micOff).toBe("The microphone is blocked.");
+  });
+
+  it("forgets the gate's PIN_NOT_SET once the acting member changes", async () => {
+    const { c } = await showing([proposal({ needsPin: true })], {
+      run: async () => fail("PIN_NOT_SET"),
+    });
+    await c.confirmAll(PIN_OPTS);
+    expect(c.getState().pinMissing).toBe(true);
+    c.actingChanged();
+    expect(c.getState().pinMissing).toBe(false);
   });
 
   it("stops at the gate's PIN_NOT_SET, and sends no PIN card after it", async () => {

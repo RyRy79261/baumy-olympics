@@ -85,7 +85,7 @@ export const initialConversation: ConversationState = {
   earned: 0,
 };
 
-export type ConversationEvent =
+type ConversationEvent =
   /** A typed question was sent. */
   | { type: "ask"; id: number }
   /** A clip was sent to be transcribed. */
@@ -288,8 +288,11 @@ export interface ConfirmOptions {
   pin?: string;
   /** The kitchen screen, where a card may ask for the PIN. */
   kiosk: boolean;
-  /** Whether the acting member has a personal PIN (the kiosk shell's). */
-  hasPin: boolean;
+  /**
+   * Whether the acting member has a personal PIN (the kiosk shell's), read
+   * again for each card: the acting member may change mid-run.
+   */
+  hasPin: () => boolean;
   /** "<Name> hasn't set a personal PIN yet." */
   noPinMessage: string;
 }
@@ -382,7 +385,31 @@ export function createConversation(deps: ConversationDeps) {
         listeners.delete(listener);
       };
     },
-    dispatch,
+
+    /** A new hold to talk: the last answer, all of it settled, makes way. */
+    clear() {
+      dispatch({ type: "clear" });
+    },
+
+    /** The microphone is unavailable (blocked, or none): type instead. */
+    micOff(message: string) {
+      dispatch({ type: "mic_off", message });
+    },
+
+    /** A card's ×: just that one is dropped. */
+    drop(row: ReviewRow) {
+      dispatch({ type: "drop", proposalId: row.proposal.proposalId });
+    },
+
+    /** Cancel: every card still open is dropped. */
+    cancelAll() {
+      dispatch({ type: "cancel_all" });
+    },
+
+    /** The acting member changed: whether they have a PIN is known again. */
+    actingChanged() {
+      dispatch({ type: "pin_known" });
+    },
 
     /** Send what was typed. */
     ask(said: string): Promise<Outcome> {
@@ -457,7 +484,7 @@ export function createConversation(deps: ConversationDeps) {
           );
           if (!row || !canApprove(row)) continue;
           // Nobody can type a PIN that was never set: the card waits.
-          const hasPin = opts.hasPin && !state.pinMissing;
+          const hasPin = opts.hasPin() && !state.pinMissing;
           if (opts.kiosk && row.needsPin && !hasPin) {
             dispatch({
               type: "waits",
