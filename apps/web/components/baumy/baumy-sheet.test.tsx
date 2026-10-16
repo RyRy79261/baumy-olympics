@@ -783,6 +783,80 @@ describe("BaumySheet on the kitchen dashboard", () => {
     expect(document.body.textContent).not.toContain("I did the bins");
   });
 
+  describe("Type instead while Baumy is thinking", () => {
+    /** Baumy answers slowly; returns the answer to give by hand. */
+    function slowAnswer() {
+      let answer: (r: Response) => void = () => undefined;
+      fetchMock.mockImplementation(async (url: string) =>
+        url === "/api/ai/transcribe"
+          ? json({ ok: true, data: { text: "I did the bins" } })
+          : new Promise<Response>((resolve) => {
+              answer = resolve;
+            }),
+      );
+      return () =>
+        act(async () =>
+          answer(
+            json({
+              ok: true,
+              data: {
+                reply: "Bins it is.",
+                proposals: [proposal],
+                choices: { members: [], chores: [] },
+              },
+            }),
+          ),
+        );
+    }
+    const sheet = () =>
+      document.querySelector<HTMLDialogElement>(
+        'dialog[aria-label="Ask Baumy"]',
+      )!;
+
+    it("shows the answer in the sheet", async () => {
+      const answer = slowAnswer();
+      mountCat({ actingName: "Ryan" });
+      await talkToCat();
+      expect(bubble()!.dataset.mode).toBe("thinking");
+      await act(async () => button("Type instead").click());
+      expect(bubble()).toBeNull();
+      expect(sheet().open).toBe(true);
+      expect(sheet().textContent).toContain("Hmm, let me think");
+      await answer();
+      await settle();
+      expect(bubble()).toBeNull();
+      expect(sheet().textContent).toContain("Bins it is.");
+      expect(sheet().textContent).toContain("Log Bins for Ryan");
+      expect(button("Confirm all")).toBeDefined();
+    });
+
+    it("drops the answer once the sheet is closed before it comes", async () => {
+      const answer = slowAnswer();
+      mountCat({ actingName: "Ryan" });
+      await talkToCat();
+      await act(async () => button("Type instead").click());
+      expect(sheet().open).toBe(true);
+      expect(sheet().textContent).toContain("Hmm, let me think");
+      await act(async () =>
+        sheet()
+          .querySelector<HTMLButtonElement>(
+            ':scope > div > button[aria-label="Close"]',
+          )!
+          .click(),
+      );
+      expect(sheet().open).toBe(false);
+      await answer();
+      await settle();
+      await settle();
+      expect(bubble()).toBeNull();
+      expect(document.body.textContent).not.toContain("Bins it is.");
+      expect(document.body.textContent).not.toContain("Log Bins for Ryan");
+      expect(fetchMock.mock.calls.map((c) => c[0])).not.toContain(
+        "/api/actions/run",
+      );
+    });
+  });
+
   it("does nothing on Cancel and listens again; Type instead opens the sheet", async () => {
     heardAndAnswered("Bins it is.", [proposal]);
     mountCat({ actingName: "Ryan" });

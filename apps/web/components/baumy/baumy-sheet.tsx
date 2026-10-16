@@ -23,33 +23,17 @@ import {
   ScorePop,
   SpeechBubble,
 } from "@baumy/ui";
-import type { HistoryTurn } from "@/lib/ai/command";
-import type { Proposal } from "@/lib/ai/proposal";
-import {
-  asksForPin,
-  canApprove,
-  cancelAll,
-  confirmAllTargets,
-  isOpen,
-  stopsPin,
-  nextHistory,
-  rowsFor,
-  savedMessage,
-  type ReviewRow,
-} from "@/lib/ai/review";
+import { isAsking, isTranscribing } from "@/lib/ai/conversation";
+import { confirmAllTargets, isOpen } from "@/lib/ai/review";
 import { canRecord } from "@/lib/ai/voice";
-import {
-  KIOSK_COVER_EVENT,
-  KIOSK_IDLE_MS,
-  PIN_PROMPT_CODES,
-} from "@/lib/kiosk/constants";
+import { KIOSK_COVER_EVENT, KIOSK_IDLE_MS } from "@/lib/kiosk/constants";
 import { useIdle } from "@/components/kiosk/use-idle";
 import { useActingPin } from "@/components/kiosk/acting-pin";
 import { noPinHeadline } from "@/components/kiosk/no-pin-notice";
 import { setKioskBusy } from "@/lib/kiosk/busy";
 import { announceScore } from "@/lib/ui/scored";
-import { askBaumy, recheckProposal, runProposal, transcribeClip } from "./api";
 import { SuggestionCards } from "./suggestion-cards";
+import { useConversation } from "./use-conversation";
 import { useBaumyMood } from "./use-mood";
 import { usePublishToBar } from "./bar-relay";
 import { useRecorder } from "./use-recorder";
@@ -73,6 +57,11 @@ import { VoiceRecorder } from "./voice-recorder";
 // Baumy's sprite follows lib/ai/mood.ts: listening while held, thinking
 // while transcribing and asking, talking with the answer, sad on an error,
 // happy (with the "+N" pop) when an approved row scores points.
+//
+// The conversation itself (asking, transcribing, the cards, Confirm all
+// with the PIN, and dropping an answer that comes back after a close) is
+// lib/ai/conversation.ts, through ./use-conversation.ts: the sheet and the
+// cat's bubble below are two views of it.
 //
 // On the kitchen dashboard (`cat`, ADR 0005 §1, the approved prototype's
 // baumy-cat.tsx) the cat itself is the button and the talking happens in
@@ -139,18 +128,9 @@ export function BaumySheet({
   const size = kiosk ? "kiosk" : "default";
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
-  const [asking, setAsking] = useState(false);
-  const [reply, setReply] = useState<{ text: string; error: boolean } | null>(
-    null,
-  );
   const [mood, feel] = useBaumyMood();
-  const [heard, setHeard] = useState<string | null>(null);
-  const [transcribing, setTranscribing] = useState(false);
-  const [micOff, setMicOff] = useState<string | null>(null);
   const [micHint, setMicHint] = useState<string | null>(null);
   const [pop, setPop] = useState<{ key: number; points: number } | null>(null);
-  // What approvals scored while the sheet was open, and the bubble saying it.
-  const earned = useRef(0);
   const [says, setSays] = useState<string | null>(null);
   useEffect(() => {
     if (!says) return;
@@ -164,219 +144,85 @@ export function BaumySheet({
     () => canRecord(window as unknown as Parameters<typeof canRecord>[0]),
     () => false,
   );
-  const showMic = voice && recordable && micOff === null;
-  const [rows, setRows] = useState<ReviewRow[]>([]);
-  const [history, setHistory] = useState<HistoryTurn[]>([]);
-  const [bulk, setBulk] = useState(false);
-  // The latest rows, for approvals that run one after another.
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
 
-  // Whether the acting member has a personal PIN (the kiosk shell's
-  // boolean, issue #145), or the gate has just said they have none: then
-  // Confirm all runs the cards that need no PIN and leaves the others
-  // waiting with "<Name> hasn't set a personal PIN yet", never a PinPad.
-  const acting = useActingPin();
-  const [pinMissing, setPinMissing] = useState(false);
-  useEffect(() => setPinMissing(false), [acting.name, acting.hasPin]);
-  const hasPin = acting.hasPin && !pinMissing;
-  const hasPinRef = useRef(hasPin);
-  hasPinRef.current = hasPin;
-  const noPinMessage = `${noPinHeadline(acting.name ?? actingName)}.`;
-
-  const update = (id: string, patch: Partial<ReviewRow>) =>
-    setRows((rs) =>
-      rs.map((r) => (r.proposal.proposalId === id ? { ...r, ...patch } : r)),
-    );
-
-  /**
-   * Send what was typed or said; true when Baumy answered. `current` says
-   * whether the conversation that asked is still on screen: an answer that
-   * comes back after it was closed shows nowhere.
-   */
-  async function send(
-    said: string,
-    current: () => boolean = () => true,
-  ): Promise<boolean> {
-    setAsking(true);
-    feel({ type: "ask" });
-    const result = await askBaumy(said, history, surface);
-    setAsking(false);
-    if (!current()) return false;
-    if (!result.ok) {
-      setReply({ text: result.message, error: true });
-      feel({ type: "error" });
-      return false;
-    }
-    setReply({ text: result.data.reply, error: false });
-    feel({ type: "reply" });
-    setRows(rowsFor(result.data.proposals));
-    setHistory((h) => nextHistory(h, said, result.data.reply));
-    return true;
-  }
-
-  async function ask(e: React.FormEvent) {
-    e.preventDefault();
-    const said = text.trim();
-    if (!said || asking || transcribing) return;
-    setHeard(null);
-    if (await send(said, sheetCurrent())) setText("");
-  }
-
-  function micUnavailable(message: string) {
-    feel({ type: "record_cancel" });
-    setMicOff(message);
-    setMicHint(null);
-    textRef.current?.focus();
-  }
-
-  async function heardClip(clip: Blob, mime: string) {
-    const current = sheetCurrent();
-    feel({ type: "record_stop" });
-    setTranscribing(true);
-    const result = await transcribeClip(clip, mime, surface);
-    setTranscribing(false);
-    if (!current()) return;
-    if (!result.ok) {
-      setReply({ text: result.message, error: true });
-      feel({ type: "error" });
-      // The transcriber went away (the key was removed): type instead.
-      if (result.code === "NOT_CONFIGURED") setMicOff(result.message);
-      return;
-    }
-    setHeard(result.data.text);
-    await send(result.data.text, current);
-  }
-
-  /** Approve one row: null when it saved, else the failure's code. */
-  async function approve(row: ReviewRow, pin?: string): Promise<string | null> {
-    const id = row.proposal.proposalId;
-    update(id, { state: "saving", message: undefined });
-    const result = await runProposal(row.proposal, surface, pin);
-    if (result.ok) {
-      update(id, { state: "saved", message: savedMessage(result.data) });
-      const pts = (result.data as { totalPts?: unknown } | null)?.totalPts;
-      const points = typeof pts === "number" ? pts : null;
-      feel({ type: "points", points });
+  // Asking, transcribing, the cards, Confirm all and the stale-answer rule
+  // (lib/ai/conversation.ts): the sheet and the bubble are views of it.
+  const [chat, conversation] = useConversation({
+    surface,
+    feel,
+    onSaved: (points) => {
       if (points !== null && points > 0) {
-        earned.current += points;
         const key = Date.now();
         setPop({ key, points });
         announceScore(points);
         setTimeout(() => setPop((p) => (p?.key === key ? null : p)), POP_MS);
       }
       router.refresh();
-      return null;
-    }
-    if (kiosk && asksForPin(result, PIN_PROMPT_CODES)) {
-      const none = !result.ok && result.code === "PIN_NOT_SET";
-      if (none) {
-        hasPinRef.current = false;
-        setPinMissing(true);
-      }
-      update(id, {
-        state: "pending",
-        needsPin: true,
-        message: none ? noPinMessage : result.message,
-      });
-      return result.code;
-    }
-    update(id, { state: "failed", message: result.message });
-    feel({ type: "error" });
-    return result.code;
+    },
+  });
+  const { reply, heard, rows, micOff } = chat;
+  const asking = isAsking(chat);
+  const transcribing = isTranscribing(chat);
+  const bulk = chat.confirming;
+  const showMic = voice && recordable && micOff === null;
+
+  // Whether the acting member has a personal PIN (the kiosk shell's
+  // boolean, issue #145), or the gate has just said they have none: then
+  // Confirm all runs the cards that need no PIN and leaves the others
+  // waiting with "<Name> hasn't set a personal PIN yet", never a PinPad.
+  const acting = useActingPin();
+  useEffect(
+    () => conversation.actingChanged(),
+    [conversation, acting.name, acting.hasPin],
+  );
+  const hasPin = acting.hasPin && !chat.pinMissing;
+  const noPinMessage = `${noPinHeadline(acting.name ?? actingName)}.`;
+  // The latest, for Confirm all, which reads it again for each card.
+  const actingHasPin = useRef(acting.hasPin);
+  actingHasPin.current = acting.hasPin;
+
+  async function ask(e: React.FormEvent) {
+    e.preventDefault();
+    const said = text.trim();
+    if (!said || asking || transcribing) return;
+    const outcome = await conversation.ask(said);
+    if (outcome.kind === "answered") setText("");
   }
 
-  /**
-   * Run every valid card, in order; the PIN goes with those that need it.
-   * Once the PIN is refused (wrong, resting or locked) it is sent no more:
-   * each try counts against the member's PIN, so the rest stay waiting for
-   * the PIN typed again rather than burning the attempts.
-   */
-  async function confirmAll(pin?: string) {
-    setBulk(true);
-    let pinLeft = pin;
-    try {
-      // One at a time, so the cards that saved stay saved if one fails.
-      for (const target of confirmAllTargets(rowsRef.current)) {
-        // Read it again: it may have changed since the list was taken.
-        const row = rowsRef.current.find(
-          (r) => r.proposal.proposalId === target.proposal.proposalId,
-        );
-        if (!row || !canApprove(row)) continue;
-        // Nobody can type a PIN that was never set: the card waits.
-        if (kiosk && row.needsPin && !hasPinRef.current) {
-          update(row.proposal.proposalId, { message: noPinMessage });
-          continue;
-        }
-        if (row.needsPin && pin !== undefined && pinLeft === undefined) {
-          continue;
-        }
-        const sent = row.needsPin ? pinLeft : undefined;
-        const code = await approve(row, sent);
-        if (sent !== undefined && code !== null && stopsPin(code)) {
-          pinLeft = undefined;
-        }
-      }
-    } finally {
-      setBulk(false);
-    }
+  function micUnavailable(message: string) {
+    feel({ type: "record_cancel" });
+    conversation.micOff(message);
+    setMicHint(null);
+    textRef.current?.focus();
   }
 
-  function drop(row: ReviewRow) {
-    update(row.proposal.proposalId, { state: "rejected", message: undefined });
-  }
-
-  /**
-   * Check an edited card again. The new proposal replaces the card only if
-   * it is still waiting (or failed): one that saved, or was dropped, while
-   * the check ran stays as it is, so nothing is ever saved twice.
-   */
-  async function edit(row: ReviewRow, input: Record<string, unknown>) {
-    const id = row.proposal.proposalId;
-    const result = await recheckProposal(row.proposal.name, input, surface);
-    const still = (r: ReviewRow) => r.proposal.proposalId === id && isOpen(r);
-    if (!result.ok) {
-      const { message } = result;
-      setRows((rs) => rs.map((r) => (still(r) ? { ...r, message } : r)));
-      return;
-    }
-    const next: Proposal = result.data;
-    setRows((rs) =>
-      rs.map((r) =>
-        still(r)
-          ? { proposal: next, state: "pending", needsPin: next.needsPin }
-          : r,
-      ),
-    );
+  function confirmAll(pin?: string) {
+    return conversation.confirmAll({
+      pin,
+      kiosk,
+      hasPin: () => actingHasPin.current,
+      noPinMessage,
+    });
   }
 
   const busy = asking || transcribing;
 
   /** Once the talking is over: Baumy says what the approvals scored. */
   function sayEarned() {
-    if (earned.current > 0) {
+    const earned = conversation.takeEarned();
+    if (earned > 0) {
       setSays(
-        `Purrfect. +${earned.current}${actingName ? ` for ${actingName}` : ""} ✦`,
+        `Purrfect. +${earned}${actingName ? ` for ${actingName}` : ""} ✦`,
       );
     }
-    earned.current = 0;
   }
 
-  // Which opening of the sheet an answer in flight belongs to: closing it
-  // (its ×, Cancel, the kiosk going home) moves on, so a late answer never
-  // brings back the last person's cards (issue #174).
-  const sheetGeneration = useRef(0);
-  const sheetCurrent = () => {
-    const mine = sheetGeneration.current;
-    return () => sheetGeneration.current === mine;
-  };
-
   function close() {
-    sheetGeneration.current += 1;
-    // A question or a clip still on its way belongs to this opening: the
-    // next one starts ready, not "thinking" (#174).
-    setAsking(false);
-    setTranscribing(false);
+    // A question or a clip still on its way belongs to this opening (its ×,
+    // Cancel, the kiosk going home): its answer is dropped, never bringing
+    // back the last person's cards, and the next one starts ready, not
+    // "thinking" (#174).
+    conversation.close();
     // A recording in progress is dropped when the recorder unmounts.
     feel({ type: "record_cancel" });
     setMicHint(null);
@@ -395,10 +241,6 @@ export function BaumySheet({
   const [bubble, setBubble] = useState<CatMode | null>(null);
   // A recording stopped by closing the bubble is dropped, not sent.
   const dropClip = useRef(false);
-  // Which bubble a transcribe or an answer in flight belongs to: closing it
-  // (a tap, a reminder, the screensaver, idle) moves on, so a late answer
-  // never reopens it with the last person's proposals.
-  const generation = useRef(0);
   // What a too-short hold or a passing microphone failure says, under the
   // button, without leaving it.
   const [holdHint, setHoldHint] = useState<string | null>(null);
@@ -408,9 +250,7 @@ export function BaumySheet({
     onStart: () => {
       // A new hold: the last answer (all of it settled) makes way.
       feel({ type: "record_start" });
-      setReply(null);
-      setRows([]);
-      setHeard(null);
+      conversation.clear();
       setPraise(null);
       setHoldHint(null);
       setBubble("talk");
@@ -426,7 +266,7 @@ export function BaumySheet({
     onUnavailable: (message) => {
       // No microphone here: type instead, in the sheet.
       feel({ type: "record_cancel" });
-      setMicOff(message);
+      conversation.micOff(message);
       setBubble(null);
       setOpen(true);
     },
@@ -435,9 +275,7 @@ export function BaumySheet({
   /** "Hold to talk", with the microphone opened by the tap that got here. */
   function talk() {
     dropClip.current = false;
-    setReply(null);
-    setRows([]);
-    setHeard(null);
+    conversation.clear();
     setPraise(null);
     setHoldHint(null);
     setBubble("talk");
@@ -462,27 +300,19 @@ export function BaumySheet({
     b === "thinking" ? "answer" : b;
 
   async function catHeard(clip: Blob, mime: string) {
-    const mine = generation.current;
-    const current = () => generation.current === mine;
     setBubble("thinking");
-    feel({ type: "record_stop" });
-    setTranscribing(true);
-    const result = await transcribeClip(clip, mime, surface);
-    setTranscribing(false);
-    if (!current()) return;
-    if (!result.ok) {
-      setReply({ text: result.message, error: true });
-      feel({ type: "error" });
-      if (result.code === "NOT_CONFIGURED") {
-        setMicOff(result.message);
-        recorder.close();
-      }
-      setBubble(showAnswer);
-      return;
+    // Dropped when the bubble closed (a tap, a reminder, the screensaver,
+    // idle) while it was on its way: it never reopens with the last
+    // person's proposals.
+    const outcome = await conversation.hear(clip, mime);
+    if (outcome.kind === "dropped") return;
+    if (
+      outcome.kind === "failed" &&
+      outcome.step === "transcribing" &&
+      outcome.code === "NOT_CONFIGURED"
+    ) {
+      recorder.close();
     }
-    setHeard(result.data.text);
-    await send(result.data.text, current);
-    if (!current()) return;
     setBubble(showAnswer);
   }
 
@@ -494,7 +324,7 @@ export function BaumySheet({
   }
 
   function hideBubble() {
-    generation.current += 1;
+    conversation.close();
     stopListening();
     setBubble(null);
     setPraise(null);
@@ -598,15 +428,14 @@ export function BaumySheet({
 
   async function catConfirmAll(pin?: string) {
     await confirmAll(pin);
-    // Let the cards' last states render before reading them.
-    await new Promise((r) => setTimeout(r, 0));
     // Everything is done and scored: the cat says so, and stays to listen.
-    const unsettled = rowsRef.current.some(isOpen);
-    if (!unsettled && earned.current > 0) {
-      setPraise(
-        `Purrfect. +${earned.current}${actingName ? ` for ${actingName}` : ""} ✦`,
-      );
-      earned.current = 0;
+    if (!conversation.getState().rows.some(isOpen)) {
+      const earned = conversation.takeEarned();
+      if (earned > 0) {
+        setPraise(
+          `Purrfect. +${earned}${actingName ? ` for ${actingName}` : ""} ✦`,
+        );
+      }
     }
   }
 
@@ -616,7 +445,7 @@ export function BaumySheet({
   }
 
   function sheetCancel() {
-    setRows(cancelAll);
+    conversation.cancelAll();
     close();
   }
 
@@ -734,7 +563,7 @@ export function BaumySheet({
         onConfirmAll={(pin) => void catConfirmAll(pin)}
         onCancel={catCancel}
         onDone={dismissBubble}
-        onDrop={drop}
+        onDrop={(row) => conversation.drop(row)}
       />
     </>
   ) : (
@@ -872,7 +701,7 @@ export function BaumySheet({
                 setMicHint(null);
                 feel({ type: "record_start" });
               }}
-              onClip={(clip, mime) => void heardClip(clip, mime)}
+              onClip={(clip, mime) => void conversation.hear(clip, mime)}
               onCancel={(message) => {
                 feel({ type: "record_cancel" });
                 setMicHint(message);
@@ -921,8 +750,8 @@ export function BaumySheet({
               onConfirmAll={(pin) => void confirmAll(pin)}
               onCancel={sheetCancel}
               onDone={close}
-              onDrop={drop}
-              onEdit={edit}
+              onDrop={(row) => conversation.drop(row)}
+              onEdit={(row, input) => conversation.edit(row, input)}
             />
           ) : null}
         </div>
