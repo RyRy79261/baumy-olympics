@@ -58,6 +58,11 @@ import { VoiceRecorder } from "./voice-recorder";
 // while transcribing and asking, talking with the answer, sad on an error,
 // happy (with the "+N" pop) when an approved row scores points.
 //
+// The conversation itself (asking, transcribing, the cards, Confirm all
+// with the PIN, and dropping an answer that comes back after a close) is
+// lib/ai/conversation.ts, through ./use-conversation.ts: the sheet and the
+// cat's bubble below are two views of it.
+//
 // On the kitchen dashboard (`cat`, ADR 0005 §1, the approved prototype's
 // baumy-cat.tsx) the cat itself is the button and the talking happens in
 // its speech bubble (issue #132): a tap opens the microphone and shows a big
