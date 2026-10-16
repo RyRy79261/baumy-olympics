@@ -389,9 +389,15 @@ describe("Dialog's ways out (issue #174)", () => {
       // is never locked (SPEC §12 decision 32).
       expect(who.disabled && cancel.disabled).toBe(true);
       expect(note.matches(":disabled")).toBe(false);
+      // It can still be typed in while it sends.
+      await type(note);
+      expect(note.value).toBe("Bins are out");
 
       await act(async () => answer());
       expect(dialog.open).toBe(true);
+      // No remount: the same field, typed text kept.
+      expect(byLabel(dialog, "Note")).toBe(note);
+      expect(note.value).toBe("Bins are out");
       expect(who.disabled || cancel.disabled).toBe(false);
       expect(closeButton(dialog).disabled).toBe(false);
       await act(async () => closeButton(dialog).click());

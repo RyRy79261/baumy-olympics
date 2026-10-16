@@ -42,8 +42,8 @@ const SheetSendingContext = createContext<Report | null>(null);
 
 /**
  * Tell the sheet (Dialog) around this component that its form is sending,
- * so the sheet stays open and locks its fields until the answer is in. Told
- * "not sending" when the component goes away. Outside a sheet it does
+ * so the sheet holds itself open and greys its × until the answer is in.
+ * Told "not sending" when the component goes away. Outside a sheet it does
  * nothing.
  */
 export function useSheetSending(sending: boolean): void {
