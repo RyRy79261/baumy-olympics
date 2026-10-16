@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-  choreNameTaken,
-  findChoreWithWeight,
-  lockChoreRow,
-  updateChore,
-  type ChoreRow,
-} from "@baumy/db/chores";
+import { findChoreWithWeight, lockChoreRow } from "@baumy/db/chores";
 import {
   BasePoints,
   ChoreKind,
@@ -13,11 +7,11 @@ import {
   CooldownHours,
   EffortFactorPct,
   ProofMode,
-  cooldownMinutesFromHours,
 } from "@baumy/types";
-import { defineAction, type ActionCtx } from "./define";
-import { createChoreBy, nameTaken, type ManageChoreData } from "./manage-chore";
-import { fail, type ActionFailure } from "./result";
+import { editBounty, editScope } from "@/lib/chores/edit";
+import { defineAction } from "./define";
+import { createChoreBy, type ManageChoreData } from "./manage-chore";
+import { fail } from "./result";
 
 // Baumy's bounty writes (issue #107, SPEC §12 decision 10 as amended
 // 2026-09-29): add a bounty or edit one, from the AI command (a proposal an
@@ -126,76 +120,9 @@ const updateInput = z
     error: "Say what to change about the bounty.",
   });
 
-/** What an edit to a bounty may change; a field left out is kept. */
-export interface BountyEdit {
-  name?: string;
-  kind?: ChoreKind;
-  points?: number;
-  cooldownHours?: number;
-  proofMode?: ProofMode;
-  effortFactorPct?: number;
-}
-
-/**
- * Apply an edit to a chore row the caller has locked (FOR UPDATE): its
- * settings, and a new weight from now when the points or the cooldown are
- * given (half a weight keeps the other half as it is now). The caller checks
- * that it is not archived and that its new name is free. Shared by
- * update_bounty and update_bounties (issue #175).
- */
-export async function applyBountyEdit(
-  ctx: ActionCtx,
-  chore: ChoreRow,
-  edit: BountyEdit,
-): Promise<
-  { ok: true; chore: ChoreRow; weightChanged: boolean } | ActionFailure
-> {
-  let weight: { basePoints: number; cooldownMinutes: number } | undefined;
-  if (edit.points !== undefined || edit.cooldownHours !== undefined) {
-    const current = await findChoreWithWeight(ctx.db, {
-      householdId: ctx.householdId,
-      choreId: chore.id,
-      now: ctx.now,
-    });
-    const was = current?.weight;
-    const basePoints = edit.points ?? was?.basePoints;
-    const cooldownMinutes =
-      edit.cooldownHours !== undefined
-        ? cooldownMinutesFromHours(edit.cooldownHours)
-        : was?.cooldownMinutes;
-    if (basePoints === undefined || cooldownMinutes === undefined) {
-      return fail(
-        "NO_RULE_VERSION",
-        `${chore.name} has no points yet. Give both its points and its cooldown.`,
-      );
-    }
-    weight = { basePoints, cooldownMinutes };
-  }
-
-  const r = await updateChore(ctx.db, {
-    householdId: ctx.householdId,
-    chore,
-    settings: {
-      ...(edit.name !== undefined ? { name: edit.name } : {}),
-      ...(edit.kind !== undefined ? { kind: edit.kind } : {}),
-      ...(edit.proofMode !== undefined ? { proofMode: edit.proofMode } : {}),
-      ...(edit.effortFactorPct !== undefined
-        ? { effortFactorPct: edit.effortFactorPct }
-        : {}),
-    },
-    ...(weight ? { weight } : {}),
-    createdBy: ctx.actor.memberId!,
-    now: ctx.now,
-  });
-  return { ok: true, chore: r.chore, weightChanged: r.weightChanged };
-}
-
 const NOT_FOUND = fail("NOT_FOUND", "That bounty was not found.");
-const archived = (name: string) =>
-  fail(
-    "ARCHIVED_CHORE",
-    `${name} is archived. Restore it on the admin page first.`,
-  );
+const archivedSentence = (name: string) =>
+  `${name} is archived. Restore it on the admin page first.`;
 
 export const updateBounty = defineAction({
   name: "update_bounty",
@@ -219,7 +146,7 @@ export const updateBounty = defineAction({
     // What execute would refuse, said on the card instead (never run).
     if (!found) return { invalid: NOT_FOUND.message };
     if (found.chore.archivedAt !== null) {
-      return { invalid: archived(found.chore.name).message };
+      return { invalid: archivedSentence(found.chore.name) };
     }
     const { choreId: _id, name, ...rest } = i;
     const changes = describeBounty(rest);
@@ -231,19 +158,14 @@ export const updateBounty = defineAction({
   async execute(ctx, i) {
     const chore = await lockChoreRow(ctx.db, ctx.householdId, i.choreId);
     if (!chore) return NOT_FOUND;
-    if (chore.archivedAt !== null) return archived(chore.name);
-    if (
-      i.name !== undefined &&
-      (await choreNameTaken(ctx.db, {
-        householdId: ctx.householdId,
-        name: i.name,
-        exceptId: chore.id,
-      }))
-    ) {
-      return nameTaken(i.name);
-    }
-
-    const r = await applyBountyEdit(ctx, chore, i);
+    const { choreId: _id, ...patch } = i;
+    // Half a weight keeps the other half as it is now (an LLM gives only
+    // what was asked); an archived bounty is restored on the admin page.
+    const r = await editBounty(editScope(ctx), chore, patch, {
+      halves: "keepOther",
+      archived: { refuse: archivedSentence },
+      names: "now",
+    });
     if (!r.ok) return r;
     const data: ManageChoreData = {
       choreId: r.chore.id,

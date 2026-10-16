@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  choreNameTaken,
   lockChoreRow,
   setChoreArchived,
   type ChoreRow,
@@ -16,9 +15,14 @@ import {
   EFFORT_FACTOR_MIN,
   ProofMode,
 } from "@baumy/types";
-import { applyBountyEdit, type BountyEdit } from "./bounties";
+import {
+  editBounty,
+  editScope,
+  nameFree,
+  type BountyPatch,
+} from "@/lib/chores/edit";
 import { defineAction } from "./define";
-import { nameTaken, type ManageChoreData } from "./manage-chore";
+import type { ManageChoreData } from "./manage-chore";
 import { fail, type ActionFailure } from "./result";
 
 // Mass editing of bounties (issue #175, SPEC §12 decision 31): one editable
@@ -36,7 +40,10 @@ import { fail, type ActionFailure } from "./result";
 /**
  * A number, never coerced: the editor sends numbers in JSON, so a blank
  * field ("" or null) is "Required." rather than the 0 `z.coerce` would make
- * of it (a cooldown of 0 hours is valid, and would be saved).
+ * of it (a cooldown of 0 hours is valid, and would be saved). That is why
+ * these are not the shared `BasePoints`, `CooldownHours` and
+ * `EffortFactorPct` (packages/types), which coerce for form posts and word
+ * their type errors differently (issue #214).
  */
 const number = (what: string) =>
   z.number({
@@ -101,8 +108,11 @@ export interface UpdateBountiesData {
   changed: ManageChoreData[];
 }
 
+const archivedSentence = (name: string) =>
+  `${name} is archived. Restore it to edit it.`;
+
 /** A change's edits besides archiving, or null when it only (un)archives. */
-function editOf(c: BountyChange): BountyEdit | null {
+function editOf(c: BountyChange): BountyPatch | null {
   const { choreId: _id, archived: _archived, ...edit } = c;
   return Object.keys(edit).length > 0 ? edit : null;
 }
@@ -151,23 +161,25 @@ export const updateBounties = defineAction({
       let chore = rows.get(c.choreId)!;
       const edit = editOf(c);
       if (edit) {
-        if (chore.archivedAt !== null && c.archived !== false) {
-          return onRow(
-            fail(
-              "ARCHIVED_CHORE",
-              `${chore.name} is archived. Restore it to edit it.`,
-            ),
-            index,
-            "archived",
-          );
-        }
-        const r = await applyBountyEdit(ctx, chore, edit);
-        // Only NO_RULE_VERSION: the half of the weight that is missing.
+        // A row that restores its bounty may edit it in the same change;
+        // the names wait for the end state, checked below.
+        const r = await editBounty(editScope(ctx), chore, edit, {
+          halves: "keepOther",
+          archived:
+            c.archived === false ? "edit" : { refuse: archivedSentence },
+          names: "afterBatch",
+        });
+        // ARCHIVED_CHORE, or NO_RULE_VERSION: the half of the weight that
+        // is missing.
         if (!r.ok) {
           return onRow(
             r,
             index,
-            c.points === undefined ? "points" : "cooldownHours",
+            r.code === "ARCHIVED_CHORE"
+              ? "archived"
+              : c.points === undefined
+                ? "points"
+                : "cooldownHours",
           );
         }
         chore = r.chore;
@@ -202,19 +214,10 @@ export const updateBounties = defineAction({
       const chore = rows.get(c.choreId)!;
       if (chore.archivedAt !== null) continue;
       if (c.name === undefined && c.archived !== false) continue;
-      if (
-        await choreNameTaken(ctx.db, {
-          householdId: ctx.householdId,
-          name: chore.name,
-          exceptId: chore.id,
-        })
-      ) {
+      const taken = await nameFree(ctx, chore.name, chore.id);
+      if (taken) {
         // On the name, or on the Status of a restore that clashes.
-        return onRow(
-          nameTaken(chore.name),
-          index,
-          c.name !== undefined ? "name" : "archived",
-        );
+        return onRow(taken, index, c.name !== undefined ? "name" : "archived");
       }
     }
 

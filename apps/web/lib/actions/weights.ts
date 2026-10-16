@@ -30,6 +30,7 @@ import {
   WeightChangeReason,
   cooldownMinutesFromHours,
 } from "@baumy/types";
+import { archivedRefusal } from "@/lib/chores/edit";
 import { defineAction, type ActionCtx } from "./define";
 import { fail } from "./result";
 
@@ -327,12 +328,10 @@ export const schedulePointsChange = defineAction({
     // weekly compute and the other weight writes keep.
     const chore = await lockChoreRow(ctx.db, ctx.householdId, input.choreId);
     if (!chore) return fail("NOT_FOUND", "That bounty was not found.");
-    if (chore.archivedAt) {
-      return fail(
-        "ARCHIVED_CHORE",
-        "That bounty is archived. Restore it on Edit chores first.",
-      );
-    }
+    const archived = archivedRefusal(chore, {
+      refuse: () => "That bounty is archived. Restore it on Edit chores first.",
+    });
+    if (archived) return archived;
     const rule = await currentRule(ctx.db, chore.id, ctx.now);
     if (!rule) {
       return fail(
