@@ -10,7 +10,9 @@ import { useTestDb } from "@baumy/db/test-harness";
 import { cooldownMinutesFromHours } from "@baumy/types";
 import { FIXED_NOW, seedMember } from "@/test-utils/actions";
 import {
+  batchNamesFree,
   editBounty,
+  type BatchEntry,
   type BountyPatch,
   type EditOptions,
   type EditScope,
@@ -29,6 +31,7 @@ const DISHES = SEED_CHORES.dishes;
 const TRASH_HOURS = TRASH.cooldownMinutes / 60;
 
 let scope: EditScope;
+let dishesId: string;
 const ids: Record<"active" | "archived" | "bare", string> = {
   active: "",
   archived: "",
@@ -39,7 +42,7 @@ beforeEach(async () => {
   const admin = await seedMember(db(), { role: "admin" });
   scope = { db: db(), householdId: HOUSEHOLD_ID, by: admin, now: FIXED_NOW };
   ({ choreId: ids.active } = await seedChore(db(), TRASH));
-  await seedChore(db(), DISHES);
+  ({ choreId: dishesId } = await seedChore(db(), DISHES));
   ({ choreId: ids.archived } = await seedChore(db(), {
     ...TRASH,
     name: "Old trash",
@@ -94,7 +97,10 @@ const cases: {
     expected: {
       ok: true,
       name: TRASH.name,
-      weight: { basePoints: TRASH.basePoints + 1, cooldownMinutes: 120 },
+      weight: {
+        basePoints: TRASH.basePoints + 1,
+        cooldownMinutes: cooldownMinutesFromHours(2),
+      },
       weightChanged: true,
     },
   },
@@ -247,7 +253,11 @@ const cases: {
   {
     rule: "no weight yet, keepOther: half a weight is NO_RULE_VERSION",
     chore: "bare",
-    patch: { points: 9 },
+    patch: {
+      name: "Bare bins",
+      proofMode: "required",
+      points: TRASH.basePoints,
+    },
     options: keepOther,
     expected: {
       ok: false,
@@ -258,12 +268,15 @@ const cases: {
   {
     rule: "no weight yet: both halves give it its first weight",
     chore: "bare",
-    patch: { points: 9, cooldownHours: 1 },
+    patch: { points: TRASH.basePoints, cooldownHours: 1 },
     options: keepOther,
     expected: {
       ok: true,
       name: "Bare",
-      weight: { basePoints: 9, cooldownMinutes: 60 },
+      weight: {
+        basePoints: TRASH.basePoints,
+        cooldownMinutes: cooldownMinutesFromHours(1),
+      },
       weightChanged: true,
     },
   },
@@ -274,11 +287,57 @@ const cases: {
     options: keepOther,
     expected: { ok: true, name: "Bare", weight: null, weightChanged: false },
   },
+  // The order of the checks: archived, half a weight, the name, a missing
+  // weight. Each row breaks every later rule too, so only the first speaks.
+  {
+    rule: "order: archived comes before half a weight and a taken name",
+    chore: "archived",
+    patch: { name: DISHES.name, points: TRASH.basePoints + 1 },
+    options: { ...together, archived: keepOther.archived },
+    expected: {
+      ok: false,
+      code: "ARCHIVED_CHORE",
+      message: "Old trash is archived.",
+    },
+  },
+  {
+    rule: "order: half a weight comes before a taken name",
+    chore: "active",
+    patch: { name: DISHES.name, points: TRASH.basePoints + 1 },
+    options: together,
+    expected: {
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "Give the points and the cooldown together.",
+      issues: [
+        {
+          path: ["cooldownHours"],
+          message: "Give the points and the cooldown together.",
+        },
+      ],
+    },
+  },
+  {
+    rule: "order: a taken name comes before a missing weight",
+    chore: "bare",
+    patch: { name: DISHES.name, points: TRASH.basePoints },
+    options: keepOther,
+    expected: {
+      ok: false,
+      code: "CHORE_NAME_TAKEN",
+      message: `There is already a chore called ${DISHES.name}. Pick another name.`,
+    },
+  },
 ];
 
 async function nameOf(id: string) {
+  return (await settingsOf(id)).name;
+}
+
+/** The settings an edit may change, as stored. */
+async function settingsOf(id: string) {
   const [r] = await t.db().select().from(chores).where(eq(chores.id, id));
-  return r!.name;
+  return { name: r!.name, kind: r!.kind, proofMode: r!.proofMode };
 }
 
 /** The newest rule version (by effective time), or null. */
@@ -303,7 +362,7 @@ async function weightOf(id: string) {
 describe("editBounty", () => {
   it.each(cases)("$rule", async ({ chore, patch, options, expected }) => {
     const id = ids[chore];
-    const before = { name: await nameOf(id), weight: await weightOf(id) };
+    const before = { ...(await settingsOf(id)), weight: await weightOf(id) };
     const row = (await lockChoreRow(db(), HOUSEHOLD_ID, id))!;
 
     const r = await editBounty(scope, row, patch, options);
@@ -324,9 +383,73 @@ describe("editBounty", () => {
         ...(expected.issues ? { issues: expected.issues } : {}),
       });
       // A refusal writes nothing.
-      expect({ name: await nameOf(id), weight: await weightOf(id) }).toEqual(
+      expect({ ...(await settingsOf(id)), weight: await weightOf(id) }).toEqual(
         before,
       );
     }
+  });
+});
+
+describe("batchNamesFree", () => {
+  /** Rename a bounty as a batch would have, and return its row. */
+  async function renamed(id: string, name: string) {
+    await t.db().update(chores).set({ name }).where(eq(chores.id, id));
+    return (await lockChoreRow(db(), HOUSEHOLD_ID, id))!;
+  }
+  const row = async (id: string) =>
+    (await lockChoreRow(db(), HOUSEHOLD_ID, id))!;
+
+  it("lets two bounties swap names, judged on the end state", async () => {
+    const entries: BatchEntry[] = [
+      {
+        chore: await renamed(ids.active, DISHES.name),
+        renamed: true,
+        restored: false,
+      },
+      {
+        chore: await renamed(dishesId, TRASH.name),
+        renamed: true,
+        restored: false,
+      },
+    ];
+    await expect(batchNamesFree(scope, entries)).resolves.toBeNull();
+  });
+
+  it("names the first clash, on the name or on the restore", async () => {
+    const clash = await renamed(dishesId, TRASH.name);
+    const trash = await row(ids.active);
+    await expect(
+      batchNamesFree(scope, [{ chore: trash, renamed: true, restored: false }]),
+    ).resolves.toEqual({
+      index: 0,
+      on: "name",
+      refusal: {
+        ok: false,
+        code: "CHORE_NAME_TAKEN",
+        message: `There is already a chore called ${TRASH.name}. Pick another name.`,
+      },
+    });
+    await expect(
+      batchNamesFree(scope, [
+        { chore: await row(ids.bare), renamed: true, restored: false },
+        { chore: clash, renamed: false, restored: true },
+      ]),
+    ).resolves.toMatchObject({ index: 1, on: "restore" });
+  });
+
+  it("leaves alone a bounty the batch did not rename or restore, or archived", async () => {
+    await renamed(dishesId, TRASH.name);
+    const trash = await row(ids.active);
+    // The clash is caught when the batch renamed it...
+    await expect(
+      batchNamesFree(scope, [{ chore: trash, renamed: true, restored: false }]),
+    ).resolves.not.toBeNull();
+    // ...and not when it did not, nor for a bounty that ends archived.
+    await expect(
+      batchNamesFree(scope, [
+        { chore: trash, renamed: false, restored: false },
+        { chore: await row(ids.archived), renamed: true, restored: false },
+      ]),
+    ).resolves.toBeNull();
   });
 });
