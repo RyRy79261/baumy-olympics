@@ -24,6 +24,7 @@ export const setPrizeMode = defineAction({
     "Sets how the season's pot is won, for the current season (only before its first completion) or next year's. Only points (winner takes all) is played in v1.",
   consent: "Change how the season's pot is won",
   kind: "write",
+  refreshes: ["scores", "pot"],
   risk: "confirm",
   surfaces: ["ui"],
   requires: "admin",

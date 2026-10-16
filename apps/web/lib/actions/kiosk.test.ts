@@ -29,6 +29,10 @@ vi.mock("next/headers", () => ({
   headers: async () => new Headers({ "x-forwarded-for": "7.7.7.7" }),
   cookies: async () => ({ set: setCookie, delete: removeCookie }),
 }));
+const revalidatePath = vi.fn();
+vi.mock("next/cache", () => ({
+  revalidatePath: (...args: unknown[]) => revalidatePath(...args),
+}));
 // Picking reads through the HTTP driver; here it reads the test database.
 vi.mock("@/lib/kiosk/selection", async (importOriginal) => {
   const real = await importOriginal<typeof Selection>();
@@ -44,6 +48,7 @@ const {
   FACE_FIELD,
   kioskActionAsFace,
   kioskActionForm,
+  kioskActionFormRefreshing,
   kioskActionInput,
   kioskRequestCtx,
   NOT_PAIRED_MESSAGE,
@@ -63,6 +68,7 @@ beforeEach(() => {
   getKioskActor.mockReset();
   setCookie.mockReset();
   removeCookie.mockReset();
+  revalidatePath.mockReset();
   __resetMemoryRateLimits();
 });
 
@@ -295,6 +301,35 @@ describe("kioskActionAsFace", () => {
       ),
     ).resolves.toMatchObject({ ok: false, code: "INVALID_INPUT" });
     expect(setCookie).not.toHaveBeenCalled();
+  });
+
+  it("as the picked member, refreshes the kiosk pages of the action's tags once it succeeded (issue #215)", async () => {
+    const ryan = await seedMember(db(), { createdAt: before });
+    const reminderId = await reminder(ryan);
+    getKioskActor.mockResolvedValue({
+      kind: "kiosk",
+      deviceId: "d1",
+      memberId: ryan,
+      displayName: "Member",
+    });
+    await expect(
+      kioskActionFormRefreshing(
+        "acknowledge_reminder",
+        form({ reminderId, requestId: "req-refresh-0001" }),
+      ),
+    ).resolves.toMatchObject({ ok: true, data: { memberId: ryan } });
+    // `reminders` on the kiosk: the shell's layout, where they show.
+    expect(revalidatePath.mock.calls).toEqual([["/kiosk", "layout"]]);
+
+    revalidatePath.mockReset();
+    await expect(
+      kioskActionFormRefreshing(
+        "acknowledge_reminder",
+        form({ reminderId, requestId: "req-refresh-0002" }),
+        () => ({ reminderId: "not-a-uuid" }),
+      ),
+    ).resolves.toMatchObject({ ok: false });
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("says so when the kiosk is not paired", async () => {

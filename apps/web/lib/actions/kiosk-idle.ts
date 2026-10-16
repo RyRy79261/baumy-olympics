@@ -24,6 +24,7 @@ export const setKioskIdleMinutesAction = defineAction({
     "Sets how many minutes the kitchen screen waits, untouched, before it forgets who is acting and goes home.",
   consent: "Change the kitchen screen's idle time",
   kind: "write",
+  refreshes: ["kitchen_screens"],
   risk: "safe",
   surfaces: ["kiosk"],
   requires: "member",

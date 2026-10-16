@@ -140,6 +140,7 @@ const DISPUTE_GATE: Gate = "attested";
 /** What undo, withdraw and concede share: only the claim's id. */
 const byId = {
   kind: "write",
+  refreshes: ["chores", "activity", "scores"],
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
   requires: CLAIM_GATE,
@@ -205,6 +206,7 @@ export const disputeCompletion = defineAction({
     "Disputes a housemate's self-claimed chore within 24 hours of logging, with a reason. Get ids from get_activity. While disputed it scores nothing but still blocks the chore's cooldown. It is voided when the window ends unless the doer attached a photo in time. You cannot dispute your own.",
   consent: "Dispute your housemates' chore claims",
   kind: "write",
+  refreshes: ["chores", "activity", "scores"],
   risk: "confirm",
   surfaces: ["ui", "kiosk", "ai", "mcp", "brain"],
   requires: DISPUTE_GATE,
@@ -232,6 +234,7 @@ export const resolveDispute = defineAction({
     "An admin rules on an open dispute: uphold confirms the claim, void voids it. An admin cannot rule on their own claim.",
   consent: "Rule on disputed chores as an admin",
   kind: "write",
+  refreshes: ["chores", "activity", "scores"],
   risk: "confirm",
   surfaces: ["ui"],
   requires: "admin",

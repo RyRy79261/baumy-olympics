@@ -52,6 +52,7 @@ export const adjustPoints = defineAction({
     "Proposes a change to a member's season points (op create, with a reason), or approves one another admin proposed (op approve). An adjustment counts only once a second admin approves it.",
   consent: "Change a member's season points",
   kind: "write",
+  refreshes: ["scores", "pot"],
   risk: "confirm",
   surfaces: ["ui"],
   requires: "admin",

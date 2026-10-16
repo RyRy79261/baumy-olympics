@@ -30,6 +30,7 @@ import {
   WeightChangeReason,
   cooldownMinutesFromHours,
 } from "@baumy/types";
+import { archivedRefusal } from "@/lib/chores/edit";
 import { defineAction, type ActionCtx } from "./define";
 import { fail } from "./result";
 
@@ -245,6 +246,7 @@ export const scheduleWeight = defineAction({
     "Schedules a suggested weight change, as suggested or edited (points, cooldown in hours). It applies at the next Monday 00:00 Berlin at least 48h ahead, and at least 28 days after the chore's last change, unless another member vetoes it first.",
   consent: "Change how many points a chore is worth",
   kind: "write",
+  refreshes: ["weights", "activity"],
   risk: "confirm",
   surfaces: ["ui"],
   requires: "admin",
@@ -312,6 +314,7 @@ export const schedulePointsChange = defineAction({
     "Schedules new points and a new cooldown (in hours) for any bounty, with an optional reason. It applies at the next Monday 00:00 Berlin at least 48h ahead, unless another member vetoes it first. A bounty has one change waiting at a time; this one replaces the week's open suggestion.",
   consent: "Change how many points a chore is worth",
   kind: "write",
+  refreshes: ["weights", "activity"],
   risk: "confirm",
   // The kiosk too, for an admin with their PIN (issue #147).
   surfaces: ["ui", "kiosk"],
@@ -327,12 +330,10 @@ export const schedulePointsChange = defineAction({
     // weekly compute and the other weight writes keep.
     const chore = await lockChoreRow(ctx.db, ctx.householdId, input.choreId);
     if (!chore) return fail("NOT_FOUND", "That bounty was not found.");
-    if (chore.archivedAt) {
-      return fail(
-        "ARCHIVED_CHORE",
-        "That bounty is archived. Restore it on Edit chores first.",
-      );
-    }
+    const archived = archivedRefusal(chore, {
+      refuse: "That bounty is archived. Restore it on Edit chores first.",
+    });
+    if (archived) return archived;
     const rule = await currentRule(ctx.db, chore.id, ctx.now);
     if (!rule) {
       return fail(
@@ -400,6 +401,7 @@ export const dismissWeight = defineAction({
     "Dismisses a suggested weight change, or cancels a scheduled one before it applies.",
   consent: "Dismiss a suggested weight change",
   kind: "write",
+  refreshes: ["weights", "activity"],
   risk: "confirm",
   surfaces: ["ui"],
   requires: "admin",
@@ -437,6 +439,7 @@ export const vetoWeight = defineAction({
     "Vetoes a scheduled weight change before it applies. Only a member other than the one who scheduled it can veto it; a vetoed change never applies.",
   consent: "Veto a scheduled weight change",
   kind: "write",
+  refreshes: ["weights", "activity"],
   risk: "confirm",
   surfaces: ["ui", "brain"],
   requires: "member",

@@ -77,6 +77,7 @@ export const redeemInvite = defineAction({
     "Redeems a household invite code for the signed-in account, which becomes a household member with the code's role.",
   consent: "Join the household with an invite code",
   kind: "write",
+  refreshes: ["members"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "account",

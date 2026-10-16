@@ -45,6 +45,7 @@ export const joinAsFounder = defineAction({
     "Makes the signed-in account a household admin when its verified email is on the founders list (FOUNDER_EMAILS).",
   consent: "Join the household as a founding admin",
   kind: "write",
+  refreshes: ["members"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "account",

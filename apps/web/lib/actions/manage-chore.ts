@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-  choreNameTaken,
-  createChore,
-  lockChoreRow,
-  setChoreArchived,
-  updateChore,
-} from "@baumy/db/chores";
+import { createChore, lockChoreRow, setChoreArchived } from "@baumy/db/chores";
 import {
   BasePoints,
   ChoreIcon,
@@ -16,6 +10,7 @@ import {
   ProofMode,
   cooldownMinutesFromHours,
 } from "@baumy/types";
+import { editBounty, nameFree, type EditScope } from "@/lib/chores/edit";
 import { defineAction, type ActionCtx, type ExecuteResult } from "./define";
 import { fail } from "./result";
 
@@ -86,11 +81,18 @@ export function spriteFor(name: string): string {
   return slug || "chore";
 }
 
-export const nameTaken = (name: string) =>
-  fail(
-    "CHORE_NAME_TAKEN",
-    `There is already a chore called ${name}. Pick another name.`,
-  );
+/**
+ * An action's context as the bounty edit rules' scope (lib/chores/edit.ts):
+ * the acting admin edits. Shared by the actions that edit a bounty.
+ */
+export function editScope(ctx: ActionCtx): EditScope {
+  return {
+    db: ctx.db,
+    householdId: ctx.householdId,
+    by: ctx.actor.memberId!,
+    now: ctx.now,
+  };
+}
 
 /** A new chore's parsed settings, with its first weight. */
 export interface NewChore {
@@ -112,14 +114,8 @@ export async function createChoreBy(
   ctx: ActionCtx,
   change: NewChore,
 ): Promise<ExecuteResult<ManageChoreData>> {
-  if (
-    await choreNameTaken(ctx.db, {
-      householdId: ctx.householdId,
-      name: change.name,
-    })
-  ) {
-    return nameTaken(change.name);
-  }
+  const taken = await nameFree(ctx, change.name);
+  if (taken) return taken;
   const chore = await createChore(ctx.db, {
     householdId: ctx.householdId,
     name: change.name,
@@ -152,12 +148,12 @@ export const manageChore = defineAction({
     "Creates a household chore, edits its name, kind (consumable or maintenance), icon, points, cooldown, proof mode and effort factor, or archives or restores it.",
   consent: "Manage the household's chores",
   kind: "write",
+  refreshes: ["chores", "activity", "weights"],
   risk: "confirm",
   surfaces: ["ui"],
   requires: "admin",
   input,
   async execute(ctx, change) {
-    const admin = ctx.actor.memberId!;
     if (change.op === "create") return createChoreBy(ctx, change);
 
     const chore = await lockChoreRow(ctx.db, ctx.householdId, change.choreId);
@@ -165,6 +161,8 @@ export const manageChore = defineAction({
 
     let data: ManageChoreData;
     if (change.op === "update") {
+      // Whether this form carries a weight at all is the input's own rule;
+      // half of one is the edit rules' (lib/chores/edit.ts).
       const noWeight =
         change.basePoints === undefined && change.cooldownHours === undefined;
       if (change.weight === "keep" ? !noWeight : noWeight) {
@@ -179,53 +177,23 @@ export const manageChore = defineAction({
           ],
         });
       }
-      if (
-        (change.basePoints === undefined) !==
-        (change.cooldownHours === undefined)
-      ) {
-        const message = "Give the points and the cooldown together.";
-        return fail("INVALID_INPUT", message, {
-          issues: [
-            {
-              path: [
-                change.basePoints === undefined
-                  ? "basePoints"
-                  : "cooldownHours",
-              ],
-              message,
-            },
-          ],
-        });
-      }
-      if (
-        await choreNameTaken(ctx.db, {
-          householdId: ctx.householdId,
-          name: change.name,
-          exceptId: chore.id,
-        })
-      ) {
-        return nameTaken(change.name);
-      }
-      const r = await updateChore(ctx.db, {
-        householdId: ctx.householdId,
+      // The admin chores page edits an archived chore too, and refuses half
+      // a weight rather than keeping the other half.
+      const r = await editBounty(
+        editScope(ctx),
         chore,
-        settings: {
+        {
           name: change.name,
-          ...(change.kind ? { kind: change.kind } : {}),
-          ...(change.sprite ? { sprite: change.sprite } : {}),
+          kind: change.kind,
+          sprite: change.sprite,
           proofMode: change.proofMode,
           effortFactorPct: change.effortFactorPct,
+          points: change.basePoints,
+          cooldownHours: change.cooldownHours,
         },
-        weight:
-          change.basePoints !== undefined && change.cooldownHours !== undefined
-            ? {
-                basePoints: change.basePoints,
-                cooldownMinutes: cooldownMinutesFromHours(change.cooldownHours),
-              }
-            : undefined,
-        createdBy: admin,
-        now: ctx.now,
-      });
+        { halves: "together", archived: "edit", names: "now" },
+      );
+      if (!r.ok) return r;
       data = {
         choreId: r.chore.id,
         name: r.chore.name,
@@ -234,16 +202,9 @@ export const manageChore = defineAction({
       };
     } else {
       const restoring = change.op === "restore";
-      if (
-        restoring &&
-        chore.archivedAt !== null &&
-        (await choreNameTaken(ctx.db, {
-          householdId: ctx.householdId,
-          name: chore.name,
-          exceptId: chore.id,
-        }))
-      ) {
-        return nameTaken(chore.name);
+      if (restoring && chore.archivedAt !== null) {
+        const taken = await nameFree(ctx, chore.name, chore.id);
+        if (taken) return taken;
       }
       const row = await setChoreArchived(ctx.db, {
         chore,

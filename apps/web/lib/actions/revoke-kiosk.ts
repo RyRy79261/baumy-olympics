@@ -22,6 +22,7 @@ export const revokeKiosk = defineAction({
     "Signs a paired kitchen kiosk out of the household, or cancels an approval its iPad has not picked up. It must be paired again by scanning a new code.",
   consent: "Sign kitchen kiosks out of the household",
   kind: "write",
+  refreshes: ["kitchen_screens"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "admin",

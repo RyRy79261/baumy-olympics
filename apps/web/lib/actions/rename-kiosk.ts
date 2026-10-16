@@ -19,6 +19,7 @@ export const renameKiosk = defineAction({
   description: "Renames a kitchen screen (a paired kiosk device).",
   consent: "Rename kitchen screens",
   kind: "write",
+  refreshes: ["kitchen_screens"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "admin",

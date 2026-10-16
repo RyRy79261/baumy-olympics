@@ -19,9 +19,18 @@ const headersMock = vi.fn(
 );
 vi.mock("@/lib/auth", () => ({ getActor: () => getActor() }));
 vi.mock("next/headers", () => ({ headers: () => headersMock() }));
+const revalidatePath = vi.fn();
+vi.mock("next/cache", () => ({
+  revalidatePath: (...args: unknown[]) => revalidatePath(...args),
+}));
 
-const { actionForm, actionInput, formDataToInput, uiRequestCtx } =
-  await import("./ui");
+const {
+  actionForm,
+  actionFormRefreshing,
+  actionInput,
+  formDataToInput,
+  uiRequestCtx,
+} = await import("./ui");
 
 const t = useTestDb();
 const db = () => t.db() as unknown as Queryable;
@@ -36,6 +45,7 @@ function form(fields: Record<string, string | string[]>): FormData {
 
 beforeEach(() => {
   getActor.mockReset();
+  revalidatePath.mockReset();
   __resetMemoryRateLimits();
 });
 
@@ -150,6 +160,32 @@ describe("actionForm", () => {
     await expect(actionForm("whoami", form({}))).rejects.toThrow(
       "NEXT_REDIRECT",
     );
+  });
+});
+
+describe("actionFormRefreshing", () => {
+  it("refreshes the hub pages of the action's tags once it succeeded (issue #215)", async () => {
+    const me = await seedMember(db(), { displayName: "Old" });
+    getActor.mockResolvedValue(sessionActor(me));
+    const res = await actionFormRefreshing(
+      "update_my_profile",
+      form({ displayName: "Ryan", requestId: "form-request-0101" }),
+      (input) => ({ ...input, displayName: "Mapped" }),
+    );
+    expect(res).toMatchObject({ ok: true, data: { displayName: "Mapped" } });
+    // `profile` on the hub: every page under the root layout.
+    expect(revalidatePath.mock.calls).toEqual([["/", "layout"]]);
+  });
+
+  it("refreshes nothing when the action failed", async () => {
+    const me = await seedMember(db());
+    getActor.mockResolvedValue(sessionActor(me));
+    const res = await actionFormRefreshing(
+      "update_my_profile",
+      form({ color: "red", requestId: "form-request-0102" }),
+    );
+    expect(res).toMatchObject({ ok: false, code: "INVALID_INPUT" });
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 });
 

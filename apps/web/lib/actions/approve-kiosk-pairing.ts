@@ -31,6 +31,7 @@ export const approveKioskPairing = defineAction({
     "Approves the pairing code an unpaired iPad shows at /kiosk/pair (its QR code), so that iPad signs in as the household's kitchen screen, a device rather than a person.",
   consent: "Pair kitchen screens with the household",
   kind: "write",
+  refreshes: ["kitchen_screens"],
   risk: "safe",
   surfaces: ["ui"],
   requires: "admin",
