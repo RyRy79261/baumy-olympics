@@ -130,7 +130,9 @@ export const REQUIRED = "Required.";
 /**
  * The touched number fields left blank that must not be: the effort always,
  * and the points and the cooldown once the bounty has them, or once the
- * other half is given (a bounty with no points may stay without).
+ * other half is given (a bounty with no points may stay without). Only a
+ * hint before the save: the server's rules are lib/chores/edit.ts
+ * (`keepOther`), which this file cannot import.
  */
 export function blankErrors(
   b: BulkBounty,
