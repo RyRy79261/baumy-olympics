@@ -417,8 +417,22 @@ describe("Dialog's ways out (issue #174)", () => {
       const container = await render(<Sheet form />);
       const dialog = container.querySelector("dialog")!;
       expect(closeButton(dialog).disabled).toBe(true);
+      // The kiosk's screen rules read it (apps/web/lib/kiosk/screen.ts).
+      expect(dialog.hasAttribute("data-sending")).toBe(true);
       await act(async () => root!.render(<Sheet form={false} />));
       expect(closeButton(dialog).disabled).toBe(false);
+      expect(dialog.hasAttribute("data-sending")).toBe(false);
+      // Ask Baumy's own `busy` (Confirm all) marks it the same way.
+      await act(async () =>
+        root!.render(
+          <Dialog open busy onClose={() => {}} title="Log Bins">
+            <input aria-label="Note" />
+          </Dialog>,
+        ),
+      );
+      const asked = container.querySelector("dialog")!;
+      expect(asked.open).toBe(true);
+      expect(asked.hasAttribute("data-sending")).toBe(true);
     });
 
     it("holds only the pop-up the sending form is in", async () => {

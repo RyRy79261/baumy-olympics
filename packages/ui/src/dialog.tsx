@@ -102,6 +102,8 @@ export function Dialog({
     <dialog
       {...dialogProps}
       aria-label={title}
+      // Read by the kiosk's screen rules (apps/web/lib/kiosk/screen.ts).
+      data-sending={busy || sending ? "" : undefined}
       className="m-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-hidden border-0 bg-transparent p-0 text-bm-text backdrop:bg-[rgb(8_4_14/0.82)]"
     >
       <div className="relative flex max-h-[calc(100dvh-2rem)] flex-col border-4 border-bm-line bg-bm-surface">
