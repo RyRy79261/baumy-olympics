@@ -6,7 +6,12 @@ import type { ActionResult } from "@/lib/actions/result";
 import type { UpdateBountiesData } from "@/lib/actions/update-bounties";
 import { CHANGES_FIELD, EFFORT_STOPS } from "@/lib/chores/bulk-edit";
 import { BountyBulkEditor, type BulkEditorBounty } from "./bounty-bulk-editor";
-import { hubSubmit, kioskSubmit } from "./bounty-submit";
+import {
+  hubSubmit,
+  kioskSubmit,
+  type BountySubmit,
+  type BountySubmitProps,
+} from "./bounty-submit";
 
 /** The admin page's adapter, or with `pinLabel` the kitchen screen's. */
 const submitOf = ({ pinLabel }: { pinLabel?: string }) =>
@@ -744,6 +749,149 @@ describe("BountyBulkEditor", () => {
       root = null;
       document.body.innerHTML = "";
     }
+  });
+});
+
+// The editor's body at its seam (issue #217): a fake submit adapter stands
+// in for the hub's form and the kiosk's AttestedForm, so the body's own
+// rules are read straight off what it hands the adapter.
+describe("BountyBulkEditor with a fake submit adapter", () => {
+  /** Renders the rows and records each render's props. */
+  function fake() {
+    const seen: BountySubmitProps[] = [];
+    const submit: BountySubmit = {
+      render: (props) => {
+        seen.push(props);
+        return (
+          <form data-testid="fake-form">
+            {props.fields}
+            <div data-testid="fake-status">{props.status}</div>
+            <div data-testid="fake-error">{props.error}</div>
+          </form>
+        );
+      },
+    };
+    return { submit, last: () => seen.at(-1)! };
+  }
+
+  async function mountFake(
+    result: Result,
+    opts: { kiosk?: boolean; onClose?: () => void } = {},
+  ) {
+    const action = vi.fn(async (_p: Result | null, _f: FormData) => result);
+    const { submit, last } = fake();
+    const el = document.createElement("div");
+    document.body.append(el);
+    root = createRoot(el);
+    await act(async () =>
+      root!.render(
+        <BountyBulkEditor
+          bounties={BOUNTIES}
+          action={action}
+          submit={submit}
+          kiosk={opts.kiosk}
+          onClose={opts.onClose}
+        />,
+      ),
+    );
+    /** What the adapter does on Save: send the form, then report. */
+    const save = () =>
+      act(async () => {
+        const props = last();
+        const form = el.querySelector<HTMLFormElement>(
+          '[data-testid="fake-form"]',
+        )!;
+        props.onResult(await props.action(null, new FormData(form)));
+      });
+    return { el, action, last, save };
+  }
+
+  it("hands the adapter nothing to save until a row changes", async () => {
+    const { el, last } = await mountFake(OK, { onClose: vi.fn() });
+    expect(last().canSave).toBe(false);
+    expect(last().label).toBe("Save changes");
+    expect(last().discard).toMatchObject({ label: "Close", disabled: false });
+    expect(last().error).toBeNull();
+    expect(el.querySelector('[data-testid="fake-status"]')!.textContent).toBe(
+      "No changes yet.",
+    );
+    await editTwo(el);
+    expect(last().canSave).toBe(true);
+    expect(last().label).toBe("Save 3 changes");
+    expect(last().discard).toMatchObject({ label: "Discard", disabled: false });
+  });
+
+  it("on success sends only the changes, toasts, forgets the edits and closes", async () => {
+    const onClose = vi.fn();
+    const { el, action, last, save } = await mountFake(OK, { onClose });
+    await editTwo(el);
+    await save();
+    expect(sentChanges(action)).toEqual([
+      { choreId: BOUNTIES[0]!.id, points: BASE_POINTS_MAX },
+      { choreId: BOUNTIES[1]!.id, name: "Plates" },
+      { choreId: BOUNTIES[2]!.id, archived: false },
+    ]);
+    expect(toastSuccess).toHaveBeenCalledWith("Saved 3 bounties.");
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(el.querySelector("[data-changed]")).toBeNull();
+    expect(last().canSave).toBe(false);
+  });
+
+  it("puts each field issue on the row that was sent at its index", async () => {
+    const { el, last, save } = await mountFake({
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "Some of that is not valid. Check it and try again.",
+      issues: [
+        { path: ["changes", 1, "name"], message: "Give the chore a name." },
+        { path: ["changes", 2, "archived"], message: "Not now." },
+      ],
+    });
+    // Only Dishes and Fridge change, so they are sent as rows 0 and 1.
+    await set(control<HTMLInputElement>(el, "Dishes", "Name"), "Plates");
+    await set(control<HTMLSelectElement>(el, "Fridge", "Status"), "active");
+    await save();
+    expect(row(el, "Fridge").textContent).toContain("Give the chore a name.");
+    expect(row(el, "Dishes").textContent).not.toContain(
+      "Give the chore a name.",
+    );
+    // No row was sent third, so its issue lands nowhere.
+    expect(el.textContent).not.toContain("Not now.");
+    expect(el.querySelector('[data-testid="fake-error"]')!.textContent).toBe(
+      "Some rows need fixing; see the red notes.",
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(row(el, "Dishes").dataset.changed).toBe("true");
+    expect(last().canSave).toBe(true);
+  });
+
+  it("gives the adapter the answer's sentence when it is not about a field", async () => {
+    const message =
+      "There is already a chore called Plates. Pick another name.";
+    const { el, save } = await mountFake({
+      ok: false,
+      code: "CHORE_NAME_TAKEN",
+      message,
+    });
+    await editTwo(el);
+    await save();
+    const error = el.querySelector('[data-testid="fake-error"]')!;
+    expect(error.querySelector('[role="alert"]')!.textContent).toBe(message);
+    expect(row(el, "Trash").dataset.changed).toBe("true");
+  });
+
+  it("sizes the rows for touch on the kitchen screen, whatever the adapter", async () => {
+    const { el } = await mountFake(OK, { kiosk: true });
+    expect(control<HTMLSelectElement>(el, "Trash", "Kind").className).toContain(
+      "min-h-14",
+    );
+    await act(async () => root?.unmount());
+    root = null;
+    document.body.innerHTML = "";
+    const hub = await mountFake(OK);
+    expect(
+      control<HTMLSelectElement>(hub.el, "Trash", "Kind").className,
+    ).not.toContain("min-h-14");
   });
 });
 
