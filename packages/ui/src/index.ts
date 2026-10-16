@@ -64,7 +64,7 @@ export {
   type ScorePopBox,
 } from "./chores";
 export { cx } from "./cx";
-export { Dialog } from "./dialog";
+export { Dialog, SheetSending, useSheetSending } from "./dialog";
 export {
   DIALOG_TYPED_EVENT,
   forceCloseDialog,

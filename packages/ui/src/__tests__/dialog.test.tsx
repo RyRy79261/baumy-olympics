@@ -2,7 +2,7 @@
 import { act, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { Dialog } from "../dialog";
+import { Dialog, SheetSending, useSheetSending } from "../dialog";
 import { KioskModal } from "../kiosk-modal";
 import { PinPad } from "../pin-pad";
 import {
@@ -310,6 +310,106 @@ describe("Dialog's ways out (issue #174)", () => {
       const escape = new Event("cancel", { cancelable: true });
       await act(async () => dialog.dispatchEvent(escape));
       expect(escape.defaultPrevented).toBe(false);
+    });
+  });
+
+  // SPEC §12 decision 32, issue #212: the sheet learns "sending" from the
+  // form inside it, with no wiring through its caller, and locks itself.
+  describe("while a form inside it is sending", () => {
+    /** A form that sends on its button and is answered from the test. */
+    let answer: () => void = () => {};
+    function SendingForm() {
+      const [sending, setSending] = useState(false);
+      useSheetSending(sending);
+      answer = () => setSending(false);
+      return (
+        <>
+          <input aria-label="Note" />
+          <input type="radio" name="who" aria-label="Ryan" />
+          <input type="file" aria-label="Photo" />
+          <button type="button" onClick={() => setSending(true)}>
+            Send
+          </button>
+          <button type="button">Cancel</button>
+        </>
+      );
+    }
+    const byLabel = (dialog: Element, label: string) =>
+      dialog.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
+    const byText = (dialog: Element, text: string) =>
+      [...dialog.querySelectorAll("button")].find(
+        (b) => b.textContent === text,
+      )!;
+
+    it("holds it open and locks every field until the answer is in", async () => {
+      const onClose = vi.fn();
+      const container = await render(
+        <Controlled onClose={onClose}>
+          <SendingForm />
+        </Controlled>,
+      );
+      const dialog = container.querySelector("dialog")!;
+      const fields = ["Note", "Ryan", "Photo"].map((l) => byLabel(dialog, l));
+      expect(fields.every((f) => f !== null)).toBe(true);
+      expect(byText(dialog, "Cancel")).toBeDefined();
+      expect(fields.some((f) => f.matches(":disabled"))).toBe(false);
+      expect(byText(dialog, "Cancel").matches(":disabled")).toBe(false);
+      expect(closeButton(dialog).disabled).toBe(false);
+
+      await act(async () => byText(dialog, "Send").click());
+      // Nothing the user does closes it: not the ×, Escape or a tap outside.
+      expect(closeButton(dialog).disabled).toBe(true);
+      await act(async () => closeButton(dialog).click());
+      const escape = new Event("cancel", { cancelable: true });
+      await act(async () => dialog.dispatchEvent(escape));
+      expect(escape.defaultPrevented).toBe(true);
+      await tap(dialog);
+      expect(dialog.open).toBe(true);
+      expect(onClose).not.toHaveBeenCalled();
+      // And every field locks together, Cancel with them.
+      expect(fields.every((f) => f.matches(":disabled"))).toBe(true);
+      expect(byText(dialog, "Cancel").matches(":disabled")).toBe(true);
+
+      await act(async () => answer());
+      expect(dialog.open).toBe(true);
+      expect(fields.some((f) => f.matches(":disabled"))).toBe(false);
+      expect(closeButton(dialog).disabled).toBe(false);
+      await act(async () => closeButton(dialog).click());
+      expect(dialog.open).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("unlocks when the sending form goes away", async () => {
+      function Sheet({ form }: { form: boolean }) {
+        return (
+          <Dialog open onClose={() => {}} title="Log Bins">
+            {form ? <SheetSending pending /> : null}
+            <input aria-label="Note" />
+          </Dialog>
+        );
+      }
+      const container = await render(<Sheet form />);
+      const dialog = container.querySelector("dialog")!;
+      expect(closeButton(dialog).disabled).toBe(true);
+      expect(byLabel(dialog, "Note").matches(":disabled")).toBe(true);
+      await act(async () => root!.render(<Sheet form={false} />));
+      expect(closeButton(dialog).disabled).toBe(false);
+      expect(byLabel(dialog, "Note").matches(":disabled")).toBe(false);
+    });
+
+    it("locks only the pop-up the sending form is in", async () => {
+      await render(
+        <Dialog open onClose={() => {}} title="Log Bins">
+          <input aria-label="Note" />
+          <Dialog open onClose={() => {}} title="Ryan's PIN">
+            <SheetSending pending />
+          </Dialog>
+        </Dialog>,
+      );
+      const [outer, inner] = [...document.querySelectorAll("dialog")];
+      expect(closeButton(inner!).disabled).toBe(true);
+      expect(closeButton(outer!).disabled).toBe(false);
+      expect(byLabel(outer!, "Note").matches(":disabled")).toBe(false);
     });
   });
 

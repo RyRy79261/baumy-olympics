@@ -1,6 +1,14 @@
 "use client";
 
-import type { ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useState,
+  type ReactNode,
+} from "react";
 import { useModalDialog } from "./use-modal-dialog";
 
 // A modal on the native <dialog> element: focus trapping, Escape and the
@@ -15,8 +23,42 @@ import { useModalDialog } from "./use-modal-dialog";
 // dimmed page around it, unless something was typed in it (owner ruling
 // 2026-10-06). The header does not scroll, so the button never covers the
 // body. It comes last in the DOM, so the browser still focuses the panel's
-// own first control when it opens. While `busy` (its form is sending),
-// nothing closes it and the button is disabled.
+// own first control when it opens.
+//
+// Sending (SPEC §12 decision 32, issue #212): a form inside the sheet says
+// it is sending with `useSheetSending(pending)` (or `<SheetSending>` when
+// its pending lives above the sheet). The sheet hears it through context,
+// with no wiring through its caller: while any form in it is sending,
+// nothing closes it, the × is disabled, and every control in its body is
+// locked at once (a disabled <fieldset>), so a Cancel, a "Who did it?" or a
+// photo cannot start or drop the request mid-send. A form inside a pop-up
+// opened from this one reports to that pop-up only.
+
+type Report = (key: string, sending: boolean) => void;
+
+const SheetSendingContext = createContext<Report | null>(null);
+
+/**
+ * Tell the sheet (Dialog) around this component that its form is sending,
+ * so the sheet stays open and locks its fields until the answer is in. Told
+ * "not sending" when the component goes away. Outside a sheet it does
+ * nothing.
+ */
+export function useSheetSending(sending: boolean): void {
+  const report = useContext(SheetSendingContext);
+  const key = useId();
+  useEffect(() => {
+    if (!report) return;
+    report(key, sending);
+    return () => report(key, false);
+  }, [report, key, sending]);
+}
+
+/** `useSheetSending` for a form whose pending state lives above the sheet. */
+export function SheetSending({ pending }: { pending: boolean }): null {
+  useSheetSending(pending);
+  return null;
+}
 
 export function Dialog({
   open,
@@ -28,11 +70,30 @@ export function Dialog({
   open: boolean;
   onClose: () => void;
   title: string;
-  /** A request is on its way: keep it open until the answer is shown. */
+  /**
+   * Only for a sheet whose request is not a form inside it (Ask Baumy's
+   * Confirm all): keeps it open like a sending form, but locks no field.
+   * A form inside uses `useSheetSending` instead.
+   */
   busy?: boolean;
   children: ReactNode;
 }) {
-  const { close, dialogProps } = useModalDialog({ open, onClose, busy });
+  const [senders, setSenders] = useState<ReadonlySet<string>>(() => new Set());
+  const report = useCallback<Report>((key, on) => {
+    setSenders((prev) => {
+      if (prev.has(key) === on) return prev;
+      const next = new Set(prev);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+  const sending = senders.size > 0;
+  const { close, dialogProps } = useModalDialog({
+    open,
+    onClose,
+    busy: busy || sending,
+  });
 
   return (
     <dialog
@@ -51,13 +112,21 @@ export function Dialog({
           data-testid="dialog-panel"
           className="min-h-0 overflow-y-auto overscroll-contain px-6 pt-1 pb-6"
         >
-          {children}
+          <fieldset
+            disabled={sending}
+            data-testid="dialog-fields"
+            className="m-0 min-w-0 border-0 p-0"
+          >
+            <SheetSendingContext.Provider value={report}>
+              {children}
+            </SheetSendingContext.Provider>
+          </fieldset>
         </div>
         <button
           type="button"
           aria-label="Close"
           onClick={close}
-          disabled={busy}
+          disabled={busy || sending}
           className="pixel-frame absolute top-3 right-3 grid size-14 place-items-center bg-bm-raised font-display text-[22px] text-bm-text [--pf:var(--color-bm-line)] hover:bg-bm-line disabled:cursor-not-allowed disabled:opacity-50"
         >
           ×
