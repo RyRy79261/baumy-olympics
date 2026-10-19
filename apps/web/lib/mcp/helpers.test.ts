@@ -211,6 +211,27 @@ describe("http plumbing", () => {
     });
   });
 
+  it("lets a browser client send every MCP request header", () => {
+    // The 2025 transport sends the first four; the 2026-07-28 protocol
+    // (served since mcp-handler 2) adds Mcp-Method and Mcp-Name, and a
+    // preflight that does not allow them fails in the browser.
+    const allowed = (
+      corsPreflight().headers.get("access-control-allow-headers") ?? ""
+    )
+      .split(",")
+      .map((h) => h.trim().toLowerCase());
+    expect(allowed).toEqual(
+      expect.arrayContaining([
+        "content-type",
+        "authorization",
+        "mcp-protocol-version",
+        "mcp-session-id",
+        "mcp-method",
+        "mcp-name",
+      ]),
+    );
+  });
+
   it("reads form and JSON bodies, and reports a broken one", async () => {
     const form = new Request("http://x", {
       method: "POST",
