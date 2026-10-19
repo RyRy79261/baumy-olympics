@@ -851,8 +851,9 @@ e2e need nothing: off Vercel the issuer is the request's own address.
 ### The MCP endpoint (issue #24)
 
 The connector URL is `<MCP_PUBLIC_URL>/api/mcp/mcp` (the doubled `mcp` is
-right: mcp-handler's base path plus its transport). It needs nothing beyond
-`MCP_PUBLIC_URL` above: no Redis (SSE is off), no new variable. CI and e2e
+right: the `/api/mcp` base path plus the transport, kept from mcp-handler 1.x
+so connectors keep working). It needs nothing beyond `MCP_PUBLIC_URL` above:
+no Redis (Streamable HTTP only), no new variable. CI and e2e
 drive it with a scripted client (`apps/web/e2e/specs/mcp-server.spec.ts`).
 
 - [ ] **Check it answers:** `curl -i -X POST https://www.baumy.tech/api/mcp/mcp`

@@ -1,11 +1,9 @@
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  type CallToolResult,
-  type Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+import type {
+  AuthInfo,
+  CallToolResult,
+  McpServer,
+  Tool,
+} from "@modelcontextprotocol/server";
 import type { RequestCtx } from "@/lib/actions/define";
 import type { ActionErrorCode, ActionResult } from "@/lib/actions/result";
 import type { ToolSpec } from "@/lib/actions/tool-specs";
@@ -178,36 +176,37 @@ export function callerFromAuthInfo(
   return { memberId, scopes: info.scopes, clientId: info.clientId };
 }
 
-type HeaderBag = Record<string, string | string[] | undefined>;
-
 /** The client address from the forwarded headers, like getClientIp. */
-export function ipFromHeaders(headers: HeaderBag | undefined): string {
-  const one = (v: string | string[] | undefined) =>
-    Array.isArray(v) ? v[0] : v;
-  const first = one(headers?.["x-forwarded-for"])?.split(",")[0]?.trim();
+export function ipFromHeaders(headers: Headers | undefined): string {
+  const first = headers?.get("x-forwarded-for")?.split(",")[0]?.trim();
   if (first) return first;
-  return one(headers?.["x-real-ip"])?.trim() || "unknown";
+  return headers?.get("x-real-ip")?.trim() || "unknown";
 }
 
 /**
  * Serve the registry on an MCP server: `tools/list` and `tools/call`, both
  * read from the request's own token, so one server instance never mixes two
- * callers' scopes.
+ * callers' scopes. mcp-handler 2 builds a fresh server for every request.
  */
 export function registerMcpTools(server: McpServer, deps: McpToolDeps): void {
   server.server.registerCapabilities({ tools: { listChanged: false } });
-  server.server.setRequestHandler(ListToolsRequestSchema, (_req, extra) => {
-    const caller = callerFromAuthInfo(extra.authInfo);
+  server.server.setRequestHandler("tools/list", (_req, ctx) => {
+    const caller = callerFromAuthInfo(ctx.http?.authInfo);
     const specs = caller ? toolsForScopes(deps.specs(), caller.scopes) : [];
     return { tools: specs.map(mcpTool) };
   });
-  server.server.setRequestHandler(CallToolRequestSchema, (req, extra) =>
-    callMcpTool(
-      req.params.name,
-      req.params.arguments,
-      callerFromAuthInfo(extra.authInfo),
-      ipFromHeaders(extra.requestInfo?.headers),
-      deps,
+  server.server.setRequestHandler("tools/call", async (req, ctx) =>
+    // A low-level tools/call handler runs its result through the SDK's
+    // projection itself (the SDK's McpServer does the same for registerTool).
+    server.server.projectCallToolResult(
+      await callMcpTool(
+        req.params.name,
+        req.params.arguments,
+        callerFromAuthInfo(ctx.http?.authInfo),
+        ipFromHeaders(ctx.http?.req?.headers),
+        deps,
+      ),
+      undefined,
     ),
   );
 }

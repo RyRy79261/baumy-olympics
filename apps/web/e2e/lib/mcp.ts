@@ -128,7 +128,7 @@ export async function connect(
   return { meta, clientId, tokens };
 }
 
-/** The connector URL: mcp-handler's `<basePath>/mcp` (intake gotcha #7). */
+/** The connector URL: `<MCP_BASE_PATH>/mcp` (intake gotcha #7; lib/mcp/endpoint.ts). */
 export const MCP_URL = "/api/mcp/mcp";
 
 let rpcId = 0;

@@ -6,13 +6,14 @@
  * claude.ai calls the metadata, registration and token endpoints from
  * another origin. Tokens travel in headers or bodies, never cookies, so a
  * wildcard origin is safe. `WWW-Authenticate` is exposed for issue #24's
- * `Bearer resource_metadata=` hint.
+ * `Bearer resource_metadata=` hint. `Mcp-Method` and `Mcp-Name` are the
+ * 2026-07-28 protocol's request headers (served since mcp-handler 2).
  */
 export const CORS_HEADERS: Readonly<Record<string, string>> = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
   "access-control-allow-headers":
-    "Content-Type, Authorization, mcp-protocol-version, mcp-session-id",
+    "Content-Type, Authorization, mcp-protocol-version, mcp-session-id, mcp-method, mcp-name",
   "access-control-expose-headers": "WWW-Authenticate",
   "access-control-max-age": "86400",
 };
