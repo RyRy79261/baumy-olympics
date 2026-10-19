@@ -1,7 +1,17 @@
 // @vitest-environment node
+import {
+  CLIENT_CAPABILITIES_META_KEY,
+  CLIENT_INFO_META_KEY,
+  PROTOCOL_VERSION_META_KEY,
+  SERVER_INFO_META_KEY,
+} from "@modelcontextprotocol/server";
 import { describe, expect, it, vi } from "vitest";
 import { toolSpecs } from "@/lib/actions/tool-specs";
-import { createMcpEndpoint, type McpEndpointDeps } from "./endpoint";
+import {
+  MCP_SERVER_INFO,
+  createMcpEndpoint,
+  type McpEndpointDeps,
+} from "./endpoint";
 import { MCP_NOT_CONFIGURED } from "./origin";
 import type { McpCaller } from "./tools";
 
@@ -156,6 +166,58 @@ describe("the MCP endpoint", () => {
     );
     expect(out.isError).toBe(true);
     expect(runAction).not.toHaveBeenCalled();
+  });
+
+  it("runs a 2026-07-28 tools/call as the token's member", async () => {
+    const { handle, runAction } = setup();
+    const req = new Request(URL_, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "x-forwarded-for": "198.51.100.7",
+        authorization: "Bearer writer",
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": "tools/call",
+        "mcp-name": "get_standings",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: ++id,
+        method: "tools/call",
+        params: {
+          name: "get_standings",
+          arguments: {},
+          _meta: {
+            [PROTOCOL_VERSION_META_KEY]: "2026-07-28",
+            [CLIENT_INFO_META_KEY]: { name: "test", version: "1" },
+            [CLIENT_CAPABILITIES_META_KEY]: {},
+          },
+        },
+      }),
+    });
+    const out = await result(await handle(req));
+    expect(out.isError).toBeUndefined();
+    // Served on the 2026-07-28 path, not the 2025 fallback: only that era
+    // stamps the server's identity into every result's _meta.
+    expect(
+      (out._meta as Record<string, unknown> | undefined)?.[
+        SERVER_INFO_META_KEY
+      ],
+    ).toEqual(MCP_SERVER_INFO);
+    expect(runAction).toHaveBeenCalledWith(
+      "get_standings",
+      {},
+      expect.objectContaining({
+        source: "mcp",
+        actor: {
+          kind: "mcp",
+          memberId: MEMBER,
+          scopes: ["baumy:read", "baumy:write"],
+        },
+        ip: "198.51.100.7",
+      }),
+    );
   });
 
   it("serves only the connector path and answers 404 elsewhere", async () => {

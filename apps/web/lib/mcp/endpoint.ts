@@ -12,8 +12,10 @@ import {
 // `apps/web/src/app/api/mcp/[transport]/route.ts`. The connector URL is
 // `<MCP_PUBLIC_URL>/api/mcp/mcp` (intake-tracker gotcha #7). mcp-handler 1.x
 // chose that path from its `basePath`; 2.x serves whatever it is given, so
-// this file answers 404 to every other `/api/mcp/*` path itself. 2.x serves
-// Streamable HTTP only (stateless, no SSE, no Redis).
+// this file answers 404 to every other `/api/mcp/*` path itself, after the
+// token check (an unauthenticated caller gets the 401 first). 2.x serves
+// Streamable HTTP only (stateless, no SSE, no Redis): the 2026-07-28
+// protocol (with `server/discover`) and the 2025 one as a fallback.
 //
 // Every request:
 //   1. answers 503 while the issuer is unknown (MCP_PUBLIC_URL unset on
@@ -53,6 +55,7 @@ export function createMcpEndpoint(
     (server) => registerMcpTools(server, deps.tools),
     { serverInfo: MCP_SERVER_INFO, verboseLogs: false },
   );
+  // Behind withMcpAuth: a verified caller on any other path gets a 404.
   const base = (req: Request) =>
     new URL(req.url).pathname === MCP_ENDPOINT_PATH
       ? mcp(req)
