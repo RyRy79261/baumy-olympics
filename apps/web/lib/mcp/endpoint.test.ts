@@ -158,6 +158,28 @@ describe("the MCP endpoint", () => {
     expect(runAction).not.toHaveBeenCalled();
   });
 
+  it("serves only the connector path and answers 404 elsewhere", async () => {
+    const { handle, runAction } = setup();
+    const ok = await handle(
+      rpc("tools/call", { name: "get_standings", arguments: {} }, "reader"),
+    );
+    expect(ok.status).toBe(200);
+    expect(runAction).toHaveBeenCalledTimes(1);
+    for (const path of ["sse", "message", "other"]) {
+      const res = await handle(
+        rpc(
+          "tools/call",
+          { name: "get_standings", arguments: {} },
+          "reader",
+          `http://localhost:3000/api/mcp/${path}`,
+        ),
+      );
+      expect(res.status).toBe(404);
+      expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    }
+    expect(runAction).toHaveBeenCalledTimes(1);
+  });
+
   it("answers 401 with the resource metadata hint to a bad or missing token", async () => {
     const { handle, runAction } = setup();
     for (const token of ["revoked", undefined]) {

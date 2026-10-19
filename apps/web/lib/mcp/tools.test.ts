@@ -330,13 +330,27 @@ describe("auth info", () => {
 });
 
 describe("ipFromHeaders", () => {
+  // mcp-handler 2 hands the tool handler the web Request, so the headers are
+  // a `Headers` (1.x passed a Node-style record, which allowed arrays).
+  const h = (init: [string, string][]) => {
+    const headers = new Headers();
+    for (const [k, v] of init) headers.append(k, v);
+    return headers;
+  };
   it("takes the first forwarded address, then x-real-ip", () => {
-    expect(ipFromHeaders({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" })).toBe(
+    expect(ipFromHeaders(h([["x-forwarded-for", "1.2.3.4, 5.6.7.8"]]))).toBe(
       "1.2.3.4",
     );
-    expect(ipFromHeaders({ "x-forwarded-for": ["9.9.9.9"] })).toBe("9.9.9.9");
-    expect(ipFromHeaders({ "x-real-ip": " 7.7.7.7 " })).toBe("7.7.7.7");
-    expect(ipFromHeaders({})).toBe("unknown");
+    expect(
+      ipFromHeaders(
+        h([
+          ["x-forwarded-for", "9.9.9.9"],
+          ["x-forwarded-for", "8.8.8.8"],
+        ]),
+      ),
+    ).toBe("9.9.9.9");
+    expect(ipFromHeaders(h([["x-real-ip", " 7.7.7.7 "]]))).toBe("7.7.7.7");
+    expect(ipFromHeaders(h([]))).toBe("unknown");
     expect(ipFromHeaders(undefined)).toBe("unknown");
   });
 });
